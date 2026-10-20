@@ -1,5 +1,5 @@
 import { PageHeader } from "../../components/PageHeader";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Cpu,
@@ -15,6 +15,7 @@ import {
 import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
 import { bridge } from "../../services/bridge";
+import { listen } from "@tauri-apps/api/event";
 import type { Emulator } from "../../types";
 export function EmulatorsPage({
   emulators,
@@ -29,10 +30,27 @@ export function EmulatorsPage({
   const [detected, setDetected] = useState<Emulator[]>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [installing, setInstalling] = useState<{
+    id: string;
+    name: string;
+    progress: number;
+    stage: string;
+  } | null>(null);
   const installers = useQuery({
     queryKey: ["emulator-installers"],
     queryFn: bridge.emulatorInstallOptions,
   });
+  useEffect(() => {
+    const unlisten = listen<{
+      id: string;
+      name: string;
+      progress: number;
+      stage: string;
+    }>("emulator-install-progress", ({ payload }) => setInstalling(payload));
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, []);
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -89,7 +107,8 @@ export function EmulatorsPage({
             <div>
               <h2>Install an emulator</h2>
               <p className="muted">
-                Downloads open the official Windows installer.
+                Installs use the official Windows package and are configured
+                automatically.
               </p>
             </div>
           </div>
@@ -122,13 +141,35 @@ export function EmulatorsPage({
                   className="button primary"
                   disabled={busy}
                   onClick={() =>
-                    void run(async () =>
-                      notify(await bridge.installEmulator(installer.id)),
-                    )
+                    void run(async () => {
+                      setInstalling({
+                        id: installer.id,
+                        name: installer.name,
+                        progress: 4,
+                        stage: "Starting installation",
+                      });
+                      try {
+                        notify(await bridge.installEmulator(installer.id));
+                      } finally {
+                        setInstalling(null);
+                      }
+                    })
                   }
                 >
-                  <Download size={16} /> Install
+                  <Download size={16} />{" "}
+                  {installing?.id === installer.id
+                    ? "Installing…"
+                    : "Install / repair"}
                 </button>
+                {installing?.id === installer.id && (
+                  <div className="emulator-install-progress" role="status">
+                    <div>
+                      <span>{installing.stage}</span>
+                      <strong>{installing.progress}%</strong>
+                    </div>
+                    <progress value={installing.progress} max={100} />
+                  </div>
+                )}
               </article>
             ))}
           </div>

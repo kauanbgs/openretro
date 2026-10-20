@@ -14,6 +14,20 @@ export function validMagnet(uri: unknown): uri is string {
     return false;
   }
 }
+export function validDirectUrl(uri: unknown): uri is string {
+  if (typeof uri !== "string" || uri.length > 16384) return false;
+  try {
+    const url = new URL(uri);
+    return (
+      url.protocol === "https:" &&
+      !!url.hostname &&
+      !url.username &&
+      !url.password
+    );
+  } catch {
+    return false;
+  }
+}
 export function parseDownloadSource(text: string): DownloadSourceDocument {
   if (new TextEncoder().encode(text).length > MAX_SOURCE_BYTES)
     throw new Error("Source exceeds the 16 MB limit.");
@@ -41,7 +55,13 @@ export function parseDownloadSource(text: string): DownloadSourceDocument {
     if (!item || typeof item.title !== "string" || !Array.isArray(item.uris))
       continue;
     const title = item.title.trim();
-    const uris = [...new Set<string>(item.uris.filter(validMagnet))].sort();
+    const uris = [
+      ...new Set<string>(
+        item.uris.filter(
+          (uri: unknown) => validMagnet(uri) || validDirectUrl(uri),
+        ),
+      ),
+    ].sort();
     if (
       !title ||
       title.length > 1000 ||
@@ -65,7 +85,7 @@ export function parseDownloadSource(text: string): DownloadSourceDocument {
   }
   if (!entries.length)
     throw new Error(
-      "No supported magnet downloads found. Direct links and v2-only magnets are not supported yet.",
+      "No supported downloads found. Use HTTPS links or BitTorrent v1 magnets.",
     );
   return { name: raw.name.trim(), downloads: entries };
 }

@@ -160,8 +160,8 @@ export function DownloadsPage({
           </div>
         ) : sources.data?.some((s) => s.enabled) ? (
           <p className="notice">
-            No magnet downloads match this title. Try a shorter search or
-            another source.
+            No downloads match this title. Try a shorter search or another
+            source.
           </p>
         ) : null}
       </section>

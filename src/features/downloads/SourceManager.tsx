@@ -47,7 +47,8 @@ export function SourceManager() {
         <div>
           <h2>Download sources</h2>
           <p className="muted">
-            Add a Hydra-compatible JSON file or URL containing magnet links.
+            Add a Hydra-compatible JSON file or URL containing HTTPS links and
+            magnet links.
           </p>
         </div>
         <button className="button secondary" onClick={() => edit(null)}>
@@ -76,7 +77,7 @@ export function SourceManager() {
             <div className="source-info">
               <strong>{s.name}</strong>
               <p>
-                {s.gameCount.toLocaleString()} magnet downloads{" "}
+                {s.gameCount.toLocaleString()} downloads{" "}
                 <span className="muted">
                   / {s.enabled ? "Enabled" : "Disabled"}
                 </span>
@@ -223,8 +224,8 @@ export function SourceManager() {
               </>
             )}
             <p className="hint">
-              Only magnet entries are imported. Sources are stored on this
-              device; no account is required.
+              HTTPS links and magnet entries are imported. Sources are stored on
+              this device; no account is required.
             </p>
             {error && (
               <p className="error-message" role="alert">

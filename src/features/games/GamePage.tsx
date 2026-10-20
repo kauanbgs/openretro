@@ -456,8 +456,8 @@ export function GamePage({
                 <div>
                   <strong>Downloads from your sources</strong>
                   <p>
-                    OpenRetro only shows magnet links from the JSON sources you
-                    add.
+                    OpenRetro shows HTTPS links and magnet links from the JSON
+                    sources you add.
                   </p>
                 </div>
               </section>

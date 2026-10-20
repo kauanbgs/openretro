@@ -81,6 +81,26 @@ pub fn magnet_hash(uri: &str) -> Result<String> {
     }
     Err("Magnet must include a valid BitTorrent v1 infohash (btih).".into())
 }
+pub fn direct_url(uri: &str) -> Result<reqwest::Url> {
+    if uri.len() > 16_384 {
+        return Err("Download URL is too long.".into());
+    }
+    let url = reqwest::Url::parse(uri).map_err(|_| "Invalid download URL.")?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("Direct downloads must use HTTPS without embedded credentials.".into());
+    }
+    Ok(url)
+}
+pub fn supported_uri(uri: &str) -> bool {
+    magnet_hash(uri).is_ok() || direct_url(uri).is_ok()
+}
+pub fn download_key(uri: &str) -> String {
+    format!("url-{:x}", Sha256::digest(uri.as_bytes()))
+}
 pub fn entry_id(entry: &SourceEntry) -> String {
     let mut uris = entry.uris.clone();
     uris.sort();
@@ -104,7 +124,7 @@ pub fn parse_document(text: &str) -> Result<SourceDocument> {
     let mut seen = HashSet::new();
     doc.downloads.retain_mut(|e| {
         e.title = e.title.trim().to_string();
-        e.uris.retain(|uri| magnet_hash(uri).is_ok());
+        e.uris.retain(|uri| supported_uri(uri));
         e.uris.sort();
         e.uris.dedup();
         !e.title.is_empty()
@@ -116,7 +136,7 @@ pub fn parse_document(text: &str) -> Result<SourceDocument> {
             && seen.insert(entry_id(e))
     });
     if doc.downloads.is_empty() {
-        return Err("No supported magnet downloads found in this source. Direct links and BitTorrent v2-only magnets are not supported yet.".into());
+        return Err("No supported downloads found in this source. Use HTTPS links or BitTorrent v1 magnets.".into());
     }
     Ok(doc)
 }
@@ -289,10 +309,24 @@ mod tests {
     use super::*;
     const MAGNET: &str = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789";
     #[test]
-    fn parses_hydra_document_and_filters_unsupported() {
+    fn parses_direct_links_and_filters_unsupported() {
         let text = serde_json::json!({"name":"Test", "downloads":[{"title":"Homebrew", "uris":[MAGNET,"https://example.org/file.zip"], "uploadDate":"2026-10-20", "fileSize":"32 KB"}]}).to_string();
         let doc = parse_document(&text).unwrap();
-        assert_eq!(doc.downloads[0].uris, vec![MAGNET]);
+        assert_eq!(
+            doc.downloads[0].uris,
+            vec!["https://example.org/file.zip", MAGNET]
+        );
+    }
+    #[test]
+    fn accepts_only_safe_direct_urls() {
+        assert!(direct_url("https://archive.org/download/game.zip").is_ok());
+        for uri in [
+            "http://example.org/game.zip",
+            "file:///C:/game.zip",
+            "https://user:pass@example.org/game.zip",
+        ] {
+            assert!(direct_url(uri).is_err());
+        }
     }
     #[test]
     fn rejects_invalid_documents_and_magnets() {

@@ -8,9 +8,11 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fs::File,
+    io::{Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{Manager, State};
 use tokio::sync::OnceCell;
@@ -249,6 +251,215 @@ fn spawn_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result<()> {
         .insert(id, ActiveTask { cancel, task });
     Ok(())
 }
+const MAX_DIRECT_DOWNLOAD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
+fn direct_filename(url: &reqwest::Url) -> String {
+    let candidate = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("download.bin");
+    let name: String = candidate
+        .chars()
+        .map(|c| {
+            if c.is_control() || "/\\:*?\"<>|".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    if validate_component(&name).is_ok() {
+        name
+    } else {
+        "download.bin".into()
+    }
+}
+fn playable_extension(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str(),
+        "gb" | "gbc"
+            | "gba"
+            | "nes"
+            | "sfc"
+            | "smc"
+            | "z64"
+            | "n64"
+            | "v64"
+            | "nds"
+            | "sms"
+            | "md"
+            | "gen"
+            | "gg"
+            | "cue"
+            | "chd"
+            | "pbp"
+            | "iso"
+            | "cso"
+            | "bin"
+    )
+}
+fn extract_playable_zip(archive_path: &Path, directory: &Path) -> Result<()> {
+    if archive_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .is_none_or(|ext| !ext.eq_ignore_ascii_case("zip"))
+    {
+        return Ok(());
+    }
+    let mut archive = zip::ZipArchive::new(File::open(archive_path).map_err(error)?)
+        .map_err(|_| "Downloaded ZIP is invalid.".to_string())?;
+    if archive.len() > 10_000 {
+        return Err("Downloaded ZIP has too many entries.".into());
+    }
+    let output_root = directory.join("extracted");
+    let mut total = 0u64;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index).map_err(error)?;
+        let enclosed = entry
+            .enclosed_name()
+            .ok_or("Downloaded ZIP contains an unsafe path.")?;
+        if entry.is_dir() || !playable_extension(&enclosed) {
+            continue;
+        }
+        total = total
+            .checked_add(entry.size())
+            .ok_or("Downloaded ZIP is too large.")?;
+        if total > MAX_DIRECT_DOWNLOAD_BYTES {
+            return Err("Downloaded ZIP is too large.".into());
+        }
+        let destination = output_root.join(enclosed);
+        std::fs::create_dir_all(destination.parent().ok_or("Invalid ZIP path.")?).map_err(error)?;
+        let mut output = File::create(destination).map_err(error)?;
+        std::io::copy(&mut entry, &mut output).map_err(error)?;
+    }
+    Ok(())
+}
+fn direct_transfer(
+    app: &tauri::AppHandle,
+    job: &mut DownloadJob,
+    cancel: &CancellationToken,
+) -> Result<()> {
+    let url = sources::direct_url(&job.magnet)?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 5 || sources::direct_url(attempt.url().as_str()).is_err()
+            {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+        .map_err(error)?;
+    job.state = "DOWNLOADING".into();
+    job.error = None;
+    save_job(app, job)?;
+    let mut response = client
+        .get(url)
+        .send()
+        .map_err(|_| "Could not start the direct download. Check the link and your connection.")?
+        .error_for_status()
+        .map_err(|_| "The direct download link is unavailable.")?;
+    sources::direct_url(response.url().as_str())?;
+    let total = response.content_length().unwrap_or(0);
+    if total > MAX_DIRECT_DOWNLOAD_BYTES {
+        return Err("The direct download is unexpectedly large.".into());
+    }
+    let target = PathBuf::from(&job.directory).join(direct_filename(response.url()));
+    let temporary = target.with_file_name(format!(
+        "{}.part",
+        target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("download.bin")
+    ));
+    let mut output = File::create(&temporary).map_err(error)?;
+    let mut buffer = [0u8; 64 * 1024];
+    let started = Instant::now();
+    let mut saved_at = Instant::now();
+    loop {
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+        let read = response
+            .read(&mut buffer)
+            .map_err(|_| "The direct download stopped unexpectedly.")?;
+        if read == 0 {
+            break;
+        }
+        output.write_all(&buffer[..read]).map_err(error)?;
+        job.downloaded_bytes = job.downloaded_bytes.saturating_add(read as u64);
+        if job.downloaded_bytes > MAX_DIRECT_DOWNLOAD_BYTES {
+            return Err("The direct download is unexpectedly large.".into());
+        }
+        job.total_bytes = total;
+        let elapsed = started.elapsed().as_secs_f64().max(0.1);
+        job.bytes_per_second = job.downloaded_bytes as f64 / elapsed;
+        job.progress = if total == 0 {
+            0.0
+        } else {
+            (job.downloaded_bytes as f64 / total as f64 * 100.0).min(100.0)
+        };
+        job.remaining_seconds = if total > job.downloaded_bytes && job.bytes_per_second > 0.0 {
+            Some(((total - job.downloaded_bytes) as f64 / job.bytes_per_second) as u64)
+        } else {
+            None
+        };
+        if saved_at.elapsed() >= Duration::from_millis(750) {
+            save_job(app, job)?;
+            saved_at = Instant::now();
+        }
+    }
+    output.flush().map_err(error)?;
+    drop(output);
+    std::fs::rename(&temporary, &target).map_err(error)?;
+    extract_playable_zip(&target, Path::new(&job.directory))?;
+    job.state = "COMPLETED".into();
+    job.progress = 100.0;
+    job.bytes_per_second = 0.0;
+    job.remaining_seconds = None;
+    if total == 0 {
+        job.total_bytes = job.downloaded_bytes;
+    }
+    save_job(app, job)
+}
+fn spawn_direct_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result<()> {
+    job.state = "QUEUED".into();
+    job.error = None;
+    save_job(app, &job)?;
+    let cancel = CancellationToken::new();
+    let worker_cancel = cancel.clone();
+    let completion_cancel = cancel.clone();
+    let app_clone = app.clone();
+    let failure_app = app.clone();
+    let id = job.id.clone();
+    let task = tauri::async_runtime::spawn(async move {
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            let result = direct_transfer(&app_clone, &mut job, &worker_cancel);
+            (job, result)
+        })
+        .await;
+        if !completion_cancel.is_cancelled() {
+            if let Ok((mut failed_job, Err(message))) = result {
+                failed_job.state = "FAILED".into();
+                failed_job.error = Some(message);
+                failed_job.bytes_per_second = 0.0;
+                let _ = save_job(&failure_app, &failed_job);
+            }
+        }
+    });
+    app.state::<DownloadService>()
+        .active
+        .lock()
+        .map_err(error)?
+        .insert(id, ActiveTask { cancel, task });
+    Ok(())
+}
 #[tauri::command]
 pub async fn start_source_download(
     app: tauri::AppHandle,
@@ -268,20 +479,26 @@ pub async fn start_source_download(
     })
     .await
     .map_err(error)??;
-    let magnet = selected
+    let uri = selected
         .entry
         .uris
         .get(uri_index)
-        .ok_or("Select a valid magnet link.")?
+        .ok_or("Select a valid download link.")?
         .clone();
-    let hash = sources::magnet_hash(&magnet)?;
+    let is_magnet = sources::magnet_hash(&uri).is_ok();
+    let hash = if is_magnet {
+        sources::magnet_hash(&uri)?
+    } else {
+        sources::direct_url(&uri)?;
+        sources::download_key(&uri)
+    };
     let existing = list_download_jobs(app.state::<Database>())?;
     if existing
         .iter()
         .any(|j| j.info_hash == hash && j.state != "CANCELLED")
     {
         return Err(
-            "This torrent is already in Downloads. Resume or use its existing files.".into(),
+            "This download is already in Downloads. Resume or use its existing files.".into(),
         );
     }
     let id = uuid::Uuid::new_v4().to_string();
@@ -301,7 +518,7 @@ pub async fn start_source_download(
         id: id.clone(),
         name: selected.entry.title,
         source_name: selected.source_name,
-        magnet,
+        magnet: uri,
         info_hash: hash,
         state: "QUEUED".into(),
         progress: 0.0,
@@ -313,7 +530,11 @@ pub async fn start_source_download(
         error: None,
         game,
     };
-    spawn_transfer(&app, job)?;
+    if is_magnet {
+        spawn_transfer(&app, job)?;
+    } else {
+        spawn_direct_transfer(&app, job)?;
+    }
     Ok(id)
 }
 #[tauri::command]
@@ -359,7 +580,11 @@ pub async fn control_download(app: tauri::AppHandle, id: String, action: String)
                 "This torrent is already present in another download or has completed.".into(),
             );
         }
-        spawn_transfer(&app, job)?;
+        if sources::magnet_hash(&job.magnet).is_ok() {
+            spawn_transfer(&app, job)?;
+        } else {
+            spawn_direct_transfer(&app, job)?;
+        }
     } else {
         job.state = if action == "pause" {
             "PAUSED"

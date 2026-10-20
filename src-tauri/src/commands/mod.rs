@@ -5,7 +5,7 @@ use crate::{
 };
 use rusqlite::params;
 use std::process::Command;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 struct InstallerSpec {
     id: &'static str,
@@ -20,7 +20,8 @@ const INSTALLERS: &[InstallerSpec] = &[
     InstallerSpec {
         id: "retroarch",
         name: "RetroArch",
-        description: "Base for classic consoles. Install cores in RetroArch after setup.",
+        description:
+            "Base for classic consoles. OpenRetro configures compatible cores when you play.",
         platforms: &[
             "nes", "snes", "n64", "gb", "gbc", "gba", "nds", "sms", "genesis", "gg", "psx", "psp",
             "arcade", "dos",
@@ -111,27 +112,61 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
     return Err("The built-in emulator installer is currently available on Windows only.".into());
     #[cfg(windows)]
     {
-        let result = Command::new("winget")
+        emit_install_progress(
+            app,
+            id,
+            installer.name,
+            8,
+            "Preparing the official installer",
+        );
+        let mut child = Command::new("winget")
             .args([
                 "install", "--exact", "--id", installer.winget_id,
                 "--accept-package-agreements", "--accept-source-agreements",
-                "--disable-interactivity",
+                "--disable-interactivity", "--force",
             ])
-            .status()
+            .spawn()
             .map_err(|_| "Windows App Installer (winget) is required to install emulators. Install it from Microsoft Store, then try again.")?;
+        emit_install_progress(
+            app,
+            id,
+            installer.name,
+            28,
+            "Downloading from the official package source",
+        );
+        emit_install_progress(
+            app,
+            id,
+            installer.name,
+            68,
+            "Installing and registering the application",
+        );
+        let result = child.wait().map_err(error)?;
         if !result.success() {
             return Err(format!(
                 "{} could not be installed. Check the Windows installer prompt and try again.",
                 installer.name
             ));
         }
+        emit_install_progress(
+            app,
+            id,
+            installer.name,
+            88,
+            "Locating the installed emulator",
+        );
         if installer.id == "retroarch" {
-            let executable = managed_retroarch_path().ok_or(
-                "RetroArch installed, but OpenRetro could not find retroarch.exe. Use Detect installed to select it.",
-            )?;
-            register_retroarch(app, executable)?;
-            return Ok("RetroArch was installed and set as OpenRetro's default runtime. Install cores from RetroArch's Online Updater before playing each console.".into());
+            for _ in 0..15 {
+                if let Some(executable) = managed_retroarch_path() {
+                    register_retroarch(app, executable)?;
+                    emit_install_progress(app, id, installer.name, 100, "Ready to play");
+                    return Ok("RetroArch was installed and set as OpenRetro's default runtime. OpenRetro downloads a compatible core the first time you play a supported game.".into());
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            return Err("RetroArch was installed, but its executable was not found yet. Restart OpenRetro, then use Detect installed or select retroarch.exe once.".into());
         }
+        emit_install_progress(app, id, installer.name, 100, "Installation complete");
         Ok(format!(
             "{} was installed. Choose Detect installed to add it to OpenRetro.",
             installer.name
@@ -139,7 +174,23 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
     }
 }
 #[cfg(windows)]
+fn emit_install_progress(app: &tauri::AppHandle, id: &str, name: &str, progress: u8, stage: &str) {
+    let _ = app.emit(
+        "emulator-install-progress",
+        serde_json::json!({
+            "id": id,
+            "name": name,
+            "progress": progress,
+            "stage": stage,
+        }),
+    );
+}
+#[cfg(windows)]
 fn managed_retroarch_path() -> Option<std::path::PathBuf> {
+    let standalone = std::path::PathBuf::from(r"C:\RetroArch-Win64\retroarch.exe");
+    if standalone.is_file() {
+        return Some(standalone);
+    }
     let mut roots = Vec::new();
     if let Some(program_files) = std::env::var_os("ProgramFiles") {
         roots.push(std::path::PathBuf::from(program_files));
@@ -147,13 +198,59 @@ fn managed_retroarch_path() -> Option<std::path::PathBuf> {
     if let Some(program_files) = std::env::var_os("ProgramW6432") {
         roots.push(std::path::PathBuf::from(program_files));
     }
+    if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
+        roots.push(std::path::PathBuf::from(program_files_x86));
+    }
     if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
-        roots.push(std::path::PathBuf::from(local_app_data).join("Programs"));
+        let local = std::path::PathBuf::from(local_app_data);
+        roots.push(local.join("Programs"));
+        roots.push(local);
     }
     roots
         .into_iter()
         .map(|root| root.join("RetroArch").join("retroarch.exe"))
         .find(|path| path.is_file())
+        .or_else(|| {
+            Command::new("where")
+                .arg("retroarch.exe")
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(|paths| {
+                    paths
+                        .lines()
+                        .map(std::path::PathBuf::from)
+                        .find(|path| path.is_file())
+                })
+        })
+        .or_else(|| {
+            let root = std::env::var_os("LOCALAPPDATA")
+                .map(std::path::PathBuf::from)?
+                .join("Microsoft")
+                .join("WinGet")
+                .join("Packages");
+            std::fs::read_dir(root)
+                .ok()?
+                .filter_map(std::result::Result::ok)
+                .filter(|entry| {
+                    entry
+                        .file_name()
+                        .to_string_lossy()
+                        .starts_with("Libretro.RetroArch")
+                })
+                .flat_map(|entry| {
+                    let root = entry.path();
+                    let nested = std::fs::read_dir(&root)
+                        .ok()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(std::result::Result::ok)
+                        .map(|entry| entry.path().join("retroarch.exe"));
+                    std::iter::once(root.join("retroarch.exe")).chain(nested)
+                })
+                .find(|path| path.is_file())
+        })
 }
 #[cfg(windows)]
 fn register_retroarch(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {
@@ -379,6 +476,22 @@ pub fn test_emulator(id: String, db: State<Database>) -> Result<String> {
 }
 #[tauri::command]
 pub fn detect_emulators() -> Vec<Emulator> {
+    let mut detected = Vec::new();
+    #[cfg(windows)]
+    if let Some(path) = managed_retroarch_path() {
+        detected.push(Emulator {
+            id: "detected-retroarch".into(),
+            name: "RetroArch".into(),
+            executable_path: path.to_string_lossy().into_owned(),
+            supported_platforms: INSTALLERS[0]
+                .platforms
+                .iter()
+                .map(|platform| (*platform).into())
+                .collect(),
+            version: None,
+            default_platforms: vec![],
+        });
+    }
     let specs = [
         (
             "retroarch",
@@ -397,22 +510,26 @@ pub fn detect_emulators() -> Vec<Emulator> {
         ("melonDS", "melonDS", vec!["nds"]),
     ];
     let paths = std::env::var_os("PATH").unwrap_or_default();
-    specs
-        .iter()
-        .filter_map(|(bin, name, platforms)| {
-            let path = std::env::split_paths(&paths)
-                .map(|dir| dir.join(format!("{bin}{}", std::env::consts::EXE_SUFFIX)))
-                .find(|p| p.is_file())?;
-            Some(Emulator {
-                id: format!("detected-{bin}"),
-                name: name.to_string(),
-                executable_path: path.to_string_lossy().into_owned(),
-                supported_platforms: platforms.iter().map(|s| s.to_string()).collect(),
-                version: None,
-                default_platforms: vec![],
+    detected.extend(
+        specs
+            .iter()
+            .filter(|(bin, _, _)| *bin != "retroarch")
+            .filter_map(|(bin, name, platforms)| {
+                let path = std::env::split_paths(&paths)
+                    .map(|dir| dir.join(format!("{bin}{}", std::env::consts::EXE_SUFFIX)))
+                    .find(|p| p.is_file())?;
+                Some(Emulator {
+                    id: format!("detected-{bin}"),
+                    name: name.to_string(),
+                    executable_path: path.to_string_lossy().into_owned(),
+                    supported_platforms: platforms.iter().map(|s| s.to_string()).collect(),
+                    version: None,
+                    default_platforms: vec![],
+                })
             })
-        })
-        .collect()
+            .collect::<Vec<_>>(),
+    );
+    detected
 }
 #[tauri::command]
 pub fn get_settings(db: State<Database>) -> Result<serde_json::Value> {

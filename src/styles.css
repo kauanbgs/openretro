@@ -2100,6 +2100,24 @@ legend {
   margin-top: 8px;
   text-decoration: none;
 }
+.emulator-install-progress {
+  grid-column: 2 / -1;
+  margin-top: -3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.emulator-install-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.emulator-install-progress strong {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.emulator-install-progress progress {
+  margin: 7px 0 0;
+}
 .emulator-card {
   display: grid;
   grid-template-columns: 54px minmax(160px, 1.1fr) minmax(130px, 1fr) auto;

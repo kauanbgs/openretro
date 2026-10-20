@@ -167,7 +167,7 @@ export const bridge = {
   ): Promise<string> {
     if (!isDesktop)
       throw new Error(
-        "Use the OpenRetro desktop app to download torrents. Source management is available in this preview.",
+        "Use the OpenRetro desktop app to download files. Source management is available in this preview.",
       );
     return invoke("start_source_download", {
       sourceId: match.sourceId,
