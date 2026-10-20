@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
-    "tauri": "tauri",
+    "tauri": "powershell -ExecutionPolicy Bypass -File scripts/tauri.ps1",
     "prepare:runtime": "powershell -ExecutionPolicy Bypass -File scripts/vendor-retroarch-runtime.ps1",
     "bundle:windows": "npm run prepare:runtime && tauri build",
     "format": "prettier --write src server tests index.html vite.config.ts *.json .github/workflows/*.yml",
