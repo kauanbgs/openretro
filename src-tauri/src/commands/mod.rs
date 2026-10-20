@@ -166,6 +166,14 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
             }
             return Err("RetroArch was installed, but its executable was not found yet. Restart OpenRetro, then use Detect installed or select retroarch.exe once.".into());
         }
+        if installer.id == "pcsx2" {
+            if let Some(executable) = managed_pcsx2_path() {
+                register_pcsx2(app, executable)?;
+                emit_install_progress(app, id, installer.name, 100, "Ready to configure");
+                return Ok("PCSX2 was installed and added to OpenRetro. Add your legally obtained PlayStation 2 BIOS in the game configuration before playing.".into());
+            }
+            return Err("PCSX2 was installed, but pcsx2-qt.exe was not found yet. Restart OpenRetro, then use Detect installed.".into());
+        }
         emit_install_progress(app, id, installer.name, 100, "Installation complete");
         Ok(format!(
             "{} was installed. Choose Detect installed to add it to OpenRetro.",
@@ -253,6 +261,36 @@ fn managed_retroarch_path() -> Option<std::path::PathBuf> {
         })
 }
 #[cfg(windows)]
+fn managed_pcsx2_path() -> Option<std::path::PathBuf> {
+    let mut roots = Vec::new();
+    for key in ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"] {
+        if let Some(root) = std::env::var_os(key) {
+            roots.push(std::path::PathBuf::from(root));
+        }
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        roots.push(std::path::PathBuf::from(local).join("Programs"));
+    }
+    roots
+        .into_iter()
+        .map(|root| root.join("PCSX2").join("pcsx2-qt.exe"))
+        .find(|path| path.is_file())
+        .or_else(|| {
+            Command::new("where")
+                .arg("pcsx2-qt.exe")
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(|paths| {
+                    paths
+                        .lines()
+                        .map(std::path::PathBuf::from)
+                        .find(|path| path.is_file())
+                })
+        })
+}
+#[cfg(windows)]
 fn register_retroarch(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {
     let emulator = Emulator {
         id: "openretro-retroarch".into(),
@@ -280,6 +318,35 @@ fn register_retroarch(app: &tauri::AppHandle, executable: std::path::PathBuf) ->
             other
                 .default_platforms
                 .retain(|platform| !emulator.default_platforms.contains(platform));
+            transaction
+                .execute(
+                    "UPDATE emulators SET data=?1 WHERE id=?2",
+                    params![serde_json::to_string(&other).map_err(error)?, other.id],
+                )
+                .map_err(error)?;
+        }
+    }
+    transaction.execute("INSERT INTO emulators(id,data) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET data=excluded.data", params![emulator.id, serde_json::to_string(&emulator).map_err(error)?]).map_err(error)?;
+    transaction.commit().map_err(error)
+}
+#[cfg(windows)]
+fn register_pcsx2(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {
+    let emulator = Emulator {
+        id: "openretro-pcsx2".into(),
+        name: "PCSX2".into(),
+        executable_path: filesystem::executable(&executable.to_string_lossy())?
+            .to_string_lossy()
+            .into_owned(),
+        supported_platforms: vec!["ps2".into()],
+        version: None,
+        default_platforms: vec!["ps2".into()],
+    };
+    let database = app.state::<Database>();
+    let mut conn = database.0.lock().map_err(error)?;
+    let transaction = conn.transaction().map_err(error)?;
+    for mut other in database::emulators(&transaction)? {
+        if other.id != emulator.id {
+            other.default_platforms.retain(|platform| platform != "ps2");
             transaction
                 .execute(
                     "UPDATE emulators SET data=?1 WHERE id=?2",
@@ -534,6 +601,17 @@ pub fn detect_emulators() -> Vec<Emulator> {
             default_platforms: vec![],
         });
     }
+    #[cfg(windows)]
+    if let Some(path) = managed_pcsx2_path() {
+        detected.push(Emulator {
+            id: "detected-pcsx2".into(),
+            name: "PCSX2".into(),
+            executable_path: path.to_string_lossy().into_owned(),
+            supported_platforms: vec!["ps2".into()],
+            version: None,
+            default_platforms: vec![],
+        });
+    }
     let specs = [
         (
             "retroarch",
@@ -555,7 +633,7 @@ pub fn detect_emulators() -> Vec<Emulator> {
     detected.extend(
         specs
             .iter()
-            .filter(|(bin, _, _)| *bin != "retroarch")
+            .filter(|(bin, _, _)| !["retroarch", "pcsx2-qt"].contains(bin))
             .filter_map(|(bin, name, platforms)| {
                 let path = std::env::split_paths(&paths)
                     .map(|dir| dir.join(format!("{bin}{}", std::env::consts::EXE_SUFFIX)))
