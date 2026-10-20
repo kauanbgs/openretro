@@ -142,65 +142,75 @@ export function GamePage({
               <span>{game.year || "Year unknown"}</span>
               <span>{game.developer}</span>
             </div>
-            <div className="hero-actions">
-              <button
-                className="button primary"
-                disabled={running || busy}
-                onClick={() =>
-                  entry
-                    ? resolution?.state === "MISSING_EMULATOR"
-                      ? onEmulators()
-                      : void play()
-                    : onDownload(game)
-                }
-              >
-                {running ? (
-                  <LoaderCircle className="spin" size={19} />
-                ) : entry ? (
-                  <Play size={18} fill="currentColor" />
-                ) : (
-                  <Download size={18} />
-                )}{" "}
-                {running
-                  ? "Game running"
-                  : entry
-                    ? resolution?.state === "MISSING_EMULATOR"
-                      ? "Set up emulator"
-                      : "Play game"
-                    : "Find download"}
+          </div>
+        </div>
+        <div className="detail-download-ribbon">
+          <div className="download-ribbon-copy">
+            <span>{entry ? "Available in your library" : "Ready to add"}</span>
+            <strong>
+              {entry
+                ? "Your local copy is ready to launch"
+                : "Choose a source to download this game"}
+            </strong>
+          </div>
+          <div className="hero-actions">
+            <button
+              className="button primary"
+              disabled={running || busy}
+              onClick={() =>
+                entry
+                  ? resolution?.state === "MISSING_EMULATOR"
+                    ? onEmulators()
+                    : void play()
+                  : onDownload(game)
+              }
+            >
+              {running ? (
+                <LoaderCircle className="spin" size={19} />
+              ) : entry ? (
+                <Play size={18} fill="currentColor" />
+              ) : (
+                <Download size={18} />
+              )}{" "}
+              {running
+                ? "Game running"
+                : entry
+                  ? resolution?.state === "MISSING_EMULATOR"
+                    ? "Set up emulator"
+                    : "Play game"
+                  : "Find download"}
+            </button>
+            {!entry && (
+              <button className="button glass" onClick={() => onImport(game)}>
+                <FolderOpen size={17} /> Add local file
               </button>
-              {!entry && (
-                <button className="button glass" onClick={() => onImport(game)}>
-                  <FolderOpen size={17} /> Add local file
+            )}
+            {entry && (
+              <>
+                <button
+                  className={`button glass ${entry.item.favorite ? "favorited" : ""}`}
+                  aria-label={
+                    entry.item.favorite ? "Remove favorite" : "Favorite game"
+                  }
+                  onClick={() =>
+                    void action(() =>
+                      bridge.favorite(entry.item.id, !entry.item.favorite),
+                    )
+                  }
+                >
+                  <Heart
+                    size={19}
+                    fill={entry.item.favorite ? "currentColor" : "none"}
+                  />
                 </button>
-              )}
-              {entry && (
-                <>
-                  <button
-                    className={`button glass ${entry.item.favorite ? "favorited" : ""}`}
-                    aria-label={
-                      entry.item.favorite ? "Remove favorite" : "Favorite game"
-                    }
-                    onClick={() =>
-                      void action(() =>
-                        bridge.favorite(entry.item.id, !entry.item.favorite),
-                      )
-                    }
-                  >
-                    <Heart
-                      size={19}
-                      fill={entry.item.favorite ? "currentColor" : "none"}
-                    />
-                  </button>
-                  <button
-                    className="button glass"
-                    onClick={() => setConfig(true)}
-                  >
-                    <Settings2 size={18} /> Configure
-                  </button>
-                </>
-              )}
-            </div>
+                <button
+                  className="button glass"
+                  onClick={() => setConfig(true)}
+                >
+                  <Settings2 size={18} /> Configure
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -242,172 +252,222 @@ export function GamePage({
             </button>
           </div>
         )}
-        <div className="detail-stats">
-          <div>
-            <Clock3 size={19} />
-            <span>
-              Playtime
-              <strong>
-                {entry
-                  ? `${Math.floor(entry.item.playtime / 3600)}h ${Math.floor((entry.item.playtime % 3600) / 60)}m`
-                  : "Not played yet"}
-              </strong>
-            </span>
-          </div>
-          <div>
-            <CalendarDays size={19} />
-            <span>
-              Last played
-              <strong>
-                {entry?.item.lastPlayedAt
-                  ? new Date(entry.item.lastPlayedAt).toLocaleDateString()
-                  : "Never"}
-              </strong>
-            </span>
-          </div>
-          <div>
-            <ShieldCheck size={19} />
-            <span>
-              Source
-              <strong>
-                {entry
-                  ? "Your local file"
-                  : game.metadataProvider === "igdb"
-                    ? "IGDB"
-                    : "Local metadata"}
-              </strong>
-            </span>
-          </div>
-        </div>
-        <nav className="tabs">
-          {["Overview", "Screenshots", "Details"].map((t) => (
-            <button
-              className={tab === t ? "selected" : ""}
-              key={t}
-              onClick={() => setTab(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
-        {tab === "Overview" ? (
-          <div className="overview">
-            <div>
-              <h2>About this game</h2>
-              <p>{game.description}</p>
-              {details.error && (
-                <p className="hint">
-                  Additional metadata is unavailable. Showing the saved catalog
-                  information.
-                </p>
-              )}
-              {game.sourceUrl && (
-                <a
-                  className="metadata-source"
-                  href={game.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
+        <div className="detail-layout">
+          <div className="detail-main">
+            <div className="detail-stats">
+              <div>
+                <Clock3 size={19} />
+                <span>
+                  Playtime
+                  <strong>
+                    {entry
+                      ? `${Math.floor(entry.item.playtime / 3600)}h ${Math.floor((entry.item.playtime % 3600) / 60)}m`
+                      : "Not played yet"}
+                  </strong>
+                </span>
+              </div>
+              <div>
+                <CalendarDays size={19} />
+                <span>
+                  Last played
+                  <strong>
+                    {entry?.item.lastPlayedAt
+                      ? new Date(entry.item.lastPlayedAt).toLocaleDateString()
+                      : "Never"}
+                  </strong>
+                </span>
+              </div>
+              <div>
+                <ShieldCheck size={19} />
+                <span>
+                  Source
+                  <strong>
+                    {entry
+                      ? "Your local file"
+                      : game.metadataProvider === "igdb"
+                        ? "IGDB"
+                        : "Local metadata"}
+                  </strong>
+                </span>
+              </div>
+            </div>
+            <nav className="tabs">
+              {["Overview", "Screenshots", "Details"].map((t) => (
+                <button
+                  className={tab === t ? "selected" : ""}
+                  key={t}
+                  onClick={() => setTab(t)}
                 >
-                  View on IGDB <ExternalLink size={14} />
-                </a>
-              )}
-            </div>
-            <aside>
-              <h3>Game details</h3>
-              <dl>
-                <dt>Platform</dt>
-                <dd>{platform?.name}</dd>
-                <dt>Release year</dt>
-                <dd>{game.year}</dd>
-                <dt>Genre</dt>
-                <dd>{game.genre}</dd>
-                <dt>Developer</dt>
-                <dd>{game.developer}</dd>
-              </dl>
-            </aside>
-          </div>
-        ) : tab === "Screenshots" ? (
-          details.isFetching ? (
-            <div className="catalog-loading">
-              <LoaderCircle className="spin" size={22} />
-              <p>Loading screenshots…</p>
-            </div>
-          ) : game.screenshots?.length ? (
-            <div className="screenshot-grid">
-              {game.screenshots.map((url, i) => (
-                <a key={url} href={url} target="_blank" rel="noreferrer">
-                  <img
-                    src={url}
-                    alt={`${game.title} gameplay screenshot ${i + 1}`}
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                  />
-                </a>
+                  {t}
+                </button>
               ))}
-            </div>
-          ) : (
-            <div className="empty-inline">
-              <p>
-                {details.error
-                  ? "Screenshots could not be loaded. Check your connection."
-                  : "No gameplay screenshots are available for this game."}
-              </p>
-              <small>Artwork and metadata are provided by IGDB.</small>
-            </div>
-          )
-        ) : (
-          <div className="form-stack details-info">
-            <p>
-              <strong>File</strong>
-              <br />
-              {entry?.item.sourcePath ?? "No local file associated"}
-            </p>
-            {entry && (
-              <>
-                <p>
-                  <strong>SHA-256</strong>
-                  <code className="hash">{entry.item.sha256}</code>
-                </p>
-                <div className="hero-actions">
-                  <button
-                    disabled={busy}
-                    className="button secondary"
-                    onClick={() =>
-                      void action(async () => {
-                        const valid = await bridge.verify(entry.item.id);
-                        notify(
-                          valid
-                            ? "Checksum matches. Your game file is unchanged."
-                            : "The checksum changed. Locate the file again if you replaced it intentionally.",
-                        );
-                      })
-                    }
-                  >
-                    <ShieldCheck size={16} /> Verify file
-                  </button>
-                  <button
-                    disabled={busy}
-                    className="button secondary"
-                    onClick={() =>
-                      void action(async () => {
-                        const c = await bridge.pickGame();
-                        if (c) await bridge.relocate(entry.item.id, c);
-                      })
-                    }
-                  >
-                    <FolderOpen size={16} /> Locate file
-                  </button>
-                  <button
-                    className="button danger"
-                    onClick={() => setRemove(true)}
-                  >
-                    <Trash2 size={16} /> Remove from library
-                  </button>
+            </nav>
+            {tab === "Overview" ? (
+              <div className="overview">
+                <div>
+                  <h2>About this game</h2>
+                  <p>{game.description}</p>
+                  {details.error && (
+                    <p className="hint">
+                      Additional metadata is unavailable. Showing the saved
+                      catalog information.
+                    </p>
+                  )}
+                  {game.sourceUrl && (
+                    <a
+                      className="metadata-source"
+                      href={game.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View on IGDB <ExternalLink size={14} />
+                    </a>
+                  )}
                 </div>
-              </>
+                <aside>
+                  <h3>Game details</h3>
+                  <dl>
+                    <dt>Platform</dt>
+                    <dd>{platform?.name}</dd>
+                    <dt>Release year</dt>
+                    <dd>{game.year}</dd>
+                    <dt>Genre</dt>
+                    <dd>{game.genre}</dd>
+                    <dt>Developer</dt>
+                    <dd>{game.developer}</dd>
+                  </dl>
+                </aside>
+              </div>
+            ) : tab === "Screenshots" ? (
+              details.isFetching ? (
+                <div className="catalog-loading">
+                  <LoaderCircle className="spin" size={22} />
+                  <p>Loading screenshots…</p>
+                </div>
+              ) : game.screenshots?.length ? (
+                <div className="screenshot-grid">
+                  {game.screenshots.map((url, i) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      <img
+                        src={url}
+                        alt={`${game.title} gameplay screenshot ${i + 1}`}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-inline">
+                  <p>
+                    {details.error
+                      ? "Screenshots could not be loaded. Check your connection."
+                      : "No gameplay screenshots are available for this game."}
+                  </p>
+                  <small>Artwork and metadata are provided by IGDB.</small>
+                </div>
+              )
+            ) : (
+              <div className="form-stack details-info">
+                <p>
+                  <strong>File</strong>
+                  <br />
+                  {entry?.item.sourcePath ?? "No local file associated"}
+                </p>
+                {entry && (
+                  <>
+                    <p>
+                      <strong>SHA-256</strong>
+                      <code className="hash">{entry.item.sha256}</code>
+                    </p>
+                    <div className="hero-actions">
+                      <button
+                        disabled={busy}
+                        className="button secondary"
+                        onClick={() =>
+                          void action(async () => {
+                            const valid = await bridge.verify(entry.item.id);
+                            notify(
+                              valid
+                                ? "Checksum matches. Your game file is unchanged."
+                                : "The checksum changed. Locate the file again if you replaced it intentionally.",
+                            );
+                          })
+                        }
+                      >
+                        <ShieldCheck size={16} /> Verify file
+                      </button>
+                      <button
+                        disabled={busy}
+                        className="button secondary"
+                        onClick={() =>
+                          void action(async () => {
+                            const c = await bridge.pickGame();
+                            if (c) await bridge.relocate(entry.item.id, c);
+                          })
+                        }
+                      >
+                        <FolderOpen size={16} /> Locate file
+                      </button>
+                      <button
+                        className="button danger"
+                        onClick={() => setRemove(true)}
+                      >
+                        <Trash2 size={16} /> Remove from library
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
+          <aside className="detail-aside">
+            <section className="detail-aside-card">
+              <h2>Game information</h2>
+              <dl>
+                <dt>Platform</dt>
+                <dd>{platform?.name ?? game.platformId}</dd>
+                <dt>Released</dt>
+                <dd>{game.year || "Unknown"}</dd>
+                <dt>Genre</dt>
+                <dd>{game.genre || "Unknown"}</dd>
+                <dt>Developer</dt>
+                <dd>{game.developer || "Unknown"}</dd>
+              </dl>
+            </section>
+            {!entry && (
+              <section className="detail-aside-card source-note">
+                <Download size={18} />
+                <div>
+                  <strong>Downloads from your sources</strong>
+                  <p>
+                    OpenRetro only shows magnet links from the JSON sources you
+                    add.
+                  </p>
+                </div>
+              </section>
+            )}
+            {game.screenshots?.length ? (
+              <section className="detail-aside-card gallery-strip">
+                <h2>Images</h2>
+                {game.screenshots.slice(0, 3).map((url, i) => (
+                  <button
+                    key={url}
+                    onClick={() => setTab("Screenshots")}
+                    aria-label={`View screenshot ${i + 1}`}
+                  >
+                    <img
+                      src={url}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  </button>
+                ))}
+              </section>
+            ) : null}
+          </aside>
+        </div>
       </div>
       {config && entry && (
         <Modal title="Game configuration" onClose={() => setConfig(false)}>
