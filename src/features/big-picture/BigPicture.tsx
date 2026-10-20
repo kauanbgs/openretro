@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Gamepad2, Play, X } from "lucide-react";
+import { Gamepad2, Home, Library, Play, Star, X } from "lucide-react";
 import type { Emulator, LibraryGame } from "../../types";
 import { bridge } from "../../services/bridge";
 import { GameResolver } from "../../services/GameResolver";
@@ -18,13 +18,36 @@ export function BigPicture({
   notify: (message: string) => void;
 }) {
   const [selected, setSelected] = useState(0);
+  const [lane, setLane] = useState(0);
   const [launching, setLaunching] = useState(false);
   const held = useRef(new Set<number>());
-  const game = library[selected];
+  const lanes = [
+    { label: "All games", icon: Library, games: library },
+    {
+      label: "Recently played",
+      icon: Home,
+      games: [...library].sort((a, b) =>
+        (b.item.lastPlayedAt ?? "").localeCompare(a.item.lastPlayedAt ?? ""),
+      ),
+    },
+    {
+      label: "Favorites",
+      icon: Star,
+      games: library.filter((entry) => entry.item.favorite),
+    },
+  ];
+  const visibleGames = lanes[lane].games;
+  const game = visibleGames[selected];
   const move = (amount: number) =>
     setSelected((current) =>
-      library.length ? (current + amount + library.length) % library.length : 0,
+      visibleGames.length
+        ? (current + amount + visibleGames.length) % visibleGames.length
+        : 0,
     );
+  const moveLane = (amount: number) => {
+    setLane((current) => (current + amount + lanes.length) % lanes.length);
+    setSelected(0);
+  };
   const close = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     onClose();
@@ -50,8 +73,10 @@ export function BigPicture({
     void document.documentElement.requestFullscreen?.().catch(() => undefined);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close();
-      if (["ArrowLeft", "ArrowUp"].includes(event.key)) move(-1);
-      if (["ArrowRight", "ArrowDown"].includes(event.key)) move(1);
+      if (event.key === "ArrowLeft") move(-1);
+      if (event.key === "ArrowRight") move(1);
+      if (event.key === "ArrowUp") moveLane(-1);
+      if (event.key === "ArrowDown") moveLane(1);
       if (event.key === "Enter" || event.key === " ") void launch();
     };
     window.addEventListener("keydown", onKey);
@@ -65,8 +90,10 @@ export function BigPicture({
         );
         const edge = (button: number) =>
           pressed.has(button) && !held.current.has(button);
-        if (edge(12) || edge(14) || pad.axes[0] < -0.7) move(-1);
-        if (edge(13) || edge(15) || pad.axes[0] > 0.7) move(1);
+        if (edge(14) || pad.axes[0] < -0.7) move(-1);
+        if (edge(15) || pad.axes[0] > 0.7) move(1);
+        if (edge(12)) moveLane(-1);
+        if (edge(13)) moveLane(1);
         if (edge(0)) void launch();
         if (edge(1)) close();
         held.current = pressed;
@@ -91,42 +118,62 @@ export function BigPicture({
       />
       <header className="big-picture-header">
         <div className="big-picture-brand">
-          <Gamepad2 size={28} /> OpenRetro
+          <Gamepad2 size={28} /> OPENRETRO <small>CONSOLE</small>
         </div>
         <button className="big-picture-exit" onClick={close}>
-          <X size={20} /> Exit Big Picture
+          <X size={20} /> Exit
         </button>
       </header>
-      {game ? (
-        <main className="big-picture-main">
-          <div className="big-picture-copy">
-            <span>
-              {platformById(game.game.platformId)?.name ?? game.game.platformId}
-            </span>
-            <h1>{game.game.title}</h1>
-            <p>{game.game.description}</p>
+      <div className="console-shell">
+        <nav className="console-rail" aria-label="Library sections">
+          {lanes.map((item, index) => (
             <button
-              className="big-picture-play"
-              disabled={launching}
-              onClick={() => void launch()}
+              key={item.label}
+              className={lane === index ? "selected" : ""}
+              onClick={() => {
+                setLane(index);
+                setSelected(0);
+              }}
             >
-              <Play fill="currentColor" size={23} />{" "}
-              {launching ? "Launching…" : "Play"}
+              <item.icon size={20} />
+              <span>{item.label}</span>
+              <small>{item.games.length}</small>
             </button>
-          </div>
-          <div className="big-picture-cover">
-            <GameArtwork game={game.game} />
-          </div>
-        </main>
-      ) : (
-        <main className="big-picture-empty">
-          <Gamepad2 size={48} />
-          <h1>Your library is empty</h1>
-          <p>Add a game to start Big Picture.</p>
-        </main>
-      )}
-      <div className="big-picture-carousel" aria-label="Your games">
-        {library.map((entry, index) => (
+          ))}
+        </nav>
+        {game ? (
+          <main className="big-picture-main">
+            <div className="big-picture-copy">
+              <span className="console-now-playing">NOW SELECTED</span>
+              <span>
+                {platformById(game.game.platformId)?.name ??
+                  game.game.platformId}
+              </span>
+              <h1>{game.game.title}</h1>
+              <p>{game.game.description}</p>
+              <button
+                className="big-picture-play"
+                disabled={launching}
+                onClick={() => void launch()}
+              >
+                <Play fill="currentColor" size={23} />{" "}
+                {launching ? "Launching…" : "Play"}
+              </button>
+            </div>
+            <div className="big-picture-cover">
+              <GameArtwork game={game.game} />
+            </div>
+          </main>
+        ) : (
+          <main className="big-picture-empty">
+            <Gamepad2 size={48} />
+            <h1>Your library is empty</h1>
+            <p>Add a game to start Big Picture.</p>
+          </main>
+        )}
+      </div>
+      <div className="big-picture-carousel" aria-label="Selected game shelf">
+        {visibleGames.map((entry, index) => (
           <button
             key={entry.item.id}
             className={index === selected ? "selected" : ""}
@@ -145,10 +192,10 @@ export function BigPicture({
           <b>← →</b> Browse
         </span>
         <span>
-          <b>B</b> Exit
+          <b>↑ ↓</b> Sections
         </span>
         <span>
-          <ArrowLeft size={14} /> D-pad or left stick
+          <b>B</b> Exit
         </span>
       </footer>
     </section>

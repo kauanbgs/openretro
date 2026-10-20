@@ -2421,6 +2421,72 @@ progress {
   color: white;
   font-size: 10px;
 }
+/* Console navigation layer */
+.console-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  min-height: 54vh;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 5vw;
+}
+.console-rail {
+  display: flex;
+  flex-direction: column;
+  align-self: center;
+  gap: 7px;
+  padding: 24px 24px 24px 0;
+  border-right: 1px solid #ffffff18;
+}
+.console-rail button {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  color: #a3aabd;
+  text-align: left;
+  border-radius: 10px;
+  background: transparent;
+  transition: 0.16s;
+}
+.console-rail button small {
+  color: #727b92;
+  font-size: 11px;
+}
+.console-rail button.selected {
+  color: #101014;
+  background: #f0b56f;
+  box-shadow: 0 6px 24px #f0b56f33;
+}
+.console-rail button.selected small {
+  color: #66502f;
+}
+.console-shell .big-picture-main {
+  min-height: 54vh;
+  margin: 0;
+  padding: 3vh 4vw;
+}
+.console-now-playing {
+  display: block;
+  margin-bottom: 10px;
+  color: #7f879d !important;
+  font-size: 11px !important;
+  letter-spacing: 0.15em;
+}
+.console-shell + .big-picture-carousel {
+  padding-left: calc(5vw + 210px + 4vw);
+}
+.big-picture-brand small {
+  padding: 3px 6px;
+  border: 1px solid #ffffff35;
+  border-radius: 4px;
+  color: #9ca4b7;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
 .big-picture-empty {
   position: relative;
   z-index: 1;
