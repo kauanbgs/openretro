@@ -11,8 +11,7 @@ export function CatalogConnection({
       <div className="large-icon">
         <Database size={30} />
       </div>
-      <span className="eyebrow">REAL GAMES. YOUR OWN COLLECTION.</span>
-      <h2>Connect to IGDB.</h2>
+      <h2>Connect to IGDB</h2>
       <p>
         Browse real games, console libraries, cover art, and genres.
         <br />

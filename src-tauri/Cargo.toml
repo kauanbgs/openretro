@@ -25,3 +25,10 @@ log = "0.4"
 tauri-plugin-log = "2"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 dotenvy = "0.15"
+librqbit = { version = "=8.1.1", default-features = false, features = ["rust-tls"] }
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+tokio-util = "0.7"
+
+[target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
+# Upstream SHA-1 uses AWS-LC. Use its shipped assembly objects on Windows.
+aws-lc-sys = { version = "0.46", features = ["prebuilt-nasm"] }

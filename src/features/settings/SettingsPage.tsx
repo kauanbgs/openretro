@@ -1,8 +1,11 @@
+import { BrandMark } from "../../components/Brand";
+import { PageHeader } from "../../components/PageHeader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Check, ExternalLink, Folder, Info } from "lucide-react";
+import { Check, ExternalLink, Folder } from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
+import { SourceManager } from "../downloads/SourceManager";
 export function SettingsPage({
   onEmulators,
   notify,
@@ -34,19 +37,16 @@ export function SettingsPage({
   }
   return (
     <div className="page-content">
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">MAKE YOURSELF AT HOME</span>
-          <h1>
-            Settings<span className="accent">.</span>
-          </h1>
-          <p>Your collection, your way.</p>
-        </div>
-        <span className="saved-status">
-          <Check size={15} />
-          {saving ? "Saving…" : "Changes saved automatically"}
-        </span>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Manage your library and application preferences."
+        actions={
+          <span className="saved-status">
+            <Check size={15} />
+            {saving ? "Saving…" : "All changes saved"}
+          </span>
+        }
+      />
       <div className="settings-layout">
         <nav className="settings-nav">
           {[
@@ -73,7 +73,7 @@ export function SettingsPage({
               <div className="setting-row">
                 <div>
                   <strong>Application language</strong>
-                  <p>The MVP interface is available in English.</p>
+                  <p>The interface is currently available in English.</p>
                 </div>
                 <select disabled aria-label="Application language">
                   <option>English</option>
@@ -89,12 +89,10 @@ export function SettingsPage({
                 <span className="badge">Planned</span>
               </div>
               <div className="about-box">
-                <div className="brand-icon small">
-                  o<span />
-                </div>
+                <BrandMark />
                 <div>
                   <strong>OpenRetro</strong>
-                  <p>Version 0.1.0 · An open home for your classic games.</p>
+                  <p>Version 0.1.0</p>
                 </div>
               </div>
             </>
@@ -115,7 +113,8 @@ export function SettingsPage({
                 <div>
                   <strong>Scan automatically</strong>
                   <p>
-                    Folder watching is planned. Import files using Add Game.
+                    Automatic scans are not available yet. Use Add game to
+                    import a file.
                   </p>
                 </div>
                 <span className="badge">Planned</span>
@@ -133,24 +132,36 @@ export function SettingsPage({
             </div>
           ) : section === "Downloads" ? (
             <>
-              <p className="notice">
-                <Info size={17} /> No network transport is enabled in this
-                milestone. Download preferences are reserved for future
-                authorized sources.
-              </p>
+              <SourceManager />
               <label>
                 Download directory
                 <input
                   disabled
                   value={settings.downloadDirectory}
-                  placeholder="Not configured"
+                  placeholder="OpenRetro application data / downloads"
                   readOnly
                 />
               </label>
+              <button
+                className="button secondary"
+                onClick={() =>
+                  void bridge
+                    .pickDownloadDirectory()
+                    .then((path) => {
+                      if (path) return save({ downloadDirectory: path });
+                    })
+                    .catch((e) => notify(String(e)))
+                }
+              >
+                <Folder size={16} /> Choose download directory
+              </button>
               <div className="setting-row">
                 <div>
                   <strong>Concurrent downloads</strong>
-                  <p>Reserved setting · transport not yet implemented.</p>
+                  <p>
+                    Torrents run independently. Queue limits are not available
+                    yet.
+                  </p>
                 </div>
                 <input
                   disabled
@@ -186,8 +197,8 @@ export function SettingsPage({
                     void save({ theme: e.target.value as AppSettings["theme"] })
                   }
                 >
-                  <option value="dark">Midnight</option>
-                  <option value="light">Daylight</option>
+                  <option value="dark">Dark</option>
+                  <option value="light">Light</option>
                 </select>
               </div>
               <div className="setting-row">
@@ -211,7 +222,7 @@ export function SettingsPage({
               <div className="setting-row">
                 <div>
                   <strong>Subtle animations</strong>
-                  <p>A little movement between adventures.</p>
+                  <p>Animate loading indicators and control transitions.</p>
                 </div>
                 <button
                   role="switch"

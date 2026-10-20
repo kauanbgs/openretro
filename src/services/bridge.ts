@@ -9,6 +9,23 @@ import type {
   LibraryGame,
 } from "../types";
 import { defaultSettings } from "../types";
+import type {
+  DownloadSource,
+  DownloadSourceDocument,
+  SourceMatch,
+  DownloadJob,
+  DownloadedFile,
+} from "../types";
+import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
+const sourcesKey = "openretro-download-sources-v1";
+type PreviewSource = DownloadSource & { document: DownloadSourceDocument };
+function previewSources(): PreviewSource[] {
+  try {
+    return JSON.parse(localStorage.getItem(sourcesKey) ?? "[]");
+  } catch {
+    return [];
+  }
+}
 
 export const isDesktop =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -35,6 +52,141 @@ function write(data: PreviewStore) {
   localStorage.setItem(key, JSON.stringify(data));
 }
 export const bridge = {
+  async downloadSources(): Promise<DownloadSource[]> {
+    return isDesktop
+      ? invoke("list_download_sources")
+      : previewSources().map(({ document: _document, ...source }) => source);
+  },
+  async saveDownloadSource(
+    text: string | null,
+    url: string | null = null,
+    id: string | null = null,
+  ): Promise<void> {
+    if (isDesktop) return invoke("save_download_source", { text, url, id });
+    if (!text) {
+      if (!url || new URL(url).protocol !== "https:")
+        throw new Error("Enter an HTTPS source URL.");
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(45000),
+      }).catch(() => {
+        throw new Error(
+          "This source cannot be fetched by the browser. Paste/import its JSON, or use the desktop app.",
+        );
+      });
+      if (!response.ok)
+        throw new Error(`Source returned HTTP ${response.status}.`);
+      if (Number(response.headers.get("content-length")) > MAX_SOURCE_BYTES)
+        throw new Error("Source exceeds the 16 MB limit.");
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("Empty source response.");
+      const decoder = new TextDecoder();
+      let size = 0;
+      text = "";
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > MAX_SOURCE_BYTES)
+            throw new Error("Source exceeds the 16 MB limit.");
+          text += decoder.decode(value, { stream: true });
+        }
+        text += decoder.decode();
+      } finally {
+        await reader.cancel();
+      }
+    }
+    const document = parseDownloadSource(text);
+    const sources = previewSources();
+    if (url && sources.some((s) => s.url === url && s.id !== id))
+      throw new Error("This source URL is already registered.");
+    const previous = sources.find((s) => s.id === id);
+    const source: PreviewSource = {
+      id: id ?? crypto.randomUUID(),
+      name: document.name,
+      url,
+      enabled: previous?.enabled ?? true,
+      updatedAt: new Date().toISOString(),
+      gameCount: document.downloads.length,
+      document,
+    };
+    localStorage.setItem(
+      sourcesKey,
+      JSON.stringify([...sources.filter((s) => s.id !== source.id), source]),
+    );
+  },
+  async setDownloadSource(id: string, enabled: boolean): Promise<void> {
+    if (isDesktop) return invoke("set_download_source", { id, enabled });
+    localStorage.setItem(
+      sourcesKey,
+      JSON.stringify(
+        previewSources().map((s) => (s.id === id ? { ...s, enabled } : s)),
+      ),
+    );
+  },
+  async removeDownloadSource(id: string): Promise<void> {
+    if (isDesktop) return invoke("remove_download_source", { id });
+    localStorage.setItem(
+      sourcesKey,
+      JSON.stringify(previewSources().filter((s) => s.id !== id)),
+    );
+  },
+  async searchDownloadSources(query: string): Promise<SourceMatch[]> {
+    if (isDesktop) return invoke("search_download_sources", { query });
+    return previewSources()
+      .filter((s) => s.enabled)
+      .flatMap((s) =>
+        s.document.downloads.map((entry, i) => ({
+          ...entry,
+          id: String(i),
+          sourceId: s.id,
+          sourceName: s.name,
+        })),
+      )
+      .filter((e) => e.title.toLowerCase().includes(query.trim().toLowerCase()))
+      .slice(0, 60);
+  },
+  async startDownload(
+    match: SourceMatch,
+    uriIndex: number,
+    game?: GameMetadata,
+  ): Promise<string> {
+    if (!isDesktop)
+      throw new Error(
+        "Use the OpenRetro desktop app to download torrents. Source management is available in this preview.",
+      );
+    return invoke("start_source_download", {
+      sourceId: match.sourceId,
+      entryId: match.id,
+      uriIndex,
+      game: game ?? null,
+    });
+  },
+  async downloadJobs(): Promise<DownloadJob[]> {
+    return isDesktop ? invoke("list_download_jobs") : [];
+  },
+  async controlDownload(
+    id: string,
+    action: "pause" | "resume" | "cancel",
+  ): Promise<void> {
+    if (isDesktop) return invoke("control_download", { id, action });
+  },
+  async downloadFiles(id: string): Promise<DownloadedFile[]> {
+    return isDesktop ? invoke("download_files", { id }) : [];
+  },
+  async inspect(path: string): Promise<ImportCandidate> {
+    if (!isDesktop)
+      throw new Error("Inspect downloaded files in the desktop app.");
+    return invoke("inspect_game", { path });
+  },
+  async pickDownloadDirectory(): Promise<string | null> {
+    if (!isDesktop) throw new Error("Choose the directory in the desktop app.");
+    return open({
+      directory: true,
+      multiple: false,
+      title: "Choose download directory",
+    });
+  },
   library: (): Promise<LibraryGame[]> =>
     isDesktop ? invoke("list_library") : Promise.resolve(read().library),
   emulators: (): Promise<Emulator[]> =>

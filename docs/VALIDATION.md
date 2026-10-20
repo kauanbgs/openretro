@@ -41,3 +41,14 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 - Automatic token renewal and one-time 401 recovery are implemented; natural token expiry was not awaited during live validation.
 
 Browser imports remain isolated in localStorage; desktop library data and catalog caching use SQLite.
+
+## UI redesign and JSON/magnet sources — 2026-10-20
+
+- Rebuilt the application shell, Home, Discover, Library, game details, Emulators, Downloads, Settings and dialogs around the palette/type/layout in `DESIGN.md`. Bundled fonts and refreshed application icons.
+- Browser checks covered both themes and a 390px responsive viewport. Home and source-import dialog had no horizontal overflow. Temporary viewport and theme changes were restored.
+- Imported an original UI test source using the Hydra `name`/`downloads` schema. Verified validation errors for empty sources, results, enable/disable, persistence after reload, magnet selection and the explicit desktop requirement. Removed the UI test source after validation.
+- Verified **IGDB game → Find download → source search** preserves the selected catalog game's context.
+- `npm test`: **38 passed**. `npm run build`, `npm run format:check`, `git diff --check`: pass.
+- `cargo check` and **11 Rust tests** passed. The local-peer test downloaded an original 256 KB fixture from a magnet, verified exact contents, paused/unpaused, detached without deleting files, corrupted the local copy, resumed/rechecked it, verified repair from the seed, and detected the downloaded Game Boy file. No commercial game files or public torrents were used.
+- Native desktop startup succeeded with network downloads enabled. Read-only inspection confirmed migrations **1, 2 and 3**, plus the source/job tables. No test sources or jobs were inserted into the user's desktop database.
+- Public-swarm availability and a real game/emulator session remain unverified. Archive extraction, automatic emulator installation, queue limits and speed limits are not implemented.

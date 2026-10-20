@@ -28,12 +28,11 @@ export function GameCard({
       <div className="card-title">{game.title}</div>
       <div className="card-meta">
         {platformById(game.platformId)?.name}
-        <span>·</span>
-        {game.year || "Year unknown"}
+        <span className="card-year">{game.year || "Year unknown"}</span>
       </div>
       <div className="card-status">
         <i className={item ? "installed" : ""} />
-        {item ? "In your library" : game.genre}
+        {item ? "Local file" : game.genre}
       </div>
     </button>
   );

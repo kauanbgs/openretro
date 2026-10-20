@@ -16,6 +16,10 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("002_metadata_cache.sql"))
         .map_err(error)?;
+    tx.execute_batch(include_str!("003_download_sources.sql"))
+        .map_err(error)?;
+    // Restart requires explicit resume, which rechecks the partial files.
+    tx.execute("UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')", []).map_err(error)?;
     let platforms: serde_json::Value =
         serde_json::from_str(include_str!("../../../src/db/platforms.json")).map_err(error)?;
     for p in platforms.as_array().ok_or("Invalid platform catalog")? {

@@ -12,7 +12,6 @@ import {
   Settings,
   Search,
   Plus,
-  ChevronRight,
   X,
   Gamepad2,
   CircleHelp,
@@ -24,9 +23,14 @@ import { EmulatorsPage } from "./features/emulators/EmulatorsPage";
 import { DownloadsPage } from "./features/downloads/DownloadsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { Modal } from "./components/Modal";
+import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop } from "./services/bridge";
-import { defaultSettings, type GameMetadata } from "./types";
+import {
+  defaultSettings,
+  type GameMetadata,
+  type ImportCandidate,
+} from "./types";
 import { platformById } from "./db/platforms";
 type Page =
   "Home" | "Library" | "Discover" | "Downloads" | "Emulators" | "Settings";
@@ -43,6 +47,17 @@ export function App() {
   const [selected, setSelected] = useState<GameMetadata>();
   const [importing, setImporting] = useState(false);
   const [importGame, setImportGame] = useState<GameMetadata>();
+  const [importCandidate, setImportCandidate] = useState<ImportCandidate>();
+  const [downloadGame, setDownloadGame] = useState<GameMetadata>();
+  const downloads = useQuery({
+    queryKey: ["download-jobs"],
+    queryFn: bridge.downloadJobs,
+    refetchInterval: isDesktop ? 2000 : false,
+  });
+  const jobs = downloads.data ?? [];
+  const activeDownloads = jobs.filter((j) =>
+    ["QUEUED", "RESOLVING", "DOWNLOADING", "VERIFYING"].includes(j.state),
+  );
   const [query, setQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [toast, setToast] = useState("");
@@ -84,6 +99,7 @@ export function App() {
     setPlatform("all");
   };
   const openImport = (g?: GameMetadata) => {
+    setImportCandidate(undefined);
     setImportGame(g);
     setImporting(true);
   };
@@ -96,21 +112,17 @@ export function App() {
           onClick={() => navigate("Home")}
           aria-label="OpenRetro home"
         >
-          <div className="brand-icon">
-            o<span />
-          </div>
-          <span>
-            open<span className="brand-light">retro</span>
-            <small>YOUR NEXT NOSTALGIA TRIP.</small>
-          </span>
+          <BrandMark />
+          <span>OpenRetro</span>
         </button>
-        <div className="sidebar-label">YOUR SPACE</div>
+        <div className="sidebar-label">Collection</div>
         <nav className="main-nav">
           {navItems.map((n, i) => (
             <div key={n.page} className={i === 3 || i === 5 ? "nav-group" : ""}>
               <button
                 aria-label={n.page}
                 title={n.page}
+                aria-current={page === n.page ? "page" : undefined}
                 className={page === n.page ? "active" : ""}
                 onClick={() => navigate(n.page)}
               >
@@ -119,13 +131,14 @@ export function App() {
                 {n.page === "Library" && library.length > 0 && (
                   <small>{library.length}</small>
                 )}
-                {page === n.page && <i />}
               </button>
             </div>
           ))}
         </nav>
         <div className="sidebar-collection">
-          <span className="sidebar-label">YOUR PLATFORMS</span>
+          {library.length > 0 && (
+            <span className="sidebar-label">Your consoles</span>
+          )}
           {[...new Set(library.map((x) => x.game.platformId))]
             .slice(0, 4)
             .map((id) => (
@@ -143,25 +156,19 @@ export function App() {
                 </span>
               </button>
             ))}
-          {!library.length && (
-            <p>
-              A space for every
-              <br />
-              era of play.
-            </p>
-          )}
         </div>
         <div className="sidebar-bottom">
           <div className="download-status">
-            <span className="status-dot" />
+            <Download size={16} />
             <span>
-              All systems quiet<small>No active downloads</small>
+              {activeDownloads.length
+                ? `${activeDownloads.length} active download${activeDownloads.length === 1 ? "" : "s"}`
+                : "No active downloads"}
             </span>
-            <Download size={15} />
           </div>
           <div className="sidebar-version">
             <span>
-              OpenRetro <b>v0.1.0</b>
+              {isDesktop ? "Desktop" : "Browser preview"} <b>v0.1.0</b>
             </span>
             <button
               className="icon-button"
@@ -180,18 +187,15 @@ export function App() {
       </aside>
       <main>
         <header className="topbar">
-          <div className="breadcrumb">
-            Your space
-            <ChevronRight size={13} />
-            <span>{selected ? selected.title : page}</span>
-          </div>
           <div className="topbar-actions">
             <div className="global-search">
               <Search size={17} />
               <input
                 id="global-search"
                 aria-label="Search games"
-                placeholder="Search your next adventure…"
+                placeholder={
+                  page === "Library" ? "Search your library" : "Search games"
+                }
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -211,17 +215,17 @@ export function App() {
               )}
             </div>
             <button
-              className="button secondary add-game"
+              className="button primary add-game"
               onClick={() => openImport()}
             >
-              <Plus size={17} /> Add Game
+              <Plus size={18} /> Add game
             </button>
             <button
-              className="profile"
+              className="icon-button topbar-settings"
               aria-label="Open settings"
               onClick={() => navigate("Settings")}
             >
-              P<span />
+              <Settings size={19} />
             </button>
           </div>
         </header>
@@ -239,7 +243,11 @@ export function App() {
             entry={activeEntry}
             emulators={emulators}
             onBack={() => setSelected(undefined)}
-            onImport={() => openImport(selected)}
+            onImport={(game) => openImport(game)}
+            onDownload={(game) => {
+              setDownloadGame(game);
+              navigate("Downloads");
+            }}
             onEmulators={() => navigate("Emulators")}
             refresh={refresh}
             notify={notify}
@@ -251,6 +259,10 @@ export function App() {
             onImport={() => openImport()}
             onLibrary={() => navigate("Library")}
             onDiscover={() => navigate("Discover")}
+            onDownloads={() => {
+              setDownloadGame(undefined);
+              navigate("Downloads");
+            }}
           />
         ) : page === "Discover" ? (
           <DiscoverPage
@@ -279,7 +291,18 @@ export function App() {
             notify={notify}
           />
         ) : page === "Downloads" ? (
-          <DownloadsPage onImport={() => openImport()} />
+          <DownloadsPage
+            jobs={jobs}
+            game={downloadGame}
+            onClearGame={() => setDownloadGame(undefined)}
+            onImport={() => openImport()}
+            notify={notify}
+            onDownloaded={(candidate, game) => {
+              setImportCandidate(candidate);
+              setImportGame(game);
+              setImporting(true);
+            }}
+          />
         ) : (
           <SettingsPage
             onEmulators={() => navigate("Emulators")}
@@ -290,24 +313,23 @@ export function App() {
       {importing && (
         <ImportDialog
           initial={importGame}
+          initialCandidate={importCandidate}
           onClose={() => setImporting(false)}
           onImported={(game) => {
             void refresh();
             setImporting(false);
             setPage("Library");
             setSelected(game);
-            notify("Added to your collection. Make yourself at home.");
+            notify("Game added to your library.");
           }}
         />
       )}
       {help && (
-        <Modal
-          title="An open home for classic games."
-          onClose={() => setHelp(false)}
-        >
+        <Modal title="About OpenRetro" onClose={() => setHelp(false)}>
           <p className="muted">
             OpenRetro 0.1.0 brings your legally obtained game files and
-            installed emulators together. No game files, BIOS files, or
+            installed emulators together. Add JSON download sources in Downloads
+            to acquire games through magnet links. No game files, BIOS files, or
             emulators are bundled.
           </p>
           <p className="notice">

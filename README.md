@@ -46,10 +46,39 @@ The browser development server includes a localhost-only proxy; a static `vite p
 - Select **Discover**, then a console or All consoles. Fourteen initial systems are mapped from IGDB's platform catalog.
 - Choose a genre. Console and genre filtering, ordering, and pagination are performed by IGDB rather than filtering only a loaded page.
 - Search by title; results use IGDB relevance ordering. **Load more games** fetches another 24 entries. Most rated, highest rated (minimum five ratings), alphabetical, newest, and oldest ordering apply when no text search is active.
-- Open a game for its overview, developer and screenshots; **Locate game file** associates your own file with its metadata. Games available on multiple supported consoles retain the compatible console choices during import.
+- Open a game for its overview, developer and screenshots. **Find download** searches your enabled sources; **Add local file** associates an existing file with its metadata. Games available on multiple supported consoles retain compatible console choices during import.
 - IGDB supplies metadata and artwork only. It is not a game-download provider.
 
 ## Try the vertical slice
+
+### Download using your JSON sources
+
+1. In the **desktop app**, open **Downloads → Add source** (also available in Settings → Downloads).
+2. Paste an HTTPS JSON URL, choose a `.json` file, or paste its JSON text. The supported Hydra-style format is:
+
+```json
+{
+  "name": "My source",
+  "downloads": [
+    {
+      "title": "Game title",
+      "uris": ["magnet:?xt=urn:btih:REPLACE_WITH_REAL_40_HEX_OR_32_BASE32_HASH"],
+      "uploadDate": "2026-10-20T00:00:00Z",
+      "fileSize": "32 MB"
+    }
+  ]
+}
+```
+
+This is a format template, not a working download. Sources are user-supplied; none are bundled. Unknown extra fields are ignored. Direct HTTP download links and v2-only magnets are skipped. Sources must contain at least one valid v1 magnet. Imports are limited to 16 MB/100,000 entries. Duplicate entries/links are removed. Remote source refresh is manual and preserves enabled state; imported files can be replaced with new JSON.
+
+3. Search titles in **Downloads**, or open an IGDB game and click **Find download**. Choose an edition and magnet, then **Start download**. Selecting a source result is explicit; IGDB records are never silently matched to unrelated files.
+4. Native BitTorrent runs inside OpenRetro using [librqbit](https://github.com/ikatson/rqbit), without an external torrent client or HTTP control server. Progress, speed, remaining time and errors are real. You can pause, resume or cancel. Closing the app interrupts transfers; reopening restores them paused, and Resume rechecks existing pieces. Cancelling retains partial files. BitTorrent uploads pieces while downloading; completed transfers are detached and stop seeding.
+5. At completion, click **Add to library**, choose the downloaded console file and confirm its platform/metadata. Archives must currently be extracted manually; installers and scripts are not executed. Configure a compatible emulator and click **Play game**. Automatic emulator installation is not implemented.
+
+Settings → Downloads lets you choose the destination. Each transfer gets its own UUID folder, and its original directory remains saved even if the default changes. JSON sources, their enablement, and jobs persist in SQLite. Browser preview supports JSON source management and search with separate localStorage data; actual torrents, file access and launching require desktop.
+
+### Import an existing file
 
 1. Open the desktop app, click **Add Game**, and choose a legally obtained game file.
 2. Confirm the detected platform. `.bin` and `.pbp` are ambiguous and require a deliberate selection. ZIP archives are treated as Arcade files and are never extracted automatically.
@@ -75,7 +104,7 @@ src/
     library/        import wizard
     games/          game page, resolver feedback and configuration
     emulators/      executable registration, detection, defaults and path tests
-    downloads/      queue presentation, empty until a transport is configured
+    downloads/      JSON sources, source search, transfers and file import
     settings/       local preferences, storage paths and milestone boundaries
   hooks/            TanStack Query reads and invalidation
   providers/
@@ -91,7 +120,7 @@ src-tauri/
     metadata/       IGDB requests, Twitch OAuth and persistent cache
     filesystem/     canonical paths, executable validation, streamed SHA-256
     launcher/       process ownership and session accounting
-    downloads/      network transport boundary (disabled)
+    downloads/      validated source persistence and native BitTorrent engine
 server/
   igdb.ts           browser-development proxy, OAuth and public metadata cache
 ```
@@ -114,6 +143,8 @@ The database lives in Tauri's OS-specific app-data directory as `openretro.sqlit
 | `sources` | Local files and disabled mock fixtures |
 | `settings` | Persisted application preferences |
 | `metadata_cache` | Public IGDB responses with expiry; no credentials or tokens |
+| `download_sources` | User-imported JSON catalogs, URLs, enabled state and refresh timestamp |
+| `download_jobs` | Torrent identity, destination, linked metadata and latest transfer state |
 
 SHA-256 is unique in the library to prevent duplicate imports. Removing an emulator clears per-game overrides. A partial unique index prevents two active sessions of the same game. Crash-interrupted sessions close at startup with no invented offline time. Session tracking lasts until the launched process exits; keep OpenRetro open while playing.
 
@@ -123,7 +154,7 @@ SHA-256 is unique in the library to prevent duplicate imports. Removing an emula
 - Paths must be absolute, canonicalize to files, and contain no `..` traversal or NUL. Executable permissions are checked on Linux; Windows accepts `.exe` executables only.
 - Rust uses `std::process::Command` and separate arguments, never shell interpolation. Providers cannot supply executable scripts.
 - The registered emulator is a trusted application chosen by the user. Per-game arguments may enable emulator-specific behavior; only use configuration you understand.
-- Downloads have HTTPS/credential/checksum validation and an injectable transport interface, but **no network transport or provider downloads are enabled**. Pause, resume, retry, installation, bandwidth enforcement, and real download progress are future work. The UI does not fabricate activity.
+- Remote JSON sources require HTTPS, bounded UTF-8 responses and valid magnet entries. Torrent metadata is resolved before payload writes; filenames are validated against traversal, drive prefixes, alternate streams, symlinks and device names. BitTorrent validates piece hashes; library import computes SHA-256. This validates integrity, not the trustworthiness of third-party content. Automatic extraction, executable installation, queue/bandwidth limits and selective torrent files are not implemented.
 - IGDB metadata requests are restricted to fixed official IGDB/Twitch endpoints. External query text is escaped, numeric filters and sorting are validated, images use the official IGDB CDN, and redirects are disabled. Credentials stay in the backend; OAuth tokens live in memory.
 - No commercial ROMs, BIOS files, DRM bypass, secrets, analytics, or API keys are included in the repository.
 - Autostart, folder scanning, complete gamepad navigation, automatic BIOS/core discovery and automatic emulator installation are not implemented. Settings label unavailable features as planned or reserved.
@@ -138,10 +169,12 @@ cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-The 35 TypeScript/SQLite tests cover the domain, migrations, IGDB field mapping, multi-platform games, image validation, server query boundaries, genre filters and pagination. Six Rust tests cover paths, SHA-256 and native IGDB query behavior. GitHub Actions is configured to build/test the frontend and check Rust on Windows and Linux.
+Tests cover the domain, migrations, IGDB mapping/query boundaries, Hydra JSON parsing, source persistence and interrupted download recovery. Rust tests include a real local-peer magnet transfer with integrity verification, pause/unpause, file retention and downloaded-file detection. GitHub Actions builds/tests the frontend and checks Rust on Windows and Linux.
 
-Local verification: frontend production build, 35 frontend/database tests, `cargo check`, six Rust tests, live IGDB queries, browser console/genre navigation, and native desktop startup. A real emulator session, production installer packaging, Linux execution and a remote CI run remain unverified. See [the validation record](docs/VALIDATION.md).
+Local verification includes a frontend production build, frontend/database tests, `cargo check`, Rust tests, live IGDB queries, browser navigation/source management, responsive layouts, both themes and native desktop startup. Public-swarm availability depends on the user's source and peers. A real emulator session, production installer packaging, Linux execution and a remote CI run remain unverified. See [the validation record](docs/VALIDATION.md).
 
 ## License
 
 Application code and original development illustrations: MIT, see [LICENSE](LICENSE). IGDB metadata and game artwork retain their respective providers' and owners' rights; they are not relicensed under MIT.
+
+Manrope and Space Grotesk fonts are bundled locally; their SIL Open Font License notices are in `public/licenses/`. The visual system is documented in [docs/DESIGN.md](docs/DESIGN.md). librqbit is Apache-2.0; its dependency licensing remains separate from OpenRetro's MIT application code.

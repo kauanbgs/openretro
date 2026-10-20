@@ -3,6 +3,7 @@ import { enrichGameMetadata } from "../../utils/metadata";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  Download,
   Play,
   Heart,
   Settings2,
@@ -12,6 +13,7 @@ import {
   Clock3,
   CalendarDays,
   LoaderCircle,
+  ExternalLink,
 } from "lucide-react";
 import type {
   Emulator,
@@ -31,6 +33,7 @@ export function GamePage({
   emulators,
   onBack,
   onImport,
+  onDownload,
   onEmulators,
   refresh,
   notify,
@@ -39,7 +42,8 @@ export function GamePage({
   entry?: LibraryGame;
   emulators: Emulator[];
   onBack: () => void;
-  onImport: () => void;
+  onImport: (game: GameMetadata) => void;
+  onDownload: (game: GameMetadata) => void;
   onEmulators: () => void;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
@@ -125,65 +129,78 @@ export function GamePage({
         <GameArtwork game={game} hero />
         <div className="detail-shade" />
         <button className="back-button" onClick={onBack}>
-          <ArrowLeft size={17} /> Back to collection
+          <ArrowLeft size={17} /> Back
         </button>
         <div className="detail-heading">
-          <span className="eyebrow">
-            {game.genre} <span> / </span> {platform?.shortName}
-          </span>
-          <h1>{game.title}</h1>
-          <p>
-            {platform?.name}
-            <span>·</span>
-            {game.year}
-            <span>·</span>
-            {game.developer}
-          </p>
-          <div className="hero-actions">
-            <button
-              className="button primary"
-              disabled={running || busy}
-              onClick={() => (entry ? void play() : onImport())}
-            >
-              {running ? (
-                <LoaderCircle className="spin" size={19} />
-              ) : entry ? (
-                <Play size={18} fill="currentColor" />
-              ) : (
-                <FolderOpen size={18} />
-              )}{" "}
-              {running
-                ? "Playing · waiting for emulator"
-                : entry
-                  ? "Play game"
-                  : "Locate game file"}
-            </button>
-            {entry && (
-              <>
-                <button
-                  className={`button glass ${entry.item.favorite ? "favorited" : ""}`}
-                  aria-label={
-                    entry.item.favorite ? "Remove favorite" : "Favorite game"
-                  }
-                  onClick={() =>
-                    void action(() =>
-                      bridge.favorite(entry.item.id, !entry.item.favorite),
-                    )
-                  }
-                >
-                  <Heart
-                    size={19}
-                    fill={entry.item.favorite ? "currentColor" : "none"}
-                  />
+          <div className="detail-cover">
+            <GameArtwork game={game} />
+          </div>
+          <div className="detail-titleblock">
+            <span className="detail-console">{platform?.name}</span>
+            <h1>{game.title}</h1>
+            <div className="game-facts">
+              <span>{game.year || "Year unknown"}</span>
+              <span>{game.developer}</span>
+            </div>
+            <div className="hero-actions">
+              <button
+                className="button primary"
+                disabled={running || busy}
+                onClick={() =>
+                  entry
+                    ? resolution?.state === "MISSING_EMULATOR"
+                      ? onEmulators()
+                      : void play()
+                    : onDownload(game)
+                }
+              >
+                {running ? (
+                  <LoaderCircle className="spin" size={19} />
+                ) : entry ? (
+                  <Play size={18} fill="currentColor" />
+                ) : (
+                  <Download size={18} />
+                )}{" "}
+                {running
+                  ? "Game running"
+                  : entry
+                    ? resolution?.state === "MISSING_EMULATOR"
+                      ? "Set up emulator"
+                      : "Play game"
+                    : "Find download"}
+              </button>
+              {!entry && (
+                <button className="button glass" onClick={() => onImport(game)}>
+                  <FolderOpen size={17} /> Add local file
                 </button>
-                <button
-                  className="button glass"
-                  onClick={() => setConfig(true)}
-                >
-                  <Settings2 size={18} /> Configure
-                </button>
-              </>
-            )}
+              )}
+              {entry && (
+                <>
+                  <button
+                    className={`button glass ${entry.item.favorite ? "favorited" : ""}`}
+                    aria-label={
+                      entry.item.favorite ? "Remove favorite" : "Favorite game"
+                    }
+                    onClick={() =>
+                      void action(() =>
+                        bridge.favorite(entry.item.id, !entry.item.favorite),
+                      )
+                    }
+                  >
+                    <Heart
+                      size={19}
+                      fill={entry.item.favorite ? "currentColor" : "none"}
+                    />
+                  </button>
+                  <button
+                    className="button glass"
+                    onClick={() => setConfig(true)}
+                  >
+                    <Settings2 size={18} /> Configure
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -193,10 +210,10 @@ export function GamePage({
             <div>
               <strong>
                 {resolution.state === "MISSING_EMULATOR"
-                  ? "Your next step: configure an emulator"
+                  ? "Emulator required"
                   : resolution.state === "MISSING_GAME"
-                    ? "Let’s locate your game file"
-                    : "A little preparation before you play"}
+                    ? "Game file not found"
+                    : "Configuration required"}
               </strong>
               <p>
                 {!isDesktop
@@ -244,7 +261,7 @@ export function GamePage({
               <strong>
                 {entry?.item.lastPlayedAt
                   ? new Date(entry.item.lastPlayedAt).toLocaleDateString()
-                  : "Your adventure awaits"}
+                  : "Never"}
               </strong>
             </span>
           </div>
@@ -276,8 +293,7 @@ export function GamePage({
         {tab === "Overview" ? (
           <div className="overview">
             <div>
-              <span className="eyebrow">THE ADVENTURE</span>
-              <h2>A world worth coming back to.</h2>
+              <h2>About this game</h2>
               <p>{game.description}</p>
               {details.error && (
                 <p className="hint">
@@ -292,12 +308,12 @@ export function GamePage({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Game data and artwork: IGDB ↗
+                  View on IGDB <ExternalLink size={14} />
                 </a>
               )}
             </div>
             <aside>
-              <span className="eyebrow">AT A GLANCE</span>
+              <h3>Game details</h3>
               <dl>
                 <dt>Platform</dt>
                 <dd>{platform?.name}</dd>

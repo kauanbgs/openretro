@@ -1,36 +1,40 @@
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
-  ArrowRight,
-  Gamepad2,
+  Download,
+  FolderOpen,
   Library,
-  Sparkles,
+  Play,
+  Plus,
 } from "lucide-react";
 import { Artwork } from "../../components/Artwork";
-import { useMemo } from "react";
-import { enrichGameMetadata } from "../../utils/metadata";
 import { GameArtwork } from "../../components/GameArtwork";
-import { useQuery } from "@tanstack/react-query";
 import { GameCard } from "../../components/GameCard";
+import { PageHeader } from "../../components/PageHeader";
 import {
   metadataProvider,
   catalogStatus,
 } from "../../providers/metadata/IgdbMetadataProvider";
-import { isDesktop } from "../../services/bridge";
 import { platformById } from "../../db/platforms";
+import { enrichGameMetadata } from "../../utils/metadata";
 import type { GameMetadata, LibraryGame } from "../../types";
+interface Props {
+  library: LibraryGame[];
+  onSelect: (game: GameMetadata) => void;
+  onImport: () => void;
+  onLibrary: () => void;
+  onDiscover: () => void;
+  onDownloads: () => void;
+}
 export function HomePage({
   library,
   onSelect,
   onImport,
   onLibrary,
   onDiscover,
-}: {
-  library: LibraryGame[];
-  onSelect: (game: GameMetadata) => void;
-  onImport: () => void;
-  onLibrary: () => void;
-  onDiscover: () => void;
-}) {
+  onDownloads,
+}: Props) {
   const played = [...library]
     .filter((x) => x.item.lastPlayedAt)
     .sort((a, b) =>
@@ -41,16 +45,16 @@ export function HomePage({
     queryFn: catalogStatus,
     retry: false,
   });
-  const { data: spotlight } = useQuery({
+  const spotlight = useQuery({
     queryKey: ["catalog-spotlight"],
     queryFn: () => metadataProvider.browse(),
     enabled: status.data?.configured === true,
     retry: false,
     staleTime: 86400000,
   });
-  const suggestions = spotlight?.games ?? [];
+  const suggestions = spotlight.data?.games ?? [];
   const primary = played[0]?.game ?? suggestions[0];
-  const { data: featureDetails } = useQuery({
+  const details = useQuery({
     queryKey: ["game-detail", primary?.externalId, primary?.platformId],
     queryFn: () =>
       metadataProvider.getGame(
@@ -65,107 +69,136 @@ export function HomePage({
     staleTime: 86400000,
   });
   const featured = useMemo(
-    () => (primary ? enrichGameMetadata(primary, featureDetails) : undefined),
-    [primary, featureDetails],
+    () => (primary ? enrichGameMetadata(primary, details.data) : undefined),
+    [primary, details.data],
   );
+  const shelf = library.slice(0, 3);
   return (
-    <div className="home-content">
-      <div className="welcome-line">
-        <div>
-          <span className="eyebrow">GOOD GAMES. GREAT MEMORIES.</span>
-          <h1>
-            Welcome home<span className="accent">.</span>
-          </h1>
-          <p>Your favorites are right where you left them.</p>
-        </div>
-        <span className="local-badge">
-          <span className="status-dot" />
-          {isDesktop
-            ? "Your collection. Locally yours."
-            : "Interactive browser preview"}
-        </span>
-      </div>
-      <section className="featured-hero">
-        {featured ? (
-          <GameArtwork game={featured} hero />
-        ) : (
-          <Artwork kind="astral" />
-        )}
-        <div className="hero-scrim" />
-        <div className="hero-content">
-          <div className="hero-kicker">
-            <span className="tiny-pill">
-              <span />
-              {played.length ? "CONTINUE PLAYING" : "A NEW ADVENTURE AWAITS"}
+    <div className="page-content home-content">
+      <PageHeader
+        title="Home"
+        description="Your games, within reach."
+        actions={
+          <button className="text-button" onClick={onLibrary}>
+            <Library size={16} /> Open library
+          </button>
+        }
+      />
+      <div className="home-lead">
+        <section
+          className="feature-stage"
+          aria-label={played.length ? "Continue playing" : "Featured game"}
+        >
+          {featured ? (
+            <GameArtwork game={featured} hero />
+          ) : (
+            <Artwork kind="astral" />
+          )}
+          <div className="feature-shade" />
+          <div className="feature-topline">
+            <span className="feature-label">
+              {played.length ? "Continue playing" : "From the catalog"}
             </span>
+            {featured && (
+              <span className="feature-system">
+                {platformById(featured.platformId)?.shortName}
+              </span>
+            )}
+          </div>
+          <div className="feature-copy">
+            <h2>{featured?.title ?? "Your next game is out there."}</h2>
+            {featured ? (
+              <div className="feature-facts">
+                <span>{platformById(featured.platformId)?.name}</span>
+                <span>{featured.year || "Release year unknown"}</span>
+              </div>
+            ) : (
+              <p>
+                Explore the classics or add a game from your own collection.
+              </p>
+            )}
+            <div className="hero-actions">
+              <button
+                className="button primary"
+                onClick={() => (featured ? onSelect(featured) : onDiscover())}
+              >
+                {played.length ? (
+                  <Play size={17} fill="currentColor" />
+                ) : (
+                  <ArrowUpRight size={18} />
+                )}{" "}
+                {played.length
+                  ? "Continue game"
+                  : featured
+                    ? "View game"
+                    : "Explore games"}
+              </button>
+              {featured && (
+                <button className="button on-art" onClick={onDiscover}>
+                  Browse catalog
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+        <aside className="collection-shelf">
+          <div className="shelf-heading">
+            <h2>Your collection</h2>
             <span>
-              {featured ? platformById(featured.platformId)?.shortName : "IGDB"}{" "}
-              <b>·</b> {featured?.year || "CLASSIC GAMES"}
+              {library.length} {library.length === 1 ? "game" : "games"}
             </span>
           </div>
-          <h2>
-            {!featured ? (
+          {shelf.length ? (
+            <div className="shelf-games">
+              {shelf.map(({ game, item }) => (
+                <button
+                  className="shelf-game"
+                  key={item.id}
+                  onClick={() => onSelect(game)}
+                >
+                  <GameArtwork game={game} />
+                  <span>
+                    <strong>{game.title}</strong>
+                    <small>{platformById(game.platformId)?.shortName}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="shelf-empty">
+              <div className="cartridge-outline">
+                <span />
+                <i />
+              </div>
+              <h3>No games added yet</h3>
+              <p>Download a game from your sources or add a local file.</p>
+            </div>
+          )}
+          <button
+            className="button secondary shelf-import"
+            onClick={shelf.length ? onImport : onDownloads}
+          >
+            {shelf.length ? (
               <>
-                A world of classics.
-                <br />
-                One place to play.
+                <Plus size={17} /> Add a game
               </>
             ) : (
-              featured.title
+              <>
+                <Download size={17} /> Find downloads
+              </>
             )}
-          </h2>
-          <p>
-            {played.length
-              ? "Pick up your story. There’s still a whole world out there."
-              : "Rediscover the feeling of getting lost in a game.\nYour next great adventure starts here."}
-          </p>
-          <div className="hero-actions">
-            <button
-              className="button primary"
-              onClick={() => (featured ? onSelect(featured) : onDiscover())}
-            >
-              {played.length ? (
-                <Gamepad2 size={18} />
-              ) : (
-                <ArrowUpRight size={18} />
-              )}{" "}
-              {played.length
-                ? "Continue adventure"
-                : featured
-                  ? "Explore game"
-                  : "Explore the catalog"}
-            </button>
-            <button className="hero-secondary" onClick={() => onDiscover()}>
-              Discover something new <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-        <div className="hero-caption">
-          <span className="hero-caption-line" />
-          <span>
-            {featured?.title ?? "Every era. One home."}
-            <small>
-              {played.length ? "FROM YOUR COLLECTION" : "POWERED BY IGDB"}
-            </small>
-          </span>
-        </div>
-        <div className="hero-pagination">
-          <i className="active" />
-          <i />
-          <i />
-        </div>
-      </section>
+          </button>
+        </aside>
+      </div>
       {played.length > 0 && (
         <section className="game-section">
           <div className="section-heading">
-            <h2>
-              Continue playing <span>{played.length}</span>
-            </h2>
-            <button className="text-button" onClick={() => onLibrary()}>
-              View library <ArrowRight size={15} />
+            <h2>Continue playing</h2>
+            <button className="text-button" onClick={onLibrary}>
+              View library
             </button>
           </div>
-          <div className="games-grid">
+          <div className="games-grid home-game-grid">
             {played.slice(0, 4).map((x) => (
               <GameCard
                 key={x.item.id}
@@ -180,27 +213,21 @@ export function HomePage({
       <section className="game-section">
         <div className="section-heading">
           <div>
-            <h2>
-              {library.length ? "Recently added" : "Find your next favorite"}
-              <span>{library.length || suggestions.length}</span>
-            </h2>
-            <p>
-              {library.length
-                ? "Fresh additions to your personal collection."
-                : "Real games from IGDB, ready to join your personal collection."}
-            </p>
+            <h2>{library.length ? "Recently added" : "Worth a look"}</h2>
+            {!library.length && <p>Classics from the IGDB catalog.</p>}
           </div>
           <button
             className="text-button"
-            onClick={() => (library.length ? onLibrary() : onDiscover())}
+            onClick={library.length ? onLibrary : onDiscover}
           >
-            View all <ArrowRight size={15} />
+            {library.length ? "View library" : "Browse all games"}
+            <ArrowUpRight size={15} />
           </button>
         </div>
-        <div className="games-grid">
+        <div className="games-grid home-game-grid">
           {(library.length
             ? library.slice(0, 4).map((x) => ({ game: x.game, item: x.item }))
-            : suggestions.slice(0, 4).map((game) => ({ game, item: undefined }))
+            : suggestions.slice(1, 5).map((game) => ({ game, item: undefined }))
           ).map((x) => (
             <GameCard
               key={x.game.id}
@@ -211,52 +238,29 @@ export function HomePage({
           ))}
         </div>
         {!library.length && !suggestions.length && (
-          <div className="home-catalog-prompt">
-            <Gamepad2 size={27} />
+          <div className="catalog-invitation">
+            <FolderOpen size={24} />
             <div>
               <h3>
                 {status.data?.configured
-                  ? "Your catalog is ready to explore."
-                  : "Connect your real game catalog."}
+                  ? "The catalog is unavailable right now."
+                  : "Connect your game catalog."}
               </h3>
-              <p>Browse games by console and genre with IGDB.</p>
+              <p>
+                {status.data?.configured
+                  ? "You can still add and play local games."
+                  : "Set up IGDB to browse games and cover art."}
+              </p>
             </div>
             <button className="button secondary" onClick={onDiscover}>
-              {status.data?.configured ? "Open Discover" : "Set up IGDB"}
-              <ArrowRight size={15} />
+              {status.data?.configured ? "Open Discover" : "Connect IGDB"}
             </button>
           </div>
         )}
       </section>
-      <section className="library-banner">
-        <div className="banner-icon">
-          <Library size={26} />
-        </div>
-        <div>
-          <h3>
-            {library.length
-              ? "Your library. Every era, one home."
-              : "Every collection starts with one game."}
-          </h3>
-          <p>
-            {library.length
-              ? `${library.length} game${library.length === 1 ? "" : "s"} collected. Countless memories ahead.`
-              : "Bring your classics together. We’ll take care of the details."}
-          </p>
-        </div>
-        <button
-          className="button secondary"
-          onClick={() => (library.length ? onLibrary() : onImport())}
-        >
-          {library.length ? "Your Library" : "Import your first game"}
-          <ArrowRight size={16} />
-        </button>
-      </section>
-      <footer className="home-footer">
-        <span>
-          <Sparkles size={13} /> Built for the love of play.
-        </span>
-        <span>Open source. Yours to explore.</span>
+      <footer className="page-footer">
+        <span>OpenRetro</span>
+        <span>Game data and artwork from IGDB.</span>
       </footer>
     </div>
   );

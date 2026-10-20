@@ -100,6 +100,8 @@ export const defaultSettings: AppSettings = {
   developerMode: false,
 };
 export type DownloadState =
+  | "RESOLVING"
+  | "PAUSED"
   | "QUEUED"
   | "DOWNLOADING"
   | "VERIFYING"
@@ -115,4 +117,37 @@ export interface DownloadJob {
   bytesPerSecond: number;
   remainingSeconds: number | null;
   error?: string;
+  sourceName?: string;
+  directory?: string;
+  downloadedBytes?: number;
+  totalBytes?: number;
+  game?: GameMetadata;
+}
+export interface DownloadSourceEntry {
+  title: string;
+  uris: string[];
+  uploadDate?: string;
+  fileSize?: string;
+}
+export interface DownloadSourceDocument {
+  name: string;
+  downloads: DownloadSourceEntry[];
+}
+export interface DownloadSource {
+  id: string;
+  name: string;
+  url: string | null;
+  enabled: boolean;
+  updatedAt: string;
+  gameCount: number;
+}
+export interface SourceMatch extends DownloadSourceEntry {
+  id: string;
+  sourceId: string;
+  sourceName: string;
+}
+export interface DownloadedFile {
+  path: string;
+  filename: string;
+  platformIds: string[];
 }

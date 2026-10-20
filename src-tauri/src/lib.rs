@@ -23,6 +23,7 @@ pub fn run() {
                 .map_err(std::io::Error::other)?;
             app.manage(db);
             app.manage(metadata::CatalogService::default());
+            app.manage(downloads::DownloadService::default());
             log::info!(
                 "OpenRetro initialized; network downloads: {}",
                 downloads::NETWORK_DOWNLOADS_ENABLED
@@ -32,6 +33,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             metadata::igdb_status,
             metadata::igdb_query,
+            downloads::sources::list_download_sources,
+            downloads::sources::save_download_source,
+            downloads::sources::set_download_source,
+            downloads::sources::remove_download_source,
+            downloads::sources::search_download_sources,
+            downloads::start_source_download,
+            downloads::list_download_jobs,
+            downloads::control_download,
+            downloads::download_files,
             commands::list_library,
             commands::list_emulators,
             commands::inspect_game,

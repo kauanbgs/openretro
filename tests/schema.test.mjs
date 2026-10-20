@@ -10,11 +10,19 @@ const cacheMigration = readFileSync(
   new URL("../src-tauri/src/database/002_metadata_cache.sql", import.meta.url),
   "utf8",
 );
+const downloadsMigration = readFileSync(
+  new URL(
+    "../src-tauri/src/database/003_download_sources.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 let db;
 beforeEach(() => {
   db = new DatabaseSync(":memory:");
   db.exec(migration);
   db.exec(cacheMigration);
+  db.exec(downloadsMigration);
   db.prepare("INSERT INTO platforms VALUES (?, ?)").run("gba", "{}");
   db.prepare("INSERT INTO games VALUES (?, ?)").run("game", "{}");
   db.prepare("INSERT INTO emulators VALUES (?, ?)").run("emulator", "{}");
@@ -33,12 +41,13 @@ beforeEach(() => {
 });
 afterEach(() => db.close());
 describe("SQLite migration and relational integrity", () => {
-  it("can be applied twice and records both versions", () => {
+  it("can be applied twice and records all versions", () => {
     db.exec(migration);
     db.exec(cacheMigration);
+    db.exec(downloadsMigration);
     expect(
       db.prepare("SELECT count(*) AS count FROM schema_migrations").get().count,
-    ).toBe(2);
+    ).toBe(3);
   });
   it("rejects duplicate file fingerprints", () => {
     expect(() =>
@@ -91,5 +100,72 @@ describe("SQLite migration and relational integrity", () => {
     expect(db.prepare("SELECT count(*) AS count FROM games").get().count).toBe(
       1,
     );
+  });
+});
+describe("download source and job persistence", () => {
+  it("preserves source enabled state on refresh and rejects duplicate URLs", () => {
+    const insert = db.prepare(
+      "INSERT INTO download_sources(id,name,url,enabled,updated_at,document) VALUES(?,?,?,?,?,?)",
+    );
+    insert.run(
+      "source",
+      "Test",
+      "https://example.org/source.json",
+      0,
+      "today",
+      '{"downloads":[]}',
+    );
+    expect(() =>
+      insert.run(
+        "other",
+        "Test",
+        "https://example.org/source.json",
+        1,
+        "today",
+        "{}",
+      ),
+    ).toThrow();
+    db.prepare("UPDATE download_sources SET name=?,document=? WHERE id=?").run(
+      "Updated",
+      '{"downloads":[{}]}',
+      "source",
+    );
+    const source = db
+      .prepare(
+        "SELECT enabled,json_array_length(document,'$.downloads') AS count FROM download_sources",
+      )
+      .get();
+    expect(source.enabled).toBe(0);
+    expect(source.count).toBe(1);
+  });
+  it("marks interrupted transfers paused without changing completed downloads", () => {
+    const insert = db.prepare("INSERT INTO download_jobs(id,data) VALUES(?,?)");
+    insert.run(
+      "active",
+      JSON.stringify({
+        state: "RESOLVING",
+        progress: 12,
+        directory: "/downloads/active",
+      }),
+    );
+    insert.run("done", JSON.stringify({ state: "COMPLETED", progress: 100 }));
+    db.exec(
+      "UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')",
+    );
+    expect(
+      JSON.parse(
+        db.prepare("SELECT data FROM download_jobs WHERE id='active'").get()
+          .data,
+      ),
+    ).toEqual({
+      state: "PAUSED",
+      progress: 12,
+      directory: "/downloads/active",
+    });
+    expect(
+      JSON.parse(
+        db.prepare("SELECT data FROM download_jobs WHERE id='done'").get().data,
+      ).state,
+    ).toBe("COMPLETED");
   });
 });

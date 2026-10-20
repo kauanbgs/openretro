@@ -14,17 +14,28 @@ import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider"
 import type { GameMetadata, ImportCandidate } from "../../types";
 export function ImportDialog({
   initial,
+  initialCandidate,
   onClose,
   onImported,
 }: {
   initial?: GameMetadata;
+  initialCandidate?: ImportCandidate;
   onClose: () => void;
   onImported: (game: GameMetadata) => void;
 }) {
-  const [candidate, setCandidate] = useState<ImportCandidate>();
+  const [candidate, setCandidate] = useState<ImportCandidate | undefined>(
+    initialCandidate,
+  );
   const [selected, setSelected] = useState(initial?.id ?? "custom");
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [platform, setPlatform] = useState(initial?.platformId ?? "");
+  const [title, setTitle] = useState(
+    initial?.title ?? initialCandidate?.filename.replace(/\.[^.]+$/, "") ?? "",
+  );
+  const [platform, setPlatform] = useState(
+    initialCandidate?.platformIds.find((p) => p === initial?.platformId) ??
+      initialCandidate?.platformIds[0] ??
+      initial?.platformId ??
+      "",
+  );
   const [matches, setMatches] = useState<GameMetadata[]>(
     initial ? [initial] : [],
   );
@@ -135,14 +146,14 @@ export function ImportDialog({
     }
   }
   return (
-    <Modal title="A new addition to your collection." onClose={onClose}>
+    <Modal title="Add game" onClose={onClose}>
       <div className="steps">
         <span className="active">
           1 <b>Locate file</b>
         </span>
         <ArrowRight size={14} />
         <span className={candidate ? "active" : ""}>
-          2 <b>Make it yours</b>
+          2 <b>Confirm details</b>
         </span>
       </div>
       {!candidate ? (
@@ -150,10 +161,10 @@ export function ImportDialog({
           <div className="large-icon">
             <FolderOpen size={30} />
           </div>
-          <h3>Your games. Your collection.</h3>
+          <h3>Choose your game file</h3>
           <p>
-            Choose a game file you own or are authorized to use. We’ll detect
-            the platform and calculate its SHA-256 checksum.
+            OpenRetro detects the console and helps match the game’s details.
+            Your original file stays where it is.
           </p>
           <button
             className="button primary"

@@ -1,3 +1,4 @@
+import { PageHeader } from "../../components/PageHeader";
 import { useState } from "react";
 import {
   Cpu,
@@ -47,32 +48,31 @@ export function EmulatorsPage({
   });
   return (
     <div className="page-content">
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">THE ENGINES BEHIND YOUR GAMES</span>
-          <h1>
-            Emulators<span className="accent">.</span>
-          </h1>
-          <p>Set it up once. Come back and play.</p>
-        </div>
-        <div className="hero-actions">
-          <button
-            disabled={busy}
-            className="button secondary"
-            onClick={() =>
-              void run(async () => setDetected(await bridge.detectEmulators()))
-            }
-          >
-            <Search size={17} /> Detect emulators
-          </button>
-          <button
-            className="button primary"
-            onClick={() => setEditing(blank())}
-          >
-            <Plus size={18} /> Add emulator
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Emulators"
+        description="Choose the applications that run your games."
+        actions={
+          <>
+            <button
+              disabled={busy}
+              className="button secondary"
+              onClick={() =>
+                void run(async () =>
+                  setDetected(await bridge.detectEmulators()),
+                )
+              }
+            >
+              <Search size={17} /> Detect installed
+            </button>
+            <button
+              className="button primary"
+              onClick={() => setEditing(blank())}
+            >
+              <Plus size={18} /> Add emulator
+            </button>
+          </>
+        }
+      />
       {emulators.length ? (
         <div className="emulator-grid">
           {emulators.map((e) => (
@@ -126,17 +126,17 @@ export function EmulatorsPage({
           <div className="large-icon">
             <Cpu size={32} />
           </div>
-          <h2>A little setup. A lot of nostalgia.</h2>
+          <h2>Add an emulator to play</h2>
           <p>
-            Add an emulator you trust, then choose the platforms it supports.
+            Select an installed emulator and the consoles it supports.
             <br />
-            OpenRetro will take care of launching your games.
+            OpenRetro uses it when you launch a compatible game.
           </p>
           <button
             className="button primary"
             onClick={() => setEditing(blank())}
           >
-            <Plus size={17} /> Add your first emulator
+            <Plus size={17} /> Add emulator
           </button>
           <small>Bring your own executable from its official project.</small>
         </div>

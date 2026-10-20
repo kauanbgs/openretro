@@ -64,7 +64,6 @@ export function Modal({
       >
         <header>
           <div>
-            <span className="eyebrow">OPENRETRO</span>
             <h2>{title}</h2>
           </div>
           <button

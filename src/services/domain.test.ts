@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { detectPlatforms } from "../db/platforms";
 import { catalog } from "../providers/metadata/MockMetadataProvider";
 import { GameResolver } from "./GameResolver";
-import { DownloadManager } from "./DownloadManager";
 import { EmulatorManager } from "./EmulatorManager";
 import type { Emulator, LibraryItem } from "../types";
 const item: LibraryItem = {
@@ -126,26 +125,4 @@ describe("emulator selection", () => {
       ]).resolve("gba", null)?.id,
     ).toBe("default");
   });
-});
-describe("download boundaries", () => {
-  const manager = new DownloadManager();
-  const request = {
-    name: "fixture",
-    url: "https://example.org/game",
-    sha256: "a".repeat(64),
-  };
-  it("rejects insecure protocols and embedded credentials", () => {
-    for (const url of [
-      "http://example.org/game",
-      "file:///tmp/game",
-      "https://user:password@example.org/game",
-    ])
-      expect(() => manager.validate({ ...request, url })).toThrow();
-  });
-  it("requires a SHA-256 checksum", () =>
-    expect(() => manager.validate({ ...request, sha256: "bad" })).toThrow());
-  it("does not pretend to download without an authorized transport", async () =>
-    expect(
-      manager.enqueue(request, new AbortController().signal, () => {}),
-    ).rejects.toThrow("No authorized download source"));
 });

@@ -1,3 +1,4 @@
+import { PageHeader } from "../../components/PageHeader";
 import { useState } from "react";
 import {
   Plus,
@@ -50,21 +51,19 @@ export function CollectionPage({
     );
   return (
     <div className="page-content">
-      <div className="page-title">
-        <div>
-          <span className="eyebrow">EVERY ERA. ONE HOME.</span>
-          <h1>
-            Your library<span className="accent">.</span>
-          </h1>
-          <p>
-            {library.length} game{library.length === 1 ? "" : "s"}. A collection
-            that’s unmistakably yours.
-          </p>
-        </div>
-        <button className="button primary" onClick={onImport}>
-          <Plus size={18} /> Add a game
-        </button>
-      </div>
+      <PageHeader
+        title="Library"
+        description={
+          library.length
+            ? `${library.length} game${library.length === 1 ? "" : "s"} in your collection.`
+            : "Your games live here."
+        }
+        actions={
+          <button className="button primary" onClick={onImport}>
+            <Plus size={18} /> Add game
+          </button>
+        }
+      />
       <div className="library-toolbar">
         <div className="filter-tabs">
           <button
@@ -146,12 +145,12 @@ export function CollectionPage({
           <h2>
             {library.length
               ? "No games match this view."
-              : "A home for your favorite worlds."}
+              : "No games added yet"}
           </h2>
           <p>
             {library.length
               ? "Try a different search or platform filter."
-              : "Import your first local game, choose an emulator, and make yourself at home."}
+              : "Download a game from your sources in Downloads, or add a file from your computer."}
           </p>
           <button
             className="button primary"
@@ -167,7 +166,7 @@ export function CollectionPage({
               "Clear filters"
             ) : (
               <>
-                <FolderOpen size={17} /> Import your first game
+                <FolderOpen size={17} /> Add game
               </>
             )}
           </button>
