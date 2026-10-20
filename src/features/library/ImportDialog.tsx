@@ -109,7 +109,16 @@ export function ImportDialog({
     setBusy(true);
     setError("");
     try {
-      const match = matches.find((g) => g.id === selected);
+      // A custom title must never retain an old IGDB match after its platform changes.
+      const match =
+        selected === "custom"
+          ? undefined
+          : matches.find((g) => g.id === selected);
+      if (!candidate.platformIds.includes(platform)) {
+        throw new Error(
+          "Choose a platform detected from the selected game file.",
+        );
+      }
       if (
         match &&
         match.platformId !== platform &&
