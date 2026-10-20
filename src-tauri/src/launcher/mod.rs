@@ -6,6 +6,39 @@ use rusqlite::params;
 use std::{process::Command, time::Instant};
 use tauri::{Emitter, Manager};
 
+fn retroarch_core(executable: &std::path::Path, platform: &str) -> Result<std::path::PathBuf> {
+    let candidates: &[&str] = match platform {
+        "nes" => &[
+            "mesen_libretro.dll",
+            "nestopia_libretro.dll",
+            "fceumm_libretro.dll",
+        ],
+        "snes" => &["snes9x_libretro.dll"],
+        "n64" => &["mupen64plus_next_libretro.dll", "parallel_n64_libretro.dll"],
+        "gb" | "gbc" => &["sameboy_libretro.dll", "gambatte_libretro.dll"],
+        "gba" => &["mgba_libretro.dll", "vba_next_libretro.dll"],
+        "nds" => &["melonds_libretro.dll", "desmume_libretro.dll"],
+        "sms" | "genesis" | "gg" => &["genesis_plus_gx_libretro.dll", "picodrive_libretro.dll"],
+        "psx" => &[
+            "swanstation_libretro.dll",
+            "pcsx_rearmed_libretro.dll",
+            "beetle_psx_hw_libretro.dll",
+        ],
+        "psp" => &["ppsspp_libretro.dll"],
+        "arcade" => &["fbneo_libretro.dll", "mame_libretro.dll"],
+        _ => &[],
+    };
+    let cores = executable
+        .parent()
+        .ok_or("Invalid RetroArch path.")?
+        .join("cores");
+    candidates
+        .iter()
+        .map(|core| cores.join(core))
+        .find(|core| core.is_file())
+        .ok_or_else(|| format!("RetroArch has no core installed for this console. In RetroArch, open Online Updater → Core Downloader, then install a compatible core for {platform}.").into())
+}
+
 #[tauri::command]
 pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -20,9 +53,10 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  let game_path=filesystem::canonical_file(&entry.item.source_path)?;
  let executable=filesystem::executable(&emulator.executable_path)?;
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
- if entry.item.platform_id == "psx" && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
- let mut args:Vec<String>=entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect();
- if !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
+ let managed_retroarch=emulator.id=="openretro-retroarch" && entry.item.runtime_args.is_empty();
+ if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
+ let mut args:Vec<String>=if managed_retroarch { vec!["-L".into(),retroarch_core(&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()] } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
+ if !managed_retroarch && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
  let session=uuid::Uuid::new_v4().to_string(); let started=chrono::Utc::now().to_rfc3339();
  {
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;

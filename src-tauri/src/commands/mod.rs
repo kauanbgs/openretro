@@ -97,12 +97,12 @@ pub fn emulator_install_options() -> Vec<EmulatorInstall> {
         .collect()
 }
 #[tauri::command]
-pub async fn install_emulator(id: String) -> Result<String> {
-    tauri::async_runtime::spawn_blocking(move || install_emulator_blocking(&id))
+pub async fn install_emulator(id: String, app: tauri::AppHandle) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || install_emulator_blocking(&id, &app))
         .await
         .map_err(error)?
 }
-fn install_emulator_blocking(id: &str) -> Result<String> {
+fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String> {
     let installer = INSTALLERS
         .iter()
         .find(|installer| installer.id == id)
@@ -125,11 +125,74 @@ fn install_emulator_blocking(id: &str) -> Result<String> {
                 installer.name
             ));
         }
+        if installer.id == "retroarch" {
+            let executable = managed_retroarch_path().ok_or(
+                "RetroArch installed, but OpenRetro could not find retroarch.exe. Use Detect installed to select it.",
+            )?;
+            register_retroarch(app, executable)?;
+            return Ok("RetroArch was installed and set as OpenRetro's default runtime. Install cores from RetroArch's Online Updater before playing each console.".into());
+        }
         Ok(format!(
             "{} was installed. Choose Detect installed to add it to OpenRetro.",
             installer.name
         ))
     }
+}
+#[cfg(windows)]
+fn managed_retroarch_path() -> Option<std::path::PathBuf> {
+    let mut roots = Vec::new();
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        roots.push(std::path::PathBuf::from(program_files));
+    }
+    if let Some(program_files) = std::env::var_os("ProgramW6432") {
+        roots.push(std::path::PathBuf::from(program_files));
+    }
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        roots.push(std::path::PathBuf::from(local_app_data).join("Programs"));
+    }
+    roots
+        .into_iter()
+        .map(|root| root.join("RetroArch").join("retroarch.exe"))
+        .find(|path| path.is_file())
+}
+#[cfg(windows)]
+fn register_retroarch(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {
+    let emulator = Emulator {
+        id: "openretro-retroarch".into(),
+        name: "RetroArch".into(),
+        executable_path: filesystem::executable(&executable.to_string_lossy())?
+            .to_string_lossy()
+            .into_owned(),
+        supported_platforms: INSTALLERS[0]
+            .platforms
+            .iter()
+            .map(|platform| (*platform).into())
+            .collect(),
+        version: None,
+        default_platforms: INSTALLERS[0]
+            .platforms
+            .iter()
+            .map(|platform| (*platform).into())
+            .collect(),
+    };
+    let database = app.state::<Database>();
+    let mut conn = database.0.lock().map_err(error)?;
+    let transaction = conn.transaction().map_err(error)?;
+    for mut other in database::emulators(&transaction)? {
+        if other.id != emulator.id {
+            other
+                .default_platforms
+                .retain(|platform| !emulator.default_platforms.contains(platform));
+            transaction
+                .execute(
+                    "UPDATE emulators SET data=?1 WHERE id=?2",
+                    params![serde_json::to_string(&other).map_err(error)?, other.id],
+                )
+                .map_err(error)?;
+        }
+    }
+    transaction.execute("INSERT INTO emulators(id,data) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET data=excluded.data", params![emulator.id, serde_json::to_string(&emulator).map_err(error)?]).map_err(error)?;
+    transaction.commit().map_err(error)
 }
 #[tauri::command]
 pub async fn inspect_game(path: String) -> Result<ImportCandidate> {
