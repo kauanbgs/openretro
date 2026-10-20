@@ -36,6 +36,8 @@ pub struct DownloadJob {
     pub directory: String,
     pub error: Option<String>,
     pub game: Option<GameMetadata>,
+    #[serde(default)]
+    pub auto_extract: bool,
 }
 struct ActiveTask {
     cancel: CancellationToken,
@@ -418,7 +420,9 @@ fn direct_transfer(
     output.flush().map_err(error)?;
     drop(output);
     std::fs::rename(&temporary, &target).map_err(error)?;
-    extract_playable_zip(&target, Path::new(&job.directory))?;
+    if job.auto_extract {
+        extract_playable_zip(&target, Path::new(&job.directory))?;
+    }
     job.state = "COMPLETED".into();
     job.progress = 100.0;
     job.bytes_per_second = 0.0;
@@ -467,6 +471,8 @@ pub async fn start_source_download(
     entry_id: String,
     uri_index: usize,
     game: Option<GameMetadata>,
+    download_directory: Option<String>,
+    auto_extract: bool,
 ) -> Result<String> {
     let service = app.state::<DownloadService>();
     let _guard = service.operations.lock().await;
@@ -503,10 +509,15 @@ pub async fn start_source_download(
     }
     let id = uuid::Uuid::new_v4().to_string();
     let settings = crate::commands::get_settings(app.state::<Database>())?;
-    let root = settings["downloadDirectory"]
-        .as_str()
-        .filter(|s| !s.trim().is_empty())
+    let root = download_directory
+        .filter(|directory| !directory.trim().is_empty())
         .map(PathBuf::from)
+        .or_else(|| {
+            settings["downloadDirectory"]
+                .as_str()
+                .filter(|s| !s.trim().is_empty())
+                .map(PathBuf::from)
+        })
         .unwrap_or(app.path().app_data_dir().map_err(error)?.join("downloads"));
     if !root.is_absolute() {
         return Err("Choose an absolute download directory in Settings.".into());
@@ -529,6 +540,7 @@ pub async fn start_source_download(
         directory: directory.to_string_lossy().into_owned(),
         error: None,
         game,
+        auto_extract,
     };
     if is_magnet {
         spawn_transfer(&app, job)?;

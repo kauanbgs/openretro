@@ -164,6 +164,8 @@ export const bridge = {
     match: SourceMatch,
     uriIndex: number,
     game?: GameMetadata,
+    downloadDirectory?: string | null,
+    autoExtract = true,
   ): Promise<string> {
     if (!isDesktop)
       throw new Error(
@@ -174,6 +176,8 @@ export const bridge = {
       entryId: match.id,
       uriIndex,
       game: game ?? null,
+      downloadDirectory: downloadDirectory ?? null,
+      autoExtract,
     });
   },
   async downloadJobs(): Promise<DownloadJob[]> {

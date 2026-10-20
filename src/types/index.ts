@@ -131,6 +131,7 @@ export interface DownloadJob {
   downloadedBytes?: number;
   totalBytes?: number;
   game?: GameMetadata;
+  autoExtract?: boolean;
 }
 export interface DownloadSourceEntry {
   title: string;

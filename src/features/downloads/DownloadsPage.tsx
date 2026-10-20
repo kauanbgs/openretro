@@ -55,6 +55,10 @@ export function DownloadsPage({
   const [debounced, setDebounced] = useState(query);
   const [choice, setChoice] = useState<SourceMatch>();
   const [uri, setUri] = useState(0);
+  const [downloadDirectory, setDownloadDirectory] = useState<string | null>(
+    null,
+  );
+  const [autoExtract, setAutoExtract] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [files, setFiles] = useState<{
@@ -150,6 +154,8 @@ export function DownloadsPage({
                   onClick={() => {
                     setChoice(m);
                     setUri(0);
+                    setDownloadDirectory(null);
+                    setAutoExtract(true);
                     setError("");
                   }}
                 >
@@ -237,12 +243,18 @@ export function DownloadsPage({
                         disabled={busy}
                         className="button primary"
                         onClick={() =>
-                          void run(async () =>
-                            setFiles({
-                              job: j,
-                              files: await bridge.downloadFiles(j.id),
-                            }),
-                          )
+                          void run(async () => {
+                            const downloaded = await bridge.downloadFiles(j.id);
+                            if (downloaded.length === 1) {
+                              onDownloaded(
+                                await bridge.inspect(downloaded[0].path),
+                                j.game,
+                              );
+                              notify("Game added to your library.");
+                              return;
+                            }
+                            setFiles({ job: j, files: downloaded });
+                          })
                         }
                       >
                         <FolderOpen size={15} /> Add to library
@@ -290,9 +302,9 @@ export function DownloadsPage({
               </p>
             )}
             <label>
-              Magnet link
+              Download link
               <select
-                aria-label="Magnet link"
+                aria-label="Download link"
                 value={uri}
                 onChange={(e) => setUri(Number(e.target.value))}
               >
@@ -302,6 +314,40 @@ export function DownloadsPage({
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              Download folder
+              <div className="input-action">
+                <input
+                  value={downloadDirectory ?? ""}
+                  readOnly
+                  placeholder="Use the default download folder"
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Choose download folder"
+                  onClick={() =>
+                    void bridge
+                      .pickDownloadDirectory()
+                      .then(
+                        (directory) =>
+                          directory && setDownloadDirectory(directory),
+                      )
+                      .catch((e) => setError(String(e)))
+                  }
+                >
+                  <FolderOpen size={17} />
+                </button>
+              </div>
+            </label>
+            <label className="checkbox-line">
+              <input
+                type="checkbox"
+                checked={autoExtract}
+                onChange={(e) => setAutoExtract(e.target.checked)}
+              />{" "}
+              Extract ZIP files automatically when the download finishes
             </label>
             <p className="hint">
               BitTorrent downloads depend on available peers. Files are checked
@@ -319,7 +365,13 @@ export function DownloadsPage({
               disabled={busy}
               onClick={() =>
                 void run(async () => {
-                  await bridge.startDownload(choice, uri, game);
+                  await bridge.startDownload(
+                    choice,
+                    uri,
+                    game,
+                    downloadDirectory,
+                    autoExtract,
+                  );
                   setChoice(undefined);
                   notify("Download started. Waiting for torrent metadata.");
                 })
