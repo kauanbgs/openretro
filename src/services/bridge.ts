@@ -191,6 +191,9 @@ export const bridge = {
   ): Promise<void> {
     if (isDesktop) return invoke("control_download", { id, action });
   },
+  async removeDownload(id: string): Promise<void> {
+    if (isDesktop) return invoke("remove_download", { id });
+  },
   async downloadFiles(id: string): Promise<DownloadedFile[]> {
     return isDesktop ? invoke("download_files", { id }) : [];
   },

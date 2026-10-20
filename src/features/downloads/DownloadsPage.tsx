@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, Pause, Play, FolderOpen } from "lucide-react";
+import { Download, Pause, Play, FolderOpen, Trash2 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
@@ -161,6 +161,17 @@ export function DownloadsPage({
                         Cancel
                       </button>
                     ) : null}
+                    <button
+                      disabled={busy}
+                      className="icon-button"
+                      aria-label={`Remove ${j.name} from downloads`}
+                      title="Remove from downloads"
+                      onClick={() =>
+                        void run(() => bridge.removeDownload(j.id))
+                      }
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
               </article>

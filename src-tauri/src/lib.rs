@@ -42,6 +42,7 @@ pub fn run() {
             downloads::start_source_download,
             downloads::list_download_jobs,
             downloads::control_download,
+            downloads::remove_download,
             downloads::download_files,
             commands::list_library,
             commands::list_emulators,

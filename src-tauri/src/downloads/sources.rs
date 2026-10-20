@@ -165,6 +165,9 @@ fn fetch_document(url: &str) -> Result<SourceDocument> {
         .send()
         .map_err(|_| "Could not fetch source. Check its URL and your connection.")?;
     if !response.status().is_success() {
+        if response.status() == reqwest::StatusCode::FORBIDDEN {
+            return Err("This source blocks direct imports (HTTP 403). Download its JSON in your browser, then import the JSON file here.".into());
+        }
         return Err(format!(
             "Source returned HTTP {}.",
             response.status().as_u16()

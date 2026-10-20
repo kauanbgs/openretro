@@ -678,6 +678,23 @@ pub async fn control_download(app: tauri::AppHandle, id: String, action: String)
     }
     Ok(())
 }
+#[tauri::command]
+pub async fn remove_download(app: tauri::AppHandle, id: String) -> Result<()> {
+    let service = app.state::<DownloadService>();
+    let _guard = service.operations.lock().await;
+    let active = service.active.lock().map_err(error)?.remove(&id);
+    if let Some(active) = active {
+        active.cancel.cancel();
+        active.task.await.map_err(error)?;
+    }
+    app.state::<Database>()
+        .0
+        .lock()
+        .map_err(error)?
+        .execute("DELETE FROM download_jobs WHERE id=?1", [&id])
+        .map_err(error)?;
+    Ok(())
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadedFile {
