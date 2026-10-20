@@ -1947,6 +1947,47 @@ legend {
   flex-direction: column;
   border-top: 1px solid var(--border);
 }
+.emulator-installs {
+  padding: 2px 0 30px;
+  border-bottom: 1px solid var(--border);
+}
+.emulator-install-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.emulator-install {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  padding: 15px;
+}
+.emulator-install .emulator-icon {
+  width: 48px;
+  height: 48px;
+}
+.emulator-install h3 {
+  font-size: 15px;
+}
+.emulator-install p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+  margin-top: 4px;
+}
+.emulator-install a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  font-size: 10px;
+  margin-top: 8px;
+  text-decoration: none;
+}
 .emulator-card {
   display: grid;
   grid-template-columns: 54px minmax(160px, 1.1fr) minmax(130px, 1fr) auto;

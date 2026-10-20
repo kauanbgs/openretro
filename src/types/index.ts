@@ -54,6 +54,14 @@ export interface Emulator {
   version?: string;
   defaultPlatforms: string[];
 }
+export interface EmulatorInstall {
+  id: string;
+  name: string;
+  description: string;
+  supportedPlatforms: string[];
+  sourceName: string;
+  sourceUrl: string;
+}
 export type ResolutionState =
   | "READY"
   | "MISSING_GAME"

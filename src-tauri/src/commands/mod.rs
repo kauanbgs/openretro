@@ -4,7 +4,23 @@ use crate::{
     models::*,
 };
 use rusqlite::params;
+use serde::Deserialize;
+use std::{fs::File, io::copy, process::Command};
 use tauri::{Manager, State};
+
+const MGBA_RELEASES_API: &str = "https://api.github.com/repos/mgba-emu/mgba/releases/latest";
+
+#[derive(Deserialize)]
+struct GithubRelease {
+    tag_name: String,
+    assets: Vec<GithubAsset>,
+}
+#[derive(Deserialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
+    size: u64,
+}
 
 #[tauri::command]
 pub fn list_library(db: State<Database>) -> Result<Vec<LibraryGame>> {
@@ -15,6 +31,94 @@ pub fn list_library(db: State<Database>) -> Result<Vec<LibraryGame>> {
 pub fn list_emulators(db: State<Database>) -> Result<Vec<Emulator>> {
     let conn = db.0.lock().map_err(error)?;
     database::emulators(&conn)
+}
+#[tauri::command]
+pub fn emulator_install_options() -> Vec<EmulatorInstall> {
+    vec![EmulatorInstall {
+        id: "mgba".into(),
+        name: "mGBA".into(),
+        description: "Game Boy, Game Boy Color and Game Boy Advance".into(),
+        supported_platforms: vec!["gb".into(), "gbc".into(), "gba".into()],
+        source_name: "mGBA official GitHub release".into(),
+        source_url: "https://github.com/mgba-emu/mgba/releases".into(),
+    }]
+}
+#[tauri::command]
+pub async fn install_emulator(id: String, app: tauri::AppHandle) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || install_emulator_blocking(&id, &app))
+        .await
+        .map_err(error)?
+}
+fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String> {
+    if id != "mgba" {
+        return Err("This emulator installer is not supported.".into());
+    }
+    #[cfg(not(all(windows, target_arch = "x86_64")))]
+    return Err(
+        "The built-in mGBA installer is currently available on 64-bit Windows only.".into(),
+    );
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(90))
+            .user_agent("OpenRetro/0.1")
+            .build()
+            .map_err(error)?;
+        let release: GithubRelease = client
+            .get(MGBA_RELEASES_API)
+            .send()
+            .map_err(error)?
+            .error_for_status()
+            .map_err(error)?
+            .json()
+            .map_err(error)?;
+        let asset = release
+            .assets
+            .iter()
+            .find(|asset| asset.name.ends_with("-win64-installer.exe"))
+            .ok_or("The latest official mGBA release has no 64-bit Windows installer.")?;
+        if asset.size == 0 || asset.size > 100 * 1024 * 1024 {
+            return Err("The official installer has an unexpected size.".into());
+        }
+        let parsed = url::Url::parse(&asset.browser_download_url).map_err(error)?;
+        if parsed.scheme() != "https" || parsed.host_str() != Some("github.com") {
+            return Err("The release asset is not hosted by GitHub.".into());
+        }
+        let installers = app
+            .path()
+            .app_cache_dir()
+            .map_err(error)?
+            .join("installers");
+        std::fs::create_dir_all(&installers).map_err(error)?;
+        let installer = installers.join(format!("mGBA-{}-win64-installer.exe", release.tag_name));
+        if !installer.is_file() {
+            let mut response = client
+                .get(&asset.browser_download_url)
+                .send()
+                .map_err(error)?
+                .error_for_status()
+                .map_err(error)?;
+            let final_url = response.url();
+            if final_url.scheme() != "https"
+                || !final_url.host_str().is_some_and(|host| {
+                    host == "github.com" || host.ends_with(".githubusercontent.com")
+                })
+            {
+                return Err("The installer download was redirected outside GitHub.".into());
+            }
+            let temporary = installer.with_extension("partial");
+            let mut output = File::create(&temporary).map_err(error)?;
+            let written = copy(&mut response, &mut output).map_err(error)?;
+            drop(output);
+            if written != asset.size {
+                let _ = std::fs::remove_file(&temporary);
+                return Err("The official installer download was incomplete.".into());
+            }
+            std::fs::rename(temporary, &installer).map_err(error)?;
+        }
+        Command::new(&installer).spawn().map_err(error)?;
+        Ok("The official mGBA installer is open. Finish its Windows steps, then choose Detect installed in OpenRetro.".into())
+    }
 }
 #[tauri::command]
 pub async fn inspect_game(path: String) -> Result<ImportCandidate> {

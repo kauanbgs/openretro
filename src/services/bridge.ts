@@ -4,6 +4,7 @@ import { detectPlatforms } from "../db/platforms";
 import type {
   AppSettings,
   Emulator,
+  EmulatorInstall,
   GameMetadata,
   ImportCandidate,
   LibraryGame,
@@ -191,6 +192,13 @@ export const bridge = {
     isDesktop ? invoke("list_library") : Promise.resolve(read().library),
   emulators: (): Promise<Emulator[]> =>
     isDesktop ? invoke("list_emulators") : Promise.resolve(read().emulators),
+  emulatorInstallOptions: (): Promise<EmulatorInstall[]> =>
+    isDesktop ? invoke("emulator_install_options") : Promise.resolve([]),
+  async installEmulator(id: string): Promise<string> {
+    if (!isDesktop)
+      throw new Error("Install emulators in the OpenRetro desktop app.");
+    return invoke("install_emulator", { id });
+  },
   settings: (): Promise<AppSettings> =>
     isDesktop ? invoke("get_settings") : Promise.resolve(read().settings),
   async pickGame(): Promise<ImportCandidate | null> {

@@ -64,6 +64,17 @@ pub struct Emulator {
     pub version: Option<String>,
     pub default_platforms: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmulatorInstall {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub supported_platforms: Vec<String>,
+    pub source_name: String,
+    pub source_url: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportCandidate {

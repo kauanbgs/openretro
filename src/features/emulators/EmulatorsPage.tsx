@@ -1,5 +1,6 @@
 import { PageHeader } from "../../components/PageHeader";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Cpu,
   Plus,
@@ -8,6 +9,8 @@ import {
   Check,
   Trash2,
   Settings2,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
@@ -26,6 +29,10 @@ export function EmulatorsPage({
   const [detected, setDetected] = useState<Emulator[]>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const installers = useQuery({
+    queryKey: ["emulator-installers"],
+    queryFn: bridge.emulatorInstallOptions,
+  });
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -73,6 +80,52 @@ export function EmulatorsPage({
           </>
         }
       />
+      {installers.data?.length ? (
+        <section
+          className="emulator-installs"
+          aria-label="Official emulator installers"
+        >
+          <div className="section-heading">
+            <div>
+              <h2>Install an emulator</h2>
+              <p className="muted">
+                Downloads open the official Windows installer.
+              </p>
+            </div>
+          </div>
+          <div className="emulator-install-grid">
+            {installers.data.map((installer) => (
+              <article className="emulator-install" key={installer.id}>
+                <div className="emulator-icon">
+                  <Cpu size={25} />
+                </div>
+                <div>
+                  <h3>{installer.name}</h3>
+                  <p>{installer.description}</p>
+                  <a
+                    href={installer.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {installer.sourceName} <ExternalLink size={12} />
+                  </a>
+                </div>
+                <button
+                  className="button primary"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () =>
+                      notify(await bridge.installEmulator(installer.id)),
+                    )
+                  }
+                >
+                  <Download size={16} /> Install
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {emulators.length ? (
         <div className="emulator-grid">
           {emulators.map((e) => (

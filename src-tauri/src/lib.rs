@@ -44,6 +44,8 @@ pub fn run() {
             downloads::download_files,
             commands::list_library,
             commands::list_emulators,
+            commands::emulator_install_options,
+            commands::install_emulator,
             commands::inspect_game,
             commands::file_exists,
             commands::add_game,
