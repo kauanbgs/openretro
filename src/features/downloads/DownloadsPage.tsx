@@ -13,7 +13,7 @@ import type {
 const active = (state: string) =>
   ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING"].includes(state);
 const labels: Record<string, string> = {
-  RESOLVING: "Finding peers and metadata",
+  RESOLVING: "Looking for peers and metadata (up to 90 seconds)",
   QUEUED: "Queued",
   DOWNLOADING: "Downloading",
   VERIFYING: "Checking torrent pieces",

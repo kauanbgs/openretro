@@ -19,6 +19,7 @@ use tokio::sync::OnceCell;
 use tokio_util::sync::CancellationToken;
 
 pub const NETWORK_DOWNLOADS_ENABLED: bool = true;
+const METADATA_WAIT_TIMEOUT: Duration = Duration::from_secs(90);
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadJob {
@@ -162,7 +163,7 @@ async fn checked_add(
 ) -> Result<Arc<librqbit::ManagedTorrent>> {
     // Resolve metadata without writing payload files, then validate paths on every platform.
     let response = tokio::time::timeout(
-        Duration::from_secs(180),
+        METADATA_WAIT_TIMEOUT,
         session.add_torrent(
             AddTorrent::from_url(magnet),
             Some(AddTorrentOptions {
@@ -175,7 +176,7 @@ async fn checked_add(
     )
     .await
     .map_err(|_| {
-        "No torrent metadata received within 3 minutes. Check peers/trackers, then retry."
+        "No torrent metadata or peers were found after 90 seconds. This release may be offline; try another release or resume later."
     })?
     .map_err(|e| format!("Could not start torrent: {e}"))?;
     let metadata = match response {
