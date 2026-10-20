@@ -486,30 +486,30 @@ export function GamePage({
       </div>
       {downloadOptions && (
         <Modal
-          title="Download options"
+          title="Opções de download"
           onClose={() => {
             if (!busy) setDownloadOptions(false);
           }}
         >
           <div className="download-options-modal">
-            <p>Choose a release for {game.title}</p>
+            <p>Escolha uma versão de {game.title}</p>
             <div className="download-option-filters">
-              <label className="source-search-input">
+              <div className="download-option-search">
                 <Search size={17} />
                 <input
                   autoFocus
                   aria-label="Filter download releases"
                   value={downloadQuery}
                   onChange={(event) => setDownloadQuery(event.target.value)}
-                  placeholder="Filter releases"
+                  placeholder="Filtrar versões"
                 />
-              </label>
+              </div>
               <select
                 aria-label="Filter download source"
                 value={downloadSource}
                 onChange={(event) => setDownloadSource(event.target.value)}
               >
-                <option value="all">All sources</option>
+                <option value="all">Todas as fontes</option>
                 {[
                   ...new Map(
                     (sourceMatches.data ?? []).map((match) => [
@@ -525,7 +525,7 @@ export function GamePage({
               </select>
             </div>
             {sourceMatches.isFetching ? (
-              <p className="muted">Looking through your sources…</p>
+              <p className="muted">Buscando nas suas fontes…</p>
             ) : sourceMatches.error ? (
               <p className="error-message">{String(sourceMatches.error)}</p>
             ) : visibleMatches.length ? (
@@ -540,7 +540,7 @@ export function GamePage({
                         await bridge.startDownload(match, 0, game);
                         setDownloadOptions(false);
                         notify(
-                          "Download started. It will appear in Downloads.",
+                          "Download iniciado. Ele aparecerá em Downloads.",
                         );
                       })
                     }
@@ -548,7 +548,7 @@ export function GamePage({
                     <span>
                       <strong>{match.title}</strong>
                       <small>
-                        {match.fileSize || "Size not provided"} ·{" "}
+                        {match.fileSize || "Tamanho não informado"} ·{" "}
                         {match.sourceName}
                       </small>
                     </span>
@@ -558,7 +558,7 @@ export function GamePage({
               </div>
             ) : (
               <p className="download-options-empty">
-                No releases match this game in your enabled sources.
+                Nenhuma versão deste jogo foi encontrada nas fontes ativas.
               </p>
             )}
           </div>

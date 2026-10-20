@@ -259,6 +259,30 @@ pub async fn search_download_sources(
     .await
     .map_err(error)?
 }
+#[tauri::command]
+pub async fn available_download_titles(
+    app: tauri::AppHandle,
+    titles: Vec<String>,
+) -> Result<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if titles.len() > 200 || titles.iter().any(|title| title.len() > 300) {
+            return Err("Too many game titles to check.".into());
+        }
+        let entries = all_matches(&app.state::<Database>(), "")?;
+        Ok(titles
+            .into_iter()
+            .filter(|title| {
+                let query = title.to_lowercase();
+                query.len() >= 3
+                    && entries
+                        .iter()
+                        .any(|entry| entry.entry.title.to_lowercase().contains(&query))
+            })
+            .collect())
+    })
+    .await
+    .map_err(error)?
+}
 
 #[cfg(test)]
 mod tests {

@@ -147,6 +147,19 @@ export const bridge = {
       .filter((e) => e.title.toLowerCase().includes(query.trim().toLowerCase()))
       .slice(0, 60);
   },
+  async availableDownloadTitles(titles: string[]): Promise<string[]> {
+    if (isDesktop) return invoke("available_download_titles", { titles });
+    const entries = previewSources()
+      .filter((source) => source.enabled)
+      .flatMap((source) => source.document.downloads);
+    return titles.filter((title) => {
+      const query = title.trim().toLowerCase();
+      return (
+        query.length >= 3 &&
+        entries.some((entry) => entry.title.toLowerCase().includes(query))
+      );
+    });
+  },
   async startDownload(
     match: SourceMatch,
     uriIndex: number,

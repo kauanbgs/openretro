@@ -74,6 +74,7 @@ pub struct EmulatorInstall {
     pub supported_platforms: Vec<String>,
     pub source_name: String,
     pub source_url: String,
+    pub is_base: bool,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

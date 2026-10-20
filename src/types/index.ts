@@ -61,6 +61,7 @@ export interface EmulatorInstall {
   supportedPlatforms: string[];
   sourceName: string;
   sourceUrl: string;
+  isBase: boolean;
 }
 export type ResolutionState =
   | "READY"

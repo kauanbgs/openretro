@@ -39,6 +39,8 @@ const aliases: Record<string, string> = {
   playstation: "psx",
   ps: "psx",
   ps1: "psx",
+  playstation2: "ps2",
+  ps2: "ps2",
   playstationportable: "psp",
   psp: "psp",
   arcade: "arcade",

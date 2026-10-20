@@ -38,6 +38,7 @@ pub fn run() {
             downloads::sources::set_download_source,
             downloads::sources::remove_download_source,
             downloads::sources::search_download_sources,
+            downloads::sources::available_download_titles,
             downloads::start_source_download,
             downloads::list_download_jobs,
             downloads::control_download,

@@ -85,6 +85,14 @@ export const platforms: Platform[] = [
     manufacturer: "Sony",
     extensions: ["iso", "cso", "pbp"],
   },
+  {
+    id: "ps2",
+    name: "PlayStation 2",
+    shortName: "PS2",
+    manufacturer: "Sony",
+    extensions: ["iso", "chd"],
+    biosRequired: true,
+  },
   { id: "arcade", name: "Arcade", shortName: "ARC", extensions: ["zip"] },
   {
     id: "dos",

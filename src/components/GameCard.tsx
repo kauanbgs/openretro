@@ -1,14 +1,16 @@
-import { ArrowUpRight, Heart } from "lucide-react";
+import { ArrowUpRight, Download, Heart } from "lucide-react";
 import type { GameMetadata, LibraryItem } from "../types";
 import { platformById } from "../db/platforms";
 import { GameArtwork } from "./GameArtwork";
 export function GameCard({
   game,
   item,
+  downloadAvailable = false,
   onClick,
 }: {
   game: GameMetadata;
   item?: LibraryItem;
+  downloadAvailable?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -20,6 +22,11 @@ export function GameCard({
         </span>
         {item?.favorite && (
           <Heart className="card-heart" size={15} fill="currentColor" />
+        )}
+        {downloadAvailable && !item && (
+          <span className="card-download" title="Download available">
+            <Download size={13} /> Download
+          </span>
         )}
         <span className="card-open">
           <ArrowUpRight size={20} />

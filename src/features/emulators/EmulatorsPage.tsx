@@ -95,12 +95,20 @@ export function EmulatorsPage({
           </div>
           <div className="emulator-install-grid">
             {installers.data.map((installer) => (
-              <article className="emulator-install" key={installer.id}>
+              <article
+                className={`emulator-install ${installer.isBase ? "emulator-install-base" : ""}`}
+                key={installer.id}
+              >
                 <div className="emulator-icon">
                   <Cpu size={25} />
                 </div>
                 <div>
                   <h3>{installer.name}</h3>
+                  {installer.isBase && (
+                    <span className="emulator-base-label">
+                      Base recomendada
+                    </span>
+                  )}
                   <p>{installer.description}</p>
                   <a
                     href={installer.sourceUrl}

@@ -4,23 +4,68 @@ use crate::{
     models::*,
 };
 use rusqlite::params;
-use serde::Deserialize;
-use std::{fs::File, io::copy, process::Command};
+use std::process::Command;
 use tauri::{Manager, State};
 
-const MGBA_RELEASES_API: &str = "https://api.github.com/repos/mgba-emu/mgba/releases/latest";
-
-#[derive(Deserialize)]
-struct GithubRelease {
-    tag_name: String,
-    assets: Vec<GithubAsset>,
+struct InstallerSpec {
+    id: &'static str,
+    name: &'static str,
+    description: &'static str,
+    platforms: &'static [&'static str],
+    is_base: bool,
+    winget_id: &'static str,
+    source_url: &'static str,
 }
-#[derive(Deserialize)]
-struct GithubAsset {
-    name: String,
-    browser_download_url: String,
-    size: u64,
-}
+const INSTALLERS: &[InstallerSpec] = &[
+    InstallerSpec {
+        id: "retroarch",
+        name: "RetroArch",
+        description: "Base for classic consoles. Install cores in RetroArch after setup.",
+        platforms: &[
+            "nes", "snes", "n64", "gb", "gbc", "gba", "nds", "sms", "genesis", "gg", "psx", "psp",
+            "arcade", "dos",
+        ],
+        is_base: true,
+        winget_id: "Libretro.RetroArch",
+        source_url: "https://www.retroarch.com/?page=platforms",
+    },
+    InstallerSpec {
+        id: "pcsx2",
+        name: "PCSX2",
+        description: "PlayStation 2",
+        platforms: &["ps2"],
+        is_base: false,
+        winget_id: "PCSX2Team.PCSX2",
+        source_url: "https://pcsx2.net/downloads/",
+    },
+    InstallerSpec {
+        id: "mgba",
+        name: "mGBA",
+        description: "Game Boy, Game Boy Color and Game Boy Advance",
+        platforms: &["gb", "gbc", "gba"],
+        is_base: false,
+        winget_id: "JeffreyPfau.mGBA",
+        source_url: "https://mgba.io/downloads.html",
+    },
+    InstallerSpec {
+        id: "ppsspp",
+        name: "PPSSPP",
+        description: "PlayStation Portable",
+        platforms: &["psp"],
+        is_base: false,
+        winget_id: "PPSSPPTeam.PPSSPP",
+        source_url: "https://www.ppsspp.org/download/",
+    },
+    InstallerSpec {
+        id: "duckstation",
+        name: "DuckStation",
+        description: "PlayStation",
+        platforms: &["psx"],
+        is_base: false,
+        winget_id: "Stenzek.DuckStation",
+        source_url: "https://www.duckstation.org/",
+    },
+];
 
 #[tauri::command]
 pub fn list_library(db: State<Database>) -> Result<Vec<LibraryGame>> {
@@ -34,90 +79,56 @@ pub fn list_emulators(db: State<Database>) -> Result<Vec<Emulator>> {
 }
 #[tauri::command]
 pub fn emulator_install_options() -> Vec<EmulatorInstall> {
-    vec![EmulatorInstall {
-        id: "mgba".into(),
-        name: "mGBA".into(),
-        description: "Game Boy, Game Boy Color and Game Boy Advance".into(),
-        supported_platforms: vec!["gb".into(), "gbc".into(), "gba".into()],
-        source_name: "mGBA official GitHub release".into(),
-        source_url: "https://github.com/mgba-emu/mgba/releases".into(),
-    }]
+    INSTALLERS
+        .iter()
+        .map(|installer| EmulatorInstall {
+            id: installer.id.into(),
+            name: installer.name.into(),
+            description: installer.description.into(),
+            supported_platforms: installer
+                .platforms
+                .iter()
+                .map(|platform| (*platform).into())
+                .collect(),
+            source_name: "Official project download".into(),
+            source_url: installer.source_url.into(),
+            is_base: installer.is_base,
+        })
+        .collect()
 }
 #[tauri::command]
-pub async fn install_emulator(id: String, app: tauri::AppHandle) -> Result<String> {
-    tauri::async_runtime::spawn_blocking(move || install_emulator_blocking(&id, &app))
+pub async fn install_emulator(id: String) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || install_emulator_blocking(&id))
         .await
         .map_err(error)?
 }
-fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String> {
-    if id != "mgba" {
-        return Err("This emulator installer is not supported.".into());
-    }
-    #[cfg(not(all(windows, target_arch = "x86_64")))]
-    return Err(
-        "The built-in mGBA installer is currently available on 64-bit Windows only.".into(),
-    );
-    #[cfg(all(windows, target_arch = "x86_64"))]
+fn install_emulator_blocking(id: &str) -> Result<String> {
+    let installer = INSTALLERS
+        .iter()
+        .find(|installer| installer.id == id)
+        .ok_or("This emulator installer is not supported.")?;
+    #[cfg(not(windows))]
+    return Err("The built-in emulator installer is currently available on Windows only.".into());
+    #[cfg(windows)]
     {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(90))
-            .user_agent("OpenRetro/0.1")
-            .build()
-            .map_err(error)?;
-        let release: GithubRelease = client
-            .get(MGBA_RELEASES_API)
-            .send()
-            .map_err(error)?
-            .error_for_status()
-            .map_err(error)?
-            .json()
-            .map_err(error)?;
-        let asset = release
-            .assets
-            .iter()
-            .find(|asset| asset.name.ends_with("-win64-installer.exe"))
-            .ok_or("The latest official mGBA release has no 64-bit Windows installer.")?;
-        if asset.size == 0 || asset.size > 100 * 1024 * 1024 {
-            return Err("The official installer has an unexpected size.".into());
+        let result = Command::new("winget")
+            .args([
+                "install", "--exact", "--id", installer.winget_id,
+                "--accept-package-agreements", "--accept-source-agreements",
+                "--disable-interactivity",
+            ])
+            .status()
+            .map_err(|_| "Windows App Installer (winget) is required to install emulators. Install it from Microsoft Store, then try again.")?;
+        if !result.success() {
+            return Err(format!(
+                "{} could not be installed. Check the Windows installer prompt and try again.",
+                installer.name
+            ));
         }
-        let parsed = url::Url::parse(&asset.browser_download_url).map_err(error)?;
-        if parsed.scheme() != "https" || parsed.host_str() != Some("github.com") {
-            return Err("The release asset is not hosted by GitHub.".into());
-        }
-        let installers = app
-            .path()
-            .app_cache_dir()
-            .map_err(error)?
-            .join("installers");
-        std::fs::create_dir_all(&installers).map_err(error)?;
-        let installer = installers.join(format!("mGBA-{}-win64-installer.exe", release.tag_name));
-        if !installer.is_file() {
-            let mut response = client
-                .get(&asset.browser_download_url)
-                .send()
-                .map_err(error)?
-                .error_for_status()
-                .map_err(error)?;
-            let final_url = response.url();
-            if final_url.scheme() != "https"
-                || !final_url.host_str().is_some_and(|host| {
-                    host == "github.com" || host.ends_with(".githubusercontent.com")
-                })
-            {
-                return Err("The installer download was redirected outside GitHub.".into());
-            }
-            let temporary = installer.with_extension("partial");
-            let mut output = File::create(&temporary).map_err(error)?;
-            let written = copy(&mut response, &mut output).map_err(error)?;
-            drop(output);
-            if written != asset.size {
-                let _ = std::fs::remove_file(&temporary);
-                return Err("The official installer download was incomplete.".into());
-            }
-            std::fs::rename(temporary, &installer).map_err(error)?;
-        }
-        Command::new(&installer).spawn().map_err(error)?;
-        Ok("The official mGBA installer is open. Finish its Windows steps, then choose Detect installed in OpenRetro.".into())
+        Ok(format!(
+            "{} was installed. Choose Detect installed to add it to OpenRetro.",
+            installer.name
+        ))
     }
 }
 #[tauri::command]
@@ -306,6 +317,15 @@ pub fn test_emulator(id: String, db: State<Database>) -> Result<String> {
 #[tauri::command]
 pub fn detect_emulators() -> Vec<Emulator> {
     let specs = [
+        (
+            "retroarch",
+            "RetroArch",
+            vec![
+                "nes", "snes", "n64", "gb", "gbc", "gba", "nds", "sms", "genesis", "gg", "psx",
+                "psp", "arcade", "dos",
+            ],
+        ),
+        ("pcsx2-qt", "PCSX2", vec!["ps2"]),
         ("mgba", "mGBA", vec!["gb", "gbc", "gba"]),
         ("duckstation-qt", "DuckStation", vec!["psx"]),
         ("ppsspp", "PPSSPP", vec!["psp"]),

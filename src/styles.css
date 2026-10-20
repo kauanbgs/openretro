@@ -1004,6 +1004,22 @@ main {
   border-radius: 3px;
   font-weight: 650;
 }
+.card-download {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 7px;
+  border-radius: 4px;
+  color: var(--accentText);
+  background: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px #0006;
+}
 .card-heart {
   position: absolute;
   top: 12px;
@@ -1786,8 +1802,30 @@ main {
   gap: 9px;
   margin: 20px 0 14px;
 }
-.download-option-filters .source-search-input {
-  min-height: 40px;
+.download-option-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  background: var(--bg);
+}
+.download-option-search:focus-within {
+  border-color: var(--accent);
+}
+.download-option-search input {
+  min-width: 0;
+  min-height: 0;
+  height: 38px;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
 }
 .download-option-filters select {
   min-height: 40px;
@@ -2033,6 +2071,16 @@ legend {
 .emulator-install .emulator-icon {
   width: 48px;
   height: 48px;
+}
+.emulator-install-base {
+  border-color: var(--accent);
+}
+.emulator-base-label {
+  display: inline-block;
+  margin: 7px 0 -1px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
 }
 .emulator-install h3 {
   font-size: 15px;

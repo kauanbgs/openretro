@@ -2938,7 +2938,6 @@ dependencies = [
  "tauri-plugin-log",
  "tokio",
  "tokio-util",
- "url",
  "uuid",
 ]
 

@@ -11,6 +11,7 @@ import {
 } from "../../providers/metadata/IgdbMetadataProvider";
 import { platforms } from "../../db/platforms";
 import { GameCard } from "../../components/GameCard";
+import { bridge } from "../../services/bridge";
 import { PageHeader } from "../../components/PageHeader";
 import { CatalogConnection } from "./CatalogConnection";
 import type { CatalogRequest } from "../../providers/metadata/types";
@@ -79,6 +80,17 @@ export function DiscoverPage({
     available.some((r) => r.localId === p.id),
   );
   const selectedGenre = taxonomy.data?.genres.find((g) => g.id === genre)?.name;
+  const availability = useQuery({
+    queryKey: [
+      "catalog-download-availability",
+      games.map((game) => game.title),
+    ],
+    queryFn: () =>
+      bridge.availableDownloadTitles(games.map((game) => game.title)),
+    enabled: games.length > 0,
+    staleTime: 30000,
+  });
+  const availableDownloads = new Set(availability.data ?? []);
   async function retry() {
     await client.invalidateQueries({ queryKey: ["catalog-status"] });
     await client.invalidateQueries({ queryKey: ["catalog-taxonomy"] });
@@ -248,6 +260,7 @@ export function DiscoverPage({
                 <GameCard
                   key={game.id}
                   game={game}
+                  downloadAvailable={availableDownloads.has(game.title)}
                   onClick={() => onSelect(game)}
                 />
               ))}
