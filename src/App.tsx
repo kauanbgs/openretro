@@ -373,7 +373,13 @@ export function App() {
         <BigPicture
           library={library}
           emulators={emulators}
+          jobs={jobs}
+          refresh={refresh}
           onClose={() => setBigPicture(false)}
+          onDesktop={(destination) => {
+            setBigPicture(false);
+            navigate(destination);
+          }}
           notify={notify}
         />
       )}
