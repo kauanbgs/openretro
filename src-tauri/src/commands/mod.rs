@@ -112,6 +112,23 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
     return Err("The built-in emulator installer is currently available on Windows only.".into());
     #[cfg(windows)]
     {
+        // RetroArch is part of the OpenRetro installer. It is copied into the
+        // application data directory once so its configuration and cores never
+        // touch a user-installed RetroArch instance.
+        if installer.id == "retroarch" {
+            emit_install_progress(app, id, installer.name, 12, "Preparing OpenRetro runtime");
+            let executable = install_bundled_retroarch(app)?;
+            emit_install_progress(
+                app,
+                id,
+                installer.name,
+                82,
+                "Configuring classic console support",
+            );
+            register_retroarch(app, executable)?;
+            emit_install_progress(app, id, installer.name, 100, "Ready to play");
+            return Ok("OpenRetro's built-in RetroArch runtime is ready. Compatible cores are installed automatically when you play.".into());
+        }
         emit_install_progress(
             app,
             id,
@@ -155,17 +172,6 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
             88,
             "Locating the installed emulator",
         );
-        if installer.id == "retroarch" {
-            for _ in 0..15 {
-                if let Some(executable) = managed_retroarch_path() {
-                    register_retroarch(app, executable)?;
-                    emit_install_progress(app, id, installer.name, 100, "Ready to play");
-                    return Ok("RetroArch was installed and set as OpenRetro's default runtime. OpenRetro downloads a compatible core the first time you play a supported game.".into());
-                }
-                std::thread::sleep(std::time::Duration::from_secs(1));
-            }
-            return Err("RetroArch was installed, but its executable was not found yet. Restart OpenRetro, then use Detect installed or select retroarch.exe once.".into());
-        }
         if installer.id == "pcsx2" {
             if let Some(executable) = managed_pcsx2_path() {
                 register_pcsx2(app, executable)?;
@@ -179,6 +185,52 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
             "{} was installed. Choose Detect installed to add it to OpenRetro.",
             installer.name
         ))
+    }
+}
+#[cfg(windows)]
+fn copy_directory(source: &std::path::Path, destination: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(destination).map_err(error)?;
+    for entry in std::fs::read_dir(source).map_err(error)? {
+        let entry = entry.map_err(error)?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_directory(&source_path, &destination_path)?;
+        } else {
+            std::fs::copy(&source_path, &destination_path).map_err(error)?;
+        }
+    }
+    Ok(())
+}
+#[cfg(windows)]
+fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::path::PathBuf> {
+    let runtime = app
+        .path()
+        .app_data_dir()
+        .map_err(error)?
+        .join("runtime")
+        .join("retroarch");
+    let executable = runtime.join("retroarch.exe");
+    if executable.is_file() {
+        return Ok(executable);
+    }
+    let bundled = app
+        .path()
+        .resource_dir()
+        .map_err(error)?
+        .join("runtime")
+        .join("retroarch");
+    if !bundled.join("retroarch.exe").is_file() {
+        return Err("The OpenRetro runtime is missing from this development build. Package the app with src-tauri/resources/runtime/retroarch populated from the official RetroArch Windows distribution.".into());
+    }
+    if runtime.exists() {
+        std::fs::remove_dir_all(&runtime).map_err(error)?;
+    }
+    copy_directory(&bundled, &runtime)?;
+    if executable.is_file() {
+        Ok(executable)
+    } else {
+        Err("OpenRetro could not prepare its bundled RetroArch runtime.".into())
     }
 }
 #[cfg(windows)]

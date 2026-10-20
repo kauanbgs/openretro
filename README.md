@@ -2,6 +2,15 @@
 
 A local, open-source launcher for classic games. Tauri 2 + React + TypeScript + Rust + SQLite. The first milestone focuses on **import → confirm platform and metadata → library → configure emulator → launch → record session**.
 
+## Bundled RetroArch runtime
+
+The Windows installer packages a private RetroArch runtime for OpenRetro. Run
+`npm run bundle:windows` on the release machine: it obtains the official
+portable distribution, bundles it as an application resource, then OpenRetro
+copies and configures it on first use. The player never has to install
+RetroArch or select an executable. Include the RetroArch GPLv3 notice and the
+license notices for every included Libretro core with each release.
+
 Discover now connects to **IGDB**, with real covers, screenshots, developers, console libraries, genre filters, search, ordering, and pagination. The mock provider is retained only as a development/test fixture; the application does not silently fall back to fictional games.
 
 ## Run
