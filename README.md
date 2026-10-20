@@ -1,0 +1,114 @@
+# OpenRetro
+
+A local, open-source launcher for classic games. Tauri 2 + React + TypeScript + Rust + SQLite. The first milestone focuses on **import → confirm platform and metadata → library → configure emulator → launch → record session**.
+
+## Run
+
+Use Node.js 22.12+ (or 24 LTS) and npm.
+
+```powershell
+npm ci
+npm run dev
+```
+
+Open http://127.0.0.1:1420 for the browser preview. This mode persists imported metadata in localStorage; browsers cannot retain real executable paths or launch emulators. Preview data is intentionally separate from the desktop database.
+
+For the desktop app, install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/): Rust stable, Windows Visual Studio C++ Build Tools and WebView2; on Linux install WebKitGTK 4.1 and native development packages.
+
+```powershell
+npm run tauri dev
+# Production desktop bundle:
+npm run tauri build
+```
+
+Windows MSVC prerequisite: **Desktop development with C++**, including the Windows SDK. Linux (Ubuntu/Debian): `libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev`. macOS is not validated in this milestone.
+
+## Try the vertical slice
+
+1. Open the desktop app, click **Add Game**, and choose a legally obtained game file.
+2. Confirm the detected platform. `.bin` and `.pbp` are ambiguous and require a deliberate selection. ZIP archives are treated as Arcade files and are never extracted automatically.
+3. Choose fictional development metadata or keep your own title. No remote matching or hash database is configured; filename matching only searches the mock catalog. SHA-256 fingerprints are streamed in Rust, then checked again on import.
+4. Go to **Emulators → Add emulator**. Select an official, already-installed executable, mark its supported systems, and optionally make it the default for those systems. Detection only searches PATH for known emulator names.
+5. Open the game and click **Play game**. The default launch is `executable` with a single game-path argument. For runtimes that need flags or a core (e.g. RetroArch), use **Configure**: one argument per line, with `{game}` and optional `{bios}` placeholders. Quote characters are unnecessary; paths with spaces are already passed as single arguments.
+6. Close the emulator. The session duration, last-played date, and total playtime are saved. Emulators must run in the foreground rather than hand the game off to another process. Runtime compatibility, firmware validity, and core availability depend on the emulator.
+7. Use **Details** to verify the checksum, relocate a moved file, or remove the library entry. Removing an entry never deletes the original file. Favorite games can be filtered in Library.
+
+### BIOS and disc images
+
+PlayStation currently requires a BIOS path plus an explicit `{bios}` argument in configuration. Use the flag required by your specific emulator; OpenRetro cannot assume all emulators use the same flag. Other firmware or core requirements can be represented through launch arguments but do not yet have automatic detection. CUE/BIN and other multi-file games retain their original locations; associated tracks must remain together. No BIOS files are included.
+
+## Architecture
+
+```text
+src/
+  components/       shared controls and original SVG artwork
+  db/               platform catalog
+  features/
+    library/        import wizard
+    games/          game page, resolver feedback and configuration
+    emulators/      executable registration, detection, defaults and path tests
+    downloads/      queue presentation, empty until a transport is configured
+    settings/       local preferences, storage paths and milestone boundaries
+  hooks/            TanStack Query reads and invalidation
+  providers/
+    metadata/       MetadataProvider + MockMetadataProvider
+    sources/        GameSourceProvider + LocalFileProvider + MockFreewareProvider
+  services/         GameResolver, EmulatorManager, LibraryManager, DownloadManager, bridge
+  types/            strict domain models
+src-tauri/
+  capabilities/     main-window permissions
+  src/
+    commands/       IPC handlers and input validation
+    database/       SQLite setup, migration 001 and queries
+    filesystem/     canonical paths, executable validation, streamed SHA-256
+    launcher/       process ownership and session accounting
+    downloads/      network transport boundary (disabled)
+```
+
+`GameResolver` returns `READY`, `MISSING_GAME`, `MISSING_EMULATOR`, `MISSING_BIOS`, `CONFIGURATION_REQUIRED` or `UNSUPPORTED`. UI components explain the next action. The Rust launcher independently checks paths, compatibility and BIOS configuration before execution; it never trusts the frontend's readiness result.
+
+`GameMetadata`, `Platform`, `LibraryItem`, `Emulator`, and `GameResolution` are the primary models. Metadata providers return catalog records without acquiring game files. Source providers resolve availability independently. `EmulatorInstaller` is an interface for future official installers; no executable downloader is supplied. The implementation uses Tailwind 4 alongside a custom stylesheet, Lucide icons, and small accessible controls rather than adding a component kit unnecessarily.
+
+### SQLite
+
+The database lives in Tauri's OS-specific app-data directory as `openretro.sqlite`. Settings → Advanced shows its exact path, plus cache and log directories. Foreign keys are enabled and WAL mode is used. Migration 001 runs in a transaction and records its version in `schema_migrations`.
+
+| Table | Purpose |
+| --- | --- |
+| `games` | Game metadata keyed by ID |
+| `platforms` | Known systems and file extensions |
+| `library_items` | File path, SHA-256, source, emulator override, BIOS, args, favorite and playtime |
+| `emulators` | Registered executables, compatible systems and default systems |
+| `play_sessions` | Start, finish, duration and process exit code |
+| `sources` | Local files and disabled mock fixtures |
+| `settings` | Persisted application preferences |
+
+SHA-256 is unique in the library to prevent duplicate imports. Removing an emulator clears per-game overrides. A partial unique index prevents two active sessions of the same game. Crash-interrupted sessions close at startup with no invented offline time. Session tracking lasts until the launched process exits; keep OpenRetro open while playing.
+
+## Security and scope
+
+- Importing never modifies, copies, or executes the original game file.
+- Paths must be absolute, canonicalize to files, and contain no `..` traversal or NUL. Executable permissions are checked on Linux; Windows accepts `.exe` executables only.
+- Rust uses `std::process::Command` and separate arguments, never shell interpolation. Providers cannot supply executable scripts.
+- The registered emulator is a trusted application chosen by the user. Per-game arguments may enable emulator-specific behavior; only use configuration you understand.
+- Downloads have HTTPS/credential/checksum validation and an injectable transport interface, but **no network transport or provider downloads are enabled**. Pause, resume, retry, installation, bandwidth enforcement, and real download progress are future work. The UI does not fabricate activity.
+- Only fictional development metadata and original SVG illustrations ship. No commercial ROMs, BIOS files, DRM bypass, secrets, analytics, or API keys are included.
+- Autostart, folder scanning, complete gamepad navigation, automatic BIOS/core discovery, real metadata sources and automatic emulator installation are not implemented. Settings label unavailable features as planned or reserved.
+- Appearance, density, reduced motion, and developer details persist. English is the only interface language in this milestone.
+
+## Validation
+
+```powershell
+npm test
+npm run build
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+```
+
+The 20 passing tests cover platform ambiguity, missing files and emulators, defaults, BIOS states, argument boundaries, download validation, and the actual SQLite migration (idempotency, duplicates, foreign keys and active-session constraints). Additional Rust tests cover canonical path rejection and a known SHA-256 vector; these require the Rust toolchain. GitHub Actions is configured to build/test the frontend and check Rust on Windows and Linux.
+
+Local verification in this workspace: frontend build and domain tests run successfully. **The native Rust build and real emulator launch remain unverified because Rust and the MSVC C++ toolchain are absent on the current machine.** Install the prerequisites above to run the native checks and the end-to-end desktop flow. No CI run or native launch success is implied by the source code being present.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Original development artwork is covered by the same license.

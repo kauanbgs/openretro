@@ -1,0 +1,20 @@
+[
+  { "id": "nes", "extensions": ["nes"] },
+  { "id": "snes", "extensions": ["sfc", "smc"] },
+  { "id": "n64", "extensions": ["z64", "n64", "v64"] },
+  { "id": "gb", "extensions": ["gb"] },
+  { "id": "gbc", "extensions": ["gbc"] },
+  { "id": "gba", "extensions": ["gba"] },
+  { "id": "nds", "extensions": ["nds"] },
+  { "id": "sms", "extensions": ["sms"] },
+  { "id": "genesis", "extensions": ["md", "gen", "bin"] },
+  { "id": "gg", "extensions": ["gg"] },
+  {
+    "id": "psx",
+    "extensions": ["cue", "chd", "pbp", "bin"],
+    "biosRequired": true
+  },
+  { "id": "psp", "extensions": ["iso", "cso", "pbp"] },
+  { "id": "arcade", "extensions": ["zip"] },
+  { "id": "dos", "extensions": ["exe", "com", "conf"] }
+]

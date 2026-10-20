@@ -1,0 +1,40 @@
+import { ArrowUpRight, Heart } from "lucide-react";
+import type { GameMetadata, LibraryItem } from "../types";
+import { platformById } from "../db/platforms";
+import { Artwork } from "./Artwork";
+export function GameCard({
+  game,
+  item,
+  onClick,
+}: {
+  game: GameMetadata;
+  item?: LibraryItem;
+  onClick: () => void;
+}) {
+  return (
+    <button className="game-card" onClick={onClick}>
+      <div className="cover">
+        <Artwork kind={game.artwork} title />
+        <span className="platform-label">
+          {platformById(game.platformId)?.shortName}
+        </span>
+        {item?.favorite && (
+          <Heart className="card-heart" size={15} fill="currentColor" />
+        )}
+        <span className="card-open">
+          <ArrowUpRight size={20} />
+        </span>
+      </div>
+      <div className="card-title">{game.title}</div>
+      <div className="card-meta">
+        {platformById(game.platformId)?.name}
+        <span>·</span>
+        {game.year}
+      </div>
+      <div className="card-status">
+        <i className={item ? "installed" : ""} />
+        {item ? "In your library" : game.genre}
+      </div>
+    </button>
+  );
+}
