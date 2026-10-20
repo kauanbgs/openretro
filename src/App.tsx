@@ -28,6 +28,8 @@ import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop } from "./services/bridge";
 import { listen } from "@tauri-apps/api/event";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import {
   defaultSettings,
   type GameMetadata,
@@ -64,6 +66,8 @@ export function App() {
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
   const [bigPicture, setBigPicture] = useState(false);
+  const [updateVersion, setUpdateVersion] = useState<string>();
+  const [installingUpdate, setInstallingUpdate] = useState(false);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [page, selected?.id]);
@@ -96,6 +100,21 @@ export function App() {
     document.documentElement.dataset.animations = String(settings.animations);
   }, [settings]);
   useEffect(() => {
+    if (!isDesktop) return;
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      void check()
+        .then((update) => {
+          if (alive && update) setUpdateVersion(update.version);
+        })
+        .catch(() => undefined);
+    }, 3500);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, []);
+  useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
@@ -115,6 +134,21 @@ export function App() {
     setImportCandidate(undefined);
     setImportGame(g);
     setImporting(true);
+  };
+  const installUpdate = async () => {
+    setInstallingUpdate(true);
+    try {
+      const update = await check();
+      if (!update) {
+        setUpdateVersion(undefined);
+        return;
+      }
+      await update.downloadAndInstall();
+      await relaunch();
+    } catch (error) {
+      notify(`Could not install the update: ${String(error)}`);
+      setInstallingUpdate(false);
+    }
   };
   const activeEntry = library.find((x) => x.game.id === selected?.id);
   return (
@@ -233,6 +267,16 @@ export function App() {
             >
               <Gamepad2 size={18} /> Big Picture
             </button>
+            {updateVersion && (
+              <button
+                className="button primary update-button"
+                disabled={installingUpdate}
+                onClick={() => void installUpdate()}
+              >
+                <Download size={18} />
+                {installingUpdate ? "Updating…" : `Update ${updateVersion}`}
+              </button>
+            )}
             <button
               className="button primary add-game"
               onClick={() => openImport()}

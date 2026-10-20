@@ -11,6 +11,20 @@ copies and configures it on first use. The player never has to install
 RetroArch or select an executable. Include the RetroArch GPLv3 notice and the
 license notices for every included Libretro core with each release.
 
+## Automatic updates
+
+OpenRetro checks GitHub Releases after startup. When a signed newer release is
+available, an **Update** button downloads it and restarts the app through the
+Windows updater.
+
+The signing key is intentionally kept outside this repository. Before the
+first release, add the content of the local `openretro-updater.key` file to the
+GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`. The public key is already in
+`src-tauri/tauri.conf.json`. Publish a release by increasing the version in
+`src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, then push a matching
+`v*` tag; `.github/workflows/release.yml` builds the signed installer and
+publishes `latest.json` for the updater.
+
 Discover now connects to **IGDB**, with real covers, screenshots, developers, console libraries, genre filters, search, ordering, and pagination. The mock provider is retained only as a development/test fixture; the application does not silently fall back to fictional games.
 
 ## Run
@@ -71,7 +85,9 @@ The browser development server includes a localhost-only proxy; a static `vite p
   "downloads": [
     {
       "title": "Game title",
-      "uris": ["magnet:?xt=urn:btih:REPLACE_WITH_REAL_40_HEX_OR_32_BASE32_HASH"],
+      "uris": [
+        "magnet:?xt=urn:btih:REPLACE_WITH_REAL_40_HEX_OR_32_BASE32_HASH"
+      ],
       "uploadDate": "2026-10-20T00:00:00Z",
       "fileSize": "32 MB"
     }
@@ -142,18 +158,18 @@ server/
 
 The database lives in Tauri's OS-specific app-data directory as `openretro.sqlite`. Settings → Advanced shows its exact path, plus cache and log directories. Foreign keys are enabled and WAL mode is used. Migrations 001 and 002 run in a transaction and record their versions in `schema_migrations`. Existing library entries remain compatible with the optional IGDB metadata fields.
 
-| Table | Purpose |
-| --- | --- |
-| `games` | Game metadata keyed by ID |
-| `platforms` | Known systems and file extensions |
-| `library_items` | File path, SHA-256, source, emulator override, BIOS, args, favorite and playtime |
-| `emulators` | Registered executables, compatible systems and default systems |
-| `play_sessions` | Start, finish, duration and process exit code |
-| `sources` | Local files and disabled mock fixtures |
-| `settings` | Persisted application preferences |
-| `metadata_cache` | Public IGDB responses with expiry; no credentials or tokens |
-| `download_sources` | User-imported JSON catalogs, URLs, enabled state and refresh timestamp |
-| `download_jobs` | Torrent identity, destination, linked metadata and latest transfer state |
+| Table              | Purpose                                                                          |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `games`            | Game metadata keyed by ID                                                        |
+| `platforms`        | Known systems and file extensions                                                |
+| `library_items`    | File path, SHA-256, source, emulator override, BIOS, args, favorite and playtime |
+| `emulators`        | Registered executables, compatible systems and default systems                   |
+| `play_sessions`    | Start, finish, duration and process exit code                                    |
+| `sources`          | Local files and disabled mock fixtures                                           |
+| `settings`         | Persisted application preferences                                                |
+| `metadata_cache`   | Public IGDB responses with expiry; no credentials or tokens                      |
+| `download_sources` | User-imported JSON catalogs, URLs, enabled state and refresh timestamp           |
+| `download_jobs`    | Torrent identity, destination, linked metadata and latest transfer state         |
 
 SHA-256 is unique in the library to prevent duplicate imports. Removing an emulator clears per-game overrides. A partial unique index prevents two active sessions of the same game. Crash-interrupted sessions close at startup with no invented offline time. Session tracking lasts until the launched process exits; keep OpenRetro open while playing.
 
