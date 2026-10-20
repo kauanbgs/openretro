@@ -49,7 +49,6 @@ export function App() {
   const [importing, setImporting] = useState(false);
   const [importGame, setImportGame] = useState<GameMetadata>();
   const [importCandidate, setImportCandidate] = useState<ImportCandidate>();
-  const [downloadGame, setDownloadGame] = useState<GameMetadata>();
   const downloads = useQuery({
     queryKey: ["download-jobs"],
     queryFn: bridge.downloadJobs,
@@ -268,7 +267,6 @@ export function App() {
             onLibrary={() => navigate("Library")}
             onDiscover={() => navigate("Discover")}
             onDownloads={() => {
-              setDownloadGame(undefined);
               navigate("Downloads");
             }}
           />
@@ -301,8 +299,6 @@ export function App() {
         ) : page === "Downloads" ? (
           <DownloadsPage
             jobs={jobs}
-            game={downloadGame}
-            onClearGame={() => setDownloadGame(undefined)}
             onImport={() => openImport()}
             notify={notify}
             onDownloaded={(candidate, game) => {
