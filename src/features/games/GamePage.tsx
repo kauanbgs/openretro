@@ -14,12 +14,14 @@ import {
   CalendarDays,
   LoaderCircle,
   ExternalLink,
+  Search,
 } from "lucide-react";
 import type {
   Emulator,
   GameMetadata,
   GameResolution,
   LibraryGame,
+  SourceMatch,
 } from "../../types";
 import { GameArtwork } from "../../components/GameArtwork";
 import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
@@ -33,7 +35,6 @@ export function GamePage({
   emulators,
   onBack,
   onImport,
-  onDownload,
   onEmulators,
   refresh,
   notify,
@@ -43,7 +44,6 @@ export function GamePage({
   emulators: Emulator[];
   onBack: () => void;
   onImport: (game: GameMetadata) => void;
-  onDownload: (game: GameMetadata) => void;
   onEmulators: () => void;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
@@ -74,6 +74,19 @@ export function GamePage({
   const [bios, setBios] = useState(entry?.item.biosPath ?? "");
   const [args, setArgs] = useState((entry?.item.runtimeArgs ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
+  const [downloadOptions, setDownloadOptions] = useState(false);
+  const [downloadQuery, setDownloadQuery] = useState("");
+  const [downloadSource, setDownloadSource] = useState("all");
+  const sourceMatches = useQuery({
+    queryKey: ["game-download-options", game.id, downloadOptions],
+    queryFn: () => bridge.searchDownloadSources(game.title),
+    enabled: downloadOptions,
+  });
+  const visibleMatches = (sourceMatches.data ?? []).filter(
+    (match) =>
+      match.title.toLowerCase().includes(downloadQuery.trim().toLowerCase()) &&
+      (downloadSource === "all" || match.sourceId === downloadSource),
+  );
   useEffect(() => {
     let active = true;
     new GameResolver(bridge.exists)
@@ -162,7 +175,9 @@ export function GamePage({
                   ? resolution?.state === "MISSING_EMULATOR"
                     ? onEmulators()
                     : void play()
-                  : onDownload(game)
+                  : (setDownloadQuery(""),
+                    setDownloadSource("all"),
+                    setDownloadOptions(true))
               }
             >
               {running ? (
@@ -469,6 +484,86 @@ export function GamePage({
           </aside>
         </div>
       </div>
+      {downloadOptions && (
+        <Modal
+          title="Download options"
+          onClose={() => {
+            if (!busy) setDownloadOptions(false);
+          }}
+        >
+          <div className="download-options-modal">
+            <p>Choose a release for {game.title}</p>
+            <div className="download-option-filters">
+              <label className="source-search-input">
+                <Search size={17} />
+                <input
+                  autoFocus
+                  aria-label="Filter download releases"
+                  value={downloadQuery}
+                  onChange={(event) => setDownloadQuery(event.target.value)}
+                  placeholder="Filter releases"
+                />
+              </label>
+              <select
+                aria-label="Filter download source"
+                value={downloadSource}
+                onChange={(event) => setDownloadSource(event.target.value)}
+              >
+                <option value="all">All sources</option>
+                {[
+                  ...new Map(
+                    (sourceMatches.data ?? []).map((match) => [
+                      match.sourceId,
+                      match,
+                    ]),
+                  ).values(),
+                ].map((match) => (
+                  <option value={match.sourceId} key={match.sourceId}>
+                    {match.sourceName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {sourceMatches.isFetching ? (
+              <p className="muted">Looking through your sources…</p>
+            ) : sourceMatches.error ? (
+              <p className="error-message">{String(sourceMatches.error)}</p>
+            ) : visibleMatches.length ? (
+              <div className="download-option-list">
+                {visibleMatches.map((match: SourceMatch) => (
+                  <button
+                    className="download-option"
+                    disabled={busy}
+                    key={`${match.sourceId}-${match.id}`}
+                    onClick={() =>
+                      void action(async () => {
+                        await bridge.startDownload(match, 0, game);
+                        setDownloadOptions(false);
+                        notify(
+                          "Download started. It will appear in Downloads.",
+                        );
+                      })
+                    }
+                  >
+                    <span>
+                      <strong>{match.title}</strong>
+                      <small>
+                        {match.fileSize || "Size not provided"} ·{" "}
+                        {match.sourceName}
+                      </small>
+                    </span>
+                    <Download size={18} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="download-options-empty">
+                No releases match this game in your enabled sources.
+              </p>
+            )}
+          </div>
+        </Modal>
+      )}
       {config && entry && (
         <Modal title="Game configuration" onClose={() => setConfig(false)}>
           <div className="form-stack">

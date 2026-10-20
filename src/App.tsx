@@ -244,10 +244,6 @@ export function App() {
             emulators={emulators}
             onBack={() => setSelected(undefined)}
             onImport={(game) => openImport(game)}
-            onDownload={(game) => {
-              setDownloadGame(game);
-              navigate("Downloads");
-            }}
             onEmulators={() => navigate("Emulators")}
             refresh={refresh}
             notify={notify}
