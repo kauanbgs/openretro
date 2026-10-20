@@ -298,8 +298,8 @@ export const bridge = {
     });
     write(data);
   },
-  async removeGame(id: string) {
-    if (isDesktop) return invoke("remove_game", { id });
+  async removeGame(id: string, deleteFile = false) {
+    if (isDesktop) return invoke("remove_game", { id, deleteFile });
     const d = read();
     d.library = d.library.filter((x) => x.item.id !== id);
     write(d);

@@ -70,6 +70,7 @@ export function GamePage({
   const [running, setRunning] = useState(false);
   const [config, setConfig] = useState(false);
   const [remove, setRemove] = useState(false);
+  const [deleteFile, setDeleteFile] = useState(false);
   const [emulatorId, setEmulatorId] = useState(entry?.item.emulatorId ?? "");
   const [bios, setBios] = useState(entry?.item.biosPath ?? "");
   const [args, setArgs] = useState((entry?.item.runtimeArgs ?? []).join("\n"));
@@ -426,7 +427,10 @@ export function GamePage({
                       </button>
                       <button
                         className="button danger"
-                        onClick={() => setRemove(true)}
+                        onClick={() => {
+                          setDeleteFile(false);
+                          setRemove(true);
+                        }}
                       >
                         <Trash2 size={16} /> Remove from library
                       </button>
@@ -644,8 +648,15 @@ export function GamePage({
         <Modal title="Remove this game?" onClose={() => setRemove(false)}>
           <p className="muted">
             {game.title} and its play history will be removed from OpenRetro.
-            The original game file stays on your computer.
           </p>
+          <label className="checkbox-line">
+            <input
+              type="checkbox"
+              checked={deleteFile}
+              onChange={(e) => setDeleteFile(e.target.checked)}
+            />{" "}
+            Also delete the downloaded game file from this computer
+          </label>
           <div className="modal-footer">
             <button
               className="button secondary"
@@ -658,7 +669,7 @@ export function GamePage({
               disabled={busy}
               onClick={() =>
                 void action(async () => {
-                  await bridge.removeGame(entry.item.id);
+                  await bridge.removeGame(entry.item.id, deleteFile);
                   onBack();
                 })
               }

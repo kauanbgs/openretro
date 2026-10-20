@@ -346,12 +346,29 @@ pub fn add_game_blocking(
     Ok(())
 }
 #[tauri::command]
-pub fn remove_game(id: String, db: State<Database>) -> Result<()> {
+pub fn remove_game(id: String, delete_file: bool, db: State<Database>) -> Result<()> {
     let conn = db.0.lock().map_err(error)?;
     let active: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM play_sessions WHERE library_item_id=?1 AND finished_at IS NULL)", [&id], |r| r.get(0)).map_err(error)?;
     if active {
         return Err("Close the running game before removing it from your library.".into());
     }
+    let source_path: String = conn
+        .query_row(
+            "SELECT source_path FROM library_items WHERE id=?1",
+            [&id],
+            |r| r.get(0),
+        )
+        .map_err(|_| "This game is no longer in your library.".to_string())?;
+    drop(conn);
+    if delete_file {
+        let path = std::fs::canonicalize(&source_path)
+            .map_err(|_| "The game file could not be found to delete it.".to_string())?;
+        if !path.is_file() {
+            return Err("The game path is not a file.".into());
+        }
+        std::fs::remove_file(path).map_err(error)?;
+    }
+    let conn = db.0.lock().map_err(error)?;
     conn.execute("DELETE FROM library_items WHERE id=?1", [id])
         .map_err(error)?;
     Ok(())
