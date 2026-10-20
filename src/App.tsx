@@ -22,6 +22,7 @@ import { GamePage } from "./features/games/GamePage";
 import { EmulatorsPage } from "./features/emulators/EmulatorsPage";
 import { DownloadsPage } from "./features/downloads/DownloadsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { BigPicture } from "./features/big-picture/BigPicture";
 import { Modal } from "./components/Modal";
 import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
@@ -62,6 +63,7 @@ export function App() {
   const [platform, setPlatform] = useState("all");
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
+  const [bigPicture, setBigPicture] = useState(false);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [page, selected?.id]);
@@ -226,6 +228,12 @@ export function App() {
               )}
             </div>
             <button
+              className="button secondary big-picture-toggle"
+              onClick={() => setBigPicture(true)}
+            >
+              <Gamepad2 size={18} /> Big Picture
+            </button>
+            <button
               className="button primary add-game"
               onClick={() => openImport()}
             >
@@ -360,6 +368,14 @@ export function App() {
             <X size={16} />
           </button>
         </div>
+      )}
+      {bigPicture && (
+        <BigPicture
+          library={library}
+          emulators={emulators}
+          onClose={() => setBigPicture(false)}
+          notify={notify}
+        />
       )}
     </div>
   );
