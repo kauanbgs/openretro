@@ -6,8 +6,15 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Artwork } from "../../components/Artwork";
+import { useMemo } from "react";
+import { enrichGameMetadata } from "../../utils/metadata";
+import { GameArtwork } from "../../components/GameArtwork";
+import { useQuery } from "@tanstack/react-query";
 import { GameCard } from "../../components/GameCard";
-import { catalog } from "../../providers/metadata/MockMetadataProvider";
+import {
+  metadataProvider,
+  catalogStatus,
+} from "../../providers/metadata/IgdbMetadataProvider";
 import { isDesktop } from "../../services/bridge";
 import { platformById } from "../../db/platforms";
 import type { GameMetadata, LibraryGame } from "../../types";
@@ -29,7 +36,38 @@ export function HomePage({
     .sort((a, b) =>
       (b.item.lastPlayedAt ?? "").localeCompare(a.item.lastPlayedAt ?? ""),
     );
-  const featured = played[0]?.game ?? catalog[0];
+  const status = useQuery({
+    queryKey: ["catalog-status"],
+    queryFn: catalogStatus,
+    retry: false,
+  });
+  const { data: spotlight } = useQuery({
+    queryKey: ["catalog-spotlight"],
+    queryFn: () => metadataProvider.browse(),
+    enabled: status.data?.configured === true,
+    retry: false,
+    staleTime: 86400000,
+  });
+  const suggestions = spotlight?.games ?? [];
+  const primary = played[0]?.game ?? suggestions[0];
+  const { data: featureDetails } = useQuery({
+    queryKey: ["game-detail", primary?.externalId, primary?.platformId],
+    queryFn: () =>
+      metadataProvider.getGame(
+        `igdb-${primary!.externalId}`,
+        primary!.platformId,
+      ),
+    enabled:
+      status.data?.configured === true &&
+      primary?.metadataProvider === "igdb" &&
+      Boolean(primary?.externalId),
+    retry: false,
+    staleTime: 86400000,
+  });
+  const featured = useMemo(
+    () => (primary ? enrichGameMetadata(primary, featureDetails) : undefined),
+    [primary, featureDetails],
+  );
   return (
     <div className="home-content">
       <div className="welcome-line">
@@ -48,7 +86,11 @@ export function HomePage({
         </span>
       </div>
       <section className="featured-hero">
-        <Artwork kind={featured.artwork} />
+        {featured ? (
+          <GameArtwork game={featured} hero />
+        ) : (
+          <Artwork kind="astral" />
+        )}
         <div className="hero-scrim" />
         <div className="hero-content">
           <div className="hero-kicker">
@@ -57,16 +99,16 @@ export function HomePage({
               {played.length ? "CONTINUE PLAYING" : "A NEW ADVENTURE AWAITS"}
             </span>
             <span>
-              {platformById(featured.platformId)?.shortName} <b>·</b>{" "}
-              {featured.year}
+              {featured ? platformById(featured.platformId)?.shortName : "IGDB"}{" "}
+              <b>·</b> {featured?.year || "CLASSIC GAMES"}
             </span>
           </div>
           <h2>
-            {featured.title === "Astral Horizon" ? (
+            {!featured ? (
               <>
-                Beyond the familiar.
+                A world of classics.
                 <br />
-                Into the extraordinary.
+                One place to play.
               </>
             ) : (
               featured.title
@@ -80,14 +122,18 @@ export function HomePage({
           <div className="hero-actions">
             <button
               className="button primary"
-              onClick={() => onSelect(featured)}
+              onClick={() => (featured ? onSelect(featured) : onDiscover())}
             >
               {played.length ? (
                 <Gamepad2 size={18} />
               ) : (
                 <ArrowUpRight size={18} />
               )}{" "}
-              {played.length ? "Continue adventure" : "Explore game"}
+              {played.length
+                ? "Continue adventure"
+                : featured
+                  ? "Explore game"
+                  : "Explore the catalog"}
             </button>
             <button className="hero-secondary" onClick={() => onDiscover()}>
               Discover something new <ArrowRight size={16} />
@@ -97,11 +143,9 @@ export function HomePage({
         <div className="hero-caption">
           <span className="hero-caption-line" />
           <span>
-            {featured.title}
+            {featured?.title ?? "Every era. One home."}
             <small>
-              {played.length
-                ? "FROM YOUR COLLECTION"
-                : "FICTIONAL DEVELOPMENT SPOTLIGHT"}
+              {played.length ? "FROM YOUR COLLECTION" : "POWERED BY IGDB"}
             </small>
           </span>
         </div>
@@ -138,12 +182,12 @@ export function HomePage({
           <div>
             <h2>
               {library.length ? "Recently added" : "Find your next favorite"}
-              <span>{library.length || catalog.length}</span>
+              <span>{library.length || suggestions.length}</span>
             </h2>
             <p>
               {library.length
                 ? "Fresh additions to your personal collection."
-                : "A few fictional worlds to explore while you make this space your own."}
+                : "Real games from IGDB, ready to join your personal collection."}
             </p>
           </div>
           <button
@@ -156,7 +200,7 @@ export function HomePage({
         <div className="games-grid">
           {(library.length
             ? library.slice(0, 4).map((x) => ({ game: x.game, item: x.item }))
-            : catalog.slice(1, 5).map((game) => ({ game, item: undefined }))
+            : suggestions.slice(0, 4).map((game) => ({ game, item: undefined }))
           ).map((x) => (
             <GameCard
               key={x.game.id}
@@ -166,6 +210,23 @@ export function HomePage({
             />
           ))}
         </div>
+        {!library.length && !suggestions.length && (
+          <div className="home-catalog-prompt">
+            <Gamepad2 size={27} />
+            <div>
+              <h3>
+                {status.data?.configured
+                  ? "Your catalog is ready to explore."
+                  : "Connect your real game catalog."}
+              </h3>
+              <p>Browse games by console and genre with IGDB.</p>
+            </div>
+            <button className="button secondary" onClick={onDiscover}>
+              {status.data?.configured ? "Open Discover" : "Set up IGDB"}
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
       </section>
       <section className="library-banner">
         <div className="banner-icon">

@@ -1,7 +1,7 @@
 import { ArrowUpRight, Heart } from "lucide-react";
 import type { GameMetadata, LibraryItem } from "../types";
 import { platformById } from "../db/platforms";
-import { Artwork } from "./Artwork";
+import { GameArtwork } from "./GameArtwork";
 export function GameCard({
   game,
   item,
@@ -14,7 +14,7 @@ export function GameCard({
   return (
     <button className="game-card" onClick={onClick}>
       <div className="cover">
-        <Artwork kind={game.artwork} title />
+        <GameArtwork game={game} />
         <span className="platform-label">
           {platformById(game.platformId)?.shortName}
         </span>
@@ -29,7 +29,7 @@ export function GameCard({
       <div className="card-meta">
         {platformById(game.platformId)?.name}
         <span>·</span>
-        {game.year}
+        {game.year || "Year unknown"}
       </div>
       <div className="card-status">
         <i className={item ? "installed" : ""} />

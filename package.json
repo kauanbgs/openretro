@@ -9,8 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "tauri": "tauri",
-    "format": "prettier --write src index.html vite.config.ts *.json .github/workflows/*.yml",
-    "format:check": "prettier --check src index.html vite.config.ts *.json .github/workflows/*.yml"
+    "format": "prettier --write src server tests index.html vite.config.ts *.json .github/workflows/*.yml",
+    "format:check": "prettier --check src server tests index.html vite.config.ts *.json .github/workflows/*.yml"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.0",
@@ -23,6 +23,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
     "@tauri-apps/cli": "^2.8.0",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.0",

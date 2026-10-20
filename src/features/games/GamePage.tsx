@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { enrichGameMetadata } from "../../utils/metadata";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Play,
@@ -17,13 +19,14 @@ import type {
   GameResolution,
   LibraryGame,
 } from "../../types";
-import { Artwork } from "../../components/Artwork";
+import { GameArtwork } from "../../components/GameArtwork";
+import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
 import { Modal } from "../../components/Modal";
 import { platformById } from "../../db/platforms";
 import { GameResolver } from "../../services/GameResolver";
 import { bridge, isDesktop } from "../../services/bridge";
 export function GamePage({
-  game,
+  game: initialGame,
   entry,
   emulators,
   onBack,
@@ -42,6 +45,23 @@ export function GamePage({
   notify: (message: string) => void;
 }) {
   const [tab, setTab] = useState("Overview");
+  const details = useQuery({
+    queryKey: ["game-detail", initialGame.externalId, initialGame.platformId],
+    queryFn: () =>
+      metadataProvider.getGame(
+        `igdb-${initialGame.externalId}`,
+        initialGame.platformId,
+      ),
+    enabled:
+      initialGame.metadataProvider === "igdb" &&
+      Boolean(initialGame.externalId),
+    retry: false,
+    staleTime: 86400000,
+  });
+  const game = useMemo(
+    () => enrichGameMetadata(initialGame, details.data),
+    [initialGame, details.data],
+  );
   const [resolution, setResolution] = useState<GameResolution>();
   const [running, setRunning] = useState(false);
   const [config, setConfig] = useState(false);
@@ -102,7 +122,7 @@ export function GamePage({
   return (
     <div className="game-page">
       <div className="detail-hero">
-        <Artwork kind={game.artwork} />
+        <GameArtwork game={game} hero />
         <div className="detail-shade" />
         <button className="back-button" onClick={onBack}>
           <ArrowLeft size={17} /> Back to collection
@@ -233,7 +253,11 @@ export function GamePage({
             <span>
               Source
               <strong>
-                {entry ? "Your local file" : "Development catalog"}
+                {entry
+                  ? "Your local file"
+                  : game.metadataProvider === "igdb"
+                    ? "IGDB"
+                    : "Local metadata"}
               </strong>
             </span>
           </div>
@@ -255,6 +279,22 @@ export function GamePage({
               <span className="eyebrow">THE ADVENTURE</span>
               <h2>A world worth coming back to.</h2>
               <p>{game.description}</p>
+              {details.error && (
+                <p className="hint">
+                  Additional metadata is unavailable. Showing the saved catalog
+                  information.
+                </p>
+              )}
+              {game.sourceUrl && (
+                <a
+                  className="metadata-source"
+                  href={game.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Game data and artwork: IGDB ↗
+                </a>
+              )}
             </div>
             <aside>
               <span className="eyebrow">AT A GLANCE</span>
@@ -271,12 +311,34 @@ export function GamePage({
             </aside>
           </div>
         ) : tab === "Screenshots" ? (
-          <div className="empty-inline">
-            <p>No gameplay screenshots available.</p>
-            <small>
-              The artwork in this catalog is original development artwork.
-            </small>
-          </div>
+          details.isFetching ? (
+            <div className="catalog-loading">
+              <LoaderCircle className="spin" size={22} />
+              <p>Loading screenshots…</p>
+            </div>
+          ) : game.screenshots?.length ? (
+            <div className="screenshot-grid">
+              {game.screenshots.map((url, i) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer">
+                  <img
+                    src={url}
+                    alt={`${game.title} gameplay screenshot ${i + 1}`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-inline">
+              <p>
+                {details.error
+                  ? "Screenshots could not be loaded. Check your connection."
+                  : "No gameplay screenshots are available for this game."}
+              </p>
+              <small>Artwork and metadata are provided by IGDB.</small>
+            </div>
+          )
         ) : (
           <div className="form-stack details-info">
             <p>

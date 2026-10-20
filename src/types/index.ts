@@ -16,6 +16,15 @@ export interface GameMetadata {
   genre: string;
   artwork: string;
   color: string;
+  metadataProvider?: "igdb" | "mock";
+  externalId?: number;
+  coverUrl?: string;
+  backgroundUrl?: string;
+  screenshots?: string[];
+  genreIds?: number[];
+  genres?: string[];
+  sourceUrl?: string;
+  platformIds?: string[];
 }
 export interface LibraryItem {
   id: string;

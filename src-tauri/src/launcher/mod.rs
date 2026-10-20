@@ -1,11 +1,14 @@
-use std::{process::Command, time::Instant};
+use crate::{
+    database::{self, error, Database, Result},
+    filesystem,
+};
 use rusqlite::params;
-use tauri::{Manager, Emitter};
-use crate::{database::{self, error, Database, Result}, filesystem};
+use std::{process::Command, time::Instant};
+use tauri::{Emitter, Manager};
 
 #[tauri::command]
 pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
- tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
  let (entry,emulator) = {
   let conn=db.0.lock().map_err(error)?;

@@ -1,4 +1,5 @@
 import { HomePage } from "./features/home/HomePage";
+import { DiscoverPage } from "./features/discover/DiscoverPage";
 import { CollectionPage } from "./features/library/CollectionPage";
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -46,6 +47,9 @@ export function App() {
   const [platform, setPlatform] = useState("all");
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [page, selected?.id]);
   const { data: library = [], isPending, error } = useLibrary();
   const { data: emulators = [] } = useEmulators();
   const refresh = useRefresh();
@@ -248,10 +252,17 @@ export function App() {
             onLibrary={() => navigate("Library")}
             onDiscover={() => navigate("Discover")}
           />
-        ) : page === "Library" || page === "Discover" ? (
+        ) : page === "Discover" ? (
+          <DiscoverPage
+            query={query}
+            setQuery={setQuery}
+            platform={platform}
+            setPlatform={setPlatform}
+            onSelect={setSelected}
+          />
+        ) : page === "Library" ? (
           <CollectionPage
             key={page}
-            page={page}
             library={library}
             isPending={isPending}
             query={query}
@@ -305,8 +316,9 @@ export function App() {
               : "Browser preview · localStorage. Use the Tauri desktop build to launch games."}
           </p>
           <p className="hint">
-            The development catalog uses fictional games and original
-            illustrations. Press Ctrl K to search.
+            Discover uses IGDB metadata and artwork. Add your Twitch application
+            credentials to .env.local to connect the catalog. Press Ctrl K to
+            search.
           </p>
         </Modal>
       )}

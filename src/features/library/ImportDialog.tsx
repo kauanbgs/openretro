@@ -10,10 +10,7 @@ import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
 import { LibraryManager } from "../../services/LibraryManager";
 import { platforms } from "../../db/platforms";
-import {
-  catalog,
-  metadataProvider,
-} from "../../providers/metadata/MockMetadataProvider";
+import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
 import type { GameMetadata, ImportCandidate } from "../../types";
 export function ImportDialog({
   initial,
@@ -28,7 +25,11 @@ export function ImportDialog({
   const [selected, setSelected] = useState(initial?.id ?? "custom");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [platform, setPlatform] = useState(initial?.platformId ?? "");
-  const [matches, setMatches] = useState<GameMetadata[]>(catalog);
+  const [matches, setMatches] = useState<GameMetadata[]>(
+    initial ? [initial] : [],
+  );
+  const [metadataSearch, setMetadataSearch] = useState("");
+  const [metadataError, setMetadataError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function pick() {
@@ -39,18 +40,51 @@ export function ImportDialog({
       if (c) {
         setCandidate(c);
         setPlatform(
-          c.platformIds.includes(initial?.platformId ?? "")
-            ? initial!.platformId
-            : (c.platformIds[0] ?? ""),
+          c.platformIds.find((p) => p === initial?.platformId) ??
+            c.platformIds.find((p) => initial?.platformIds?.includes(p)) ??
+            c.platformIds[0] ??
+            "",
         );
-        const stem = c.filename.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
-        const results = await metadataProvider.search(stem);
-        setMatches(results.length ? results : catalog);
+        const stem = c.filename
+          .replace(/\.[^.]+$/, "")
+          .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
+          .replace(/[_-]/g, " ")
+          .trim();
         if (!initial) {
           setTitle(stem);
-          setSelected(results[0]?.id ?? "custom");
-          if (results[0] && c.platformIds.includes(results[0].platformId))
-            setPlatform(results[0].platformId);
+          setMetadataSearch(stem);
+          setSelected("custom");
+          try {
+            const results = await metadataProvider.search(stem);
+            const compatible = results.filter((g) =>
+              c.platformIds.some(
+                (p) => g.platformId === p || g.platformIds?.includes(p),
+              ),
+            );
+            setMatches(compatible);
+            setSelected(compatible[0]?.id ?? "custom");
+            if (compatible[0])
+              setPlatform(
+                c.platformIds.find(
+                  (p) =>
+                    p === compatible[0].platformId ||
+                    compatible[0].platformIds?.includes(p),
+                )!,
+              );
+          } catch {
+            setMetadataError(
+              "Online matching is unavailable. You can still import with your own title, or connect IGDB in Discover.",
+            );
+          }
+        } else if (
+          !c.platformIds.some(
+            (p) => p === initial.platformId || initial.platformIds?.includes(p),
+          )
+        ) {
+          setSelected("custom");
+          setMetadataError(
+            "The chosen file does not match this game's console. Choose the correct file or use your own title.",
+          );
         }
       }
     } catch (e) {
@@ -64,7 +98,15 @@ export function ImportDialog({
     setBusy(true);
     setError("");
     try {
-      const match = catalog.find((g) => g.id === selected);
+      const match = matches.find((g) => g.id === selected);
+      if (
+        match &&
+        match.platformId !== platform &&
+        !match.platformIds?.includes(platform)
+      )
+        throw new Error(
+          "The metadata and file must belong to the same console. Choose matching metadata or use your own title.",
+        );
       const game: GameMetadata = match
         ? {
             ...match,
@@ -80,7 +122,7 @@ export function ImportDialog({
             description:
               "A game from your personal collection. Imported from a local file; your original file stays exactly where it is.",
             genre: "Local game",
-            artwork: "astral",
+            artwork: "neutral",
             color: "#c0a3f5",
           };
       if (!game.title) throw new Error("Enter a title for your game.");
@@ -165,6 +207,44 @@ export function ImportDialog({
             </p>
           )}
           <label>
+            Search IGDB
+            <div className="input-action">
+              <input
+                maxLength={120}
+                value={metadataSearch}
+                onChange={(e) => setMetadataSearch(e.target.value)}
+                placeholder="Find matching game metadata"
+              />
+              <button
+                className="button secondary"
+                disabled={busy || !metadataSearch.trim()}
+                onClick={() => {
+                  setBusy(true);
+                  setMetadataError("");
+                  void metadataProvider
+                    .browse(metadataSearch, platform)
+                    .then((result) => {
+                      setMatches(result.games);
+                      setSelected(result.games[0]?.id ?? "custom");
+                      if (!result.games.length)
+                        setMetadataError(
+                          "No matches found for this title and console. Try another name or use your own title.",
+                        );
+                    })
+                    .catch(() =>
+                      setMetadataError(
+                        "IGDB could not be reached. You can import using your own title.",
+                      ),
+                    )
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Search
+              </button>
+            </div>
+          </label>
+          {metadataError && <p className="hint">{metadataError}</p>}
+          <label>
             Metadata
             <select
               value={selected}
@@ -173,11 +253,17 @@ export function ImportDialog({
               }}
             >
               <option value="custom">Use my own title</option>
-              {matches.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.title} · fictional development metadata
-                </option>
-              ))}
+              {matches
+                .filter(
+                  (g) =>
+                    g.platformId === platform ||
+                    g.platformIds?.includes(platform),
+                )
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title} · {g.year || "Year unknown"} · IGDB
+                  </option>
+                ))}
             </select>
           </label>
           {selected === "custom" && (

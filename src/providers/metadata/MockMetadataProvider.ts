@@ -1,9 +1,6 @@
 import type { GameMetadata } from "../../types";
 export type GameSearchResult = GameMetadata;
-export interface MetadataProvider {
-  search(query: string): Promise<GameSearchResult[]>;
-  getGame(id: string): Promise<GameMetadata>;
-}
+import type { MetadataProvider } from "./types";
 export const catalog: GameMetadata[] = [
   {
     id: "astral",
@@ -106,4 +103,3 @@ export class MockMetadataProvider implements MetadataProvider {
     return game;
   }
 }
-export const metadataProvider: MetadataProvider = new MockMetadataProvider();

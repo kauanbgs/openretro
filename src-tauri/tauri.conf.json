@@ -6,7 +6,7 @@
   "build": { "beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:1420", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
   "app": {
     "windows": [{ "title": "OpenRetro", "width": 1440, "height": 940, "minWidth": 900, "minHeight": 680, "backgroundColor": "#101213" }],
-    "security": { "csp": "default-src 'self'; img-src 'self' data: asset:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; font-src 'self' data:" }
+    "security": { "csp": "default-src 'self'; img-src 'self' data: asset: https://images.igdb.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; font-src 'self' data:" }
   },
   "bundle": { "active": true, "targets": "all", "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"], "shortDescription": "Your classic games, at home." }
 }
