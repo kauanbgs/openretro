@@ -254,12 +254,7 @@ fn spawn_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result<()> {
     Ok(())
 }
 const MAX_DIRECT_DOWNLOAD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
-fn direct_filename(url: &reqwest::Url) -> String {
-    let candidate = url
-        .path_segments()
-        .and_then(|mut segments| segments.next_back())
-        .filter(|name| !name.is_empty())
-        .unwrap_or("download.bin");
+fn safe_download_filename(candidate: &str) -> Option<String> {
     let name: String = candidate
         .chars()
         .map(|c| {
@@ -271,10 +266,29 @@ fn direct_filename(url: &reqwest::Url) -> String {
         })
         .collect();
     if validate_component(&name).is_ok() {
-        name
+        Some(name)
     } else {
-        "download.bin".into()
+        None
     }
+}
+fn direct_filename(url: &reqwest::Url) -> String {
+    url.path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .filter(|name| !name.is_empty())
+        .and_then(safe_download_filename)
+        .unwrap_or_else(|| "download.bin".into())
+}
+fn response_filename(response: &reqwest::blocking::Response) -> Option<String> {
+    let header = response
+        .headers()
+        .get(reqwest::header::CONTENT_DISPOSITION)?
+        .to_str()
+        .ok()?;
+    header
+        .split(';')
+        .find_map(|part| part.trim().strip_prefix("filename="))
+        .map(|name| name.trim_matches('"'))
+        .and_then(safe_download_filename)
 }
 fn playable_extension(path: &Path) -> bool {
     matches!(
@@ -346,6 +360,7 @@ fn direct_transfer(
     cancel: &CancellationToken,
 ) -> Result<()> {
     let url = sources::direct_url(&job.magnet)?;
+    let requested_filename = direct_filename(&url);
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
@@ -372,7 +387,8 @@ fn direct_transfer(
     if total > MAX_DIRECT_DOWNLOAD_BYTES {
         return Err("The direct download is unexpectedly large.".into());
     }
-    let target = PathBuf::from(&job.directory).join(direct_filename(response.url()));
+    let target = PathBuf::from(&job.directory)
+        .join(response_filename(&response).unwrap_or(requested_filename));
     let temporary = target.with_file_name(format!(
         "{}.part",
         target
