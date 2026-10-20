@@ -166,6 +166,7 @@ export const bridge = {
     game?: GameMetadata,
     downloadDirectory?: string | null,
     autoExtract = true,
+    autoAddToLibrary = true,
   ): Promise<string> {
     if (!isDesktop)
       throw new Error(
@@ -178,6 +179,7 @@ export const bridge = {
       game: game ?? null,
       downloadDirectory: downloadDirectory ?? null,
       autoExtract,
+      autoAddToLibrary,
     });
   },
   async downloadJobs(): Promise<DownloadJob[]> {

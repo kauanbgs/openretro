@@ -136,7 +136,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?;
  tx.commit().map_err(error)?; let _=app.emit("game-finished",&id);
  let status=status.map_err(error)?;
- if !status.success() { return Err(format!("The emulator exited with code {:?}. Your session was saved. Check its game and BIOS configuration.",status.code())); }
+ if !status.success() { return Err(format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()))); }
  Ok(elapsed)
  }).await.map_err(error)?
 }

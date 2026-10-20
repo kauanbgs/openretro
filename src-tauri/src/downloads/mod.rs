@@ -14,7 +14,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tokio::sync::OnceCell;
 use tokio_util::sync::CancellationToken;
 
@@ -38,6 +38,8 @@ pub struct DownloadJob {
     pub game: Option<GameMetadata>,
     #[serde(default)]
     pub auto_extract: bool,
+    #[serde(default)]
+    pub auto_add_to_library: bool,
 }
 struct ActiveTask {
     cancel: CancellationToken,
@@ -130,6 +132,7 @@ async fn transfer(app: &tauri::AppHandle, job: &mut DownloadJob) -> Result<()> {
                 .delete(librqbit::api::TorrentIdOrHash::Id(handle.id()), false)
                 .await
                 .map_err(error)?;
+            auto_add_completed_game(app, job);
             return Ok(());
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -446,7 +449,42 @@ fn direct_transfer(
     if total == 0 {
         job.total_bytes = job.downloaded_bytes;
     }
-    save_job(app, job)
+    save_job(app, job)?;
+    auto_add_completed_game(app, job);
+    Ok(())
+}
+fn auto_add_completed_game(app: &tauri::AppHandle, job: &DownloadJob) {
+    if !job.auto_add_to_library {
+        return;
+    }
+    let Some(game) = job.game.clone() else {
+        return;
+    };
+    let root = match Path::new(&job.directory).canonicalize() {
+        Ok(root) => root,
+        Err(_) => return,
+    };
+    let mut files = Vec::new();
+    if collect_files(&root, &root, &mut files, &mut 0).is_err() {
+        return;
+    }
+    let matches: Vec<_> = files
+        .into_iter()
+        .filter(|file| file.platform_ids.contains(&game.platform_id))
+        .collect();
+    if matches.len() != 1 {
+        return;
+    }
+    let candidate = match crate::filesystem::inspect(&matches[0].path) {
+        Ok(candidate) => candidate,
+        Err(_) => return,
+    };
+    if crate::commands::add_game_blocking(app, game.clone(), candidate).is_ok() {
+        let _ = app.emit(
+            "download-imported",
+            serde_json::json!({"gameId": game.id, "downloadId": job.id}),
+        );
+    }
 }
 fn spawn_direct_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result<()> {
     job.state = "QUEUED".into();
@@ -489,6 +527,7 @@ pub async fn start_source_download(
     game: Option<GameMetadata>,
     download_directory: Option<String>,
     auto_extract: bool,
+    auto_add_to_library: bool,
 ) -> Result<String> {
     let service = app.state::<DownloadService>();
     let _guard = service.operations.lock().await;
@@ -557,6 +596,7 @@ pub async fn start_source_download(
         error: None,
         game,
         auto_extract,
+        auto_add_to_library,
     };
     if is_magnet {
         spawn_transfer(&app, job)?;

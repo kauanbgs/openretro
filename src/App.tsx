@@ -26,6 +26,7 @@ import { Modal } from "./components/Modal";
 import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop } from "./services/bridge";
+import { listen } from "@tauri-apps/api/event";
 import {
   defaultSettings,
   type GameMetadata,
@@ -73,6 +74,17 @@ export function App() {
     queryKey: ["settings"],
     queryFn: bridge.settings,
   });
+  useEffect(() => {
+    if (!isDesktop) return;
+    const unlisten = listen("download-imported", async () => {
+      await refresh();
+      setPage("Library");
+      notify("Download finished and was added to your library.");
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [notify, refresh]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 6500);

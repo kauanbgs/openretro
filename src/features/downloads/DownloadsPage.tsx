@@ -59,6 +59,7 @@ export function DownloadsPage({
     null,
   );
   const [autoExtract, setAutoExtract] = useState(true);
+  const [autoAddToLibrary, setAutoAddToLibrary] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [files, setFiles] = useState<{
@@ -156,6 +157,7 @@ export function DownloadsPage({
                     setUri(0);
                     setDownloadDirectory(null);
                     setAutoExtract(true);
+                    setAutoAddToLibrary(Boolean(game));
                     setError("");
                   }}
                 >
@@ -349,6 +351,16 @@ export function DownloadsPage({
               />{" "}
               Extract ZIP files automatically when the download finishes
             </label>
+            {game && (
+              <label className="checkbox-line">
+                <input
+                  type="checkbox"
+                  checked={autoAddToLibrary}
+                  onChange={(e) => setAutoAddToLibrary(e.target.checked)}
+                />{" "}
+                Add the completed game directly to my library
+              </label>
+            )}
             <p className="hint">
               BitTorrent downloads depend on available peers. Files are checked
               against the torrent's piece hashes. Downloading shares pieces with
@@ -371,6 +383,7 @@ export function DownloadsPage({
                     game,
                     downloadDirectory,
                     autoExtract,
+                    autoAddToLibrary,
                   );
                   setChoice(undefined);
                   notify("Download started. Waiting for torrent metadata.");

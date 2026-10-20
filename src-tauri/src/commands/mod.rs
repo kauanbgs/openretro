@@ -307,18 +307,43 @@ pub async fn add_game(
     game: GameMetadata,
     candidate: ImportCandidate,
 ) -> Result<()> {
-    tauri::async_runtime::spawn_blocking(move || {
- let inspected = filesystem::inspect(&candidate.path)?;
- if inspected.sha256 != candidate.sha256 { return Err("The file changed during import. Select it again.".into()); }
- if !inspected.platform_ids.contains(&game.platform_id) { return Err("The selected platform does not match this file extension.".into()); }
- if game.title.trim().is_empty() { return Err("Give this game a title before importing it.".into()); }
- let db = app.state::<Database>(); let mut conn = db.0.lock().map_err(error)?; let tx = conn.transaction().map_err(error)?;
- let duplicate: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM library_items WHERE sha256=?1)", [&inspected.sha256], |r| r.get(0)).map_err(error)?;
- if duplicate { return Err("This file is already in your library.".into()); }
- tx.execute("INSERT INTO games(id,metadata) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata",params![game.id,serde_json::to_string(&game).map_err(error)?]).map_err(error)?;
- tx.execute("INSERT INTO library_items(id,game_id,platform_id,source_provider,source_path,added_at,sha256) VALUES(?1,?2,?3,'local',?4,?5,?6)",params![uuid::Uuid::new_v4().to_string(),game.id,game.platform_id,inspected.path,chrono::Utc::now().to_rfc3339(),inspected.sha256]).map_err(error)?;
- tx.commit().map_err(error)?; log::info!("Imported game {}",game.id); Ok(())
- }).await.map_err(error)?
+    tauri::async_runtime::spawn_blocking(move || add_game_blocking(&app, game, candidate))
+        .await
+        .map_err(error)?
+}
+pub fn add_game_blocking(
+    app: &tauri::AppHandle,
+    game: GameMetadata,
+    candidate: ImportCandidate,
+) -> Result<()> {
+    let inspected = filesystem::inspect(&candidate.path)?;
+    if inspected.sha256 != candidate.sha256 {
+        return Err("The file changed during import. Select it again.".into());
+    }
+    if !inspected.platform_ids.contains(&game.platform_id) {
+        return Err("The selected platform does not match this file extension.".into());
+    }
+    if game.title.trim().is_empty() {
+        return Err("Give this game a title before importing it.".into());
+    }
+    let db = app.state::<Database>();
+    let mut conn = db.0.lock().map_err(error)?;
+    let tx = conn.transaction().map_err(error)?;
+    let duplicate: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM library_items WHERE sha256=?1)",
+            [&inspected.sha256],
+            |r| r.get(0),
+        )
+        .map_err(error)?;
+    if duplicate {
+        return Err("This file is already in your library.".into());
+    }
+    tx.execute("INSERT INTO games(id,metadata) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata",params![game.id,serde_json::to_string(&game).map_err(error)?]).map_err(error)?;
+    tx.execute("INSERT INTO library_items(id,game_id,platform_id,source_provider,source_path,added_at,sha256) VALUES(?1,?2,?3,'local',?4,?5,?6)",params![uuid::Uuid::new_v4().to_string(),game.id,game.platform_id,inspected.path,chrono::Utc::now().to_rfc3339(),inspected.sha256]).map_err(error)?;
+    tx.commit().map_err(error)?;
+    log::info!("Imported game {}", game.id);
+    Ok(())
 }
 #[tauri::command]
 pub fn remove_game(id: String, db: State<Database>) -> Result<()> {
