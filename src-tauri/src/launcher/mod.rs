@@ -114,7 +114,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  let game_path=filesystem::canonical_file(&entry.item.source_path)?;
  let executable=filesystem::executable(&emulator.executable_path)?;
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
- let managed_retroarch=emulator.id=="openretro-retroarch" && entry.item.runtime_args.is_empty();
+ let managed_retroarch=emulator.name.eq_ignore_ascii_case("RetroArch") && entry.item.runtime_args.is_empty();
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
  let mut args:Vec<String>=if managed_retroarch { vec!["-L".into(),retroarch_core(&app,&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()] } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
  if !managed_retroarch && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }

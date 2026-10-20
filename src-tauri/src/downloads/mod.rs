@@ -390,8 +390,20 @@ fn direct_transfer(
     if total > MAX_DIRECT_DOWNLOAD_BYTES {
         return Err("The direct download is unexpectedly large.".into());
     }
-    let target = PathBuf::from(&job.directory)
-        .join(response_filename(&response).unwrap_or(requested_filename));
+    let response_name = response_filename(&response);
+    let requested_is_archive = requested_filename
+        .rsplit_once('.')
+        .is_some_and(|(_, extension)| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "zip" | "7z" | "rar"
+            )
+        });
+    let target = PathBuf::from(&job.directory).join(if requested_is_archive {
+        requested_filename
+    } else {
+        response_name.unwrap_or(requested_filename)
+    });
     let temporary = target.with_file_name(format!(
         "{}.part",
         target
