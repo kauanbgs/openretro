@@ -40,6 +40,12 @@ checkout_pinned() {
 checkout_pinned "$RETROARCH_REPOSITORY" "$RETROARCH_COMMIT" "$SOURCE_DIR"
 checkout_pinned "$AUTOCONFIG_REPOSITORY" "$AUTOCONFIG_COMMIT" "$AUTOCONFIG_DIR"
 
+# The pinned release does not compile with both the menu and networking
+# disabled. These patches backport the equivalent upstream fixes.
+for patch in "$SCRIPT_DIR"/patches/*.patch; do
+  git -C "$SOURCE_DIR" apply --whitespace=nowarn "$patch"
+done
+
 mapfile -t CONFIGURE_FLAGS < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$SCRIPT_DIR/configure-flags.txt")
 
 pushd "$SOURCE_DIR" >/dev/null
@@ -129,8 +135,9 @@ GPL-3.0-or-later. The exact corresponding source is commit
 $RETROARCH_COMMIT from $RETROARCH_REPOSITORY.
 
 The build recipe, pinned dependencies and configuration are distributed in the
-runtime/retroarch directory of OpenRetro. No source patch is applied; the
-feature set is selected exclusively by configure-flags.txt.
+runtime/retroarch directory of OpenRetro. The feature set is selected by
+configure-flags.txt; the build-only fixes in openretro-build/patches are
+applied to the upstream source before compiling.
 
 The controller profiles come from commit $AUTOCONFIG_COMMIT of
 $AUTOCONFIG_REPOSITORY. Emulator cores are not part of this package.
@@ -144,6 +151,7 @@ mkdir -p "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build"
 git -C "$SOURCE_DIR" archive "$RETROARCH_COMMIT" | tar -x -C "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION"
 cp "$SCRIPT_DIR"/{build-mingw64.sh,configure-flags.txt,retroarch.cfg,upstream.env} \
   "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
+cp -R "$SCRIPT_DIR/patches" "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
 tar -czf "$DIST_ROOT/openretro-runtime-source-$RETROARCH_VERSION-r$OPENRETRO_RUNTIME_REVISION.tar.gz" \
   -C "$SOURCE_STAGE" "RetroArch-$RETROARCH_VERSION"
 

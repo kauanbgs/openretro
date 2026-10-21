@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$recipe = Join-Path $root "runtime\retroarch"
+$recipe = Join-Path $root "runtime/retroarch"
 
 $settings = @{}
 Get-Content -LiteralPath (Join-Path $recipe "upstream.env") | ForEach-Object {
@@ -35,7 +35,7 @@ if ($flags -contains "--disable-slang") {
 }
 
 $build = Get-Content -LiteralPath (Join-Path $recipe "build-mingw64.sh") -Raw
-foreach ($marker in @('retroarch.exe', 'runtime-manifest.json', 'SOURCE.md', 'DEPENDENCIES.txt', 'RetroArch-GPL-3.0.txt')) {
+foreach ($marker in @('retroarch.exe', 'patches/*.patch', 'runtime-manifest.json', 'SOURCE.md', 'DEPENDENCIES.txt', 'RetroArch-GPL-3.0.txt')) {
   if (-not $build.Contains($marker)) { throw "Build recipe does not package $marker." }
 }
 Write-Host "OpenRetro Runtime recipe is internally consistent ($($flags.Count) feature flags)."

@@ -10,7 +10,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run test:runtime-recipe
+      - name: Validate runtime recipe
+        shell: pwsh
+        run: ./scripts/test-runtime-recipe.ps1
       - run: npm test
       - run: npm run build
   desktop:

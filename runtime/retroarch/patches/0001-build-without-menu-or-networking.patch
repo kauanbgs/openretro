@@ -1,0 +1,33 @@
+--- a/retroarch.c
++++ b/retroarch.c
+@@ -138,6 +138,7 @@
+ 
+ #include "audio/audio_driver.h"
+ 
++#include "gfx/gfx_display.h"
+ #ifdef HAVE_GFX_WIDGETS
+ #include "gfx/gfx_widgets.h"
+ #endif
+--- a/runloop.c
++++ b/runloop.c
+@@ -7176,15 +7176,18 @@
+    runloop_state_t *runloop_st            = &runloop_state;
+    bool vrr_runloop_enable                = settings->bools.vrr_runloop_enable;
+    retro_time_t current_time              = cpu_features_get_time_usec();
+-#ifdef HAVE_MENU
+ #ifdef HAVE_NETWORKING
+    bool netplay_is_enabled                = netplay_driver_ctl(RARCH_NETPLAY_CTL_IS_ENABLED, NULL);
+    bool netplay_allow_timeskip            = netplay_driver_ctl(RARCH_NETPLAY_CTL_ALLOW_TIMESKIP, NULL);
+    bool netplay_allow_pause               = netplay_driver_ctl(RARCH_NETPLAY_CTL_ALLOW_PAUSE, NULL);
+-   bool menu_pause_libretro               = settings->bools.menu_pause_libretro && netplay_allow_pause;
+ #else
+    bool netplay_allow_timeskip            = false;
+    bool netplay_allow_pause               = false;
++#endif
++#ifdef HAVE_MENU
++#ifdef HAVE_NETWORKING
++   bool menu_pause_libretro               = settings->bools.menu_pause_libretro && netplay_allow_pause;
++#else
+    bool menu_pause_libretro               = settings->bools.menu_pause_libretro;
+ #endif
+    bool core_paused                       =
