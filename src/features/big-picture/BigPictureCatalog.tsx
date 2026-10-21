@@ -14,6 +14,7 @@ import type { GameMetadata, LibraryGame } from "../../types";
 import { bridge } from "../../services/bridge";
 import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
+import { useCatalogPagination } from "../../hooks/useCatalogPagination";
 
 export function BigPictureCatalog({
   library,
@@ -75,6 +76,12 @@ export function BigPictureCatalog({
       ).values(),
     ],
     [browse.data],
+  );
+  const sentinel = useCatalogPagination(
+    Boolean(
+      browse.hasNextPage && !browse.isFetching && !browse.error && !opened,
+    ),
+    browse.fetchNextPage,
   );
   const availability = useQuery({
     queryKey: [
@@ -219,51 +226,78 @@ export function BigPictureCatalog({
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <div className="tv-catalog-filters">
-          <select
-            aria-label="Console"
-            value={platform}
-            onChange={(event) => setPlatform(event.target.value)}
-          >
-            <option value="all">Todos os consoles</option>
-            {taxonomy.data?.platforms.map((item) => (
-              <option key={item.id} value={item.localId}>
-                {platformById(item.localId)?.name ?? item.name}
+        <div
+          className="tv-catalog-filters"
+          role="group"
+          aria-label="Filtros do catálogo"
+        >
+          <label className="tv-filter-control">
+            <span>Console</span>
+            <select
+              aria-label="Console"
+              value={platform}
+              onChange={(event) => setPlatform(event.target.value)}
+            >
+              <option value="all">Todos os consoles</option>
+              {taxonomy.data?.platforms.map((item) => (
+                <option key={item.id} value={item.localId}>
+                  {platformById(item.localId)?.name ?? item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="tv-filter-control">
+            <span>Gênero</span>
+            <select
+              aria-label="Gênero"
+              value={genre ?? "all"}
+              onChange={(event) =>
+                setGenre(
+                  event.target.value === "all"
+                    ? undefined
+                    : Number(event.target.value),
+                )
+              }
+            >
+              <option value="all">Todos os gêneros</option>
+              {taxonomy.data?.genres.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="tv-filter-control">
+            <span>Ordenar</span>
+            <select
+              aria-label="Ordenar catálogo"
+              value={sort}
+              disabled={Boolean(debounced)}
+              onChange={(event) => setSort(event.target.value as typeof sort)}
+            >
+              <option value="popular">
+                {debounced ? "Relevância" : "Popularidade"}
               </option>
-            ))}
-          </select>
-          <select
-            aria-label="Gênero"
-            value={genre ?? "all"}
-            onChange={(event) =>
-              setGenre(
-                event.target.value === "all"
-                  ? undefined
-                  : Number(event.target.value),
-              )
-            }
-          >
-            <option value="all">Todos os gêneros</option>
-            {taxonomy.data?.genres.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Ordenar catálogo"
-            value={sort}
-            disabled={Boolean(debounced)}
-            onChange={(event) => setSort(event.target.value as typeof sort)}
-          >
-            <option value="popular">
-              {debounced ? "Relevância" : "Popularidade"}
-            </option>
-            <option value="rating">Melhor avaliação</option>
-            <option value="title">Nome</option>
-            <option value="newest">Mais recentes</option>
-            <option value="oldest">Mais antigos</option>
-          </select>
+              <option value="rating">Melhor avaliação</option>
+              <option value="title">Nome</option>
+              <option value="newest">Mais recentes</option>
+              <option value="oldest">Mais antigos</option>
+            </select>
+          </label>
+        </div>
+        <div className="tv-filter-summary">
+          <span>Filtros por console e gênero</span>
+          {(platform !== "all" || genre !== undefined || query) && (
+            <button
+              onClick={() => {
+                setPlatform("all");
+                setGenre(undefined);
+                setQuery("");
+              }}
+            >
+              Limpar filtros
+            </button>
+          )}
         </div>
       </div>
       {browse.isPending ? (
@@ -287,7 +321,12 @@ export function BigPictureCatalog({
                 ? `Resultados para “${debounced}”`
                 : `Ordenado por: ${{ popular: "Popularidade", rating: "Melhor avaliação", title: "Nome", newest: "Mais recentes", oldest: "Mais antigos" }[sort]}`}
             </span>
-            <small>{games.length} jogos carregados</small>
+            <small>
+              {games.length} jogos carregados
+              {browse.hasNextPage
+                ? " · Mais jogos ao rolar"
+                : " · Fim dos resultados"}
+            </small>
           </div>
           <div className="tv-catalog-grid" ref={grid}>
             {games.map((item, index) => (
@@ -337,15 +376,17 @@ export function BigPictureCatalog({
             </div>
           )}
           {browse.hasNextPage && (
-            <button
-              className="tv-catalog-load"
-              disabled={browse.isFetchingNextPage}
-              onClick={() => void browse.fetchNextPage()}
-            >
-              {browse.isFetchingNextPage
-                ? "Carregando…"
-                : "Carregar mais jogos"}
-            </button>
+            <div ref={sentinel} className="tv-catalog-pagination">
+              <button
+                className="tv-catalog-load"
+                disabled={browse.isFetchingNextPage}
+                onClick={() => void browse.fetchNextPage()}
+              >
+                {browse.isFetchingNextPage
+                  ? "Carregando…"
+                  : "Carregar mais jogos"}
+              </button>
+            </div>
           )}
           {browse.error && games.length > 0 && (
             <p role="alert">{String(browse.error)}</p>

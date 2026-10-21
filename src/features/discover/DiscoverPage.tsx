@@ -16,6 +16,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { CatalogConnection } from "./CatalogConnection";
 import type { CatalogRequest } from "../../providers/metadata/types";
 import type { GameMetadata } from "../../types";
+import { useCatalogPagination } from "../../hooks/useCatalogPagination";
 interface Props {
   query: string;
   setQuery: (s: string) => void;
@@ -76,6 +77,10 @@ export function DiscoverPage({
     ).values(),
   ];
   const available = taxonomy.data?.platforms ?? [];
+  const sentinel = useCatalogPagination(
+    Boolean(browse.hasNextPage && !browse.isFetching && !browse.error),
+    browse.fetchNextPage,
+  );
   const consoles = platforms.filter((p) =>
     available.some((r) => r.localId === p.id),
   );
@@ -288,7 +293,7 @@ export function DiscoverPage({
             </p>
           )}
           {browse.hasNextPage && (
-            <div className="load-more">
+            <div className="load-more" ref={sentinel}>
               <button
                 className="button secondary"
                 disabled={browse.isFetchingNextPage}
