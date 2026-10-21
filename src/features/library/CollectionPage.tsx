@@ -39,6 +39,8 @@ export function CollectionPage({
     .filter(
       (x) =>
         (filter !== "favorites" || x.item.favorite) &&
+        (filter !== "unplayed" || !x.item.lastPlayedAt) &&
+        (filter !== "recent" || Boolean(x.item.lastPlayedAt)) &&
         (platform === "all" || x.game.platformId === platform) &&
         x.game.title.toLowerCase().includes(query.toLowerCase()),
     )
@@ -47,7 +49,11 @@ export function CollectionPage({
         ? a.game.title.localeCompare(b.game.title)
         : sort === "played"
           ? b.item.playtime - a.item.playtime
-          : b.item.addedAt.localeCompare(a.item.addedAt),
+          : sort === "lastPlayed"
+            ? (b.item.lastPlayedAt ?? "").localeCompare(
+                a.item.lastPlayedAt ?? "",
+              )
+            : b.item.addedAt.localeCompare(a.item.addedAt),
     );
   return (
     <div className="page-content">
@@ -78,6 +84,19 @@ export function CollectionPage({
           >
             <Heart size={14} /> Favorites
           </button>
+          <button
+            className={filter === "recent" ? "selected" : ""}
+            onClick={() => setFilter("recent")}
+          >
+            Recently played
+          </button>
+          <button
+            className={filter === "unplayed" ? "selected" : ""}
+            onClick={() => setFilter("unplayed")}
+          >
+            Never played{" "}
+            <span>{library.filter((x) => !x.item.lastPlayedAt).length}</span>
+          </button>
         </div>
         <div className="toolbar-right">
           <SlidersHorizontal size={15} />
@@ -99,6 +118,7 @@ export function CollectionPage({
             onChange={(e) => setSort(e.target.value)}
           >
             <option value="recent">Recently added</option>
+            <option value="lastPlayed">Last played</option>
             <option value="title">Title A–Z</option>
             <option value="played">Most played</option>
           </select>

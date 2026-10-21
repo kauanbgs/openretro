@@ -107,14 +107,15 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
                 .and_then(|value| value.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            let platform_catalog: serde_json::Value = serde_json::from_str(
-                include_str!("../../../src/db/platforms.json"),
-            )
-            .map_err(error)?;
+            let platform_catalog: serde_json::Value =
+                serde_json::from_str(include_str!("../../../src/db/platforms.json"))
+                    .map_err(error)?;
             let supported = platform_catalog.as_array().is_some_and(|platforms| {
                 platforms.iter().any(|platform| {
                     platform["extensions"].as_array().is_some_and(|extensions| {
-                        extensions.iter().any(|item| item.as_str() == Some(&extension))
+                        extensions
+                            .iter()
+                            .any(|item| item.as_str() == Some(&extension))
                     })
                 })
             });
@@ -130,7 +131,11 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
     if found.is_empty() {
         return Err("No supported game files were found in this folder.".into());
     }
-    found.sort_by(|left, right| left.filename.to_lowercase().cmp(&right.filename.to_lowercase()));
+    found.sort_by(|left, right| {
+        left.filename
+            .to_lowercase()
+            .cmp(&right.filename.to_lowercase())
+    });
     Ok(found)
 }
 pub fn executable(path: &str) -> Result<PathBuf> {

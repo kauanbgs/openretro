@@ -413,9 +413,25 @@ main {
   background: var(--surface);
   font-size: 10px;
 }
-.now-playing span:last-child { display: grid; gap: 2px; }
-.now-playing strong { overflow: hidden; max-width: 190px; color: var(--text); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
-.playing-indicator { width: 8px; height: 8px; border-radius: 50%; background: #53d98c; box-shadow: 0 0 0 4px #53d98c22; }
+.now-playing span:last-child {
+  display: grid;
+  gap: 2px;
+}
+.now-playing strong {
+  overflow: hidden;
+  max-width: 190px;
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.playing-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #53d98c;
+  box-shadow: 0 0 0 4px #53d98c22;
+}
 .global-search {
   display: flex;
   align-items: center;
