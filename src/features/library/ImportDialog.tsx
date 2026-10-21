@@ -5,6 +5,7 @@ import {
   FolderOpen,
   LoaderCircle,
   ArrowRight,
+  FolderTree,
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
@@ -43,6 +44,7 @@ export function ImportDialog({
   const [metadataError, setMetadataError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [folderQueue, setFolderQueue] = useState<ImportCandidate[]>([]);
   async function pick() {
     setBusy(true);
     setError("");
@@ -147,7 +149,38 @@ export function ImportDialog({
           };
       if (!game.title) throw new Error("Enter a title for your game.");
       await new LibraryManager().import(game, candidate);
+      const [next, ...remaining] = folderQueue;
+      if (next) {
+        setFolderQueue(remaining);
+        setCandidate(next);
+        setTitle(next.filename.replace(/\.[^.]+$/, ""));
+        setPlatform(next.platformIds[0] ?? "");
+        setMatches([]);
+        setSelected("custom");
+        setMetadataSearch("");
+        return;
+      }
       onImported(game);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function pickFolder() {
+    setBusy(true);
+    setError("");
+    try {
+      const path = await bridge.pickGameFolder();
+      if (!path) return;
+      const [first, ...remaining] = await bridge.inspectGameFolder(path);
+      if (!first) return;
+      setFolderQueue(remaining);
+      setCandidate(first);
+      setTitle(first.filename.replace(/\.[^.]+$/, ""));
+      setPlatform(first.platformIds[0] ?? "");
+      setMatches([]);
+      setSelected("custom");
     } catch (e) {
       setError(String(e));
     } finally {
@@ -187,6 +220,13 @@ export function ImportDialog({
             )}{" "}
             {busy ? "Reading and hashing…" : "Choose game file"}
           </button>
+          <button
+            className="button secondary"
+            disabled={busy || !isDesktop}
+            onClick={() => void pickFolder()}
+          >
+            <FolderTree size={17} /> Import a folder
+          </button>
           <small>NES, SNES, Game Boy, PlayStation, and more</small>
         </div>
       ) : (
@@ -196,6 +236,9 @@ export function ImportDialog({
             <div>
               <strong>{candidate.filename}</strong>
               <small>SHA-256 calculated · Original file preserved</small>
+              {folderQueue.length > 0 && (
+                <small>{folderQueue.length} more games in this folder</small>
+              )}
             </div>
             <button
               onClick={() => void pick()}

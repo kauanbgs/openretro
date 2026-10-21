@@ -51,6 +51,7 @@ pub fn run() {
             commands::emulator_install_options,
             commands::install_emulator,
             commands::inspect_game,
+            commands::inspect_game_folder,
             commands::file_exists,
             commands::add_game,
             commands::remove_game,

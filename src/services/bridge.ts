@@ -255,6 +255,20 @@ export const bridge = {
       input.click();
     });
   },
+  async pickGameFolder(): Promise<string | null> {
+    if (!isDesktop)
+      throw new Error("Folder import requires the OpenRetro desktop app.");
+    return open({
+      directory: true,
+      multiple: false,
+      title: "Choose a folder with game files",
+    });
+  },
+  async inspectGameFolder(path: string): Promise<ImportCandidate[]> {
+    if (!isDesktop)
+      throw new Error("Folder import requires the OpenRetro desktop app.");
+    return invoke("inspect_game_folder", { path });
+  },
   async pickExecutable(): Promise<string | null> {
     if (!isDesktop)
       throw new Error(

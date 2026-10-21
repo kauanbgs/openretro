@@ -74,6 +74,65 @@ pub fn inspect(path: &str) -> Result<ImportCandidate> {
         platform_ids: ids,
     })
 }
+pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
+    if path.contains('\0') || !Path::new(path).is_absolute() {
+        return Err("Choose an absolute local folder.".into());
+    }
+    let root = std::fs::canonicalize(path)
+        .map_err(|_| "This folder could not be found or read.".to_string())?;
+    if !root.is_dir() {
+        return Err("Choose a folder, not a file.".into());
+    }
+    let mut found = Vec::new();
+    let mut pending = vec![(root, 0usize)];
+    while let Some((directory, depth)) = pending.pop() {
+        for entry in std::fs::read_dir(directory).map_err(error)? {
+            let entry = entry.map_err(error)?;
+            let kind = entry.file_type().map_err(error)?;
+            if kind.is_symlink() {
+                continue;
+            }
+            let entry_path = entry.path();
+            if kind.is_dir() {
+                if depth < 8 {
+                    pending.push((entry_path, depth + 1));
+                }
+                continue;
+            }
+            if !kind.is_file() {
+                continue;
+            }
+            let extension = entry_path
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            let platform_catalog: serde_json::Value = serde_json::from_str(
+                include_str!("../../../src/db/platforms.json"),
+            )
+            .map_err(error)?;
+            let supported = platform_catalog.as_array().is_some_and(|platforms| {
+                platforms.iter().any(|platform| {
+                    platform["extensions"].as_array().is_some_and(|extensions| {
+                        extensions.iter().any(|item| item.as_str() == Some(&extension))
+                    })
+                })
+            });
+            if !supported {
+                continue;
+            }
+            found.push(inspect(&entry_path.to_string_lossy())?);
+            if found.len() >= 500 {
+                return Err("This folder has more than 500 supported games. Import smaller folders to keep the library responsive.".into());
+            }
+        }
+    }
+    if found.is_empty() {
+        return Err("No supported game files were found in this folder.".into());
+    }
+    found.sort_by(|left, right| left.filename.to_lowercase().cmp(&right.filename.to_lowercase()));
+    Ok(found)
+}
 pub fn executable(path: &str) -> Result<PathBuf> {
     let p = canonical_file(path)?;
     #[cfg(target_os = "windows")]

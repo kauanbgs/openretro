@@ -417,6 +417,12 @@ pub async fn inspect_game(path: String) -> Result<ImportCandidate> {
         .map_err(error)?
 }
 #[tauri::command]
+pub async fn inspect_game_folder(path: String) -> Result<Vec<ImportCandidate>> {
+    tauri::async_runtime::spawn_blocking(move || filesystem::inspect_folder(&path))
+        .await
+        .map_err(error)?
+}
+#[tauri::command]
 pub fn file_exists(path: String) -> bool {
     filesystem::canonical_file(&path).is_ok()
 }
