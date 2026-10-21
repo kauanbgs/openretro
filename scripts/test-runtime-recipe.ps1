@@ -27,8 +27,11 @@ foreach ($requiredFlag in @("--disable-menu", "--enable-command", "--enable-dyna
 foreach ($forbiddenFlag in @("--enable-menu", "--disable-command", "--disable-dynamic", "--disable-screenshots")) {
   if ($flags -contains $forbiddenFlag) { throw "Incompatible runtime flag: $forbiddenFlag" }
 }
-if (($flags -contains "--disable-slang") -and ($flags -contains "--enable-opengl_core")) {
-  throw "RetroArch requires Slang when OpenGL Core is enabled."
+if ($flags -contains "--disable-slang") {
+  $slangBackends = @("--enable-opengl_core", "--enable-vulkan") | Where-Object { $flags -contains $_ }
+  if ($slangBackends) {
+    throw "RetroArch requires Slang for these video backends: $($slangBackends -join ', ')."
+  }
 }
 
 $build = Get-Content -LiteralPath (Join-Path $recipe "build-mingw64.sh") -Raw

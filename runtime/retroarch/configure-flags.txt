@@ -42,7 +42,7 @@
 --disable-opengl1
 --enable-opengl
 --disable-opengl_core
---enable-vulkan
+--disable-vulkan
 --disable-vulkan_display
 --disable-glsl
 --disable-slang
