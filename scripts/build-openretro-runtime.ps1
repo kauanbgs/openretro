@@ -17,11 +17,18 @@ Then run npm run build:runtime again.
 "@
 }
 
-$previousRoot = $env:OPENRETRO_PROJECT_ROOT_WINDOWS
+# Windows PowerShell strips embedded double quotes from native arguments, so
+# the login shell starts in the project folder instead of receiving a cd.
+$previousMsystem = $env:MSYSTEM
+$previousChere = $env:CHERE_INVOKING
+Push-Location -LiteralPath $projectRoot
 try {
-  $env:OPENRETRO_PROJECT_ROOT_WINDOWS = $projectRoot
-  & $bash -lc 'cd "$(cygpath -u "$OPENRETRO_PROJECT_ROOT_WINDOWS")" && bash ./runtime/retroarch/build-mingw64.sh'
+  $env:MSYSTEM = "MINGW64"
+  $env:CHERE_INVOKING = "1"
+  & $bash -lc 'bash ./runtime/retroarch/build-mingw64.sh'
   if ($LASTEXITCODE -ne 0) { throw "OpenRetro Runtime build failed with exit code $LASTEXITCODE." }
 } finally {
-  $env:OPENRETRO_PROJECT_ROOT_WINDOWS = $previousRoot
+  Pop-Location
+  $env:MSYSTEM = $previousMsystem
+  $env:CHERE_INVOKING = $previousChere
 }
