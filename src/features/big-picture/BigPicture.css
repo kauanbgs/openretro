@@ -1,12 +1,12 @@
 .console-mode {
-  --tv-bg: #080808;
+  --tv-bg: var(--console-bg);
   --tv-muted: #999b9f;
-  --tv-accent: #e7a15c;
+  --tv-accent: var(--console-accent);
   position: fixed;
   inset: 0;
   z-index: 1000;
   overflow: hidden;
-  color: #f3f3f3;
+  color: var(--console-text);
   background: var(--tv-bg);
   font-family: Manrope, sans-serif;
   font-size: 15px;

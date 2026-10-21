@@ -121,17 +121,26 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --bg: #111521;
-  --sidebar: #151a28;
-  --panel: #1b2131;
-  --panel2: #232b3d;
-  --border: #31384b;
-  --text: #f4f1eb;
-  --muted: #a2abc0;
-  --quiet: #78839d;
-  --accent: #e9b27a;
-  --accentText: #241c17;
-  --brand-cutout: #151a28;
+  --console-bg: #080808;
+  --console-panel: #101010;
+  --console-panel-raised: #191919;
+  --console-border: #292929;
+  --console-text: #f3f3f3;
+  --console-muted: #a1a1a1;
+  --console-quiet: #929292;
+  --console-accent: #e7a15c;
+  --console-accent-text: #17100a;
+  --bg: var(--console-bg);
+  --sidebar: var(--console-bg);
+  --panel: var(--console-panel);
+  --panel2: var(--console-panel-raised);
+  --border: var(--console-border);
+  --text: var(--console-text);
+  --muted: var(--console-muted);
+  --quiet: var(--console-quiet);
+  --accent: var(--console-accent);
+  --accentText: var(--console-accent-text);
+  --brand-cutout: var(--console-bg);
   --danger: #f0a5a5;
   --success: #a4c8b1;
   --display: "Space Grotesk Variable", sans-serif;
@@ -181,7 +190,7 @@ h3 {
   font-weight: 500;
 }
 ::selection {
-  background: #e9b27a40;
+  background: #e7a15c40;
 }
 button:focus-visible,
 a:focus-visible,
@@ -211,7 +220,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px #e9b27a12;
+  box-shadow: 0 0 0 2px #e7a15c12;
 }
 select {
   color-scheme: dark;
@@ -301,7 +310,7 @@ svg {
   color: var(--text);
 }
 .main-nav button.active {
-  background: #e9b27a0e;
+  background: #e7a15c0e;
   color: var(--accent);
 }
 .main-nav button.active:before {
@@ -536,7 +545,7 @@ main {
   color: var(--accentText);
 }
 .button.primary:hover:not(:disabled) {
-  background: #f6c896;
+  background: #f1b77d;
 }
 .button.secondary {
   background: var(--panel2);
@@ -549,13 +558,13 @@ main {
 }
 .button.on-art,
 .button.glass {
-  background: #11152180;
+  background: #08080880;
   border-color: #ffffff30;
-  color: #f4f1eb;
+  color: #f3f3f3;
 }
 .button.on-art:hover,
 .button.glass:hover {
-  background: #111521c0;
+  background: #080808c0;
 }
 .button.favorited {
   color: var(--accent);
@@ -756,8 +765,8 @@ main {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(0deg, #0c1020ed, #0c102030 80%),
-    linear-gradient(90deg, #0c102090, transparent 85%);
+    linear-gradient(0deg, #080808ed, #08080830 80%),
+    linear-gradient(90deg, #08080890, transparent 85%);
 }
 .feature-topline {
   position: absolute;
@@ -770,14 +779,14 @@ main {
   gap: 10px;
 }
 .feature-label {
-  color: #f4f1eb;
+  color: #f3f3f3;
   font-size: 12px;
   font-weight: 500;
 }
 .feature-system {
-  color: #f4f1eb;
+  color: #f3f3f3;
   font-size: 11px;
-  background: #11152165;
+  background: #08080865;
   border: 1px solid #ffffff35;
   padding: 5px 8px;
   border-radius: 4px;
@@ -794,13 +803,13 @@ main {
   font-weight: 500;
   line-height: 1.13;
   letter-spacing: -1.6px;
-  color: #fff9f1;
+  color: #f3f3f3;
   text-wrap: balance;
 }
 .feature-copy > p {
   font-size: 13px;
   line-height: 1.8;
-  color: #d0d4e0;
+  color: #d0d0d0;
   max-width: 38ch;
   margin-top: 13px;
 }
@@ -808,7 +817,7 @@ main {
   display: flex;
   align-items: center;
   gap: 15px;
-  color: #d0d4e0;
+  color: #d0d0d0;
   margin: 14px 0 24px;
   font-size: 12px;
 }
@@ -1031,8 +1040,8 @@ main {
   left: 10px;
   z-index: 2;
   padding: 4px 6px;
-  color: #f4f1eb;
-  background: #111521d9;
+  color: #f3f3f3;
+  background: #080808d9;
   font-size: 9px;
   border-radius: 3px;
   font-weight: 650;
@@ -1072,8 +1081,8 @@ main {
   align-items: center;
   justify-content: center;
   z-index: 2;
-  color: #f4f1eb;
-  background: #111521ce;
+  color: #f3f3f3;
+  background: #080808ce;
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -1174,7 +1183,7 @@ main {
   flex-direction: column;
   padding: 38px 12px 18px;
   text-align: center;
-  color: #f5ecd9;
+  color: #e9e9e9;
 }
 .cover-lettering > span {
   font-size: 5px;
@@ -1463,8 +1472,8 @@ main {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(0deg, #111521d9 0%, #11152122 62%),
-    linear-gradient(90deg, #11152199, transparent 72%);
+    linear-gradient(0deg, #080808d9 0%, #08080822 62%),
+    linear-gradient(90deg, #08080899, transparent 72%);
 }
 .back-button {
   position: absolute;
@@ -1473,9 +1482,9 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #f4f1eb;
+  color: #f3f3f3;
   font-size: 12px;
-  background: #11152165;
+  background: #08080865;
   padding: 8px 12px;
   border-radius: 5px;
 }
@@ -1503,10 +1512,10 @@ main {
 }
 .detail-console {
   font-size: 13px;
-  color: #d5d9e4;
+  color: #d5d5d5;
 }
 .detail-heading h1 {
-  color: #fffaf3;
+  color: #f3f3f3;
   font-size: clamp(30px, 3.7vw, 53px);
   font-weight: 500;
   letter-spacing: -1.8px;
@@ -1521,7 +1530,7 @@ main {
   gap: 14px;
   font-size: 12px;
   line-height: 1.7;
-  color: #c1c8d8;
+  color: #c1c1c1;
 }
 .game-facts span + span {
   padding-left: 14px;
@@ -1543,7 +1552,7 @@ main {
   padding: 16px 18px 16px 196px;
   border: 1px solid #ffffff2b;
   border-radius: 8px;
-  background: linear-gradient(90deg, #151a25ed, #151a25be);
+  background: linear-gradient(90deg, #101010ed, #101010be);
   backdrop-filter: blur(15px);
 }
 .download-ribbon-copy {
@@ -1552,11 +1561,11 @@ main {
   min-width: 0;
 }
 .download-ribbon-copy span {
-  color: #c7cddb;
+  color: #c7c7c7;
   font-size: 11px;
 }
 .download-ribbon-copy strong {
-  color: #fffaf3;
+  color: #f3f3f3;
   font-size: 14px;
   font-weight: 620;
 }
@@ -1791,7 +1800,7 @@ main {
   inset: 0;
   z-index: 100;
   padding: 26px;
-  background: #080c17ba;
+  background: #080808ba;
   backdrop-filter: blur(7px);
   display: flex;
   align-items: center;
@@ -2455,8 +2464,8 @@ html[data-theme="light"] .main-nav button.active {
 }
 html[data-theme="light"] .detail-shade {
   background:
-    linear-gradient(0deg, var(--bg), #11152135 90%),
-    linear-gradient(90deg, #11152170, transparent);
+    linear-gradient(0deg, var(--bg), #08080835 90%),
+    linear-gradient(90deg, #08080870, transparent);
 }
 html[data-theme="light"] .detail-console,
 html[data-theme="light"] .detail-heading h1,
