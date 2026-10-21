@@ -1,18 +1,5 @@
 # OpenRetro validation record
 
-## 2026-10-21 — Samsung Tizen target
-
-- Added a Tizen 5.5 Web application target that opens directly in Big Picture,
-  maps the TV Return key and Gamepad API, and renders RetroArch WebAssembly in
-  an OpenRetro canvas with an OpenRetro-owned in-game menu.
-- Added direct HTTPS download progress, pause/resume/cancel, ZIP extraction and
-  automatic library import through mandatory Tizen device APIs.
-- Added a commit-pinned Emscripten recipe for five lightweight Libretro cores
-  serving eight systems, plus an unsigned CI artifact for later Samsung signing.
-- The Chrome 69-targeted frontend build, XML manifest parsing, TypeScript checks
-  and recipe validation pass locally. Emscripten binaries and signed WGT output
-  require the CI toolchain/Tizen Studio; physical TV validation remains pending.
-
 ## 2026-10-21 — Embedded game surface
 
 - The managed runtime now starts windowed and its native render window is
@@ -107,7 +94,6 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 - Browser review confirmed the discovery Home renders 12 live IGDB recommendations with an empty library, and catalog ordering/filters use the compact reference layout. Library adds actual sorting, console filtering and grid/list modes; there were no installed games in the browser preview used for review.
 - Native Guide/PS handling now attempts the existing runtime SDL2 background controller driver, retaining Windows fallbacks. The installed runtime has SDL2.dll; a physical PS-button session remains unverified after recompilation.
 - App and pause overlay have separate lazy chunks; desktop pages unmount in console mode; offscreen catalog images use lazy loading; console backdrop blur is removed. Release preparation trims optional runtime content by default. The preparation script was syntax-checked, not executed, and TV performance/installer-size reductions have not been measured.
-- Samsung/LG adaptation constraints and proposed on-demand WebAssembly architecture are recorded in `TV.md`. No Tizen/webOS installer is produced by this change.
 
 ### Big Picture and OpenRetro in-game menu — 2026-10-20
 

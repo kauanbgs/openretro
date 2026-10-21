@@ -23,22 +23,6 @@ install or configure another application. See
 [docs/OPENRETRO_RUNTIME.md](docs/OPENRETRO_RUNTIME.md) for the feature boundary,
 local build and update process.
 
-## Samsung Tizen TV
-
-The Tizen 5.5+ target reuses Big Picture as a signed Web application and runs
-the official RetroArch Emscripten frontend in an OpenRetro-owned canvas. The
-initial pinned runtime covers NES, SNES, Game Boy/Color/Advance, Master System,
-Mega Drive and Game Gear. It reads controllers through the TV Gamepad API,
-keeps saves in IndexedDB, downloads direct HTTPS files with the Tizen Download
-API and extracts compatible ZIP files with the Tizen Archive API.
-
-`npm run build:tizen` creates an unsigned staging directory. The reproducible
-WASM runtime is built with `npm run build:runtime:tizen`; `npm run
-package:tizen -- -CertificateProfile <name>` creates a signed WGT when Tizen
-Studio and a Samsung certificate are installed. See
-[platforms/tizen/README.md](platforms/tizen/README.md). A real TV remains
-required for controller and performance qualification.
-
 ## Players, resume and local co-op
 
 Use **Settings → General → Trocar jogador**, or **Big Picture → Sistema →

@@ -30,7 +30,6 @@ import { Modal } from "./components/Modal";
 import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop } from "./services/bridge";
-import { isTizen } from "./platform/environment";
 import { listen } from "@tauri-apps/api/event";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -118,7 +117,7 @@ export function App() {
     refetchInterval: (query) =>
       downloadPollInterval(
         query.state.data,
-        isDesktop || isTizen,
+        isDesktop,
         Boolean(playing),
       ),
     refetchIntervalInBackground: false,
@@ -129,7 +128,7 @@ export function App() {
   const [platform, setPlatform] = useState("all");
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
-  const [bigPicture, setBigPicture] = useState(isTizen);
+  const [bigPicture, setBigPicture] = useState(false);
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [updateVersion, setUpdateVersion] = useState<string>();
   const [installingUpdate, setInstallingUpdate] = useState(false);
@@ -160,16 +159,6 @@ export function App() {
     return () => {
       void unlisten.then((fn) => fn());
     };
-  }, [notify, refresh]);
-  useEffect(() => {
-    if (!isTizen) return;
-    const imported = () => {
-      void refresh();
-      notify("Download concluído e adicionado à biblioteca.");
-    };
-    window.addEventListener("openretro:tizen-library", imported);
-    return () =>
-      window.removeEventListener("openretro:tizen-library", imported);
   }, [notify, refresh]);
   useEffect(() => {
     if (!isDesktop) return;
@@ -266,13 +255,7 @@ export function App() {
           jobs={jobs}
           downloadArrival={downloadArrival}
           refresh={refresh}
-          onClose={() =>
-            isTizen
-              ? void import("./platform/tizen/api").then((module) =>
-                  module.exitTizenApplication(),
-                )
-              : setBigPicture(false)
-          }
+          onClose={() => setBigPicture(false)}
           onUpdate={() => void installUpdate()}
           updateVersion={updateVersion}
           updating={installingUpdate}

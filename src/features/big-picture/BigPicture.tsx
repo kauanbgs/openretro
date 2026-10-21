@@ -57,7 +57,6 @@ import {
   AmbientBackdrop,
   BootSplash,
   ConsoleClock,
-  fxLite,
   LaunchSequence,
   pulseGlyph,
   useCardTilt,
@@ -650,7 +649,6 @@ export function BigPicture({
     // One persistent loop: opening a dialog or refreshing downloads must not
     // restart sampling or lose a held button. 30 Hz is enough for launcher UI.
     const timer = window.setInterval(() => {
-      if (document.querySelector(".tizen-player")) return;
       if (document.hidden || !document.hasFocus()) {
         wasActive = false;
         return;
@@ -733,7 +731,7 @@ export function BigPicture({
   return (
     <section
       ref={root}
-      className={`console-mode ${navFocused ? "menu-open" : ""} ${fxLite ? "fx-lite" : ""}`}
+      className={`console-mode ${navFocused ? "menu-open" : ""}`}
       data-section={workspace ? workspace.page : section}
       aria-label="Modo console do OpenRetro"
       role="dialog"

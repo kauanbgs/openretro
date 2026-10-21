@@ -1,6 +1,6 @@
 /* Big Picture motion layer. Everything here is decorative: it animates
-   transform/opacity where possible, degrades on old Chromium (Tizen) and is
-   switched off by `.fx-lite`, reduced motion or the animations setting. */
+   transform/opacity where possible and is switched off by reduced motion or
+   the animations setting. */
 
 @property --fx-angle {
   syntax: "<angle>";
@@ -1624,35 +1624,4 @@
   to {
     transform: translateX(260%);
   }
-}
-
-/* ---------- TV budget ---------- */
-.console-mode.fx-lite .fx-particles,
-.console-mode.fx-lite .fx-scanlines,
-.console-mode.fx-lite .fx-launch-art {
-  display: none;
-}
-.console-mode.fx-lite .fx-aurora,
-.console-mode.fx-lite .fx-grid-floor::before,
-.console-mode.fx-lite .tv-hero-image .artwork img,
-.console-mode.fx-lite .tv-catalog-detail-art img {
-  animation: none;
-}
-.console-mode.fx-lite .tv-content,
-.console-mode.fx-lite .tv-workspace {
-  animation: tv-page-enter 260ms ease both;
-}
-.console-mode.fx-lite .tv-game-grid > button,
-.console-mode.fx-lite .tv-catalog-grid > button {
-  animation: none;
-}
-.console-mode.fx-lite
-  .tv-game-grid:has(> button.focused)
-  > button:not(.focused)
-  .artwork,
-.console-mode.fx-lite
-  .tv-catalog-grid:has(> button.focused)
-  > button:not(.focused)
-  .artwork {
-  filter: none;
 }

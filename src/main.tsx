@@ -6,14 +6,6 @@ import "./fonts.css";
 import "./styles.css";
 import "./ui-refinements.css";
 import "./theme.css";
-import { isTizen } from "./platform/environment";
-import { initializeTizen } from "./platform/tizen/api";
-import { installTizenCompatibility } from "./platform/tizen/compatibility";
-const TizenGameSurface = lazy(() =>
-  import("./platform/tizen/TizenGameSurface").then((module) => ({
-    default: module.TizenGameSurface,
-  })),
-);
 const InGameOverlay = lazy(() =>
   import("./features/in-game/InGameOverlay").then(({ InGameOverlay }) => ({
     default: InGameOverlay,
@@ -33,10 +25,6 @@ const client = new QueryClient({
     },
   },
 });
-if (isTizen) {
-  installTizenCompatibility();
-  initializeTizen();
-}
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={client}>
@@ -50,7 +38,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         }
       >
         {inGameWindow ? <InGameOverlay /> : <App />}
-        {isTizen && <TizenGameSurface />}
       </Suspense>
     </QueryClientProvider>
   </React.StrictMode>,

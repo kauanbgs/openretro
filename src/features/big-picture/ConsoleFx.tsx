@@ -8,13 +8,11 @@ import {
 import { BrandMark } from "../../components/Brand";
 import { GameArtwork } from "../../components/GameArtwork";
 import type { GameMetadata } from "../../types";
-import { isTizen } from "../../platform/environment";
 
-/** Heavy decorative layers are skipped on TV GPUs and when motion is off. */
+/** Heavy decorative layers are skipped when motion is off. */
 export const motionEnabled = () =>
   document.documentElement.dataset.animations !== "false" &&
   !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-export const fxLite = isTizen;
 
 const cardSelector = ".tv-game-grid > button, .tv-catalog-grid > button";
 
@@ -100,7 +98,6 @@ export function AmbientBackdrop({
   };
   useEffect(() => show(fallback), [fallback]);
   useEffect(() => {
-    if (fxLite) return;
     const read = window.setTimeout(
       () =>
         show(
@@ -114,7 +111,7 @@ export function AmbientBackdrop({
   }, [watch, root]);
   useEffect(() => {
     const element = root.current;
-    if (!element || fxLite) return;
+    if (!element) return;
     const pick = (event: Event) => {
       const card = (event.target as Element | null)?.closest?.(cardSelector);
       show(card?.querySelector("img")?.currentSrc || undefined);
@@ -129,7 +126,7 @@ export function AmbientBackdrop({
   }, [root]);
   const particles = useMemo(
     () =>
-      Array.from({ length: fxLite ? 0 : 26 }, (_, index) => ({
+      Array.from({ length: 26 }, (_, index) => ({
         "--x": `${(index * 37 + 11) % 100}%`,
         "--s": `${2 + (index % 4)}px`,
         "--d": `${14 + ((index * 7) % 16)}s`,
@@ -140,17 +137,16 @@ export function AmbientBackdrop({
   );
   return (
     <div className="fx-ambient" aria-hidden="true">
-      {!fxLite &&
-        layers.map((layer, index) => (
-          <img
-            key={layer.id}
-            className={`fx-ambient-art ${index === layers.length - 1 ? "current" : "previous"}`}
-            src={layer.url}
-            alt=""
-            referrerPolicy="no-referrer"
-            draggable={false}
-          />
-        ))}
+      {layers.map((layer, index) => (
+        <img
+          key={layer.id}
+          className={`fx-ambient-art ${index === layers.length - 1 ? "current" : "previous"}`}
+          src={layer.url}
+          alt=""
+          referrerPolicy="no-referrer"
+          draggable={false}
+        />
+      ))}
       <i className="fx-aurora a" />
       <i className="fx-aurora b" />
       <i className="fx-aurora c" />
@@ -170,7 +166,7 @@ export function AmbientBackdrop({
 export function useCardTilt(root: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     const element = root.current;
-    if (!element || fxLite || !motionEnabled()) return;
+    if (!element || !motionEnabled()) return;
     let frame = 0;
     let active: HTMLElement | null = null;
     const reset = (card: HTMLElement | null) => {
