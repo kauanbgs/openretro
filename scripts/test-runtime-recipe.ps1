@@ -33,6 +33,9 @@ if ($flags -contains "--disable-slang") {
     throw "RetroArch requires Slang for these video backends: $($slangBackends -join ', ')."
   }
 }
+if ($flags -contains "--enable-opengl" -and $flags -contains "--disable-glsl") {
+  throw "RetroArch's OpenGL driver cannot start without GLSL shaders."
+}
 
 $build = Get-Content -LiteralPath (Join-Path $recipe "build-mingw64.sh") -Raw
 foreach ($marker in @('retroarch.exe', 'patches/*.patch', 'runtime-manifest.json', 'SOURCE.md', 'DEPENDENCIES.txt', 'RetroArch-GPL-3.0.txt')) {

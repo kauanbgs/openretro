@@ -1,0 +1,16 @@
+Pass the port index with the type retroarch_override_setting_unset reads.
+The upstream loop passes a size_t* that is read through an unsigned*, which
+GCC 16 at -Os turns into an out-of-bounds bit clear and a crash at startup.
+
+diff --git a/retroarch.c b/retroarch.c
+--- a/retroarch.c
++++ b/retroarch.c
+@@ -5755,7 +5755,7 @@ static void retroarch_override_setting_free_state(void)
+    {
+       if (i == RARCH_OVERRIDE_SETTING_LIBRETRO_DEVICE)
+       {
+-         size_t j;
++         unsigned j;
+          for (j = 0; j < MAX_USERS; j++)
+             retroarch_override_setting_unset(
+                   RARCH_OVERRIDE_SETTING_LIBRETRO_DEVICE, &j);
