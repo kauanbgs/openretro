@@ -14,8 +14,12 @@ foreach ($path in $required) {
 $pins = Get-Content -Raw (Join-Path $root "runtime/tizen/cores.env")
 $commits = [regex]::Matches($pins, '(?m)^\w+_COMMIT=([0-9a-f]{40})$')
 if ($commits.Count -ne 5) { throw "Os cinco cores Tizen precisam de commits completos fixados." }
+$recipe = Get-Content -Raw (Join-Path $root "runtime/tizen/build-emscripten.sh")
+foreach ($value in @('[[ -f Makefile.libretro ]]', '[[ -f Makefile ]]', 'make -f "$makefile" platform=emscripten')) {
+  if (-not $recipe.Contains($value)) { throw "A receita Tizen não aceita os formatos de Makefile dos cores: $value" }
+}
 $config = Get-Content -Raw (Join-Path $root "platforms/tizen/config.xml")
 foreach ($value in @('tv-samsung', 'required_version="5.5"', 'privilege/download', 'privilege/tv.inputdevice')) {
   if (-not $config.Contains($value)) { throw "config.xml não contém $value" }
 }
-Write-Host "Receita Tizen válida: 5 cores fixados e manifesto Samsung configurado."
+Write-Host "Receita Tizen válida: 5 cores fixados, Makefiles compatíveis e manifesto Samsung configurado."

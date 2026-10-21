@@ -36,6 +36,9 @@ cp "$RETROARCH_DIR/COPYING" "$OUTPUT_ROOT/licenses/RetroArch-GPL-3.0.txt"
 build_core() {
   local name="$1" repository="$2" commit="$3"
   local core_dir="$CACHE_ROOT/$name"
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::group::Build libretro core: $name"
+  fi
   checkout_pinned "$repository" "$commit" "$core_dir"
   local license
   license="$(find "$core_dir" -maxdepth 1 -type f \( -iname 'copying*' -o -iname 'license*' \) | head -n 1)"
@@ -43,8 +46,18 @@ build_core() {
     cp "$license" "$OUTPUT_ROOT/licenses/$name-$(basename "$license")"
   fi
   pushd "$core_dir" >/dev/null
-  emmake make -f Makefile.libretro clean platform=emscripten >/dev/null 2>&1 || true
-  emmake make -f Makefile.libretro platform=emscripten -j"${NUMBER_OF_PROCESSORS:-$(nproc)}"
+  local makefile
+  if [[ -f Makefile.libretro ]]; then
+    makefile="Makefile.libretro"
+  elif [[ -f Makefile ]]; then
+    makefile="Makefile"
+  else
+    echo "No libretro Makefile found for $name" >&2
+    exit 1
+  fi
+  echo "Building $name with $makefile"
+  emmake make -f "$makefile" clean platform=emscripten >/dev/null 2>&1 || true
+  emmake make -f "$makefile" platform=emscripten -j"${NUMBER_OF_PROCESSORS:-$(nproc)}"
   local library
   library="$(find . -maxdepth 3 -type f \( -name '*_libretro_emscripten.bc' -o -name '*_libretro_emscripten.a' \) | head -n 1)"
   [[ -n "$library" ]] || { echo "No Emscripten library produced for $name" >&2; exit 1; }
@@ -63,6 +76,9 @@ build_core() {
   mkdir -p "$OUTPUT_ROOT/$name"
   cp "${name}_libretro.js" "${name}_libretro.wasm" "$OUTPUT_ROOT/$name/"
   popd >/dev/null
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    echo "::endgroup::"
+  fi
 }
 
 build_core fceumm "$FCEUMM_REPOSITORY" "$FCEUMM_COMMIT"

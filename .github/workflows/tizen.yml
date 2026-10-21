@@ -32,8 +32,17 @@ jobs:
         run: ./scripts/test-tizen-recipe.ps1
       - name: Install Emscripten
         run: |
-          git clone --depth 1 --branch 3.1.46 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
-          "$RUNNER_TEMP/emsdk/emsdk" install 3.1.46
+          for attempt in 1 2 3; do
+            git clone --depth 1 --branch 3.1.46 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk" && break
+            rm -rf "$RUNNER_TEMP/emsdk"
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+          for attempt in 1 2 3; do
+            "$RUNNER_TEMP/emsdk/emsdk" install 3.1.46 && break
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep $((attempt * 10))
+          done
           "$RUNNER_TEMP/emsdk/emsdk" activate 3.1.46
       - name: Build pinned RetroArch WebAssembly runtime
         run: |
