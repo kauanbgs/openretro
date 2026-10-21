@@ -20,7 +20,7 @@ Then run npm run build:runtime again.
 $previousRoot = $env:OPENRETRO_PROJECT_ROOT_WINDOWS
 try {
   $env:OPENRETRO_PROJECT_ROOT_WINDOWS = $projectRoot
-  & $bash -lc 'cd "$(cygpath -u "$OPENRETRO_PROJECT_ROOT_WINDOWS")" && ./runtime/retroarch/build-mingw64.sh'
+  & $bash -lc 'cd "$(cygpath -u "$OPENRETRO_PROJECT_ROOT_WINDOWS")" && bash ./runtime/retroarch/build-mingw64.sh'
   if ($LASTEXITCODE -ne 0) { throw "OpenRetro Runtime build failed with exit code $LASTEXITCODE." }
 } finally {
   $env:OPENRETRO_PROJECT_ROOT_WINDOWS = $previousRoot

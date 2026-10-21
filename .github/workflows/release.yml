@@ -33,7 +33,7 @@ jobs:
       - run: npm ci
       - name: Build minimal OpenRetro Runtime
         shell: msys2 {0}
-        run: ./runtime/retroarch/build-mingw64.sh
+        run: bash ./runtime/retroarch/build-mingw64.sh
       - run: npm run prepare:runtime
       - uses: tauri-apps/tauri-action@v1
         env:

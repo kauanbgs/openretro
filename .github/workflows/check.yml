@@ -54,7 +54,7 @@ jobs:
             mingw-w64-x86_64-ntldd
       - name: Build minimal OpenRetro Runtime
         shell: msys2 {0}
-        run: ./runtime/retroarch/build-mingw64.sh
+        run: bash ./runtime/retroarch/build-mingw64.sh
       - name: Verify runtime package
         shell: pwsh
         run: |
