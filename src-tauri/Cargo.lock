@@ -3029,6 +3029,7 @@ name = "openretro"
 version = "0.1.0"
 dependencies = [
  "aws-lc-sys",
+ "base64 0.22.1",
  "chrono",
  "dotenvy",
  "librqbit",

@@ -51,6 +51,7 @@ import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
+import { PlayerAvatar, playerAccent } from "../../components/PlayerAvatar";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
 import { HeroArtwork } from "./HeroArtwork";
 import {
@@ -116,6 +117,7 @@ export function BigPicture({
     queryKey: ["players"],
     queryFn: bridge.profiles,
   });
+  const activePlayer = players?.players.find((p) => p.id === players.activeId);
   const [powerOpen, setPowerOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const keyboardInput = useRef<((key: string) => boolean) | null>(null);
@@ -732,6 +734,7 @@ export function BigPicture({
     <section
       ref={root}
       className={`console-mode ${navFocused ? "menu-open" : ""}`}
+      style={playerAccent(activePlayer)}
       data-section={workspace ? workspace.page : section}
       aria-label="Modo console do OpenRetro"
       role="dialog"
@@ -858,9 +861,8 @@ export function BigPicture({
               onClick={() => setPlayersOpen(true)}
               aria-label="Trocar jogador"
             >
-              <UserRound size={18} />
-              {players?.players.find((p) => p.id === players.activeId)?.name ??
-                "Jogadores"}
+              <PlayerAvatar player={activePlayer} size={24} />
+              {activePlayer?.name ?? "Jogadores"}
             </button>
             <ConsoleClock />
             <span

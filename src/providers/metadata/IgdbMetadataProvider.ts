@@ -85,8 +85,22 @@ interface RawGame {
   cover?: { image_id: string };
   artworks?: { image_id: string }[];
   screenshots?: { image_id: string }[];
-  involved_companies?: { developer?: boolean; company?: { name: string } }[];
+  involved_companies?: {
+    developer?: boolean;
+    publisher?: boolean;
+    company?: { name: string };
+  }[];
+  total_rating?: number;
+  total_rating_count?: number;
+  videos?: { video_id?: string; name?: string }[];
+  game_modes?: { name: string }[];
+  player_perspectives?: { name: string }[];
+  themes?: { name: string }[];
+  franchises?: { name: string }[];
+  similar_games?: RawGame[];
 }
+const names = (list?: { name?: string }[]) =>
+  list?.map((item) => item.name).filter((name): name is string => !!name);
 export function mapIgdbGame(
   raw: RawGame,
   platforms: CatalogPlatform[],
@@ -102,6 +116,12 @@ export function mapIgdbGame(
     raw.slug && /^[a-z0-9-]+$/.test(raw.slug)
       ? `https://www.igdb.com/games/${raw.slug}`
       : undefined;
+  const companies = (role: "developer" | "publisher") =>
+    raw.involved_companies
+      ?.filter((c) => c[role])
+      .map((c) => c.company?.name)
+      .filter(Boolean)
+      .join(", ");
   return {
     id: `igdb-${raw.id}`,
     externalId: raw.id,
@@ -112,12 +132,8 @@ export function mapIgdbGame(
     year: raw.first_release_date
       ? new Date(raw.first_release_date * 1000).getUTCFullYear()
       : 0,
-    developer:
-      raw.involved_companies
-        ?.filter((c) => c.developer)
-        .map((c) => c.company?.name)
-        .filter(Boolean)
-        .join(", ") || "Developer not listed",
+    developer: companies("developer") || "Developer not listed",
+    publisher: companies("publisher") || undefined,
     description:
       raw.summary ||
       raw.storyline ||
@@ -134,6 +150,28 @@ export function mapIgdbGame(
       .filter((s): s is string => Boolean(s))
       .slice(0, 8),
     sourceUrl,
+    storyline:
+      raw.summary && raw.storyline && raw.storyline !== raw.summary
+        ? raw.storyline
+        : undefined,
+    rating:
+      raw.total_rating && (raw.total_rating_count ?? 0) > 0
+        ? Math.round(raw.total_rating)
+        : undefined,
+    ratingCount: raw.total_rating_count,
+    // YouTube IDs are restricted to their documented alphabet before embedding.
+    trailers: raw.videos
+      ?.filter((v) => v.video_id && /^[\w-]{6,20}$/.test(v.video_id))
+      .map((v) => ({ id: v.video_id!, name: v.name || "Trailer" }))
+      .slice(0, 4),
+    gameModes: names(raw.game_modes),
+    perspectives: names(raw.player_perspectives),
+    themes: names(raw.themes),
+    franchise: names(raw.franchises)?.[0],
+    similar: raw.similar_games
+      ?.map((g) => mapIgdbGame(g, platforms, preferred))
+      .filter((g): g is GameMetadata => Boolean(g))
+      .slice(0, 10),
   };
 }
 export async function catalogTransport(

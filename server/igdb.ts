@@ -10,7 +10,7 @@ import type {
 
 const fields =
   "id,name,slug,summary,first_release_date,genres.id,genres.name,platforms.id,platforms.name,cover.image_id,total_rating,total_rating_count,artworks.image_id,screenshots.image_id";
-const detailFields = `${fields},storyline,involved_companies.developer,involved_companies.company.name`;
+const detailFields = `${fields},storyline,involved_companies.developer,involved_companies.publisher,involved_companies.company.name,videos.video_id,videos.name,game_modes.name,player_perspectives.name,themes.name,franchises.name,similar_games.id,similar_games.name,similar_games.cover.image_id,similar_games.first_release_date,similar_games.platforms.id,similar_games.genres.id,similar_games.genres.name`;
 const sorts = {
   popular: "total_rating_count desc",
   rating: "total_rating desc",

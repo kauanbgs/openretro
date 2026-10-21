@@ -7,6 +7,7 @@ import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { SourceManager } from "../downloads/SourceManager";
 import { PlayerPicker } from "../../components/PlayerPicker";
+import { PlayerAvatar } from "../../components/PlayerAvatar";
 const sectionLabels: Record<string, string> = {
   General: "Geral",
   Library: "Biblioteca",
@@ -122,19 +123,27 @@ export function SettingsPage({
           {section === "General" ? (
             <>
               <div className="setting-row">
-                <div>
-                  <strong>Jogador</strong>
-                  <p>
-                    {players?.players.find((p) => p.id === players.activeId)
-                      ?.name ?? "Jogador 1"}{" "}
-                    · saves e favoritos individuais
-                  </p>
+                <div className="player-chip">
+                  <PlayerAvatar
+                    player={players?.players.find(
+                      (p) => p.id === players.activeId,
+                    )}
+                    size={40}
+                  />
+                  <div>
+                    <strong>Jogador</strong>
+                    <p>
+                      {players?.players.find((p) => p.id === players.activeId)
+                        ?.name ?? "Jogador 1"}{" "}
+                      · saves e favoritos individuais
+                    </p>
+                  </div>
                 </div>
                 <button
                   className="button secondary"
                   onClick={() => setPlayersOpen(true)}
                 >
-                  Trocar jogador
+                  Trocar ou personalizar
                 </button>
               </div>
               <div className="setting-row">

@@ -7,6 +7,32 @@ use tauri::State;
 pub struct PlayerProfile {
     pub id: String,
     pub name: String,
+    pub avatar: String,
+    pub color: String,
+}
+
+/// New players cycle through the same palette the editor offers.
+const COLORS: &[&str] = &[
+    "#ff8a3d", "#38bdf8", "#4ade80", "#f472b6", "#a78bfa", "#ffd23f", "#f87171", "#2dd4bf",
+];
+
+fn validate(name: &str, avatar: &str, color: &str) -> Result<()> {
+    if name.is_empty() || name.chars().count() > 32 {
+        return Err("Use um nome entre 1 e 32 caracteres.".into());
+    }
+    if avatar.is_empty()
+        || avatar.len() > 24
+        || !avatar.bytes().all(|b| b.is_ascii_lowercase() || b == b'-')
+    {
+        return Err("Avatar inválido.".into());
+    }
+    if color.len() != 7
+        || !color.starts_with('#')
+        || !color[1..].bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err("Cor inválida.".into());
+    }
+    Ok(())
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,13 +54,15 @@ pub fn active(conn: &Connection) -> Result<String> {
 pub fn list_profiles(db: State<Database>) -> Result<Profiles> {
     let conn = db.0.lock().map_err(error)?;
     let mut stmt = conn
-        .prepare("SELECT id,name FROM player_profiles ORDER BY rowid")
+        .prepare("SELECT id,name,avatar,color FROM player_profiles ORDER BY rowid")
         .map_err(error)?;
     let players = stmt
         .query_map([], |row| {
             Ok(PlayerProfile {
                 id: row.get(0)?,
                 name: row.get(1)?,
+                avatar: row.get(2)?,
+                color: row.get(3)?,
             })
         })
         .map_err(error)?
@@ -49,15 +77,41 @@ pub fn list_profiles(db: State<Database>) -> Result<Profiles> {
 #[tauri::command]
 pub fn create_profile(name: String, db: State<Database>) -> Result<()> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > 32 {
-        return Err("Use um nome entre 1 e 32 caracteres.".into());
-    }
     let conn = db.0.lock().map_err(error)?;
+    let count: usize = conn
+        .query_row("SELECT COUNT(*) FROM player_profiles", [], |r| r.get(0))
+        .map_err(error)?;
+    let color = COLORS[count % COLORS.len()];
+    validate(name, "gamepad", color)?;
     conn.execute(
-        "INSERT INTO player_profiles(id,name) VALUES(?1,?2)",
-        params![uuid::Uuid::new_v4().to_string(), name],
+        "INSERT INTO player_profiles(id,name,avatar,color) VALUES(?1,?2,'gamepad',?3)",
+        params![uuid::Uuid::new_v4().to_string(), name, color],
     )
     .map_err(error)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_profile(
+    id: String,
+    name: String,
+    avatar: String,
+    color: String,
+    db: State<Database>,
+) -> Result<()> {
+    let name = name.trim();
+    let color = color.to_ascii_lowercase();
+    validate(name, &avatar, &color)?;
+    let conn = db.0.lock().map_err(error)?;
+    let changed = conn
+        .execute(
+            "UPDATE player_profiles SET name=?2,avatar=?3,color=?4 WHERE id=?1",
+            params![id, name, avatar, color],
+        )
+        .map_err(error)?;
+    if changed == 0 {
+        return Err("Jogador não encontrado.".into());
+    }
     Ok(())
 }
 
@@ -123,4 +177,19 @@ pub fn project_library(
         entry.item.last_played_at = last_played_at;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn appearance_is_validated() {
+        assert!(super::validate("Ana", "ghost", "#a78bfa").is_ok());
+        assert!(super::validate("", "ghost", "#a78bfa").is_err());
+        assert!(super::validate("Ana", "../x", "#a78bfa").is_err());
+        assert!(super::validate("Ana", "ghost", "red").is_err());
+        assert!(super::validate("Ana", "ghost", "#zzzzzz").is_err());
+        assert!(super::COLORS
+            .iter()
+            .all(|color| super::validate("Ana", "gamepad", color).is_ok()));
+    }
 }

@@ -103,7 +103,7 @@ fn build_query(request: &CatalogRequest) -> Result<(&'static str, String)> {
             if ids.len() != 1 {
                 return Err("Choose one game.".into());
             }
-            return Ok(("games",format!("fields {FIELDS},storyline,involved_companies.developer,involved_companies.company.name; where id = {}; limit 1;",ids[0])));
+            return Ok(("games",format!("fields {FIELDS},storyline,involved_companies.developer,involved_companies.publisher,involved_companies.company.name,videos.video_id,videos.name,game_modes.name,player_perspectives.name,themes.name,franchises.name,similar_games.id,similar_games.name,similar_games.cover.image_id,similar_games.first_release_date,similar_games.platforms.id,similar_games.genres.id,similar_games.genres.name; where id = {}; limit 1;",ids[0])));
         }
         "games" => {}
         _ => return Err("Unsupported catalog operation.".into()),

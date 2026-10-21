@@ -3265,3 +3265,417 @@ html[data-animations="false"] *:after {
   outline: 2px solid var(--accent, #e9ae70);
   outline-offset: 2px;
 }
+
+/* Player appearance: avatar badge, picker rows and the editor. */
+.player-avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #17100a;
+  background: var(--player-color);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--player-color) 35%, transparent),
+    0 6px 18px color-mix(in srgb, var(--player-color) 30%, transparent);
+}
+.player-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.player-row .player-edit {
+  justify-content: center;
+  width: 58px;
+  padding: 0;
+}
+.player-editor h3 {
+  margin: 20px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.player-editor-preview {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.player-editor-preview label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.player-avatar-grid,
+.player-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.player-color-grid {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.player-avatar-grid button,
+.player-color-grid button {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--panel2);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+.player-color-grid button {
+  border-radius: 50%;
+  color: #17100a;
+}
+.player-avatar-grid button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel2));
+}
+.player-color-grid button[aria-pressed="true"] {
+  border: 2px solid var(--text);
+}
+.player-avatar-grid button:focus-visible,
+.player-color-grid button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  transform: scale(1.06);
+}
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Richer game page: badges, trailer, gallery, similar games. */
+.detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.detail-badges:empty {
+  display: none;
+}
+.detail-badge,
+.detail-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #ffffff26;
+  border-radius: 999px;
+  color: #e6e6e6;
+  background: #0000004d;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+.detail-rating {
+  color: #ffd23f;
+  border-color: #ffd23f55;
+}
+.detail-badge.accent {
+  color: var(--accentText);
+  border-color: transparent;
+  background: var(--accent);
+}
+.detail-storyline {
+  margin-top: 18px;
+  color: var(--muted);
+}
+.detail-storyline summary {
+  color: var(--text);
+  font-weight: 650;
+  cursor: pointer;
+}
+.detail-storyline p {
+  margin-top: 10px;
+  line-height: 1.7;
+}
+.captures-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.captures-heading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.screenshot-grid {
+  margin-top: 16px;
+}
+.screenshot-grid button {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.screenshot-grid button:hover img,
+.screenshot-grid button:focus-visible img {
+  border-color: var(--accent);
+}
+.screenshot-grid .own-capture::after {
+  content: "Sua captura";
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--accentText);
+  background: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.trailer-list {
+  display: grid;
+  gap: 10px;
+}
+.trailer-list button {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.trailer-list img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+.trailer-list span {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 10px 8px;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(transparent, #000000c0);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.trailer-list button:hover,
+.trailer-list button:focus-visible {
+  border-color: var(--accent);
+}
+.trailer-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.trailer-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 8px;
+}
+.similar-games {
+  margin-top: 48px;
+}
+.similar-games h2 {
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+.similar-row {
+  display: grid;
+  grid-auto-columns: 168px;
+  grid-auto-flow: column;
+  gap: 18px;
+  padding-bottom: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+.similar-row > * {
+  scroll-snap-align: start;
+}
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 40px 80px;
+  background: #000000e6;
+  outline: none;
+  animation: lightbox-in 160ms ease both;
+}
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+  }
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+  box-shadow: 0 24px 80px #000;
+}
+.lightbox p {
+  color: #d0d0d0;
+  font-size: 13px;
+}
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid #ffffff30;
+  border-radius: 50%;
+  color: #fff;
+  background: #ffffff14;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.lightbox-nav.previous {
+  left: 18px;
+}
+.lightbox-nav.next {
+  right: 18px;
+}
+@media (max-width: 720px) {
+  .lightbox {
+    padding: 24px 16px;
+  }
+  .lightbox-nav {
+    top: auto;
+    bottom: 18px;
+    transform: none;
+  }
+}
+
+/* Save state timeline. */
+.save-timeline {
+  display: grid;
+  gap: 28px;
+  padding-top: 28px;
+}
+.save-timeline h3 {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.save-timeline ol {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  padding-left: 22px;
+  list-style: none;
+}
+.save-timeline ol::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 5px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.save-state {
+  position: relative;
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.save-state::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -22px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%);
+}
+.save-state-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 6px;
+  color: var(--quiet);
+  background: var(--panel2);
+}
+.save-state-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.save-state-thumb span {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--accentText);
+  background: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+.save-state-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.save-state-copy strong {
+  font-size: 15px;
+}
+.save-state-copy span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.save-state-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.save-timeline-empty {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+@media (max-width: 720px) {
+  .save-state {
+    grid-template-columns: 96px 1fr;
+  }
+  .save-state-actions {
+    grid-column: 1 / -1;
+  }
+}

@@ -20,6 +20,18 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("004_player_profiles.sql"))
         .map_err(error)?;
+    // SQLite has no ADD COLUMN IF NOT EXISTS, so check before applying 005.
+    let has_avatar: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('player_profiles') WHERE name='avatar')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(error)?;
+    if !has_avatar {
+        tx.execute_batch(include_str!("005_player_appearance.sql"))
+            .map_err(error)?;
+    }
     // Restart requires explicit resume, which rechecks the partial files.
     tx.execute("UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')", []).map_err(error)?;
     let platforms: serde_json::Value =

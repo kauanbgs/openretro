@@ -513,6 +513,7 @@ export function ConsoleWorkspace({
               onBack={back}
               onImport={(game) => setImporting({ game })}
               onEmulators={() => navigate({ page: "emulators" })}
+              onSelect={(game) => navigate({ page: "game", game })}
               refresh={refresh}
               notify={notify}
             />

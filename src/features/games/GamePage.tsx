@@ -15,6 +15,12 @@ import {
   LoaderCircle,
   ExternalLink,
   Search,
+  Star,
+  Users,
+  Clapperboard,
+  ChevronLeft,
+  ChevronRight,
+  Camera,
 } from "lucide-react";
 import type {
   Emulator,
@@ -30,6 +36,17 @@ import { platformById } from "../../db/platforms";
 import { GameResolver } from "../../services/GameResolver";
 import { bridge, isDesktop } from "../../services/bridge";
 import { InGameMenuHelp } from "../../components/InGameMenuHelp";
+import { GameCard } from "../../components/GameCard";
+import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
+import { formatRelative } from "../../utils/format";
+
+const tabLabels: Record<string, string> = {
+  Overview: "Visão geral",
+  Saves: "Saves",
+  Screenshots: "Imagens",
+  Details: "Detalhes",
+};
+const multiplayer = /co-?op|multiplayer|split/i;
 export function GamePage({
   game: initialGame,
   entry,
@@ -37,6 +54,7 @@ export function GamePage({
   onBack,
   onImport,
   onEmulators,
+  onSelect,
   refresh,
   notify,
 }: {
@@ -44,6 +62,7 @@ export function GamePage({
   entry?: LibraryGame;
   emulators: Emulator[];
   onBack: () => void;
+  onSelect: (game: GameMetadata) => void;
   onImport: (game: GameMetadata) => void;
   onEmulators: () => void;
   refresh: () => Promise<void>;
@@ -80,6 +99,32 @@ export function GamePage({
   const [downloadOptions, setDownloadOptions] = useState(false);
   const [downloadQuery, setDownloadQuery] = useState("");
   const [downloadSource, setDownloadSource] = useState("all");
+  const [trailer, setTrailer] = useState<string>();
+  const [lightbox, setLightbox] = useState<number>();
+  const captures = useQuery({
+    queryKey: ["game-captures", entry?.item.id],
+    queryFn: () => bridge.gameCaptures(entry!.item.id),
+    enabled: isDesktop && Boolean(entry),
+  });
+  // Your own captures first, then the catalog's gameplay images.
+  const gallery = [
+    ...(captures.data ?? []).map((c) => ({
+      src: c.data,
+      caption: `Sua captura · ${formatRelative(new Date(c.takenAt))}`,
+      referrer: undefined,
+    })),
+    ...(game.screenshots ?? []).map((src, i) => ({
+      src,
+      caption: `${game.title} · imagem ${i + 1}`,
+      referrer: "no-referrer" as const,
+    })),
+  ];
+  const step = (delta: number) =>
+    setLightbox((index) =>
+      index === undefined
+        ? index
+        : (index + delta + gallery.length) % gallery.length,
+    );
   const sourceMatches = useQuery({
     queryKey: ["game-download-options", game.id, downloadOptions],
     queryFn: () => bridge.searchDownloadSources(game.title),
@@ -114,7 +159,7 @@ export function GamePage({
       setBusy(false);
     }
   }
-  async function play() {
+  async function play(slot?: number) {
     if (!entry) return;
     setRunning(true);
     try {
@@ -128,7 +173,7 @@ export function GamePage({
         notify(r.message);
         return;
       }
-      const seconds = await bridge.launch(entry.item.id);
+      const seconds = await bridge.launch(entry.item.id, slot);
       notify(
         `Session saved · ${Math.max(1, Math.round(seconds / 60))} min played`,
       );
@@ -136,6 +181,12 @@ export function GamePage({
       notify(String(e));
     } finally {
       setRunning(false);
+      void queryClient.invalidateQueries({
+        queryKey: saveStatesKey(entry.item.id),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["game-captures", entry.item.id],
+      });
       await refresh();
     }
   }
@@ -157,6 +208,27 @@ export function GamePage({
             <div className="game-facts">
               <span>{game.year || "Year unknown"}</span>
               <span>{game.developer}</span>
+            </div>
+            <div className="detail-badges">
+              {game.rating !== undefined && (
+                <span
+                  className="detail-rating"
+                  title={`${game.ratingCount ?? 0} avaliações no IGDB`}
+                >
+                  <Star size={14} fill="currentColor" /> {game.rating}
+                </span>
+              )}
+              {game.gameModes?.map((mode) =>
+                multiplayer.test(mode) ? (
+                  <span className="detail-badge accent" key={mode}>
+                    <Users size={14} /> {mode}
+                  </span>
+                ) : (
+                  <span className="detail-badge" key={mode}>
+                    {mode}
+                  </span>
+                ),
+              )}
             </div>
           </div>
         </div>
@@ -200,6 +272,16 @@ export function GamePage({
                     : "Jogar"
                   : "Opções de download"}
             </button>
+            {game.trailers?.length ? (
+              <button
+                className="button glass"
+                aria-label="Assistir trailer"
+                title="Assistir trailer"
+                onClick={() => setTrailer(game.trailers![0].id)}
+              >
+                <Clapperboard size={18} />
+              </button>
+            ) : null}
             {!entry && (
               <button className="button glass" onClick={() => onImport(game)}>
                 <FolderOpen size={17} /> Adicionar arquivo local
@@ -321,19 +403,18 @@ export function GamePage({
               />
             )}
             <nav className="tabs">
-              {["Overview", "Screenshots", "Details"].map((t) => (
+              {[
+                "Overview",
+                ...(entry ? ["Saves"] : []),
+                "Screenshots",
+                "Details",
+              ].map((t) => (
                 <button
                   className={tab === t ? "selected" : ""}
                   key={t}
                   onClick={() => setTab(t)}
                 >
-                  {
-                    {
-                      Overview: "Visão geral",
-                      Screenshots: "Imagens",
-                      Details: "Detalhes",
-                    }[t]
-                  }
+                  {tabLabels[t]}
                 </button>
               ))}
             </nav>
@@ -342,6 +423,12 @@ export function GamePage({
                 <div>
                   <h2>Sobre o jogo</h2>
                   <p>{game.description}</p>
+                  {game.storyline && (
+                    <details className="detail-storyline">
+                      <summary>História</summary>
+                      <p>{game.storyline}</p>
+                    </details>
+                  )}
                   {details.error && (
                     <p className="hint">
                       Additional metadata is unavailable. Showing the saved
@@ -373,25 +460,63 @@ export function GamePage({
                   </dl>
                 </aside>
               </div>
+            ) : tab === "Saves" && entry ? (
+              <SaveTimeline
+                entry={entry}
+                running={running || busy}
+                onPlay={(slot) => void play(slot)}
+                notify={notify}
+              />
             ) : tab === "Screenshots" ? (
-              details.isFetching ? (
+              details.isFetching || captures.isLoading ? (
                 <div className="catalog-loading">
                   <LoaderCircle className="spin" size={22} />
                   <p>Loading screenshots…</p>
                 </div>
-              ) : game.screenshots?.length ? (
-                <div className="screenshot-grid">
-                  {game.screenshots.map((url, i) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer">
-                      <img
-                        src={url}
-                        alt={`${game.title} gameplay screenshot ${i + 1}`}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    </a>
-                  ))}
-                </div>
+              ) : gallery.length ? (
+                <>
+                  {entry && (
+                    <div className="captures-heading">
+                      <span>
+                        <Camera size={16} />{" "}
+                        {captures.data?.length
+                          ? `${captures.data.length} capturas suas`
+                          : "Capture momentos no menu do jogo (F8)"}
+                      </span>
+                      {isDesktop && (
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            void bridge
+                              .openGameScreenshots(entry.item.id)
+                              .catch((e) => notify(String(e)))
+                          }
+                        >
+                          Abrir pasta
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div className="screenshot-grid">
+                    {gallery.map((image, i) => (
+                      <button
+                        key={image.src}
+                        className={
+                          i < (captures.data?.length ?? 0) ? "own-capture" : ""
+                        }
+                        onClick={() => setLightbox(i)}
+                        aria-label={`Ampliar ${image.caption}`}
+                      >
+                        <img
+                          src={image.src}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy={image.referrer}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="empty-inline">
                   <p>
@@ -471,8 +596,50 @@ export function GamePage({
                 <dd>{game.genre || "Unknown"}</dd>
                 <dt>Developer</dt>
                 <dd>{game.developer || "Unknown"}</dd>
+                {game.publisher && (
+                  <>
+                    <dt>Publicadora</dt>
+                    <dd>{game.publisher}</dd>
+                  </>
+                )}
+                {game.franchise && (
+                  <>
+                    <dt>Franquia</dt>
+                    <dd>{game.franchise}</dd>
+                  </>
+                )}
+                {game.perspectives?.length ? (
+                  <>
+                    <dt>Perspectiva</dt>
+                    <dd>{game.perspectives.join(", ")}</dd>
+                  </>
+                ) : null}
+                {game.themes?.length ? (
+                  <>
+                    <dt>Temas</dt>
+                    <dd>{game.themes.join(", ")}</dd>
+                  </>
+                ) : null}
               </dl>
             </section>
+            {game.trailers?.length ? (
+              <section className="detail-aside-card trailer-list">
+                <h2>Vídeos</h2>
+                {game.trailers.map((video) => (
+                  <button key={video.id} onClick={() => setTrailer(video.id)}>
+                    <img
+                      src={`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span>
+                      <Play size={14} fill="currentColor" /> {video.name}
+                    </span>
+                  </button>
+                ))}
+              </section>
+            ) : null}
             {!entry && (
               <section className="detail-aside-card source-note">
                 <Download size={18} />
@@ -506,7 +673,92 @@ export function GamePage({
             ) : null}
           </aside>
         </div>
+        {game.similar?.length ? (
+          <section className="similar-games">
+            <h2>Se você gosta deste jogo</h2>
+            <div className="similar-row">
+              {game.similar.map((similar) => (
+                <GameCard
+                  key={similar.id}
+                  game={similar}
+                  onClick={() => onSelect(similar)}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
+      {trailer && (
+        <Modal title="Trailer" wide onClose={() => setTrailer(undefined)}>
+          <div className="trailer-frame">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&rel=0`}
+              title={`Trailer de ${game.title}`}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+          <a
+            className="metadata-source"
+            href={`https://www.youtube.com/watch?v=${trailer}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Não carregou? Abrir no YouTube <ExternalLink size={14} />
+          </a>
+        </Modal>
+      )}
+      {lightbox !== undefined && gallery[lightbox] && (
+        <div
+          className="lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={gallery[lightbox].caption}
+          tabIndex={-1}
+          ref={(node) => node?.focus()}
+          onClick={() => setLightbox(undefined)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setLightbox(undefined);
+            if (event.key === "ArrowLeft") step(-1);
+            if (event.key === "ArrowRight") step(1);
+          }}
+        >
+          <img
+            src={gallery[lightbox].src}
+            alt={gallery[lightbox].caption}
+            referrerPolicy={gallery[lightbox].referrer}
+            onClick={(event) => event.stopPropagation()}
+          />
+          <p>
+            {gallery[lightbox].caption} · {lightbox + 1}/{gallery.length}
+          </p>
+          {gallery.length > 1 && (
+            <>
+              <button
+                className="lightbox-nav previous"
+                aria-label="Imagem anterior"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  step(-1);
+                }}
+              >
+                <ChevronLeft size={28} />
+              </button>
+              <button
+                className="lightbox-nav next"
+                aria-label="Próxima imagem"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  step(1);
+                }}
+              >
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {downloadOptions && (
         <Modal
           title="Opções de download"

@@ -476,7 +476,7 @@
 }
 .tv-filter-summary button {
   text-decoration: underline;
-  color: #e7a15c;
+  color: var(--tv-accent);
 }
 .tv-catalog-pagination {
   min-height: 90px;
@@ -1293,7 +1293,7 @@
 }
 .tv-search:focus-within {
   border-color: #d7b28b;
-  box-shadow: 0 0 0 3px #e7a15c17;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tv-accent) 9%, transparent);
 }
 .console-mode .tv-open-keyboard {
   display: grid;
@@ -1537,7 +1537,7 @@
 }
 .tv-keyboard-actions button.primary {
   color: #e7b886;
-  border-color: #e7a15c60;
+  border-color: color-mix(in srgb, var(--tv-accent) 38%, transparent);
 }
 .tv-keyboard-actions button.primary.focused {
   color: #17100a;

@@ -14,3 +14,16 @@ export function formatRemaining(seconds: number) {
   const minutes = Math.ceil(seconds / 60);
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min restantes`;
 }
+const relative = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
+export function formatRelative(date: Date, now = new Date()) {
+  const seconds = (date.getTime() - now.getTime()) / 1000;
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [
+    ["day", 86400],
+    ["hour", 3600],
+    ["minute", 60],
+  ];
+  for (const [unit, size] of units)
+    if (Math.abs(seconds) >= size)
+      return relative.format(Math.round(seconds / size), unit);
+  return "agora mesmo";
+}

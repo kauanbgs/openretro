@@ -8,6 +8,8 @@ import type {
   GameMetadata,
   ImportCandidate,
   LibraryGame,
+  PlayerProfile,
+  SaveState,
 } from "../types";
 import { defaultSettings } from "../types";
 import type {
@@ -18,6 +20,7 @@ import type {
 } from "../types";
 import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
 import { sourceStore, type PreviewSource } from "./sourceStore";
+import { DEFAULT_AVATAR, PLAYER_COLORS } from "./playerAppearance";
 export interface FilePickerRequest {
   title: string;
   directory: boolean;
@@ -43,15 +46,24 @@ export const isDesktop =
 const key = "openretro-preview-v1";
 export interface PlayerProfiles {
   activeId: string;
-  players: { id: string; name: string }[];
+  players: PlayerProfile[];
+}
+export interface GameCapture {
+  name: string;
+  takenAt: string;
+  data: string;
 }
 function readPlayerProfiles(): PlayerProfiles {
-  return (
-    JSON.parse(localStorage.getItem("openretro-players") ?? "null") ?? {
-      activeId: "default",
-      players: [{ id: "default", name: "Jogador 1" }],
-    }
-  );
+  const stored: PlayerProfiles = JSON.parse(
+    localStorage.getItem("openretro-players") ?? "null",
+  ) ?? { activeId: "default", players: [{ id: "default", name: "Jogador 1" }] };
+  // Profiles saved before avatars existed get the same defaults as the database.
+  stored.players = stored.players.map((player) => ({
+    ...player,
+    avatar: player.avatar ?? DEFAULT_AVATAR,
+    color: player.color ?? PLAYER_COLORS[0],
+  }));
+  return stored;
 }
 interface PreviewStore {
   library: LibraryGame[];
@@ -108,7 +120,27 @@ export const bridge = {
     const profiles = readPlayerProfiles();
     if (!name.trim() || name.trim().length > 32)
       throw new Error("Use um nome entre 1 e 32 caracteres.");
-    profiles.players.push({ id: crypto.randomUUID(), name: name.trim() });
+    profiles.players.push({
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      avatar: DEFAULT_AVATAR,
+      color: PLAYER_COLORS[profiles.players.length % PLAYER_COLORS.length],
+    });
+    localStorage.setItem("openretro-players", JSON.stringify(profiles));
+  },
+  async updateProfile(
+    id: string,
+    name: string,
+    avatar: string,
+    color: string,
+  ): Promise<void> {
+    if (isDesktop) return invoke("update_profile", { id, name, avatar, color });
+    const profiles = readPlayerProfiles();
+    const player = profiles.players.find((p) => p.id === id);
+    if (!player) throw new Error("Jogador não encontrado.");
+    if (!name.trim() || name.trim().length > 32)
+      throw new Error("Use um nome entre 1 e 32 caracteres.");
+    Object.assign(player, { name: name.trim(), avatar, color });
     localStorage.setItem("openretro-players", JSON.stringify(profiles));
   },
   async selectProfile(id: string): Promise<void> {
@@ -279,9 +311,7 @@ export const bridge = {
   library: (): Promise<LibraryGame[]> =>
     isDesktop ? invoke("list_library") : Promise.resolve(read().library),
   emulators: (): Promise<Emulator[]> =>
-    isDesktop
-      ? invoke("list_emulators")
-      : Promise.resolve(read().emulators),
+    isDesktop ? invoke("list_emulators") : Promise.resolve(read().emulators),
   emulatorInstallOptions: (): Promise<EmulatorInstall[]> =>
     isDesktop ? invoke("emulator_install_options") : Promise.resolve([]),
   async installEmulator(id: string): Promise<string> {
@@ -442,11 +472,23 @@ export const bridge = {
     if (isDesktop) return invoke("test_emulator", { id });
     throw new Error("Testing executables requires the desktop app.");
   },
-  async launch(id: string): Promise<number> {
-    if (isDesktop) return invoke("launch_game", { id });
+  /** `slot` starts from a saved state: -1 is the automatic resume state. */
+  async launch(id: string, slot?: number): Promise<number> {
+    if (isDesktop) return invoke("launch_game", { id, slot: slot ?? null });
     throw new Error(
       "Open the desktop app to launch a game with your configured emulator.",
     );
+  },
+  async saveStates(id: string): Promise<SaveState[]> {
+    return isDesktop ? invoke("list_save_states", { id }) : [];
+  },
+  async deleteSaveState(id: string, slot: number): Promise<void> {
+    if (!isDesktop)
+      throw new Error("Abra o aplicativo desktop para gerenciar seus saves.");
+    return invoke("delete_save_state", { id, slot });
+  },
+  async gameCaptures(id: string): Promise<GameCapture[]> {
+    return isDesktop ? invoke("list_game_screenshots", { id }) : [];
   },
   async openGameScreenshots(id: string): Promise<void> {
     if (!isDesktop)

@@ -48,6 +48,7 @@ pub fn run() {
             profiles::list_profiles,
             profiles::create_profile,
             profiles::select_profile,
+            profiles::update_profile,
             metadata::igdb_status,
             metadata::igdb_query,
             downloads::sources::list_download_sources,
@@ -83,6 +84,9 @@ pub fn run() {
             commands::app_paths,
             launcher::launch_game,
             launcher::runtime_menu::open_game_screenshots,
+            launcher::runtime_menu::list_game_screenshots,
+            launcher::save_states::list_save_states,
+            launcher::save_states::delete_save_state,
             in_game::in_game_status,
             in_game::in_game_action,
             in_game::open_steam_controller_settings

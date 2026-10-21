@@ -54,3 +54,27 @@ it("keeps preview progress independent when switching players and returning", as
   );
   expect((await bridge.profiles()).activeId).toBe(second);
 });
+
+it("customizes a preview player's name, avatar and color", async () => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  });
+  // Profiles stored before avatars existed still load with defaults.
+  expect((await bridge.profiles()).players[0]).toMatchObject({
+    avatar: "gamepad",
+  });
+  await bridge.createProfile("Jogador 2");
+  const second = (await bridge.profiles()).players[1];
+  expect(second.color).not.toBe((await bridge.profiles()).players[0].color);
+  await bridge.updateProfile(second.id, " Ana ", "ghost", "#a78bfa");
+  expect((await bridge.profiles()).players[1]).toMatchObject({
+    name: "Ana",
+    avatar: "ghost",
+    color: "#a78bfa",
+  });
+  await expect(
+    bridge.updateProfile("missing", "X", "ghost", "#a78bfa"),
+  ).rejects.toThrow("Jogador não encontrado");
+});

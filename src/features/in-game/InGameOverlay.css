@@ -201,3 +201,20 @@ html.in-game-overlay #root {
     animation: none;
   }
 }
+.game-menu-slot-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 2px;
+  color: #aaa;
+  font-size: 12px;
+}
+.game-menu-slot-preview img,
+.game-menu-slot-preview span {
+  width: 64px;
+  aspect-ratio: 4 / 3;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #ffffff0c;
+  image-rendering: pixelated;
+}

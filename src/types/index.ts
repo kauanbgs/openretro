@@ -25,6 +25,29 @@ export interface GameMetadata {
   genres?: string[];
   sourceUrl?: string;
   platformIds?: string[];
+  publisher?: string;
+  storyline?: string;
+  rating?: number;
+  ratingCount?: number;
+  trailers?: { id: string; name: string }[];
+  gameModes?: string[];
+  perspectives?: string[];
+  themes?: string[];
+  franchise?: string;
+  similar?: GameMetadata[];
+}
+export interface SaveState {
+  /** -1 is the runtime's automatic resume state. */
+  slot: number;
+  modifiedAt: string;
+  size: number;
+  thumbnail: string | null;
+}
+export interface PlayerProfile {
+  id: string;
+  name: string;
+  avatar: string;
+  color: string;
 }
 export interface LibraryItem {
   id: string;

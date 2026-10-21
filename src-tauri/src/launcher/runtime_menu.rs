@@ -29,6 +29,64 @@ pub fn open_game_screenshots(app: tauri::AppHandle, id: String) -> Result<()> {
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Capture {
+    name: String,
+    taken_at: String,
+    data: String,
+}
+
+/// The newest captures of a game, inlined so the page needs no file access.
+#[tauri::command]
+pub async fn list_game_screenshots(app: tauri::AppHandle, id: String) -> Result<Vec<Capture>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use base64::Engine;
+        let hash = {
+            let database = app.state::<crate::database::Database>();
+            let connection = database.0.lock().map_err(error)?;
+            crate::database::library(&connection)?
+                .into_iter()
+                .find(|entry| entry.item.id == id)
+                .ok_or("This game is no longer in your library.")?
+                .item
+                .sha256
+        };
+        let directory = screenshots_directory(&app.path().app_data_dir().map_err(error)?, &hash)?;
+        let mut files = std::fs::read_dir(directory)
+            .map_err(error)?
+            .flatten()
+            .filter_map(|entry| {
+                let path = entry.path();
+                let metadata = entry.metadata().ok()?;
+                let png = path
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("png"));
+                (png && metadata.is_file() && metadata.len() <= 8 * 1024 * 1024)
+                    .then(|| Some((path, metadata.modified().ok()?)))?
+            })
+            .collect::<Vec<_>>();
+        files.sort_by(|a, b| b.1.cmp(&a.1));
+        Ok(files
+            .into_iter()
+            .take(24)
+            .filter_map(|(path, modified)| {
+                let bytes = std::fs::read(&path).ok()?;
+                Some(Capture {
+                    name: path.file_name()?.to_string_lossy().into_owned(),
+                    taken_at: chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339(),
+                    data: format!(
+                        "data:image/png;base64,{}",
+                        base64::engine::general_purpose::STANDARD.encode(bytes)
+                    ),
+                })
+            })
+            .collect())
+    })
+    .await
+    .map_err(error)?
+}
+
 fn screenshots_directory(data: &Path, hash: &str) -> Result<PathBuf> {
     if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err("The game fingerprint is invalid. Import the game again.".into());
@@ -80,14 +138,15 @@ pub fn prepare_player(
     executable: &Path,
     hash: &str,
     player: &str,
-    auto_resume: bool,
+    auto_save: bool,
+    auto_load: bool,
 ) -> Result<PathBuf> {
     if player != "default" && uuid::Uuid::parse_str(player).is_err() {
         return Err("Perfil de jogador inválido.".into());
     }
     let base = prepare(data, executable, hash)?;
     let mut config = std::fs::read_to_string(base).map_err(error)?;
-    config.push_str(&format!("savestate_auto_save = \"{auto_resume}\"\nsavestate_auto_load = \"{auto_resume}\"\ninput_max_users = \"4\"\n"));
+    config.push_str(&format!("savestate_auto_save = \"{auto_save}\"\nsavestate_auto_load = \"{auto_load}\"\ninput_max_users = \"4\"\n"));
     for port in 1..=4 {
         config.push_str(&format!(
             "input_player{port}_joypad_index = \"{}\"\n",
@@ -226,16 +285,30 @@ mod tests {
         let root = std::env::temp_dir().join(format!("openretro-player-{}", uuid::Uuid::new_v4()));
         let hash = "a".repeat(64);
         let player = uuid::Uuid::new_v4().to_string();
-        let path =
-            prepare_player(&root, &root.join("retroarch.exe"), &hash, &player, true).unwrap();
+        let path = prepare_player(
+            &root,
+            &root.join("retroarch.exe"),
+            &hash,
+            &player,
+            true,
+            true,
+        )
+        .unwrap();
         let text = std::fs::read_to_string(path).unwrap();
         assert!(text.contains("savestate_auto_save = \"true\""));
         assert!(text.contains("savestate_auto_load = \"true\""));
         assert!(text.contains(&format!("players/{player}/{hash}/saves")));
         assert!(text.contains(&format!("players/{player}/{hash}/states")));
         assert!(text.contains("input_player4_joypad_index = \"3\""));
-        let default =
-            prepare_player(&root, &root.join("retroarch.exe"), &hash, "default", false).unwrap();
+        let default = prepare_player(
+            &root,
+            &root.join("retroarch.exe"),
+            &hash,
+            "default",
+            false,
+            false,
+        )
+        .unwrap();
         let text = std::fs::read_to_string(default).unwrap();
         assert!(text.contains("savestate_auto_load = \"false\""));
         assert!(!text.contains("savefile_directory"));
@@ -245,6 +318,7 @@ mod tests {
             &root.join("retroarch.exe"),
             &hash,
             "../outside",
+            true,
             true
         )
         .is_err());

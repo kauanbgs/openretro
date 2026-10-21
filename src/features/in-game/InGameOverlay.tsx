@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { bridge } from "../../services/bridge";
+import type { SaveState } from "../../types";
+import { formatRelative } from "../../utils/format";
 import "./InGameOverlay.css";
 
 interface Session {
@@ -39,6 +41,27 @@ export function InGameOverlay() {
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState<"load" | "reset" | "quit">();
   const [confirmed, setConfirmed] = useState(false);
+  const [states, setStates] = useState<SaveState[]>([]);
+  const sessionId = session?.open ? session.id : undefined;
+  useEffect(() => {
+    if (!sessionId) return;
+    let active = true;
+    const load = () =>
+      bridge
+        .saveStates(sessionId)
+        .then((next) => active && setStates(next))
+        .catch(() => {});
+    void load();
+    // The runtime writes the state file shortly after the save command.
+    const timer = message.startsWith("Solicitação de salvamento")
+      ? window.setTimeout(load, 900)
+      : undefined;
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [sessionId, message]);
+  const slotState = states.find((state) => state.slot === session?.slot);
   const handler = useRef<(key: string) => void>(() => {});
   useEffect(() => {
     document.documentElement.classList.add("in-game-overlay");
@@ -165,6 +188,18 @@ export function InGameOverlay() {
           >
             <ChevronRight size={19} />
           </button>
+        </div>
+        <div className="game-menu-slot-preview">
+          {slotState?.thumbnail ? (
+            <img src={slotState.thumbnail} alt="" />
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <p>
+            {slotState
+              ? `Salvo ${formatRelative(new Date(slotState.modifiedAt))}`
+              : "Slot vazio"}
+          </p>
         </div>
         {confirmation ? (
           <div className="game-menu-confirm">

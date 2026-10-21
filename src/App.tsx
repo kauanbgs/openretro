@@ -115,11 +115,7 @@ export function App() {
     queryKey: ["download-jobs"],
     queryFn: bridge.downloadJobs,
     refetchInterval: (query) =>
-      downloadPollInterval(
-        query.state.data,
-        isDesktop,
-        Boolean(playing),
-      ),
+      downloadPollInterval(query.state.data, isDesktop, Boolean(playing)),
     refetchIntervalInBackground: false,
   });
   const jobs = downloads.data ?? [];
@@ -431,12 +427,17 @@ export function App() {
         <Suspense fallback={<PageLoading />}>
           {selected ? (
             <GamePage
+              key={selected.id}
               game={selected}
               entry={activeEntry}
               emulators={emulators}
               onBack={() => setSelected(undefined)}
               onImport={(game) => openImport(game)}
               onEmulators={() => navigate("Emulators")}
+              onSelect={(game) => {
+                setSelected(game);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
               refresh={refresh}
               notify={notify}
             />

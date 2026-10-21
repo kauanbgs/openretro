@@ -27,6 +27,11 @@ pub struct SessionInfo {
     open: bool,
     slot: i32,
 }
+impl SessionInfo {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}
 
 pub struct SessionGuard {
     app: tauri::AppHandle,
@@ -82,7 +87,7 @@ impl Drop for SessionGuard {
         let _ = self.app.emit("in-game-state", Option::<SessionInfo>::None);
     }
 }
-pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str) -> Result<SessionGuard> {
+pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Result<SessionGuard> {
     let service = app.state::<InGameService>();
     let mut guard = service.0.lock().map_err(error)?;
     if guard.is_some() {
@@ -97,7 +102,7 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str) -> Result<SessionG
             id: id.into(),
             title: title.into(),
             open: false,
-            slot: 0,
+            slot,
         },
         stdin: None,
         pid: 0,
