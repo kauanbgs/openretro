@@ -58,4 +58,5 @@ jobs:
             .tizen-stage
             dist-runtime/openretro-runtime-tizen-source-*.tar.gz
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 14
