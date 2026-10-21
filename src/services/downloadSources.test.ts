@@ -20,7 +20,7 @@ describe("Hydra-compatible download sources", () => {
     expect(source.downloads).toEqual([
       {
         title: "Homebrew",
-        uris: [magnet, "https://example.com/file.zip"],
+        uris: ["https://example.com/file.zip", magnet],
         uploadDate: "2026-10-20",
         fileSize: "32 KB",
       },
