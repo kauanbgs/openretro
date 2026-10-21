@@ -45,6 +45,11 @@ build_core() {
     echo "::group::Build libretro core: $name"
   fi
   checkout_pinned "$repository" "$commit" "$core_dir"
+  local patch
+  for patch in "$SCRIPT_DIR/patches/$name"/*.patch; do
+    [[ -f "$patch" ]] || continue
+    git -C "$core_dir" apply --whitespace=nowarn "$patch"
+  done
   local license
   license="$(find "$core_dir" -maxdepth 1 -type f \( -iname 'copying*' -o -iname 'license*' \) | head -n 1)"
   if [[ -n "$license" ]]; then
@@ -71,11 +76,13 @@ build_core() {
 
   pushd "$RETROARCH_DIR" >/dev/null
   make -f Makefile.emscripten clean >/dev/null 2>&1 || true
+  # platform_emscripten.c always exports the cheat commands, so the cheat
+  # manager stays in. BSV movies would need libretrodb's msgpack code.
   emmake make -f Makefile.emscripten -j"${NUMBER_OF_PROCESSORS:-$(nproc)}" \
     LIBRETRO="$name" TARGET="${name}_libretro.js" \
     HAVE_MENU=0 HAVE_RGUI=0 HAVE_GFX_WIDGETS=0 HAVE_NETWORKING=0 \
     HAVE_ONLINE_UPDATER=0 HAVE_UPDATE_ASSETS=0 HAVE_LIBRETRODB=0 \
-    HAVE_CHEATS=0 HAVE_REWIND=0 HAVE_RUNAHEAD=0 HAVE_OVERLAY=0 \
+    HAVE_REWIND=0 HAVE_RUNAHEAD=0 HAVE_OVERLAY=0 HAVE_BSV_MOVIE=0 \
     HAVE_SCREENSHOTS=1 HAVE_COMMAND=1 HAVE_STDIN_CMD=0 \
     ASYNC=1 LTO=1 INITIAL_HEAP=134217728 STACK_SIZE=16777216
   mkdir -p "$OUTPUT_ROOT/$name"
@@ -113,7 +120,8 @@ This runtime contains RetroArch $RETROARCH_VERSION at $RETROARCH_COMMIT from
 $RETROARCH_REPOSITORY and statically linked Libretro cores at the commits in
 runtime/tizen/cores.env. The exact build recipe is
 runtime/tizen/build-emscripten.sh in the OpenRetro repository; the build-only
-fixes in runtime/retroarch/patches are applied to RetroArch before compiling.
+fixes in runtime/retroarch/patches are applied to RetroArch, and those in
+runtime/tizen/patches/<core> to each core, before compiling.
 
 The complete corresponding source archive is published beside the binary
 artifact as openretro-runtime-tizen-source-$RETROARCH_VERSION.tar.gz.
@@ -129,6 +137,7 @@ for name in fceumm gambatte snes9x2005 genesis_plus_gx gpsp; do
 done
 cp "$SCRIPT_DIR"/{build-emscripten.sh,cores.env} "$SOURCE_STAGE/openretro-runtime-tizen/openretro-build/"
 cp -R "$PROJECT_ROOT/runtime/retroarch/patches" "$SOURCE_STAGE/openretro-runtime-tizen/openretro-build/"
+cp -R "$SCRIPT_DIR/patches" "$SOURCE_STAGE/openretro-runtime-tizen/openretro-build/core-patches"
 tar -czf "$PROJECT_ROOT/dist-runtime/openretro-runtime-tizen-source-$RETROARCH_VERSION.tar.gz" \
   -C "$SOURCE_STAGE" openretro-runtime-tizen
 echo "OpenRetro Tizen runtime ready: $OUTPUT_ROOT"

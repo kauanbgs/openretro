@@ -1,3 +1,29 @@
+diff --git a/gfx/drivers/gl2.c b/gfx/drivers/gl2.c
+index d39eb1567f..977110ca14 100644
+--- a/gfx/drivers/gl2.c
++++ b/gfx/drivers/gl2.c
+@@ -81,6 +81,7 @@
+ #endif
+ #endif
+ 
++#include "../gfx_display.h"
+ #ifdef HAVE_MENU
+ #include "../../menu/menu_driver.h"
+ #endif
+diff --git a/gfx/video_driver.c b/gfx/video_driver.c
+index 7917922bb4..7310eda468 100644
+--- a/gfx/video_driver.c
++++ b/gfx/video_driver.c
+@@ -35,6 +35,7 @@
+ #include "video_display_server.h"
+ 
+ #include "gfx_animation.h"
++#include "gfx_display.h"
+ #ifdef HAVE_GFX_WIDGETS
+ #include "gfx_widgets.h"
+ #endif
+diff --git a/retroarch.c b/retroarch.c
+index b16728310b..3b2421cae3 100644
 --- a/retroarch.c
 +++ b/retroarch.c
 @@ -138,6 +138,7 @@
@@ -8,9 +34,11 @@
  #ifdef HAVE_GFX_WIDGETS
  #include "gfx/gfx_widgets.h"
  #endif
+diff --git a/runloop.c b/runloop.c
+index 679517b280..2dc5d786d7 100644
 --- a/runloop.c
 +++ b/runloop.c
-@@ -7176,15 +7176,18 @@
+@@ -7176,15 +7176,18 @@ int runloop_iterate(void)
     runloop_state_t *runloop_st            = &runloop_state;
     bool vrr_runloop_enable                = settings->bools.vrr_runloop_enable;
     retro_time_t current_time              = cpu_features_get_time_usec();
@@ -31,3 +59,15 @@
     bool menu_pause_libretro               = settings->bools.menu_pause_libretro;
  #endif
     bool core_paused                       =
+diff --git a/runtime_file.c b/runtime_file.c
+index 31b5c54671..554f314254 100644
+--- a/runtime_file.c
++++ b/runtime_file.c
+@@ -39,6 +39,7 @@
+ #include "verbosity.h"
+ #include "msg_hash.h"
+ 
++#include "runloop.h"
+ #if defined(HAVE_MENU)
+ #include "menu/menu_driver.h"
+ #endif

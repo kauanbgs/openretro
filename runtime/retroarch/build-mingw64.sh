@@ -87,7 +87,7 @@ while IFS= read -r dependency; do
   if [[ -f "$dependency" ]]; then
     cp -f "$dependency" "$OUTPUT_ROOT/$(basename "$dependency")"
     if command -v pacman >/dev/null 2>&1; then
-      package="$(pacman -Qo "$dependency" 2>/dev/null | awk '{print $5}' || true)"
+      package="$(pacman -Qqo "$dependency" 2>/dev/null || true)"
       short_package="${package#mingw-w64-x86_64-}"
       license_dir="/mingw64/share/licenses/$short_package"
       if [[ -n "$package" && -d "$license_dir" ]]; then
@@ -146,14 +146,18 @@ See DEPENDENCIES.txt and licenses/runtime-dependencies for the exact MSYS2
 packages that supplied non-system DLLs and their notices.
 EOF
 
+# Append the recipe to the upstream archive instead of extracting it: MSYS2 tar
+# cannot recreate the macOS framework symlinks shipped in the RetroArch tree.
 rm -rf "$SOURCE_STAGE"
 mkdir -p "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build"
-git -C "$SOURCE_DIR" archive "$RETROARCH_COMMIT" | tar -x -C "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION"
+git -C "$SOURCE_DIR" archive --format=tar --prefix="RetroArch-$RETROARCH_VERSION/" \
+  -o "$SOURCE_STAGE/source.tar" "$RETROARCH_COMMIT"
 cp "$SCRIPT_DIR"/{build-mingw64.sh,configure-flags.txt,retroarch.cfg,upstream.env} \
   "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
 cp -R "$SCRIPT_DIR/patches" "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
-tar -czf "$DIST_ROOT/openretro-runtime-source-$RETROARCH_VERSION-r$OPENRETRO_RUNTIME_REVISION.tar.gz" \
-  -C "$SOURCE_STAGE" "RetroArch-$RETROARCH_VERSION"
+tar -rf "$SOURCE_STAGE/source.tar" -C "$SOURCE_STAGE" "RetroArch-$RETROARCH_VERSION/openretro-build"
+gzip -9 -c "$SOURCE_STAGE/source.tar" \
+  > "$DIST_ROOT/openretro-runtime-source-$RETROARCH_VERSION-r$OPENRETRO_RUNTIME_REVISION.tar.gz"
 
 powershell.exe -NoLogo -NoProfile -Command \
   "Compress-Archive -Path '$(cygpath -w "$OUTPUT_ROOT")\\*' -DestinationPath '$(cygpath -w "$DIST_ROOT/openretro-runtime-windows-x86_64.zip")' -Force"
