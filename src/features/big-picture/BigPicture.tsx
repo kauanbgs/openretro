@@ -20,6 +20,8 @@ import {
   Keyboard,
   Info,
   LoaderCircle,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import type {
   DownloadJob,
@@ -35,6 +37,7 @@ import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
 import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
 import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
+import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { HeroArtwork } from "./HeroArtwork";
 
@@ -73,6 +76,9 @@ export function BigPicture({
   const [navIndex, setNavIndex] = useState(0);
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [query, setQuery] = useState("");
+  const [librarySort, setLibrarySort] = useState("recent");
+  const [libraryPlatform, setLibraryPlatform] = useState("all");
+  const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
   const [powerOpen, setPowerOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const keyboardInput = useRef<((key: string) => boolean) | null>(null);
@@ -92,7 +98,8 @@ export function BigPicture({
   const positions = useRef<
     Partial<Record<Section, { selected: number; scroll: number }>>
   >({});
-  const holdTimers = useRef(new Map<string, number>());
+  const dispatchInput = useRef<(key: string) => void>(() => {});
+  const catalogModal = useRef(false);
   const [connected, setConnected] = useState(false);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
@@ -102,10 +109,11 @@ export function BigPicture({
   const grid = useRef<HTMLDivElement>(null);
   const catalogInput = useRef<((key: string) => boolean) | null>(null);
   const catalogMemory = useRef<CatalogViewState | null>(null);
+  const homeMemory = useRef<CatalogViewState | null>(null);
   const [catalogCount, setCatalogCount] = useState(0);
   const [selected, setSelected] = useState(0);
   const [launching, setLaunching] = useState(false);
-  const held = useRef(new Set<string>());
+
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(undefined), 4200);
@@ -133,20 +141,28 @@ export function BigPicture({
   const games = useMemo(
     () =>
       [...library].sort((a, b) =>
-        (b.item.lastPlayedAt ?? "").localeCompare(a.item.lastPlayedAt ?? ""),
+        librarySort === "title"
+          ? a.game.title.localeCompare(b.game.title)
+          : librarySort === "playtime"
+            ? b.item.playtime - a.item.playtime
+            : (b.item.lastPlayedAt ?? "").localeCompare(
+                a.item.lastPlayedAt ?? "",
+              ),
       ),
-    [library],
+    [library, librarySort],
   );
   const visibleGames = useMemo(
     () =>
       games.filter(
         (entry) =>
           (filter === "all" || entry.item.favorite) &&
+          (libraryPlatform === "all" ||
+            entry.game.platformId === libraryPlatform) &&
           entry.game.title
             .toLocaleLowerCase()
             .includes(query.toLocaleLowerCase()),
       ),
-    [games, filter, query],
+    [games, filter, query, libraryPlatform],
   );
   const selectedGame =
     visibleGames[Math.min(selected, Math.max(visibleGames.length - 1, 0))];
@@ -155,6 +171,7 @@ export function BigPicture({
   useEffect(() => {
     const game = heroGame?.game;
     if (
+      section !== "library" ||
       !game ||
       game.metadataProvider !== "igdb" ||
       game.backgroundUrl ||
@@ -175,7 +192,7 @@ export function BigPicture({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [heroGame?.game.id, details]);
+  }, [heroGame?.game.id, details, section]);
   const selectSection = (next: Section) => {
     positions.current[section] = {
       selected,
@@ -201,7 +218,7 @@ export function BigPicture({
     onClose();
   };
   const currentSize = () =>
-    section === "catalog"
+    section === "catalog" || section === "home"
       ? catalogCount
       : section === "downloads"
         ? jobs.length
@@ -270,7 +287,8 @@ export function BigPicture({
       if (navIndex === sections.length + 1) return setPowerOpen(true);
       return selectSection(sections[navIndex].id);
     }
-    if (section === "home" || section === "library") return void launch();
+    if (section === "library") return void launch();
+    if (section === "home") return;
     if (section === "downloads") {
       const job = jobs[selected];
       if (job)
@@ -315,8 +333,8 @@ export function BigPicture({
       }
       if (preparing) return;
       if (
-        section === "catalog" &&
-        !navFocused &&
+        (section === "catalog" || section === "home") &&
+        (!navFocused || catalogModal.current) &&
         !powerOpen &&
         catalogInput.current?.(key)
       )
@@ -326,9 +344,71 @@ export function BigPicture({
         return setNavFocused((value) => !value);
       }
       if (powerOpen) return key === "a" ? close() : undefined;
+      if (key === "previous-control" || key === "next-control") return;
+      if (
+        (section === "catalog" || section === "home") &&
+        (key === "lb" || key === "rb")
+      ) {
+        catalogInput.current?.(
+          key === "lb" ? "previous-control" : "next-control",
+        );
+        return;
+      }
+      if (section === "library" && !navFocused) {
+        if (key === "lb" || key === "rb") {
+          setFilter((value) => (value === "all" ? "favorites" : "all"));
+          setSelected(0);
+          return;
+        }
+        const control = document.activeElement as HTMLElement | null;
+        if (control?.closest(".tv-library-tools, .tv-hero-actions")) {
+          if (key === "a") {
+            if (control instanceof HTMLInputElement) setKeyboardOpen(true);
+            else if (control instanceof HTMLButtonElement) control.click();
+            else control.blur();
+            return;
+          }
+          if (
+            control instanceof HTMLSelectElement &&
+            ["left", "right"].includes(key)
+          ) {
+            const option =
+              control.options[
+                (control.selectedIndex +
+                  (key === "left" ? -1 : 1) +
+                  control.options.length) %
+                  control.options.length
+              ];
+            if (control.getAttribute("aria-label") === "Ordenar biblioteca")
+              setLibrarySort(option.value);
+            else setLibraryPlatform(option.value);
+            setSelected(0);
+            return;
+          }
+          if (key === "down" || key === "b") {
+            control.blur();
+            grid.current?.querySelector<HTMLButtonElement>("button")?.focus();
+            return;
+          }
+          if (key === "up" || key === "left" || key === "right") {
+            const controls = Array.from(
+              root.current?.querySelectorAll<HTMLElement>(
+                ".tv-hero-actions button, .tv-library-tools input, .tv-library-tools button, .tv-library-tools select",
+              ) ?? [],
+            );
+            const index = controls.indexOf(control);
+            controls[
+              (index + (key === "right" ? 1 : -1) + controls.length) %
+                controls.length
+            ]?.focus();
+            return;
+          }
+        }
+      }
       if (key === "a") return activate();
       if (key === "search") {
-        if (section === "home" || section === "library") setKeyboardOpen(true);
+        if (section === "home") selectSection("catalog");
+        else if (section === "library") setKeyboardOpen(true);
         else if (section === "catalog") catalogInput.current?.("open-search");
         return;
       }
@@ -352,9 +432,15 @@ export function BigPicture({
       if (key === "right") return move(1, currentSize());
       if (key === "up" && selected < columns) {
         if (section === "catalog") catalogInput.current?.("next-control");
-        else if (section === "home" || section === "library") {
+        else if (section === "home")
+          root.current
+            ?.querySelector<HTMLButtonElement>(".tv-home-feature .tv-play")
+            ?.focus();
+        else if (section === "library") {
           content.current?.scrollTo({ top: 0, behavior: "smooth" });
-          root.current?.querySelector<HTMLButtonElement>(".tv-play")?.focus();
+          root.current
+            ?.querySelector<HTMLInputElement>(".tv-library-tools input")
+            ?.focus();
         }
         return;
       }
@@ -377,6 +463,7 @@ export function BigPicture({
       )
         void remove();
     };
+    dispatchInput.current = handle;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Tab") {
         const scope =
@@ -445,80 +532,35 @@ export function BigPicture({
           document.activeElement instanceof HTMLButtonElement
         )
           document.activeElement.blur();
-        handle(keys[event.key]);
+        dispatchInput.current(keys[event.key]);
       }
     };
     window.addEventListener("keydown", onKey);
-    let frame = 0;
-    const poll = () => {
-      const pad = navigator.getGamepads?.().find(Boolean);
-      if (pad) {
-        const active = new Set<string>();
-        const edge = (id: string, pressed: boolean) => {
-          if (!pressed) {
-            holdTimers.current.delete(id);
-            return false;
-          }
-          active.add(id);
-          const now = performance.now();
-          if (!held.current.has(id)) {
-            holdTimers.current.set(id, now + 380);
-            return true;
-          }
-          if (
-            ["left", "right", "up", "down"].includes(id) &&
-            now >= (holdTimers.current.get(id) ?? Infinity)
-          ) {
-            holdTimers.current.set(id, now + 125);
-            return true;
-          }
-          return false;
-        };
-        if (
-          edge("left", Boolean(pad.buttons[14]?.pressed || pad.axes[0] < -0.7))
-        )
-          handle("left");
-        if (
-          edge("right", Boolean(pad.buttons[15]?.pressed || pad.axes[0] > 0.7))
-        )
-          handle("right");
-        if (edge("up", Boolean(pad.buttons[12]?.pressed || pad.axes[1] < -0.7)))
-          handle("up");
-        if (
-          edge("down", Boolean(pad.buttons[13]?.pressed || pad.axes[1] > 0.7))
-        )
-          handle("down");
-        if (edge("a", Boolean(pad.buttons[0]?.pressed))) handle("a");
-        if (edge("b", Boolean(pad.buttons[1]?.pressed))) handle("b");
-        if (edge("x", Boolean(pad.buttons[2]?.pressed))) handle("x");
-        if (edge("y", Boolean(pad.buttons[3]?.pressed))) handle("y");
-        if (edge("search", Boolean(pad.buttons[8]?.pressed))) handle("search");
-        if (edge("menu", Boolean(pad.buttons[9]?.pressed))) handle("b");
-        if (
-          !launching &&
-          section === "catalog" &&
-          edge("lb", Boolean(pad.buttons[4]?.pressed))
-        )
-          catalogInput.current?.("previous-control");
-        if (
-          !launching &&
-          section === "catalog" &&
-          edge("rb", Boolean(pad.buttons[5]?.pressed))
-        )
-          catalogInput.current?.("next-control");
-        held.current = active;
-      } else {
-        held.current.clear();
-        holdTimers.current.clear();
-      }
-      frame = requestAnimationFrame(poll);
-    };
-    frame = requestAnimationFrame(poll);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => window.removeEventListener("keydown", onKey);
   });
+  useEffect(() => {
+    const device = new ControllerInput();
+    device.sample(navigator.getGamepads?.().find(Boolean), performance.now());
+    let wasActive = false;
+    // One persistent loop: opening a dialog or refreshing downloads must not
+    // restart sampling or lose a held button. 30 Hz is enough for launcher UI.
+    const timer = window.setInterval(() => {
+      if (document.hidden || !document.hasFocus()) {
+        wasActive = false;
+        return;
+      }
+      const pad = navigator.getGamepads?.().find(Boolean);
+      if (!wasActive) {
+        device.sample(pad, performance.now());
+        wasActive = true;
+        return;
+      }
+      for (const key of device.sample(pad, performance.now())) {
+        dispatchInput.current(key === "menu" ? "b" : key);
+      }
+    }, 33);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     const columns = grid.current
       ? getComputedStyle(grid.current).gridTemplateColumns.split(" ").length
@@ -536,7 +578,10 @@ export function BigPicture({
         <h2>{title}</h2>
         <span>{entries.length} jogos</span>
       </div>
-      <div className="tv-game-grid" ref={grid}>
+      <div
+        className={`tv-game-grid ${libraryView === "list" ? "tv-library-list" : ""}`}
+        ref={grid}
+      >
         {entries.map((entry, index) => (
           <button
             key={entry.item.id}
@@ -695,7 +740,11 @@ export function BigPicture({
           </span>
           <button
             aria-label="Pesquisar jogos"
-            onClick={() => selectSection("catalog")}
+            onClick={() =>
+              section === "catalog"
+                ? catalogInput.current?.("open-search")
+                : selectSection("catalog")
+            }
           >
             <Search size={22} />
           </button>
@@ -705,40 +754,40 @@ export function BigPicture({
         </div>
       </header>
       <main ref={content} className="tv-content" key={section}>
-        {section === "catalog" && (
+        {(section === "catalog" || section === "home") && (
           <BigPictureCatalog
+            mode={section === "home" ? "home" : "catalog"}
+            onLibrary={() => selectSection("library")}
             library={library}
             selected={selected}
             setSelected={setSelected}
             grid={grid}
             input={catalogInput}
+            modal={catalogModal}
             onCount={setCatalogCount}
             onPlay={(entry) => void launch(entry)}
             onDownloads={() => selectSection("downloads")}
             notify={feedback}
-            memory={catalogMemory}
+            memory={section === "home" ? homeMemory : catalogMemory}
           />
         )}
-        {(section === "home" || section === "library") && (
+        {section === "library" && (
           <>
             <section className="tv-hero">
               {heroMetadata && <HeroArtwork game={heroMetadata} />}
               <div className="tv-hero-shade" />
               <div className="tv-hero-copy" key={heroGame?.item.id ?? "empty"}>
+                <h1>{heroGame?.game.title ?? "Sua coleção começa aqui"}</h1>
                 <p className="tv-kicker">
                   {heroGame?.item.lastPlayedAt
                     ? "Continue jogando"
                     : "Pronto para jogar"}
                 </p>
-                <h1>{heroGame?.game.title ?? "Sua coleção começa aqui"}</h1>
                 <p className="tv-hero-meta">
                   {heroGame
                     ? `${heroPlatform}  ·  ${heroGame.game.genre || "Jogo"}`
                     : "Importe seus jogos no modo desktop para montar sua biblioteca."}
                 </p>
-                {heroGame?.game.description && (
-                  <p className="tv-description">{heroGame.game.description}</p>
-                )}
                 {heroGame ? (
                   <div className="tv-hero-actions">
                     <button
@@ -748,6 +797,12 @@ export function BigPicture({
                     >
                       <Play size={19} fill="currentColor" />
                       {launching ? "Iniciando…" : "Jogar"}
+                    </button>
+                    <button
+                      className="tv-secondary"
+                      onClick={() => onDesktop("Emulators")}
+                    >
+                      <Settings size={18} /> Emulador
                     </button>
                     <button
                       className="tv-secondary"
@@ -792,9 +847,7 @@ export function BigPicture({
             </section>
             <section className="tv-library">
               <div className="tv-library-tools">
-                <h2>
-                  {section === "home" ? "Continue jogando" : "Sua biblioteca"}
-                </h2>
+                <h2>Sua biblioteca</h2>
                 <label className="tv-search">
                   <Search size={19} />
                   <input
@@ -815,7 +868,51 @@ export function BigPicture({
                     <Keyboard size={20} />
                   </button>
                 </label>
-                <span>{visibleGames.length} jogos</span>
+                <select
+                  aria-label="Ordenar biblioteca"
+                  value={librarySort}
+                  onChange={(event) => {
+                    setLibrarySort(event.target.value);
+                    setSelected(0);
+                  }}
+                >
+                  <option value="recent">Jogado recentemente</option>
+                  <option value="title">Nome</option>
+                  <option value="playtime">Tempo jogado</option>
+                </select>
+                <select
+                  aria-label="Filtrar biblioteca por console"
+                  value={libraryPlatform}
+                  onChange={(event) => {
+                    setLibraryPlatform(event.target.value);
+                    setSelected(0);
+                  }}
+                >
+                  <option value="all">Todos os consoles</option>
+                  {[
+                    ...new Set(library.map((entry) => entry.game.platformId)),
+                  ].map((id) => (
+                    <option key={id} value={id}>
+                      {platformById(id)?.name ?? id}
+                    </option>
+                  ))}
+                </select>
+                <div className="tv-library-view">
+                  <button
+                    aria-label="Visualização em lista"
+                    aria-pressed={libraryView === "list"}
+                    onClick={() => setLibraryView("list")}
+                  >
+                    <List size={20} />
+                  </button>
+                  <button
+                    aria-label="Visualização em grade"
+                    aria-pressed={libraryView === "grid"}
+                    onClick={() => setLibraryView("grid")}
+                  >
+                    <LayoutGrid size={20} />
+                  </button>
+                </div>
               </div>
               <div className="tv-tabs">
                 <button
@@ -998,7 +1095,11 @@ export function BigPicture({
           <span>
             <b>LB / RB</b> Filtros
           </span>
-        ) : section === "home" || section === "library" ? (
+        ) : section === "home" ? (
+          <span>
+            <b>Share / View</b> Catálogo
+          </span>
+        ) : section === "library" ? (
           <>
             <span>
               <b>X</b> Favoritar

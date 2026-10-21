@@ -36,6 +36,15 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 
 ## Remaining validation
 
+### Controller fixes, reference layouts and smaller payload — 2026-10-20
+
+- Added persistent 30 Hz controller sampling, DS4 DirectInput mapping, modal-owned selection and modal input priority. Sampling pauses when the launcher loses focus and re-seeds held buttons on return.
+- Frontend input regression suite covers held confirmation across a grid/dialog transition, a subsequent confirmation/cancel, directional repeat, disconnect and raw DS4 mappings. Frontend suite: 41 tests passed; Rust library suite: 15 tests passed.
+- Browser review confirmed the discovery Home renders 12 live IGDB recommendations with an empty library, and catalog ordering/filters use the compact reference layout. Library adds actual sorting, console filtering and grid/list modes; there were no installed games in the browser preview used for review.
+- Native Guide/PS handling now attempts the existing runtime SDL2 background controller driver, retaining Windows fallbacks. The installed runtime has SDL2.dll; a physical PS-button session remains unverified after recompilation.
+- App and pause overlay have separate lazy chunks; desktop pages unmount in console mode; offscreen catalog images use lazy loading; console backdrop blur is removed. Release preparation trims optional runtime content by default. The preparation script was syntax-checked, not executed, and TV performance/installer-size reductions have not been measured.
+- Samsung/LG adaptation constraints and proposed on-demand WebAssembly architecture are recorded in `TV.md`. No Tizen/webOS installer is produced by this change.
+
 ### Big Picture and OpenRetro in-game menu — 2026-10-20
 
 - Production frontend build passed; frontend suite: 38 tests passed; Rust library suite: 15 tests passed.

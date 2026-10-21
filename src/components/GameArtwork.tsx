@@ -5,9 +5,11 @@ import { ImageOff } from "lucide-react";
 export function GameArtwork({
   game,
   hero = false,
+  loading,
 }: {
   game: GameMetadata;
   hero?: boolean;
+  loading?: "lazy" | "eager";
 }) {
   const [failed, setFailed] = useState(false);
   const url = hero ? (game.backgroundUrl ?? game.coverUrl) : game.coverUrl;
@@ -17,7 +19,8 @@ export function GameArtwork({
         <img
           src={url}
           alt={hero ? "" : `${game.title} cover`}
-          loading={hero ? "eager" : "lazy"}
+          loading={loading ?? (hero ? "eager" : "lazy")}
+          decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
         />

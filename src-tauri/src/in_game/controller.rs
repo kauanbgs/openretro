@@ -75,6 +75,8 @@ pub fn focus_process(pid: u32) {
 
 pub fn start(app: tauri::AppHandle) {
     thread::spawn(move || {
+        let mut sdl = None;
+        let mut sdl_pid = 0;
         let mut previous = false;
         let mut devices = Vec::new();
         let mut scanned = Instant::now() - Duration::from_secs(10);
@@ -91,14 +93,31 @@ pub fn start(app: tauri::AppHandle) {
                     guard
                         .as_ref()
                         .filter(|s| s.stdin.is_some())
-                        .map(|s| (s.pid, s.info.open))
+                        .map(|s| (s.pid, s.info.open, s.sdl_library.clone()))
                 });
-            let Some((pid, open)) = session else {
+            let Some((pid, open, sdl_library)) = session else {
+                sdl = None;
+                sdl_pid = 0;
                 previous = false;
                 thread::sleep(Duration::from_millis(150));
                 continue;
             };
+            if sdl_pid != pid {
+                sdl = sdl_library.as_deref().and_then(super::sdl::Sdl::load);
+                sdl_pid = pid;
+                log::info!(
+                    "OpenRetro background controller input: {}",
+                    if sdl.is_some() {
+                        "SDL2 + Windows fallback"
+                    } else {
+                        "Windows fallback (runtime SDL2.dll unavailable)"
+                    }
+                );
+            }
             if scanned.elapsed() > Duration::from_secs(3) {
+                if let Some(driver) = &mut sdl {
+                    driver.rescan();
+                }
                 devices.clear();
                 for id in 0..unsafe { joyGetNumDevs() }.min(16) {
                     let mut caps: JoyCaps = unsafe { std::mem::zeroed() };
@@ -118,8 +137,10 @@ pub fn start(app: tauri::AppHandle) {
                 }
                 scanned = Instant::now();
             }
-            let mut pressed = false;
-            let mut menu = 0u32;
+            let (mut pressed, mut menu) = sdl
+                .as_ref()
+                .map(super::sdl::Sdl::sample)
+                .unwrap_or((false, 0));
             for id in &devices {
                 let mut info = [0u32; 13];
                 info[0] = size_of::<[u32; 13]>() as u32;
@@ -203,7 +224,7 @@ pub fn start(app: tauri::AppHandle) {
                 }
             }
             previous_menu = menu;
-            thread::sleep(Duration::from_millis(16));
+            thread::sleep(Duration::from_millis(if open { 16 } else { 25 }));
         }
     });
 }

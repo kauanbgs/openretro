@@ -168,6 +168,23 @@ export function App() {
       setInstallingUpdate(false);
     }
   };
+  // Unmount desktop pages while the console owns the screen: no hidden catalog,
+  // images, observers or page queries behind Big Picture.
+  if (bigPicture)
+    return (
+      <BigPicture
+        library={library}
+        emulators={emulators}
+        jobs={jobs}
+        refresh={refresh}
+        onClose={() => setBigPicture(false)}
+        onDesktop={(destination) => {
+          setBigPicture(false);
+          navigate(destination);
+        }}
+        notify={notify}
+      />
+    );
   const activeEntry = library.find((x) => x.game.id === selected?.id);
   return (
     <div className={`app density-${settings.density}`}>
@@ -445,20 +462,6 @@ export function App() {
             <X size={16} />
           </button>
         </div>
-      )}
-      {bigPicture && (
-        <BigPicture
-          library={library}
-          emulators={emulators}
-          jobs={jobs}
-          refresh={refresh}
-          onClose={() => setBigPicture(false)}
-          onDesktop={(destination) => {
-            setBigPicture(false);
-            navigate(destination);
-          }}
-          notify={notify}
-        />
       )}
     </div>
   );

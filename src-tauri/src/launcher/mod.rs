@@ -134,7 +134,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  let child=Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?).spawn();
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {
-    if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id())?; }
+    if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable)?; }
  }
  db.0.lock().map_err(error)?.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?;
  let _=app.emit("game-started",&id); log::info!("Started game session {session}");

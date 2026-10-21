@@ -1634,3 +1634,326 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Console rendering budget: keep short opacity transitions, avoid repeated
+   fullscreen backdrop compositing on low-power TV GPUs. */
+.console-mode *,
+.console-mode *::before,
+.console-mode *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.console-mode .tv-dialog-backdrop,
+.console-mode .tv-keyboard-backdrop {
+  background: #000e;
+}
+.tv-catalog-grid > button {
+  contain: layout style;
+}
+.console-mode .tv-catalog-dialog button[data-controller-focused] {
+  outline: 2px solid var(--tv-accent);
+  outline-offset: 3px;
+}
+
+/* Reference layouts: one compact catalog bar, a cinematic library and discovery home. */
+.tv-compact-toolbar {
+  margin: 0 0 32px;
+  padding: 0;
+  gap: 20px;
+  background: transparent;
+}
+.tv-catalog-order-label {
+  display: grid;
+  gap: 7px;
+  font-size: 17px;
+}
+.tv-catalog-order-label small {
+  color: #999;
+  font-size: 12px;
+}
+.tv-catalog-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-left: auto;
+}
+.console-mode .tv-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  height: 44px;
+  border: 1px solid #ffffff26;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.console-mode .tv-filter-toggle[aria-expanded="true"] {
+  background: #202020;
+}
+.tv-catalog-actions .tv-filter-control > span {
+  display: none;
+}
+.tv-catalog-actions select {
+  min-width: 210px;
+}
+.tv-catalog-filter-panel {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+  flex-basis: 100%;
+  padding: 20px;
+  background: #111;
+  border: 1px solid #ffffff18;
+  border-radius: 6px;
+}
+.tv-catalog-filter-panel .tv-search {
+  flex: 1;
+  min-width: 260px;
+}
+.tv-catalog-filter-panel .tv-filter-summary {
+  margin: 0;
+  padding: 0;
+}
+.tv-catalog-filter-panel .tv-filter-summary > span {
+  display: none;
+}
+.tv-catalog-grid {
+  column-gap: 20px;
+  row-gap: 40px;
+}
+.tv-catalog-grid > button > strong {
+  margin-top: 11px;
+}
+.tv-home-discover {
+  padding: 0 0 65px;
+}
+.tv-home-feature {
+  position: relative;
+  isolation: isolate;
+  min-height: 500px;
+  height: 65vh;
+  max-height: 760px;
+  display: flex;
+  align-items: end;
+  padding: 140px 3.5vw 65px;
+  overflow: hidden;
+}
+.tv-home-feature-copy {
+  width: min(800px, 65%);
+}
+.tv-home-feature h1 {
+  color: #fff;
+  font-size: clamp(40px, 4.4vw, 76px);
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+  text-wrap: balance;
+  margin-bottom: 28px;
+}
+.tv-home-feature-copy > p {
+  color: #c3c3c3;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 580px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tv-home-shelf-title {
+  margin: 24px 3.5vw 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.tv-home-shelf-title h2 {
+  font-size: 24px;
+}
+.tv-home-shelf-title > span {
+  color: #999;
+  font-size: 13px;
+}
+.tv-home-discover > .tv-catalog-grid,
+.tv-home-discover > .tv-catalog-credit,
+.tv-home-discover > .tv-catalog-skeleton {
+  margin-left: 3.5vw;
+  margin-right: 3.5vw;
+}
+.tv-hero {
+  height: 55vh;
+  min-height: 440px;
+  max-height: 650px;
+  padding-left: 3.5vw;
+  padding-right: 3.5vw;
+}
+.tv-hero-copy h1 {
+  margin-bottom: 44px;
+  max-width: 800px;
+}
+.tv-hero-copy .tv-kicker {
+  margin: 0 0 7px !important;
+  font-size: 18px;
+}
+.tv-hero-copy .tv-hero-meta {
+  margin-top: 0 !important;
+}
+.tv-hero-copy .tv-hero-actions {
+  margin-top: 24px;
+}
+.tv-library {
+  padding: 34px 3.5vw 65px;
+}
+.tv-library-tools {
+  gap: 14px;
+}
+.tv-library-tools h2 {
+  flex-basis: 100%;
+  margin-bottom: 6px;
+  font-size: 21px;
+}
+.tv-library-tools .tv-search {
+  width: min(450px, 35%);
+}
+.console-mode .tv-library-tools select {
+  width: auto;
+  max-width: 260px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #ffffff26;
+  background: #080808;
+  color: #ccc;
+  border-radius: 5px;
+}
+.tv-library-view {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.console-mode .tv-library-view button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #ffffff26;
+  border-radius: 5px;
+}
+.console-mode .tv-library-view button[aria-pressed="true"] {
+  background: #eee;
+  color: #111;
+}
+.tv-library .tv-tabs {
+  margin-top: 32px;
+  margin-bottom: 30px;
+}
+.tv-library .tv-game-grid {
+  gap: 28px;
+}
+.tv-library .tv-game-grid .artwork {
+  aspect-ratio: 2/3;
+  outline-offset: 3px;
+}
+.tv-library .tv-game-grid > button.focused {
+  transform: none;
+}
+.tv-library .tv-game-grid > button.focused .artwork {
+  outline-color: var(--tv-accent);
+  box-shadow: none;
+}
+.tv-library .tv-library-list {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.tv-library .tv-library-list > button {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  align-items: center;
+  gap: 22px;
+  padding: 10px;
+  background: #111;
+}
+.tv-library .tv-library-list .artwork {
+  width: 70px;
+  height: 95px;
+}
+.tv-library .tv-library-list > button > span,
+.tv-library .tv-library-list > button > small {
+  padding: 0;
+}
+.tv-library .tv-library-list .tv-card-play {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .tv-home-feature {
+    min-height: 440px;
+  }
+  .tv-home-feature-copy {
+    width: 80%;
+  }
+  .tv-home-shelf-title > span {
+    display: none;
+  }
+  .tv-library-tools .tv-search {
+    width: 100%;
+  }
+  .tv-catalog-actions select {
+    min-width: 160px;
+  }
+}
+
+.tv-home-recent {
+  margin: 20px 3.5vw 40px;
+}
+.tv-home-recent h2 {
+  font-size: 22px;
+  margin-bottom: 22px;
+}
+.tv-home-recent > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.console-mode .tv-home-recent button {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #ffffff1a;
+  border-radius: 6px;
+  background: #111;
+}
+.tv-home-recent .artwork {
+  width: 54px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tv-home-recent img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tv-home-recent button > span {
+  min-width: 0;
+  flex: 1;
+}
+.tv-home-recent strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.tv-home-recent small {
+  display: block;
+  margin-top: 7px;
+  color: #999;
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .tv-home-recent > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -4,6 +4,8 @@ use std::{io::Write, process::ChildStdin, sync::Mutex};
 use tauri::{Emitter, Manager};
 #[cfg(target_os = "windows")]
 mod controller;
+#[cfg(target_os = "windows")]
+mod sdl;
 
 #[derive(Default)]
 pub struct InGameService(Mutex<Option<Session>>);
@@ -11,6 +13,7 @@ struct Session {
     info: SessionInfo,
     stdin: Option<ChildStdin>,
     pid: u32,
+    sdl_library: Option<std::path::PathBuf>,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +29,7 @@ pub struct SessionGuard {
     id: String,
 }
 impl SessionGuard {
-    pub fn attach(&self, stdin: ChildStdin, pid: u32) -> Result<()> {
+    pub fn attach(&self, stdin: ChildStdin, pid: u32, executable: &std::path::Path) -> Result<()> {
         let service = self.app.state::<InGameService>();
         let mut guard = service.0.lock().map_err(error)?;
         let session = guard
@@ -35,6 +38,7 @@ impl SessionGuard {
             .ok_or("A sessão do jogo foi encerrada.")?;
         session.stdin = Some(stdin);
         session.pid = pid;
+        session.sdl_library = executable.parent().map(|path| path.join("SDL2.dll"));
         Ok(())
     }
 }
@@ -70,6 +74,7 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str) -> Result<SessionG
         },
         stdin: None,
         pid: 0,
+        sdl_library: None,
     });
     Ok(SessionGuard {
         app: app.clone(),
@@ -244,6 +249,7 @@ mod tests {
             },
             stdin: None,
             pid: 0,
+            sdl_library: None,
         };
         assert!(super::write_command(&mut session, "SAVE_STATE").is_err());
     }
