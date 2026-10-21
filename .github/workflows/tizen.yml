@@ -8,6 +8,7 @@ on:
       - "platforms/tizen/**"
       - "runtime/tizen/**"
       - "runtime/retroarch/upstream.env"
+      - "runtime/retroarch/patches/**"
       - "src/**"
       - "scripts/build-tizen.ps1"
       - "scripts/test-tizen-recipe.ps1"

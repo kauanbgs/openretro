@@ -29,6 +29,11 @@ checkout_pinned() {
 }
 
 checkout_pinned "$RETROARCH_REPOSITORY" "$RETROARCH_COMMIT" "$RETROARCH_DIR"
+# Same build-only fixes as the Windows runtime: the pinned release does not
+# compile with both the menu and networking disabled.
+for patch in "$PROJECT_ROOT"/runtime/retroarch/patches/*.patch; do
+  git -C "$RETROARCH_DIR" apply --whitespace=nowarn "$patch"
+done
 rm -rf "$OUTPUT_ROOT"
 mkdir -p "$OUTPUT_ROOT/licenses"
 cp "$RETROARCH_DIR/COPYING" "$OUTPUT_ROOT/licenses/RetroArch-GPL-3.0.txt"
@@ -107,7 +112,8 @@ cat > "$OUTPUT_ROOT/SOURCE.md" <<EOF
 This runtime contains RetroArch $RETROARCH_VERSION at $RETROARCH_COMMIT from
 $RETROARCH_REPOSITORY and statically linked Libretro cores at the commits in
 runtime/tizen/cores.env. The exact build recipe is
-runtime/tizen/build-emscripten.sh in the OpenRetro repository.
+runtime/tizen/build-emscripten.sh in the OpenRetro repository; the build-only
+fixes in runtime/retroarch/patches are applied to RetroArch before compiling.
 
 The complete corresponding source archive is published beside the binary
 artifact as openretro-runtime-tizen-source-$RETROARCH_VERSION.tar.gz.
@@ -122,6 +128,7 @@ for name in fceumm gambatte snes9x2005 genesis_plus_gx gpsp; do
   git -C "$CACHE_ROOT/$name" archive HEAD | tar -x -C "$SOURCE_STAGE/openretro-runtime-tizen/cores/$name"
 done
 cp "$SCRIPT_DIR"/{build-emscripten.sh,cores.env} "$SOURCE_STAGE/openretro-runtime-tizen/openretro-build/"
+cp -R "$PROJECT_ROOT/runtime/retroarch/patches" "$SOURCE_STAGE/openretro-runtime-tizen/openretro-build/"
 tar -czf "$PROJECT_ROOT/dist-runtime/openretro-runtime-tizen-source-$RETROARCH_VERSION.tar.gz" \
   -C "$SOURCE_STAGE" openretro-runtime-tizen
 echo "OpenRetro Tizen runtime ready: $OUTPUT_ROOT"
