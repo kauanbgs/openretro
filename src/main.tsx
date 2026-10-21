@@ -2,8 +2,7 @@ import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const App = lazy(() => import("./App").then(({ App }) => ({ default: App })));
-import "@fontsource-variable/manrope/wght.css";
-import "@fontsource-variable/space-grotesk/wght.css";
+import "./fonts.css";
 import "./styles.css";
 const InGameOverlay = lazy(() =>
   import("./features/in-game/InGameOverlay").then(({ InGameOverlay }) => ({

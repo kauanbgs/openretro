@@ -15,7 +15,7 @@ A collection of game sleeves, organized like a personal shelf. Borrow the calm s
 | Secondary text | `#A2ABC0` |
 | Control accent / amber | `#E9B27A` |
 
-Space Grotesk carries headings and the wordmark. Manrope carries controls, descriptions and metadata. Both are bundled locally. Type starts at 12px for secondary metadata, 14px for controls, 16px for body text; headings range from 24px to 56px. Avoid tracked uppercase labels and decorative monospace.
+Nunito Sans carries headings, controls, descriptions and metadata, with lighter 500–600 weights for navigation and card titles. One variable Latin font is bundled locally. Type starts at 12px for secondary metadata, 14px for controls, 16px for body text; headings range from 24px to 56px. Avoid tracked uppercase labels and decorative monospace.
 
 ## Layout considered
 

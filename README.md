@@ -225,4 +225,4 @@ Local verification includes a frontend production build, frontend/database tests
 
 Application code and original development illustrations: MIT, see [LICENSE](LICENSE). IGDB metadata and game artwork retain their respective providers' and owners' rights; they are not relicensed under MIT.
 
-Manrope and Space Grotesk fonts are bundled locally; their SIL Open Font License notices are in `public/licenses/`. The visual system is documented in [docs/DESIGN.md](docs/DESIGN.md). librqbit is Apache-2.0; its dependency licensing remains separate from OpenRetro's MIT application code.
+Nunito Sans is bundled locally as a single Latin variable font; its SIL Open Font License notice are in `public/licenses/`. The visual system is documented in [docs/DESIGN.md](docs/DESIGN.md). librqbit is Apache-2.0; its dependency licensing remains separate from OpenRetro's MIT application code.

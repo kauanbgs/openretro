@@ -16,7 +16,7 @@ html.in-game-overlay #root {
   padding: 40px 5vw;
   background: #0009;
   color: #f3f3f3;
-  font-family: "Manrope Variable", sans-serif;
+  font-family: "Nunito Sans Variable", "Segoe UI", sans-serif;
   animation: game-menu-fade 180ms ease both;
 }
 .game-menu-panel {

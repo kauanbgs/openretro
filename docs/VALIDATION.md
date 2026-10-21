@@ -36,6 +36,13 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 
 ## Remaining validation
 
+### Explicit selects, library scrolling and typography
+
+- Replaced console filter controls with shared combobox/listbox controls: confirmation opens the menu, Up/Down highlights a draft, confirmation applies, and Back/Escape cancels. Closed controls navigate focus instead of changing values.
+- Browser review used an isolated two-game fixture without modifying the user's library. Down moved focus to the first row and scrolled its cover cards into view. Opening sort and moving to Name kept the original value until confirmation; Right then focused the console control without altering it. Cancelling a draft console option preserved All consoles.
+- Replaced the two previous font imports with one local Nunito Sans Latin variable font. The production font file is 31.08 kB; typography and select-menu appearance were reviewed in the browser.
+- Frontend suite: 41 tests passed. Production frontend build passed. Native controller hardware was not retested for this UI-only change.
+
 ### Controller fixes, reference layouts and smaller payload — 2026-10-20
 
 - Added persistent 30 Hz controller sampling, DS4 DirectInput mapping, modal-owned selection and modal input priority. Sampling pauses when the launcher loses focus and re-seeds held buttons on return.

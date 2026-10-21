@@ -24,6 +24,7 @@ import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import { useCatalogPagination } from "../../hooks/useCatalogPagination";
 import { ControllerKeyboard } from "./ControllerKeyboard";
+import { ControllerSelect } from "./ControllerSelect";
 import { HeroArtwork } from "./HeroArtwork";
 import { createPortal } from "react-dom";
 export interface CatalogViewState {
@@ -42,6 +43,7 @@ export function BigPictureCatalog({
   grid,
   input,
   modal,
+  selectInput,
   onCount,
   onPlay,
   onDownloads,
@@ -56,6 +58,7 @@ export function BigPictureCatalog({
   grid: RefObject<HTMLDivElement | null>;
   input: RefObject<((key: string) => boolean) | null>;
   modal: RefObject<boolean>;
+  selectInput: RefObject<((key: string) => boolean) | null>;
   onCount: (count: number) => void;
   onPlay: (entry: LibraryGame) => void;
   onDownloads: () => void;
@@ -355,27 +358,30 @@ export function BigPictureCatalog({
         return true;
       }
       if (
-        control instanceof HTMLSelectElement &&
-        control.closest(".tv-catalog-toolbar")
+        control instanceof HTMLElement &&
+        control.closest(".tv-catalog-toolbar") &&
+        ["left", "right", "up", "down"].includes(key)
       ) {
-        if (["left", "right", "up", "down"].includes(key)) {
-          const index =
-            (control.selectedIndex +
-              (key === "left" || key === "up" ? -1 : 1) +
-              control.options.length) %
-            control.options.length;
-          const value = control.options[index].value;
-          if (control.getAttribute("aria-label") === "Console")
-            setPlatform(value);
-          else if (control.getAttribute("aria-label") === "Gênero")
-            setGenre(value === "all" ? undefined : Number(value));
-          else setSort(value as typeof sort);
+        if (key === "down") {
+          grid.current?.querySelector<HTMLButtonElement>("button")?.focus();
           return true;
         }
-        if (key === "a" || key === "b") {
-          control.blur();
-          return true;
-        }
+        const controls = Array.from(
+          document.querySelectorAll<HTMLElement>(
+            ".tv-catalog-toolbar input, .tv-catalog-toolbar button:not(:disabled)",
+          ),
+        );
+        const index = controls.indexOf(control);
+        controls[
+          Math.max(
+            0,
+            Math.min(
+              controls.length - 1,
+              index + (key === "left" || key === "up" ? -1 : 1),
+            ),
+          )
+        ]?.focus();
+        return true;
       }
       if (
         key === "a" &&
@@ -461,20 +467,23 @@ export function BigPictureCatalog({
             </button>
             <label className="tv-filter-control">
               <span>Ordenar</span>
-              <select
-                aria-label="Ordenar catálogo"
+              <ControllerSelect
+                input={selectInput}
+                label="Ordenar catálogo"
                 value={sort}
                 disabled={Boolean(debounced)}
-                onChange={(event) => setSort(event.target.value as typeof sort)}
-              >
-                <option value="popular">
-                  {debounced ? "Relevância" : "Popularidade"}
-                </option>
-                <option value="rating">Melhor avaliação</option>
-                <option value="title">Nome</option>
-                <option value="newest">Mais recentes</option>
-                <option value="oldest">Mais antigos</option>
-              </select>
+                onChange={(value) => setSort(value as typeof sort)}
+                options={[
+                  {
+                    value: "popular",
+                    label: debounced ? "Relevância" : "Popularidade",
+                  },
+                  { value: "rating", label: "Melhor avaliação" },
+                  { value: "title", label: "Nome" },
+                  { value: "newest", label: "Mais recentes" },
+                  { value: "oldest", label: "Mais antigos" },
+                ]}
+              />
             </label>
           </div>
           {filtersOpen && (
@@ -499,39 +508,37 @@ export function BigPictureCatalog({
               </label>
               <label className="tv-filter-control">
                 <span>Console</span>
-                <select
-                  aria-label="Console"
+                <ControllerSelect
+                  input={selectInput}
+                  label="Console"
                   value={platform}
-                  onChange={(event) => setPlatform(event.target.value)}
-                >
-                  <option value="all">Todos os consoles</option>
-                  {taxonomy.data?.platforms.map((item) => (
-                    <option key={item.id} value={item.localId}>
-                      {platformById(item.localId)?.name ?? item.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setPlatform}
+                  options={[
+                    { value: "all", label: "Todos os consoles" },
+                    ...(taxonomy.data?.platforms ?? []).map((item) => ({
+                      value: item.localId,
+                      label: platformById(item.localId)?.name ?? item.name,
+                    })),
+                  ]}
+                />
               </label>
               <label className="tv-filter-control">
                 <span>Gênero</span>
-                <select
-                  aria-label="Gênero"
-                  value={genre ?? "all"}
-                  onChange={(event) =>
-                    setGenre(
-                      event.target.value === "all"
-                        ? undefined
-                        : Number(event.target.value),
-                    )
+                <ControllerSelect
+                  input={selectInput}
+                  label="Gênero"
+                  value={genre === undefined ? "all" : String(genre)}
+                  onChange={(value) =>
+                    setGenre(value === "all" ? undefined : Number(value))
                   }
-                >
-                  <option value="all">Todos os gêneros</option>
-                  {taxonomy.data?.genres.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "all", label: "Todos os gêneros" },
+                    ...(taxonomy.data?.genres ?? []).map((item) => ({
+                      value: String(item.id),
+                      label: item.name,
+                    })),
+                  ]}
+                />
               </label>
               <div className="tv-filter-summary">
                 <span>Filtros por console e gênero</span>

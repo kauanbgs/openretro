@@ -1,0 +1,9 @@
+/* One local variable font and only the Latin subset needed by the interface. */
+@font-face {
+  font-family: "Nunito Sans Variable";
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url("@fontsource-variable/nunito-sans/files/nunito-sans-latin-wght-normal.woff2")
+    format("woff2");
+}

@@ -115,7 +115,7 @@
 }
 
 :root {
-  font-family: "Manrope Variable", sans-serif;
+  font-family: "Nunito Sans Variable", "Segoe UI", sans-serif;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -143,7 +143,7 @@
   --brand-cutout: var(--console-bg);
   --danger: #f0a5a5;
   --success: #a4c8b1;
-  --display: "Space Grotesk Variable", sans-serif;
+  --display: "Nunito Sans Variable", "Segoe UI", sans-serif;
   --sidebar-width: 224px;
   --page-gutter: 40px;
 }

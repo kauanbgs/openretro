@@ -8,7 +8,7 @@
   overflow: hidden;
   color: var(--console-text);
   background: var(--tv-bg);
-  font-family: Manrope, sans-serif;
+  font-family: "Nunito Sans Variable", "Segoe UI", sans-serif;
   font-size: 15px;
 }
 .console-mode *,
@@ -1956,4 +1956,99 @@
   .tv-home-recent > div {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Selects keep a separate draft until the user confirms an option. */
+.console-mode .tv-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 44px;
+  width: 100%;
+  padding: 0 15px;
+  color: #ddd;
+  background: #0c0c0c;
+  border: 1px solid #ffffff26;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+}
+.tv-select-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tv-select-trigger > svg {
+  flex-shrink: 0;
+  color: #999;
+}
+.console-mode .tv-select-trigger[aria-expanded="true"] {
+  border-color: var(--tv-accent);
+}
+.tv-catalog-actions .tv-select-trigger {
+  min-width: 210px;
+}
+.tv-catalog-filter-panel .tv-filter-control {
+  min-width: 200px;
+}
+.tv-library-tools > .tv-select-trigger {
+  width: auto;
+  min-width: 205px;
+  max-width: 280px;
+}
+.tv-select-menu {
+  position: fixed;
+  z-index: 110;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #151515;
+  border: 1px solid #3b3b3b;
+  border-radius: 7px;
+  box-shadow: 0 16px 42px #000b;
+  scrollbar-width: thin;
+  scrollbar-color: #494949 #151515;
+}
+.tv-select-menu [role="option"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  color: #c3c3c3;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tv-select-menu [role="option"].highlighted {
+  color: #fff;
+  background: #ffffff14;
+  outline: 1px solid #ffffff25;
+  outline-offset: -1px;
+}
+.tv-select-menu [aria-selected="true"] > svg {
+  color: var(--tv-accent);
+}
+.tv-catalog-grid > button > strong,
+.tv-game-grid > button > span,
+.tv-rail-games button {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.console-mode .tv-hero h1,
+.console-mode .tv-home-feature h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.tv-game-grid > button {
+  scroll-margin-block: 88px 24px;
+}
+.tv-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }

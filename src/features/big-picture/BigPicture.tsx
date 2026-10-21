@@ -37,6 +37,7 @@ import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
 import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
 import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
+import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { HeroArtwork } from "./HeroArtwork";
@@ -100,6 +101,7 @@ export function BigPicture({
   >({});
   const dispatchInput = useRef<(key: string) => void>(() => {});
   const catalogModal = useRef(false);
+  const selectInput = useRef<((key: string) => boolean) | null>(null);
   const [connected, setConnected] = useState(false);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
@@ -209,10 +211,23 @@ export function BigPicture({
       }),
     );
   };
-  const move = (amount: number, size: number) =>
-    setSelected((current) =>
-      Math.max(0, Math.min(Math.max(0, size - 1), current + amount)),
+  const move = (amount: number, size: number) => {
+    const next = Math.max(
+      0,
+      Math.min(Math.max(0, size - 1), selected + amount),
     );
+    setSelected(next);
+    requestAnimationFrame(() => {
+      const card =
+        grid.current?.querySelectorAll<HTMLButtonElement>("button")[next];
+      card?.focus({ preventScroll: true });
+      card?.scrollIntoView({
+        block: "nearest",
+        inline: "nearest",
+        behavior: "smooth",
+      });
+    });
+  };
   const close = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     onClose();
@@ -316,6 +331,7 @@ export function BigPicture({
     const handle = (key: string) => {
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
+      if (selectInput.current?.(key)) return;
       if (keyboardOpen) {
         keyboardInput.current?.(key);
         return;
@@ -366,23 +382,6 @@ export function BigPicture({
             if (control instanceof HTMLInputElement) setKeyboardOpen(true);
             else if (control instanceof HTMLButtonElement) control.click();
             else control.blur();
-            return;
-          }
-          if (
-            control instanceof HTMLSelectElement &&
-            ["left", "right"].includes(key)
-          ) {
-            const option =
-              control.options[
-                (control.selectedIndex +
-                  (key === "left" ? -1 : 1) +
-                  control.options.length) %
-                  control.options.length
-              ];
-            if (control.getAttribute("aria-label") === "Ordenar biblioteca")
-              setLibrarySort(option.value);
-            else setLibraryPlatform(option.value);
-            setSelected(0);
             return;
           }
           if (key === "down" || key === "b") {
@@ -444,12 +443,8 @@ export function BigPicture({
         }
         return;
       }
-      if (key === "up")
-        return setSelected((value) => Math.max(0, value - columns));
-      if (key === "down")
-        return setSelected((value) =>
-          Math.min(Math.max(0, currentSize() - 1), value + columns),
-        );
+      if (key === "up") return move(-columns, currentSize());
+      if (key === "down") return move(columns, currentSize());
       if (
         key === "x" &&
         !navFocused &&
@@ -529,6 +524,9 @@ export function BigPicture({
         if (
           event.key.startsWith("Arrow") &&
           !root.current?.querySelector(".tv-catalog-dialog") &&
+          Boolean(
+            document.activeElement?.closest(".tv-game-grid, .tv-catalog-grid"),
+          ) &&
           document.activeElement instanceof HTMLButtonElement
         )
           document.activeElement.blur();
@@ -561,17 +559,6 @@ export function BigPicture({
     }, 33);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => {
-    const columns = grid.current
-      ? getComputedStyle(grid.current).gridTemplateColumns.split(" ").length
-      : 1;
-    if (!navFocused && selected >= columns)
-      grid.current?.querySelector(".focused")?.scrollIntoView({
-        block: "nearest",
-        inline: "nearest",
-        behavior: "smooth",
-      });
-  }, [selected, navFocused]);
   const shelf = (title: string, entries: LibraryGame[]) => (
     <section className="tv-game-shelf">
       <div className="tv-section-title">
@@ -589,6 +576,15 @@ export function BigPicture({
             onFocus={() => {
               setSelected(index);
               setNavFocused(false);
+              requestAnimationFrame(() =>
+                grid.current
+                  ?.querySelectorAll<HTMLButtonElement>("button")
+                  [index]?.scrollIntoView({
+                    block: "nearest",
+                    inline: "nearest",
+                    behavior: "smooth",
+                  }),
+              );
             }}
             onMouseEnter={() => {
               clearTimeout(previewTimer.current);
@@ -764,6 +760,7 @@ export function BigPicture({
             grid={grid}
             input={catalogInput}
             modal={catalogModal}
+            selectInput={selectInput}
             onCount={setCatalogCount}
             onPlay={(entry) => void launch(entry)}
             onDownloads={() => selectSection("downloads")}
@@ -868,35 +865,38 @@ export function BigPicture({
                     <Keyboard size={20} />
                   </button>
                 </label>
-                <select
-                  aria-label="Ordenar biblioteca"
+                <ControllerSelect
+                  input={selectInput}
+                  label="Ordenar biblioteca"
                   value={librarySort}
-                  onChange={(event) => {
-                    setLibrarySort(event.target.value);
+                  onChange={(value) => {
+                    setLibrarySort(value);
                     setSelected(0);
                   }}
-                >
-                  <option value="recent">Jogado recentemente</option>
-                  <option value="title">Nome</option>
-                  <option value="playtime">Tempo jogado</option>
-                </select>
-                <select
-                  aria-label="Filtrar biblioteca por console"
+                  options={[
+                    { value: "recent", label: "Jogado recentemente" },
+                    { value: "title", label: "Nome" },
+                    { value: "playtime", label: "Tempo jogado" },
+                  ]}
+                />
+                <ControllerSelect
+                  input={selectInput}
+                  label="Filtrar biblioteca por console"
                   value={libraryPlatform}
-                  onChange={(event) => {
-                    setLibraryPlatform(event.target.value);
+                  onChange={(value) => {
+                    setLibraryPlatform(value);
                     setSelected(0);
                   }}
-                >
-                  <option value="all">Todos os consoles</option>
-                  {[
-                    ...new Set(library.map((entry) => entry.game.platformId)),
-                  ].map((id) => (
-                    <option key={id} value={id}>
-                      {platformById(id)?.name ?? id}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "all", label: "Todos os consoles" },
+                    ...[
+                      ...new Set(library.map((entry) => entry.game.platformId)),
+                    ].map((id) => ({
+                      value: id,
+                      label: platformById(id)?.name ?? id,
+                    })),
+                  ]}
+                />
                 <div className="tv-library-view">
                   <button
                     aria-label="Visualização em lista"
