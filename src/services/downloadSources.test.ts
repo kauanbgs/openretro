@@ -3,7 +3,7 @@ import { parseDownloadSource, validMagnet } from "./downloadSources";
 const magnet =
   "magnet:?xt=urn:btih:0123456789012345678901234567890123456789&dn=Homebrew";
 describe("Hydra-compatible download sources", () => {
-  it("imports real schema fields and keeps only supported magnets", () => {
+  it("imports real schema fields and keeps supported magnet and HTTPS links", () => {
     const source = parseDownloadSource(
       JSON.stringify({
         name: "My source",
@@ -20,7 +20,7 @@ describe("Hydra-compatible download sources", () => {
     expect(source.downloads).toEqual([
       {
         title: "Homebrew",
-        uris: [magnet],
+        uris: [magnet, "https://example.com/file.zip"],
         uploadDate: "2026-10-20",
         fileSize: "32 KB",
       },
