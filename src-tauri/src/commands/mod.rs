@@ -500,13 +500,17 @@ pub fn remove_game(id: String, delete_file: bool, db: State<Database>) -> Result
 }
 #[tauri::command]
 pub fn set_favorite(id: String, favorite: bool, db: State<Database>) -> Result<()> {
-    db.0.lock()
-        .map_err(error)?
-        .execute(
-            "UPDATE library_items SET favorite=?1 WHERE id=?2",
-            params![favorite, id],
-        )
-        .map_err(error)?;
+    let conn = db.0.lock().map_err(error)?;
+    let profile = crate::profiles::active(&conn)?;
+    if profile != "default" {
+        conn.execute("INSERT INTO player_progress(profile_id,library_item_id,favorite) VALUES(?1,?2,?3) ON CONFLICT(profile_id,library_item_id) DO UPDATE SET favorite=excluded.favorite", params![profile,id,favorite]).map_err(error)?;
+        return Ok(());
+    }
+    conn.execute(
+        "UPDATE library_items SET favorite=?1 WHERE id=?2",
+        params![favorite, id],
+    )
+    .map_err(error)?;
     Ok(())
 }
 #[tauri::command]

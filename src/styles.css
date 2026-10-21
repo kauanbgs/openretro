@@ -3248,3 +3248,20 @@ html[data-animations="false"] *:after {
     scroll-behavior: auto !important;
   }
 }
+
+.player-picker {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.player-picker .button {
+  justify-content: flex-start;
+  min-height: 58px;
+  gap: 14px;
+}
+.player-picker .button:focus-visible {
+  outline: 2px solid var(--accent, #e9ae70);
+  outline-offset: 2px;
+}

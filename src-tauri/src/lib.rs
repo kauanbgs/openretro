@@ -6,6 +6,7 @@ mod in_game;
 mod launcher;
 mod metadata;
 mod models;
+mod profiles;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -41,6 +42,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            profiles::list_profiles,
+            profiles::create_profile,
+            profiles::select_profile,
             metadata::igdb_status,
             metadata::igdb_query,
             downloads::sources::list_download_sources,

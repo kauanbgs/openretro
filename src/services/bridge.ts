@@ -31,6 +31,18 @@ function previewSources(): PreviewSource[] {
 export const isDesktop =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const key = "openretro-preview-v1";
+export interface PlayerProfiles {
+  activeId: string;
+  players: { id: string; name: string }[];
+}
+function readPlayerProfiles(): PlayerProfiles {
+  return (
+    JSON.parse(localStorage.getItem("openretro-players") ?? "null") ?? {
+      activeId: "default",
+      players: [{ id: "default", name: "Jogador 1" }],
+    }
+  );
+}
 interface PreviewStore {
   library: LibraryGame[];
   emulators: Emulator[];
@@ -53,6 +65,55 @@ function write(data: PreviewStore) {
   localStorage.setItem(key, JSON.stringify(data));
 }
 export const bridge = {
+  async profiles(): Promise<PlayerProfiles> {
+    if (isDesktop) return invoke("list_profiles");
+    return readPlayerProfiles();
+  },
+  async createProfile(name: string): Promise<void> {
+    if (isDesktop) return invoke("create_profile", { name });
+    const profiles = readPlayerProfiles();
+    if (!name.trim() || name.trim().length > 32)
+      throw new Error("Use um nome entre 1 e 32 caracteres.");
+    profiles.players.push({ id: crypto.randomUUID(), name: name.trim() });
+    localStorage.setItem("openretro-players", JSON.stringify(profiles));
+  },
+  async selectProfile(id: string): Promise<void> {
+    if (isDesktop) return invoke("select_profile", { id });
+    const profiles = readPlayerProfiles();
+    if (!profiles.players.some((p) => p.id === id))
+      throw new Error("Jogador não encontrado.");
+    // Preview uses the same projection behavior as the native library.
+    const progress = JSON.parse(
+      localStorage.getItem("openretro-player-progress") ?? "{}",
+    );
+    progress[profiles.activeId] = read().library.map(({ item }) => ({
+      id: item.id,
+      favorite: item.favorite,
+      playtime: item.playtime,
+      lastPlayedAt: item.lastPlayedAt,
+    }));
+    localStorage.setItem("openretro-player-progress", JSON.stringify(progress));
+    const store = read();
+    store.library = store.library.map((entry) => {
+      const item = progress[id]?.find(
+        (p: { id: string }) => p.id === entry.item.id,
+      );
+      return {
+        ...entry,
+        item: {
+          ...entry.item,
+          favorite: item?.favorite ?? false,
+          playtime: item?.playtime ?? 0,
+          lastPlayedAt: item?.lastPlayedAt ?? null,
+        },
+      };
+    });
+    write(store);
+    localStorage.setItem(
+      "openretro-players",
+      JSON.stringify({ ...profiles, activeId: id }),
+    );
+  },
   async downloadSources(): Promise<DownloadSource[]> {
     return isDesktop
       ? invoke("list_download_sources")

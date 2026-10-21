@@ -105,12 +105,15 @@ fn retroarch_core(
 pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator) = {
+ let (entry,emulator,player,auto_resume) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let compatible: Vec<_> = database::emulators(&conn)?.into_iter().filter(|e|e.supported_platforms.contains(&entry.item.platform_id)).collect();
   let emulator=if let Some(preferred)=&entry.item.emulator_id { compatible.iter().find(|e| &e.id==preferred) } else { compatible.iter().find(|e|e.default_platforms.contains(&entry.item.platform_id)).or_else(||compatible.first()) }.cloned().ok_or("Configure a compatible emulator before playing this game.")?;
-  (entry,emulator)
+  let player=crate::profiles::active(&conn)?;
+  let settings: String=conn.query_row("SELECT value FROM settings WHERE key='app'",[],|r|r.get(0)).unwrap_or_default();
+  let auto_resume=serde_json::from_str::<serde_json::Value>(&settings).ok().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
+  (entry,emulator,player,auto_resume)
  };
  let game_path=filesystem::canonical_file(&entry.item.source_path)?;
  let executable=filesystem::executable(&emulator.executable_path)?;
@@ -119,7 +122,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  let runtime_session=if managed_retroarch { Some(crate::in_game::reserve(&app, &id, &entry.game.title)?) } else { None };
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
  let mut args:Vec<String>=if managed_retroarch {
-    let config=runtime_menu::prepare(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256)?;
+    let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume)?;
     vec!["--fullscreen".into(),"--appendconfig".into(),config.to_string_lossy().into_owned(),"-L".into(),retroarch_core(&app,&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()]
  } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
  if !managed_retroarch && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
@@ -136,12 +139,17 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  if let Some(runtime_session)=&runtime_session {
     if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable)?; }
  }
- db.0.lock().map_err(error)?.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?;
+ {
+ let conn=db.0.lock().map_err(error)?;
+ if player=="default" { conn.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?; }
+ else { conn.execute("INSERT INTO player_progress(profile_id,library_item_id,last_played_at) VALUES(?1,?2,?3) ON CONFLICT(profile_id,library_item_id) DO UPDATE SET last_played_at=excluded.last_played_at",params![player,id,started]).map_err(error)?; }
+ }
  let _=app.emit("game-started",&id); log::info!("Started game session {session}");
  let status=child.wait(); let elapsed=timer.elapsed().as_secs() as i64;
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;
  tx.execute("UPDATE play_sessions SET finished_at=?1,duration=?2,exit_code=?3 WHERE id=?4",params![chrono::Utc::now().to_rfc3339(),elapsed,status.as_ref().ok().and_then(|s|s.code()),session]).map_err(error)?;
- tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?;
+ if player=="default" { tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?; }
+ else { tx.execute("UPDATE player_progress SET playtime=playtime+?1 WHERE profile_id=?2 AND library_item_id=?3",params![elapsed,player,id]).map_err(error)?; }
  tx.commit().map_err(error)?; let _=app.emit("game-finished",&id);
  let status=status.map_err(error)?;
  if !status.success() { return Err(format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()))); }

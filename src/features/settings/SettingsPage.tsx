@@ -6,6 +6,7 @@ import { Check, ExternalLink, Folder } from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { SourceManager } from "../downloads/SourceManager";
+import { PlayerPicker } from "../../components/PlayerPicker";
 export function SettingsPage({
   onEmulators,
   notify,
@@ -15,6 +16,11 @@ export function SettingsPage({
 }) {
   const [section, setSection] = useState("General");
   const [saving, setSaving] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const { data: players } = useQuery({
+    queryKey: ["players"],
+    queryFn: bridge.profiles,
+  });
   const client = useQueryClient();
   const { data: settings = defaultSettings } = useQuery({
     queryKey: ["settings"],
@@ -37,6 +43,7 @@ export function SettingsPage({
   }
   return (
     <div className="page-content">
+      {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
       <PageHeader
         title="Settings"
         description="Manage your library and application preferences."
@@ -70,6 +77,54 @@ export function SettingsPage({
           <h2>{section}</h2>
           {section === "General" ? (
             <>
+              <div className="setting-row">
+                <div>
+                  <strong>Jogador</strong>
+                  <p>
+                    {players?.players.find((p) => p.id === players.activeId)
+                      ?.name ?? "Jogador 1"}{" "}
+                    · saves e favoritos individuais
+                  </p>
+                </div>
+                <button
+                  className="button secondary"
+                  onClick={() => setPlayersOpen(true)}
+                >
+                  Trocar jogador
+                </button>
+              </div>
+              <div className="setting-row">
+                <div>
+                  <strong>Continuar de onde parou</strong>
+                  <p>
+                    No runtime integrado, salva ao encerrar normalmente e retoma
+                    ao jogar novamente. Depende do suporte a estados do core.
+                  </p>
+                </div>
+                <button
+                  className={`switch ${settings.autoResume !== false ? "on" : ""}`}
+                  role="switch"
+                  aria-label="Continuar de onde parou"
+                  aria-checked={settings.autoResume !== false}
+                  disabled={saving}
+                  onClick={() =>
+                    void save({ autoResume: settings.autoResume === false })
+                  }
+                >
+                  <span />
+                </button>
+              </div>
+              <div className="setting-row">
+                <div>
+                  <strong>Coop de sofá</strong>
+                  <p>
+                    O runtime integrado configura até 4 controles na ordem
+                    detectada. Conecte-os antes de jogar. A quantidade de
+                    jogadores depende do jogo; multitap não é ativado
+                    automaticamente.
+                  </p>
+                </div>
+              </div>
               <div className="setting-row">
                 <div>
                   <strong>Application language</strong>

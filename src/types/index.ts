@@ -89,6 +89,7 @@ export interface ImportCandidate {
   platformIds: string[];
 }
 export interface AppSettings {
+  autoResume?: boolean;
   theme: "dark" | "light";
   density: "comfortable" | "compact";
   animations: boolean;
@@ -99,6 +100,7 @@ export interface AppSettings {
   developerMode: boolean;
 }
 export const defaultSettings: AppSettings = {
+  autoResume: true,
   theme: "dark",
   density: "comfortable",
   animations: true,

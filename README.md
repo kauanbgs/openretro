@@ -11,6 +11,28 @@ copies and configures it on first use. The player never has to install
 RetroArch or select an executable. Include the RetroArch GPLv3 notice and the
 license notices for every included Libretro core with each release.
 
+## Players, resume and local co-op
+
+Use **Settings → General → Trocar jogador**, or **Big Picture → Sistema →
+Jogadores**, to create and switch local players. Games and downloads are shared;
+favorites, recent activity and playtime belong to the selected player. Existing
+progress stays with Jogador 1. Profile switching is blocked during a running game.
+
+The managed RetroArch runtime isolates new players' cartridge saves and states
+under `players/<profile>/<game fingerprint>` in application data. Jogador 1 keeps
+the runtime's existing save paths, including custom paths. External emulators
+such as PCSX2 retain their own save configuration.
+
+**Continuar de onde parou** is enabled by default and can be disabled in General
+settings. For cores supporting save states, a normal emulator exit creates an
+automatic state and the next launch loads it. Forced termination and power loss
+cannot guarantee a state save. Manual slots remain available in the game menu.
+
+The runtime assigns the first four detected controllers to player ports 1–4 and
+uses automatic SDL mappings. Connect controllers before launching; supported
+player counts and multitap requirements depend on the game and core. Multitap is
+not forced. Physical controller order and automatic resume need device testing.
+
 ## Automatic updates
 
 OpenRetro checks GitHub Releases after startup. When a signed newer release is

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import {
   ChevronLeft,
@@ -22,6 +23,7 @@ import {
   LoaderCircle,
   LayoutGrid,
   List,
+  UserRound,
 } from "lucide-react";
 import type {
   DownloadJob,
@@ -41,6 +43,7 @@ import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
 import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
+import { PlayerPicker } from "../../components/PlayerPicker";
 import { HeroArtwork } from "./HeroArtwork";
 
 type Section =
@@ -83,6 +86,11 @@ export function BigPicture({
   const [librarySort, setLibrarySort] = useState("recent");
   const [libraryPlatform, setLibraryPlatform] = useState("all");
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const { data: players } = useQuery({
+    queryKey: ["players"],
+    queryFn: bridge.profiles,
+  });
   const [powerOpen, setPowerOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const keyboardInput = useRef<((key: string) => boolean) | null>(null);
@@ -287,7 +295,7 @@ export function BigPicture({
         : section === "emulators"
           ? emulators.length
           : section === "system"
-            ? 4
+            ? 5
             : visibleGames.length;
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
@@ -364,7 +372,10 @@ export function BigPicture({
       return;
     }
     if (section === "emulators") return onDesktop("Emulators");
-    const page = ["Discover", "Settings", "Emulators", "exit"][selected];
+    if (selected === 0) return setPlayersOpen(true);
+    const page = ["players", "Discover", "Settings", "Emulators", "exit"][
+      selected
+    ];
     page === "exit"
       ? close()
       : page === "Discover"
@@ -510,7 +521,7 @@ export function BigPicture({
       if (event.key === "Tab") {
         const scope =
           root.current?.querySelector(
-            ".tv-keyboard, .tv-confirm-dialog, .tv-power-dialog, .tv-catalog-dialog",
+            ".tv-player-dialog, .tv-keyboard, .tv-confirm-dialog, .tv-power-dialog, .tv-catalog-dialog",
           ) ??
           (navFocused
             ? root.current?.querySelector(".tv-side-rail")
@@ -765,6 +776,12 @@ export function BigPicture({
           </button>
         </div>
       </div>
+      {playersOpen && (
+        <PlayerPicker
+          input={selectInput}
+          onClose={() => setPlayersOpen(false)}
+        />
+      )}
       <header className="tv-topbar">
         <span>
           <ChevronLeft size={20} />{" "}
@@ -773,6 +790,14 @@ export function BigPicture({
             : sections.find((item) => item.id === section)?.label}
         </span>
         <div>
+          <button
+            onClick={() => setPlayersOpen(true)}
+            aria-label="Trocar jogador"
+          >
+            <UserRound size={18} />
+            {players?.players.find((p) => p.id === players.activeId)?.name ??
+              "Jogadores"}
+          </button>
           <span
             className="tv-controller-status"
             title={connected ? "Controle conectado" : "Teclado e mouse"}
@@ -1100,6 +1125,11 @@ export function BigPicture({
             </div>
             <div className="tv-system-grid">
               {[
+                [
+                  "Jogadores",
+                  "Troque o perfil e mantenha seus saves separados",
+                  "players",
+                ],
                 ["Encontrar jogos", "Descubra títulos e fontes", "Discover"],
                 ["Configurações", "Ajuste a experiência", "Settings"],
                 [
@@ -1113,13 +1143,15 @@ export function BigPicture({
                   key={label}
                   className={index === selected && !navFocused ? "focused" : ""}
                   onClick={() =>
-                    page === "exit"
-                      ? close()
-                      : page === "Discover"
-                        ? selectSection("catalog")
-                        : onDesktop(
-                            page as "Discover" | "Settings" | "Emulators",
-                          )
+                    page === "players"
+                      ? setPlayersOpen(true)
+                      : page === "exit"
+                        ? close()
+                        : page === "Discover"
+                          ? selectSection("catalog")
+                          : onDesktop(
+                              page as "Discover" | "Settings" | "Emulators",
+                            )
                   }
                 >
                   <Settings size={25} />

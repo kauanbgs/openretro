@@ -18,6 +18,8 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("003_download_sources.sql"))
         .map_err(error)?;
+    tx.execute_batch(include_str!("004_player_profiles.sql"))
+        .map_err(error)?;
     // Restart requires explicit resume, which rechecks the partial files.
     tx.execute("UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')", []).map_err(error)?;
     let platforms: serde_json::Value =
@@ -64,14 +66,17 @@ pub fn library(db: &Connection) -> Result<Vec<LibraryGame>> {
             ))
         })
         .map_err(error)?;
-    rows.map(|row| {
-        let (metadata, item) = row.map_err(error)?;
-        Ok(LibraryGame {
-            game: serde_json::from_str(&metadata).map_err(error)?,
-            item,
+    let mut entries = rows
+        .map(|row| {
+            let (metadata, item) = row.map_err(error)?;
+            Ok(LibraryGame {
+                game: serde_json::from_str(&metadata).map_err(error)?,
+                item,
+            })
         })
-    })
-    .collect()
+        .collect::<Result<Vec<_>>>()?;
+    crate::profiles::project_library(db, &mut entries)?;
+    Ok(entries)
 }
 pub fn emulators(db: &Connection) -> Result<Vec<Emulator>> {
     let mut stmt = db

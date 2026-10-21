@@ -17,12 +17,17 @@ const downloadsMigration = readFileSync(
   ),
   "utf8",
 );
+const playersMigration = readFileSync(
+  new URL("../src-tauri/src/database/004_player_profiles.sql", import.meta.url),
+  "utf8",
+);
 let db;
 beforeEach(() => {
   db = new DatabaseSync(":memory:");
   db.exec(migration);
   db.exec(cacheMigration);
   db.exec(downloadsMigration);
+  db.exec(playersMigration);
   db.prepare("INSERT INTO platforms VALUES (?, ?)").run("gba", "{}");
   db.prepare("INSERT INTO games VALUES (?, ?)").run("game", "{}");
   db.prepare("INSERT INTO emulators VALUES (?, ?)").run("emulator", "{}");
@@ -45,9 +50,10 @@ describe("SQLite migration and relational integrity", () => {
     db.exec(migration);
     db.exec(cacheMigration);
     db.exec(downloadsMigration);
+    db.exec(playersMigration);
     expect(
       db.prepare("SELECT count(*) AS count FROM schema_migrations").get().count,
-    ).toBe(3);
+    ).toBe(4);
   });
   it("rejects duplicate file fingerprints", () => {
     expect(() =>
@@ -167,5 +173,53 @@ describe("download source and job persistence", () => {
         db.prepare("SELECT data FROM download_jobs WHERE id='done'").get().data,
       ).state,
     ).toBe("COMPLETED");
+  });
+});
+
+describe("Player profile migration", () => {
+  it("preserves existing progress and keeps new players separate", () => {
+    db.prepare(
+      "UPDATE library_items SET favorite=1,playtime=120 WHERE id='item'",
+    ).run();
+    db.exec(playersMigration);
+    expect(
+      db
+        .prepare("SELECT favorite,playtime FROM library_items WHERE id='item'")
+        .get(),
+    ).toEqual({ favorite: 1, playtime: 120 });
+    expect(
+      db.prepare("SELECT value FROM settings WHERE key='active_profile'").get()
+        .value,
+    ).toBe("default");
+    db.prepare("INSERT INTO player_profiles VALUES (?,?)").run(
+      "second",
+      "Jogador 2",
+    );
+    db.prepare(
+      "INSERT INTO player_progress(profile_id,library_item_id,favorite,playtime) VALUES(?,?,?,?)",
+    ).run("second", "item", 0, 30);
+    expect(
+      db
+        .prepare(
+          "SELECT playtime FROM player_progress WHERE profile_id='second'",
+        )
+        .get().playtime,
+    ).toBe(30);
+    expect(
+      db.prepare("SELECT playtime FROM library_items WHERE id='item'").get()
+        .playtime,
+    ).toBe(120);
+    db.prepare(
+      "UPDATE settings SET value='second' WHERE key='active_profile'",
+    ).run();
+    db.exec(playersMigration);
+    expect(
+      db.prepare("SELECT value FROM settings WHERE key='active_profile'").get()
+        .value,
+    ).toBe("second");
+    db.prepare("DELETE FROM library_items WHERE id='item'").run();
+    expect(
+      db.prepare("SELECT count(*) AS n FROM player_progress").get().n,
+    ).toBe(0);
   });
 });

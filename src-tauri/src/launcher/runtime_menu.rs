@@ -75,6 +75,45 @@ pub fn prepare(data: &Path, executable: &Path, hash: &str) -> Result<PathBuf> {
     Ok(config)
 }
 
+pub fn prepare_player(
+    data: &Path,
+    executable: &Path,
+    hash: &str,
+    player: &str,
+    auto_resume: bool,
+) -> Result<PathBuf> {
+    if player != "default" && uuid::Uuid::parse_str(player).is_err() {
+        return Err("Perfil de jogador inválido.".into());
+    }
+    let base = prepare(data, executable, hash)?;
+    let mut config = std::fs::read_to_string(base).map_err(error)?;
+    config.push_str(&format!("savestate_auto_save = \"{auto_resume}\"\nsavestate_auto_load = \"{auto_resume}\"\ninput_max_users = \"4\"\n"));
+    for port in 1..=4 {
+        config.push_str(&format!(
+            "input_player{port}_joypad_index = \"{}\"\n",
+            port - 1
+        ));
+    }
+    // Existing saves and custom paths remain with the original player. New
+    // players get isolated paths, including per-game separation for same names.
+    if player != "default" {
+        let root = data.join("players").join(player).join(hash);
+        for (key, folder) in [
+            ("savefile_directory", "saves"),
+            ("savestate_directory", "states"),
+        ] {
+            let path = root.join(folder);
+            std::fs::create_dir_all(&path).map_err(error)?;
+            config.push_str(&format!("{key} = \"{}\"\n", quoted_path(&path)));
+        }
+    }
+    let path = data
+        .join("runtime-config")
+        .join(format!("{player}-{hash}.cfg"));
+    std::fs::write(&path, config).map_err(error)?;
+    Ok(path)
+}
+
 fn quoted_path(path: &Path) -> String {
     path.to_string_lossy()
         .replace('\\', "/")
@@ -182,6 +221,35 @@ input_state_slot_decrease = "f6"
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn player_saves_are_isolated_and_resume_can_be_disabled() {
+        let root = std::env::temp_dir().join(format!("openretro-player-{}", uuid::Uuid::new_v4()));
+        let hash = "a".repeat(64);
+        let player = uuid::Uuid::new_v4().to_string();
+        let path =
+            prepare_player(&root, &root.join("retroarch.exe"), &hash, &player, true).unwrap();
+        let text = std::fs::read_to_string(path).unwrap();
+        assert!(text.contains("savestate_auto_save = \"true\""));
+        assert!(text.contains("savestate_auto_load = \"true\""));
+        assert!(text.contains(&format!("players/{player}/{hash}/saves")));
+        assert!(text.contains(&format!("players/{player}/{hash}/states")));
+        assert!(text.contains("input_player4_joypad_index = \"3\""));
+        let default =
+            prepare_player(&root, &root.join("retroarch.exe"), &hash, "default", false).unwrap();
+        let text = std::fs::read_to_string(default).unwrap();
+        assert!(text.contains("savestate_auto_load = \"false\""));
+        assert!(!text.contains("savefile_directory"));
+        assert!(!text.contains("savestate_directory"));
+        assert!(prepare_player(
+            &root,
+            &root.join("retroarch.exe"),
+            &hash,
+            "../outside",
+            true
+        )
+        .is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn prepares_private_config_without_changing_existing_saves() {
         let root = std::env::temp_dir().join(format!("openretro-menu-{}", uuid::Uuid::new_v4()));
