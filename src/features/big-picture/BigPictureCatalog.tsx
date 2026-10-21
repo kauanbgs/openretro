@@ -6,7 +6,11 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   Download,
   Play,
@@ -65,6 +69,14 @@ export function BigPictureCatalog({
   notify: (message: string) => void;
   memory: RefObject<CatalogViewState | null>;
 }) {
+  const queryClient = useQueryClient();
+  const libraryKeys = useMemo(
+    () =>
+      new Set(
+        library.map((entry) => `${entry.game.id}:${entry.game.platformId}`),
+      ),
+    [library],
+  );
   const [query, setQuery] = useState(memory.current?.query ?? "");
   const [debounced, setDebounced] = useState(memory.current?.query ?? "");
   const [platform, setPlatform] = useState(memory.current?.platform ?? "all");
@@ -123,6 +135,7 @@ export function BigPictureCatalog({
   const taxonomy = useQuery({
     queryKey: ["catalog-taxonomy"],
     queryFn: () => metadataProvider.getTaxonomy(),
+    enabled: mode === "catalog",
     staleTime: 86400000,
     retry: false,
   });
@@ -146,9 +159,10 @@ export function BigPictureCatalog({
     () =>
       [
         ...new Map(
-          (browse.data?.pages.flatMap((page) => page.games) ?? []).map(
-            (game) => [game.id, game],
-          ),
+          (mode === "home"
+            ? (browse.data?.pages[0]?.games ?? [])
+            : (browse.data?.pages.flatMap((page) => page.games) ?? [])
+          ).map((game) => [game.id, game]),
         ).values(),
       ].slice(0, mode === "home" ? 12 : undefined),
     [browse.data, mode],
@@ -174,7 +188,10 @@ export function BigPictureCatalog({
     enabled: games.length > 0,
     staleTime: 30000,
   });
-  const downloads = new Set(availability.data ?? []);
+  const downloads = useMemo(
+    () => new Set(availability.data ?? []),
+    [availability.data],
+  );
   const details = useQuery({
     queryKey: ["tv-catalog-detail", opened?.id, opened?.platformId],
     queryFn: () => metadataProvider.getGame(opened!.id, opened!.platformId),
@@ -647,11 +664,9 @@ export function BigPictureCatalog({
                       <Download size={12} /> Download disponível
                     </small>
                   )}
-                  {library.some(
-                    (entry) =>
-                      entry.game.id === item.id &&
-                      entry.game.platformId === item.platformId,
-                  ) && <small>Na biblioteca</small>}
+                  {libraryKeys.has(`${item.id}:${item.platformId}`) && (
+                    <small>Na biblioteca</small>
+                  )}
                 </div>
               </button>
             ))}
@@ -774,6 +789,9 @@ export function BigPictureCatalog({
                             setDownloadError("");
                             try {
                               await bridge.startDownload(match, 0, game);
+                              void queryClient.invalidateQueries({
+                                queryKey: ["download-jobs"],
+                              });
                               notify("Download iniciado.");
                               onDownloads();
                             } catch (error) {

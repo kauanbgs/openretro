@@ -13,6 +13,7 @@ export function useRefresh() {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["library"] }),
       client.invalidateQueries({ queryKey: ["emulators"] }),
+      client.invalidateQueries({ queryKey: ["download-jobs"] }),
     ]);
   }, [client]);
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { enrichGameMetadata } from "../../utils/metadata";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Download,
@@ -49,6 +49,7 @@ export function GamePage({
   refresh: () => Promise<void>;
   notify: (message: string) => void;
 }) {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState("Overview");
   const details = useQuery({
     queryKey: ["game-detail", initialGame.externalId, initialGame.platformId],
@@ -550,6 +551,9 @@ export function GamePage({
                     onClick={() =>
                       void action(async () => {
                         await bridge.startDownload(match, 0, game);
+                        void queryClient.invalidateQueries({
+                          queryKey: ["download-jobs"],
+                        });
                         setDownloadOptions(false);
                         notify(
                           "Download iniciado. Ele aparecerá em Downloads.",

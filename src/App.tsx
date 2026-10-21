@@ -1,7 +1,4 @@
-import { HomePage } from "./features/home/HomePage";
-import { DiscoverPage } from "./features/discover/DiscoverPage";
-import { CollectionPage } from "./features/library/CollectionPage";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Home,
@@ -17,12 +14,6 @@ import {
   CircleHelp,
   CheckCircle2,
 } from "lucide-react";
-import { ImportDialog } from "./features/library/ImportDialog";
-import { GamePage } from "./features/games/GamePage";
-import { EmulatorsPage } from "./features/emulators/EmulatorsPage";
-import { DownloadsPage } from "./features/downloads/DownloadsPage";
-import { SettingsPage } from "./features/settings/SettingsPage";
-import { BigPicture } from "./features/big-picture/BigPicture";
 import { Modal } from "./components/Modal";
 import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
@@ -38,6 +29,51 @@ import {
   type DownloadImported,
 } from "./types";
 import { platformById } from "./db/platforms";
+const HomePage = lazy(() =>
+  import("./features/home/HomePage").then((module) => ({
+    default: module.HomePage,
+  })),
+);
+const DiscoverPage = lazy(() =>
+  import("./features/discover/DiscoverPage").then((module) => ({
+    default: module.DiscoverPage,
+  })),
+);
+const CollectionPage = lazy(() =>
+  import("./features/library/CollectionPage").then((module) => ({
+    default: module.CollectionPage,
+  })),
+);
+const ImportDialog = lazy(() =>
+  import("./features/library/ImportDialog").then((module) => ({
+    default: module.ImportDialog,
+  })),
+);
+const GamePage = lazy(() =>
+  import("./features/games/GamePage").then((module) => ({
+    default: module.GamePage,
+  })),
+);
+const EmulatorsPage = lazy(() =>
+  import("./features/emulators/EmulatorsPage").then((module) => ({
+    default: module.EmulatorsPage,
+  })),
+);
+const DownloadsPage = lazy(() =>
+  import("./features/downloads/DownloadsPage").then((module) => ({
+    default: module.DownloadsPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./features/settings/SettingsPage").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+const BigPicture = lazy(() =>
+  import("./features/big-picture/BigPicture").then((module) => ({
+    default: module.BigPicture,
+  })),
+);
 type Page =
   "Home" | "Library" | "Discover" | "Downloads" | "Emulators" | "Settings";
 const navItems = [
@@ -57,7 +93,21 @@ export function App() {
   const downloads = useQuery({
     queryKey: ["download-jobs"],
     queryFn: bridge.downloadJobs,
-    refetchInterval: isDesktop ? 2000 : false,
+    refetchInterval: (query) =>
+      !isDesktop
+        ? false
+        : query.state.data?.some((job) =>
+              [
+                "QUEUED",
+                "RESOLVING",
+                "DOWNLOADING",
+                "VERIFYING",
+                "INSTALLING",
+              ].includes(job.state),
+            )
+          ? 2000
+          : 10000,
+    refetchIntervalInBackground: false,
   });
   const jobs = downloads.data ?? [];
   const activeDownloads = jobs.filter((j) =>
@@ -178,19 +228,27 @@ export function App() {
   // images, observers or page queries behind Big Picture.
   if (bigPicture)
     return (
-      <BigPicture
-        library={library}
-        emulators={emulators}
-        jobs={jobs}
-        downloadArrival={downloadArrival}
-        refresh={refresh}
-        onClose={() => setBigPicture(false)}
-        onDesktop={(destination) => {
-          setBigPicture(false);
-          navigate(destination);
-        }}
-        notify={notify}
-      />
+      <Suspense
+        fallback={
+          <div className="console-loading" role="status">
+            Abrindo modo console…
+          </div>
+        }
+      >
+        <BigPicture
+          library={library}
+          emulators={emulators}
+          jobs={jobs}
+          downloadArrival={downloadArrival}
+          refresh={refresh}
+          onClose={() => setBigPicture(false)}
+          onDesktop={(destination) => {
+            setBigPicture(false);
+            navigate(destination);
+          }}
+          notify={notify}
+        />
+      </Suspense>
     );
   const activeEntry = library.find((x) => x.game.id === selected?.id);
   return (
@@ -357,85 +415,101 @@ export function App() {
             </button>
           </div>
         )}
-        {selected ? (
-          <GamePage
-            game={selected}
-            entry={activeEntry}
-            emulators={emulators}
-            onBack={() => setSelected(undefined)}
-            onImport={(game) => openImport(game)}
-            onEmulators={() => navigate("Emulators")}
-            refresh={refresh}
-            notify={notify}
-          />
-        ) : page === "Home" ? (
-          <HomePage
-            library={library}
-            onSelect={setSelected}
-            onImport={() => openImport()}
-            onLibrary={() => navigate("Library")}
-            onDiscover={() => navigate("Discover")}
-            onDownloads={() => {
-              navigate("Downloads");
-            }}
-          />
-        ) : page === "Discover" ? (
-          <DiscoverPage
-            query={query}
-            setQuery={setQuery}
-            platform={platform}
-            setPlatform={setPlatform}
-            onSelect={setSelected}
-          />
-        ) : page === "Library" ? (
-          <CollectionPage
-            key={page}
-            library={library}
-            isPending={isPending}
-            query={query}
-            setQuery={setQuery}
-            platform={platform}
-            setPlatform={setPlatform}
-            onSelect={setSelected}
-            onImport={() => openImport()}
-          />
-        ) : page === "Emulators" ? (
-          <EmulatorsPage
-            emulators={emulators}
-            refresh={refresh}
-            notify={notify}
-          />
-        ) : page === "Downloads" ? (
-          <DownloadsPage
-            jobs={jobs}
-            onImport={() => openImport()}
-            notify={notify}
-            onDownloaded={(candidate, game) => {
-              setImportCandidate(candidate);
-              setImportGame(game);
-              setImporting(true);
-            }}
-          />
-        ) : (
-          <SettingsPage
-            onEmulators={() => navigate("Emulators")}
-            notify={notify}
-          />
-        )}
+        <Suspense
+          fallback={
+            <div className="page-content" role="status">
+              Carregando…
+            </div>
+          }
+        >
+          {selected ? (
+            <GamePage
+              game={selected}
+              entry={activeEntry}
+              emulators={emulators}
+              onBack={() => setSelected(undefined)}
+              onImport={(game) => openImport(game)}
+              onEmulators={() => navigate("Emulators")}
+              refresh={refresh}
+              notify={notify}
+            />
+          ) : page === "Home" ? (
+            <HomePage
+              library={library}
+              onSelect={setSelected}
+              onImport={() => openImport()}
+              onLibrary={() => navigate("Library")}
+              onDiscover={() => navigate("Discover")}
+              onDownloads={() => {
+                navigate("Downloads");
+              }}
+            />
+          ) : page === "Discover" ? (
+            <DiscoverPage
+              query={query}
+              setQuery={setQuery}
+              platform={platform}
+              setPlatform={setPlatform}
+              onSelect={setSelected}
+            />
+          ) : page === "Library" ? (
+            <CollectionPage
+              key={page}
+              library={library}
+              isPending={isPending}
+              query={query}
+              setQuery={setQuery}
+              platform={platform}
+              setPlatform={setPlatform}
+              onSelect={setSelected}
+              onImport={() => openImport()}
+            />
+          ) : page === "Emulators" ? (
+            <EmulatorsPage
+              emulators={emulators}
+              refresh={refresh}
+              notify={notify}
+            />
+          ) : page === "Downloads" ? (
+            <DownloadsPage
+              jobs={jobs}
+              onImport={() => openImport()}
+              notify={notify}
+              onDownloaded={(candidate, game) => {
+                setImportCandidate(candidate);
+                setImportGame(game);
+                setImporting(true);
+              }}
+            />
+          ) : (
+            <SettingsPage
+              onEmulators={() => navigate("Emulators")}
+              notify={notify}
+            />
+          )}
+        </Suspense>
       </main>
       {importing && (
-        <ImportDialog
-          initial={importGame}
-          initialCandidate={importCandidate}
-          onClose={() => setImporting(false)}
-          onImported={(game) => {
-            void refresh();
-            setImporting(false);
-            setPage("Library");
-            setSelected(game);
-            notify("Game added to your library.");
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="toast" role="status">
+              Abrindo…
+            </div>
+          }
+        >
+          <ImportDialog
+            initial={importGame}
+            initialCandidate={importCandidate}
+            onClose={() => setImporting(false)}
+            onImported={(game) => {
+              void refresh();
+              setImporting(false);
+              setPage("Library");
+              setSelected(game);
+              notify("Game added to your library.");
+            }}
+          />
+        </Suspense>
       )}
       {help && (
         <Modal title="About OpenRetro" onClose={() => setHelp(false)}>

@@ -14,7 +14,14 @@ const inGameWindow = Boolean(
     .__OPENRETRO_GAME_MENU__,
 );
 const client = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } },
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30000,
+      gcTime: 120000,
+      refetchOnWindowFocus: true,
+    },
+  },
 });
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

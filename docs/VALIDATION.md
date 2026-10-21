@@ -36,6 +36,14 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 
 ## Remaining validation
 
+### Load and idle-work reductions
+
+- All nine application screens/dialogs now load in separate lazy chunks with local Suspense boundaries. The App chunk changed from 145.64 kB to 25.85 kB uncompressed; this is a chunk-size comparison, not an 82% reduction of total application code or RAM. Shared code and the opened page are still required.
+- Download polling stays at two seconds during active work and slows to ten seconds while idle. Start/resume/actions explicitly invalidate download jobs, keeping immediate action feedback. Background polling remains disabled.
+- Query defaults reuse fresh data for 30 seconds and release inactive cache entries after two minutes. Persistent library/download files and backend metadata caches are unchanged.
+- Catalog ownership badges use a precomputed Set instead of scanning the library for every card. Home only processes the first catalog page and does not fetch filter taxonomy until Catalog is opened.
+- Frontend tests: 41 passed; production build passed. No TV FPS, startup-time or memory benchmark was performed.
+
 ### Completed downloads in Big Picture
 
 - Read-only inspection confirmed the latest completed download was already registered in the native library. The completion handler previously changed only the hidden desktop page.
