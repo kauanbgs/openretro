@@ -1,0 +1,56 @@
+import { Camera, Gamepad2 } from "lucide-react";
+import type { Emulator, LibraryGame } from "../types";
+import { EmulatorManager } from "../services/EmulatorManager";
+import { bridge } from "../services/bridge";
+
+export function hasRuntimeMenu(
+  entry: LibraryGame | undefined,
+  emulators: Emulator[],
+) {
+  if (!entry || entry.item.runtimeArgs.length) return false;
+  const emulator = new EmulatorManager(emulators).resolve(
+    entry.item.platformId,
+    entry.item.emulatorId,
+  );
+  return emulator?.name.toLowerCase() === "retroarch";
+}
+
+export function InGameMenuHelp({
+  entry,
+  emulators,
+  notify,
+}: {
+  entry: LibraryGame;
+  emulators: Emulator[];
+  notify: (message: string) => void;
+}) {
+  if (!hasRuntimeMenu(entry, emulators)) return null;
+  return (
+    <section className="runtime-menu-help" aria-label="Menu durante o jogo">
+      <Gamepad2 size={24} />
+      <div>
+        <h2>Menu durante o jogo</h2>
+        <p>
+          Aperte <strong>PS</strong> para pausar e abrir o menu. Alternativas:{" "}
+          <strong>Share + Options</strong> (Select + Start) ou{" "}
+          <strong>F1</strong>.
+        </p>
+        <p>
+          Salve e carregue estados, escolha o slot, tire prints, reinicie ou
+          encerre o jogo. Estados dependem do suporte do core.
+        </p>
+        <small>Teclado: F2 salva · F4 carrega · F8 tira print</small>
+      </div>
+      <button
+        className="button secondary"
+        onClick={() =>
+          void bridge
+            .openGameScreenshots(entry.item.id)
+            .catch((error) => notify(String(error)))
+        }
+      >
+        <Camera size={17} /> Minhas capturas
+      </button>
+    </section>
+  );
+}

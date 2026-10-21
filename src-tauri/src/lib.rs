@@ -66,7 +66,8 @@ pub fn run() {
             commands::get_settings,
             commands::save_settings,
             commands::app_paths,
-            launcher::launch_game
+            launcher::launch_game,
+            launcher::runtime_menu::open_game_screenshots
         ])
         .run(tauri::generate_context!())
         .expect("OpenRetro failed to start");

@@ -271,6 +271,12 @@
   font-size: 15px;
   font-weight: 700;
 }
+.tv-runtime-hint {
+  margin-top: 15px !important;
+  color: #aaa;
+  font-size: 11px;
+  line-height: 1.5;
+}
 .tv-hero h1 {
   font-size: clamp(34px, 4.6vw, 76px);
   font-weight: 800;

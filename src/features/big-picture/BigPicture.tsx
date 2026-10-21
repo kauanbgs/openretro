@@ -30,6 +30,7 @@ import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
 import { BigPictureCatalog } from "./BigPictureCatalog";
+import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
 
 type Section =
   "home" | "catalog" | "library" | "downloads" | "emulators" | "system";
@@ -577,6 +578,12 @@ export function BigPicture({
                       Encontrar jogos
                     </button>
                   </div>
+                )}
+                {hasRuntimeMenu(heroGame, emulators) && (
+                  <p className="tv-runtime-hint">
+                    Durante o jogo: PS abre o menu · Share + Options ou F1 como
+                    alternativa
+                  </p>
                 )}
               </div>
               {heroGame && (

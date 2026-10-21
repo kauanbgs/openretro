@@ -2431,6 +2431,49 @@ progress {
 .spin {
   animation: spin 1s linear infinite;
 }
+.runtime-menu-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 22px 0;
+  margin: 12px 0 20px;
+  border-block: 1px solid var(--border);
+}
+.runtime-menu-help > svg {
+  color: var(--accent);
+  margin-top: 3px;
+}
+.runtime-menu-help > div {
+  flex: 1;
+}
+.runtime-menu-help h2 {
+  font-size: 16px;
+  font-weight: 650;
+  margin-bottom: 8px;
+}
+.runtime-menu-help p {
+  color: var(--muted);
+  line-height: 1.65;
+  font-size: 12px;
+  margin: 4px 0;
+}
+.runtime-menu-help strong {
+  color: var(--text);
+}
+.runtime-menu-help small {
+  display: block;
+  margin-top: 9px;
+  color: var(--quiet);
+  font-size: 11px;
+}
+@media (max-width: 1000px) {
+  .runtime-menu-help {
+    flex-wrap: wrap;
+  }
+  .runtime-menu-help .button {
+    margin-left: 40px;
+  }
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);

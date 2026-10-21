@@ -383,6 +383,11 @@ export const bridge = {
       "Open the desktop app to launch a game with your configured emulator.",
     );
   },
+  async openGameScreenshots(id: string): Promise<void> {
+    if (!isDesktop)
+      throw new Error("Abra o aplicativo desktop para ver suas capturas.");
+    return invoke("open_game_screenshots", { id });
+  },
   async saveSettings(settings: AppSettings) {
     if (isDesktop) return invoke("save_settings", { settings });
     const d = read();

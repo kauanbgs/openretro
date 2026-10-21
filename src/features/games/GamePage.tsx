@@ -29,6 +29,7 @@ import { Modal } from "../../components/Modal";
 import { platformById } from "../../db/platforms";
 import { GameResolver } from "../../services/GameResolver";
 import { bridge, isDesktop } from "../../services/bridge";
+import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 export function GamePage({
   game: initialGame,
   entry,
@@ -307,6 +308,13 @@ export function GamePage({
                 </span>
               </div>
             </div>
+            {entry && (
+              <InGameMenuHelp
+                entry={entry}
+                emulators={emulators}
+                notify={notify}
+              />
+            )}
             <nav className="tabs">
               {["Overview", "Screenshots", "Details"].map((t) => (
                 <button

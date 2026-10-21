@@ -185,6 +185,32 @@ SHA-256 is unique in the library to prevent duplicate imports. Removing an emula
 - Autostart, folder scanning, complete gamepad navigation, automatic BIOS/core discovery and automatic emulator installation are not implemented. Settings label unavailable features as planned or reserved.
 - Appearance, density, reduced motion, and developer details persist. English is the only interface language in this milestone.
 
+## Menu durante a partida (runtime RetroArch)
+
+Ao iniciar um jogo com o RetroArch gerenciado (sem argumentos personalizados),
+o OpenRetro prepara um menu rápido em português. Pressione **PS** no DualShock 4,
+**Share + Options** (Select + Start em outros controles) ou **F1** no teclado.
+O jogo pausa enquanto o menu está aberto. Ali é possível continuar, salvar/carregar
+estados, escolher o slot, desfazer operações de estado, tirar screenshot, reiniciar
+ou fechar o conteúdo e voltar ao launcher. A implementação usa o menu nativo do
+RetroArch, que recebe o controle mesmo com o OpenRetro em segundo plano.
+
+No teclado, **F2** salva, **F4** carrega e **F8** captura. O botão PS depende de
+o sistema/driver entregar o botão ao emulador; use a combinação alternativa quando
+ele for capturado pelo Steam, Game Bar ou por um mapeador de controles.
+Estados dependem de suporte do core. PCSX2 e outros emuladores mantêm seus próprios
+atalhos; esta configuração aplica-se ao runtime RetroArch.
+
+Capturas ficam em `app_data/screenshots/<SHA-256 do jogo>/`, acessíveis pelo botão
+**Minhas capturas** na página do jogo. Saves e estados continuam nas pastas já
+configuradas no runtime. A configuração adicional do OpenRetro fica em
+`app_data/runtime-config/` e não sobrescreve o `retroarch.cfg` do usuário.
+O menu Ozone é usado quando os assets/fontes estão instalados; em runtimes mínimos,
+o RGUI funciona sem baixar fontes adicionais.
+
+Referências: [menu rápido](https://docs.libretro.com/guides/quick-menu/),
+[mapeamento oficial do DualShock 4](https://github.com/libretro/retroarch-joypad-autoconfig/blob/master/sdl2/PS4%20Controller.cfg).
+
 ## Validation
 
 ```powershell
