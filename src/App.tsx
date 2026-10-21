@@ -215,6 +215,8 @@ export function App() {
       const update = await check();
       if (!update) {
         setUpdateVersion(undefined);
+        setInstallingUpdate(false);
+        notify("OpenRetro já está atualizado.");
         return;
       }
       await update.downloadAndInstall();
@@ -242,10 +244,9 @@ export function App() {
           downloadArrival={downloadArrival}
           refresh={refresh}
           onClose={() => setBigPicture(false)}
-          onDesktop={(destination) => {
-            setBigPicture(false);
-            navigate(destination);
-          }}
+          onUpdate={() => void installUpdate()}
+          updateVersion={updateVersion}
+          updating={installingUpdate}
           notify={notify}
         />
       </Suspense>

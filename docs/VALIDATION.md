@@ -91,3 +91,12 @@ Browser imports remain isolated in localStorage; desktop library data and catalo
 - `cargo check` and **11 Rust tests** passed. The local-peer test downloaded an original 256 KB fixture from a magnet, verified exact contents, paused/unpaused, detached without deleting files, corrupted the local copy, resumed/rechecked it, verified repair from the seed, and detected the downloaded Game Boy file. No commercial game files or public torrents were used.
 - Native desktop startup succeeded with network downloads enabled. Read-only inspection confirmed migrations **1, 2 and 3**, plus the source/job tables. No test sources or jobs were inserted into the user's desktop database.
 - Public-swarm availability and a real game/emulator session remain unverified. Archive extraction, automatic emulator installation, queue limits and speed limits are not implemented.
+
+
+### Big Picture functional parity — 2026-10-21
+
+- Reuses the desktop game, import, emulator, download, source and settings components inside a console workspace; desktop redirects were removed.
+- Adds scoped controller navigation, explicit select confirmation/cancellation, text entry with symbols, focus repair after asynchronous content changes and integrated native file selection.
+- File browsing is read-only, requires absolute paths, filters folders/names and bounds listings to 500 entries. JSON reads are limited to regular `.json` files and 16 MB.
+- Frontend suite: 44 tests passed. Rust library suite: 17 tests passed. Production build passed.
+- No browsers or native app windows are exposed to the UI tools in this session; a visual review and physical controller/file-dialog walkthrough remain unverified. Existing tests do not establish end-to-end input correctness.

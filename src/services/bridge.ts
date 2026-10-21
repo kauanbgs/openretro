@@ -19,6 +19,25 @@ import type {
 } from "../types";
 import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
 const sourcesKey = "openretro-download-sources-v1";
+export interface FilePickerRequest {
+  title: string;
+  directory: boolean;
+}
+let consoleFilePicker:
+  ((request: FilePickerRequest) => Promise<string | null>) | undefined;
+export function registerFilePicker(
+  picker: NonNullable<typeof consoleFilePicker>,
+) {
+  consoleFilePicker = picker;
+  return () => {
+    if (consoleFilePicker === picker) consoleFilePicker = undefined;
+  };
+}
+function pickPath(request: FilePickerRequest): Promise<string | null> {
+  return consoleFilePicker
+    ? consoleFilePicker(request)
+    : open({ ...request, multiple: false });
+}
 type PreviewSource = DownloadSource & { document: DownloadSourceDocument };
 function previewSources(): PreviewSource[] {
   try {
@@ -65,6 +84,30 @@ function write(data: PreviewStore) {
   localStorage.setItem(key, JSON.stringify(data));
 }
 export const bridge = {
+  async browseFiles(
+    path: string,
+    query: string,
+    directoriesOnly: boolean,
+  ): Promise<{
+    path: string;
+    parent: string | null;
+    entries: { name: string; path: string; isDirectory: boolean }[];
+    truncated: boolean;
+  }> {
+    if (!isDesktop)
+      throw new Error(
+        "Abra o aplicativo OpenRetro para acessar seus arquivos.",
+      );
+    return invoke("browse_files", { path, query, directoriesOnly });
+  },
+  async pickSourceJson(): Promise<string | null> {
+    if (!isDesktop) return null;
+    const path = await pickPath({
+      title: "Selecionar fonte JSON",
+      directory: false,
+    });
+    return path ? invoke("read_source_json", { path }) : null;
+  },
   async profiles(): Promise<PlayerProfiles> {
     if (isDesktop) return invoke("list_profiles");
     return readPlayerProfiles();
@@ -265,9 +308,8 @@ export const bridge = {
   },
   async pickDownloadDirectory(): Promise<string | null> {
     if (!isDesktop) throw new Error("Choose the directory in the desktop app.");
-    return open({
+    return pickPath({
       directory: true,
-      multiple: false,
       title: "Choose download directory",
     });
   },
@@ -286,8 +328,7 @@ export const bridge = {
     isDesktop ? invoke("get_settings") : Promise.resolve(read().settings),
   async pickGame(): Promise<ImportCandidate | null> {
     if (isDesktop) {
-      const path = await open({
-        multiple: false,
+      const path = await pickPath({
         directory: false,
         title: "Locate your game file",
       });
@@ -319,9 +360,8 @@ export const bridge = {
   async pickGameFolder(): Promise<string | null> {
     if (!isDesktop)
       throw new Error("Folder import requires the OpenRetro desktop app.");
-    return open({
+    return pickPath({
       directory: true,
-      multiple: false,
       title: "Choose a folder with game files",
     });
   },
@@ -335,8 +375,7 @@ export const bridge = {
       throw new Error(
         "Emulator executables can be configured in the desktop app. Run npm run tauri dev.",
       );
-    return open({
-      multiple: false,
+    return pickPath({
       directory: false,
       title: "Select emulator executable",
     });
@@ -344,8 +383,7 @@ export const bridge = {
   async pickBios(): Promise<string | null> {
     if (!isDesktop)
       throw new Error("BIOS configuration requires the desktop app.");
-    return open({
-      multiple: false,
+    return pickPath({
       directory: false,
       title: "Select your legally obtained BIOS file",
     });

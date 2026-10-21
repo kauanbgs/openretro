@@ -1,6 +1,7 @@
 mod commands;
 mod database;
 mod downloads;
+mod file_browser;
 mod filesystem;
 mod in_game;
 mod launcher;
@@ -42,6 +43,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            file_browser::browse_files,
+            file_browser::read_source_json,
             profiles::list_profiles,
             profiles::create_profile,
             profiles::select_profile,

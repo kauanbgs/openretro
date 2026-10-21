@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
-import { bridge } from "../../services/bridge";
+import { bridge, isDesktop } from "../../services/bridge";
 import { listen } from "@tauri-apps/api/event";
 import type { Emulator } from "../../types";
 export function EmulatorsPage({
@@ -41,6 +41,7 @@ export function EmulatorsPage({
     queryFn: bridge.emulatorInstallOptions,
   });
   useEffect(() => {
+    if (!isDesktop) return;
     const unlisten = listen<{
       id: string;
       name: string;

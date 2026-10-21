@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, RefreshCw, Trash2, Upload, Link, FileJson } from "lucide-react";
 import { Modal } from "../../components/Modal";
-import { bridge } from "../../services/bridge";
+import { bridge, isDesktop } from "../../services/bridge";
 import {
   MAX_SOURCE_BYTES,
   parseDownloadSource,
@@ -28,6 +28,10 @@ export function SourceManager() {
       await fn();
       await client.invalidateQueries({ queryKey: ["download-sources"] });
       await client.invalidateQueries({ queryKey: ["source-matches"] });
+      await client.invalidateQueries({ queryKey: ["game-download-options"] });
+      await client.invalidateQueries({
+        queryKey: ["catalog-download-availability"],
+      });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -204,7 +208,13 @@ export function SourceManager() {
                 <button
                   type="button"
                   className="button secondary"
-                  onClick={() => file.current?.click()}
+                  onClick={() => {
+                    if (!isDesktop) return file.current?.click();
+                    void run(async () => {
+                      const json = await bridge.pickSourceJson();
+                      if (json !== null) setText(json);
+                    });
+                  }}
                 >
                   <Upload size={16} /> Choose JSON file
                 </button>

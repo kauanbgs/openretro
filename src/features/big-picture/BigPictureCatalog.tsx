@@ -51,6 +51,7 @@ export function BigPictureCatalog({
   onCount,
   onPlay,
   onDownloads,
+  onManage,
   notify,
   memory,
 }: {
@@ -66,6 +67,7 @@ export function BigPictureCatalog({
   onCount: (count: number) => void;
   onPlay: (entry: LibraryGame) => void;
   onDownloads: () => void;
+  onManage: (game: GameMetadata) => void;
   notify: (message: string) => void;
   memory: RefObject<CatalogViewState | null>;
 }) {
@@ -754,6 +756,9 @@ export function BigPictureCatalog({
                 </p>
                 <p>{game.description}</p>
                 <div className="tv-catalog-detail-actions">
+                  <button onClick={() => onManage(game)}>
+                    Detalhes e gerenciamento
+                  </button>
                   {entry && (
                     <button
                       className="tv-catalog-primary"

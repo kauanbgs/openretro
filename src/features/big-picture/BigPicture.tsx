@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import {
   ChevronLeft,
@@ -12,7 +12,6 @@ import {
   Home,
   Library,
   MonitorCog,
-  Pause,
   Play,
   Search,
   Settings,
@@ -44,6 +43,7 @@ import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
+import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
 import { HeroArtwork } from "./HeroArtwork";
 
 type Section =
@@ -66,7 +66,9 @@ export function BigPicture({
   downloadArrival,
   refresh,
   onClose,
-  onDesktop,
+  onUpdate,
+  updateVersion,
+  updating,
   notify,
 }: {
   library: LibraryGame[];
@@ -75,10 +77,13 @@ export function BigPicture({
   downloadArrival?: DownloadImported;
   refresh: () => Promise<void>;
   onClose: () => void;
-  onDesktop: (page: "Discover" | "Settings" | "Emulators") => void;
+  onUpdate?: () => void;
+  updateVersion?: string;
+  updating?: boolean;
   notify: (message: string) => void;
 }) {
   const [section, setSection] = useState<Section>("home");
+  const queryClient = useQueryClient();
   const [navFocused, setNavFocused] = useState(false);
   const [navIndex, setNavIndex] = useState(0);
   const [filter, setFilter] = useState<"all" | "favorites">("all");
@@ -87,6 +92,8 @@ export function BigPicture({
   const [libraryPlatform, setLibraryPlatform] = useState("all");
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
   const [playersOpen, setPlayersOpen] = useState(false);
+  const [workspace, setWorkspace] = useState<WorkspaceRoute>();
+  const workspaceInput = useRef<((key: string) => boolean) | null>(null);
   const { data: players } = useQuery({
     queryKey: ["players"],
     queryFn: bridge.profiles,
@@ -152,6 +159,8 @@ export function BigPicture({
     setKeyboardOpen(false);
     setRemoveTarget(undefined);
     setPowerOpen(false);
+    setPlayersOpen(false);
+    setWorkspace(undefined);
     setFilter("all");
     setQuery("");
     setLibraryPlatform("all");
@@ -255,6 +264,9 @@ export function BigPicture({
       selected,
       scroll: content.current?.scrollTop ?? 0,
     };
+    setWorkspace(
+      next === "downloads" || next === "emulators" ? { page: next } : undefined,
+    );
     setSection(next);
     setNavIndex(sections.findIndex((item) => item.id === next));
     setSelected(positions.current[next]?.selected ?? 0);
@@ -273,8 +285,9 @@ export function BigPicture({
     );
     setSelected(next);
     requestAnimationFrame(() => {
-      const card =
-        grid.current?.querySelectorAll<HTMLButtonElement>("button")[next];
+      const card = (
+        grid.current ?? root.current?.querySelector(".tv-system-grid")
+      )?.querySelectorAll<HTMLButtonElement>("button")[next];
       card?.focus({ preventScroll: true });
       card?.scrollIntoView({
         block: "nearest",
@@ -295,7 +308,7 @@ export function BigPicture({
         : section === "emulators"
           ? emulators.length
           : section === "system"
-            ? 5
+            ? 7
             : visibleGames.length;
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
@@ -360,27 +373,33 @@ export function BigPicture({
     if (section === "library") return void launch();
     if (section === "home") return;
     if (section === "downloads") {
-      const job = jobs[selected];
-      if (job)
-        void bridge
-          .controlDownload(
-            job.id,
-            activeDownload(job.state) ? "pause" : "resume",
-          )
-          .then(refresh)
-          .catch((error) => feedback(String(error)));
-      return;
+      return setWorkspace({ page: "downloads" });
     }
-    if (section === "emulators") return onDesktop("Emulators");
+    if (section === "emulators") return setWorkspace({ page: "emulators" });
     if (selected === 0) return setPlayersOpen(true);
-    const page = ["players", "Discover", "Settings", "Emulators", "exit"][
-      selected
-    ];
+    const page = [
+      "players",
+      "Discover",
+      "Settings",
+      "Emulators",
+      "import",
+      "sources",
+      "exit",
+    ][selected];
     page === "exit"
       ? close()
       : page === "Discover"
         ? selectSection("catalog")
-        : onDesktop(page as "Discover" | "Settings" | "Emulators");
+        : setWorkspace({
+            page:
+              page === "Emulators"
+                ? "emulators"
+                : page === "import"
+                  ? "import"
+                  : page === "sources"
+                    ? "sources"
+                    : "settings",
+          });
   };
   useEffect(() => {
     void document.documentElement.requestFullscreen?.().catch(() => undefined);
@@ -390,6 +409,10 @@ export function BigPicture({
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
       if (selectInput.current?.(key)) return;
+      if (workspace && !navFocused && !powerOpen && !playersOpen) {
+        workspaceInput.current?.(key);
+        return;
+      }
       if (keyboardOpen) {
         keyboardInput.current?.(key);
         return;
@@ -479,8 +502,10 @@ export function BigPicture({
         if (key === "right") setNavFocused(false);
         return;
       }
-      const columns = grid.current
-        ? getComputedStyle(grid.current).gridTemplateColumns.split(" ").length
+      const currentGrid =
+        grid.current ?? root.current?.querySelector(".tv-system-grid");
+      const columns = currentGrid
+        ? getComputedStyle(currentGrid).gridTemplateColumns.split(" ").length
         : 1;
       if (key === "left")
         return selected % columns === 0
@@ -782,395 +807,392 @@ export function BigPicture({
           onClose={() => setPlayersOpen(false)}
         />
       )}
-      <header className="tv-topbar">
-        <span>
-          <ChevronLeft size={20} />{" "}
-          {section === "home"
-            ? "Início"
-            : sections.find((item) => item.id === section)?.label}
-        </span>
-        <div>
-          <button
-            onClick={() => setPlayersOpen(true)}
-            aria-label="Trocar jogador"
-          >
-            <UserRound size={18} />
-            {players?.players.find((p) => p.id === players.activeId)?.name ??
-              "Jogadores"}
-          </button>
-          <span
-            className="tv-controller-status"
-            title={connected ? "Controle conectado" : "Teclado e mouse"}
-          >
-            <Gamepad2 size={17} />
-            <i className={connected ? "connected" : ""} />
-            {connected ? "Controle conectado" : "Teclado e mouse"}
+      {!workspace && (
+        <header className="tv-topbar">
+          <span>
+            <ChevronLeft size={20} />{" "}
+            {section === "home"
+              ? "Início"
+              : sections.find((item) => item.id === section)?.label}
           </span>
-          <button
-            aria-label="Pesquisar jogos"
-            onClick={() =>
-              section === "catalog"
-                ? catalogInput.current?.("open-search")
-                : selectSection("catalog")
-            }
-          >
-            <Search size={22} />
-          </button>
-          <button className="tv-exit" onClick={close}>
-            Sair do modo console
-          </button>
-        </div>
-      </header>
-      <main ref={content} className="tv-content" key={section}>
-        {(section === "catalog" || section === "home") && (
-          <BigPictureCatalog
-            mode={section === "home" ? "home" : "catalog"}
-            onLibrary={() => selectSection("library")}
-            library={library}
-            selected={selected}
-            setSelected={setSelected}
-            grid={grid}
-            input={catalogInput}
-            modal={catalogModal}
-            selectInput={selectInput}
-            onCount={setCatalogCount}
-            onPlay={(entry) => void launch(entry)}
-            onDownloads={() => selectSection("downloads")}
-            notify={feedback}
-            memory={section === "home" ? homeMemory : catalogMemory}
-          />
-        )}
-        {section === "library" && (
-          <>
-            <section className="tv-hero">
-              {heroMetadata && <HeroArtwork game={heroMetadata} />}
-              <div className="tv-hero-shade" />
-              <div className="tv-hero-copy" key={heroGame?.item.id ?? "empty"}>
-                <h1>{heroGame?.game.title ?? "Sua coleção começa aqui"}</h1>
-                <p className="tv-kicker">
-                  {heroGame?.item.lastPlayedAt
-                    ? "Continue jogando"
-                    : "Pronto para jogar"}
-                </p>
-                <p className="tv-hero-meta">
-                  {heroGame
-                    ? `${heroPlatform}  ·  ${heroGame.game.genre || "Jogo"}`
-                    : "Importe seus jogos no modo desktop para montar sua biblioteca."}
-                </p>
-                {heroGame ? (
-                  <div className="tv-hero-actions">
-                    <button
-                      className="tv-play"
-                      disabled={launching}
-                      onClick={() => void launch()}
-                    >
-                      <Play size={19} fill="currentColor" />
-                      {launching ? "Iniciando…" : "Jogar"}
-                    </button>
-                    <button
-                      className="tv-secondary"
-                      onClick={() => onDesktop("Emulators")}
-                    >
-                      <Settings size={18} /> Emulador
-                    </button>
-                    <button
-                      className="tv-secondary"
-                      onClick={() => void favorite()}
-                    >
-                      <Heart
-                        size={18}
-                        fill={heroGame.item.favorite ? "currentColor" : "none"}
-                      />
-                      {heroGame.item.favorite ? "Favorito" : "Favoritar"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="tv-hero-actions">
-                    <button
-                      className="tv-play"
-                      onClick={() => selectSection("catalog")}
-                    >
-                      <Search size={19} />
-                      Encontrar jogos
-                    </button>
-                  </div>
-                )}
-                {hasRuntimeMenu(heroGame, emulators) && (
-                  <p className="tv-runtime-hint">
-                    Durante o jogo: PS abre o menu · Share + Options ou F1 como
-                    alternativa
+          <div>
+            <button
+              onClick={() => setPlayersOpen(true)}
+              aria-label="Trocar jogador"
+            >
+              <UserRound size={18} />
+              {players?.players.find((p) => p.id === players.activeId)?.name ??
+                "Jogadores"}
+            </button>
+            <span
+              className="tv-controller-status"
+              title={connected ? "Controle conectado" : "Teclado e mouse"}
+            >
+              <Gamepad2 size={17} />
+              <i className={connected ? "connected" : ""} />
+              {connected ? "Controle conectado" : "Teclado e mouse"}
+            </span>
+            <button
+              aria-label="Pesquisar jogos"
+              onClick={() =>
+                section === "catalog"
+                  ? catalogInput.current?.("open-search")
+                  : selectSection("catalog")
+              }
+            >
+              <Search size={22} />
+            </button>
+            <button className="tv-exit" onClick={close}>
+              Sair do modo console
+            </button>
+          </div>
+        </header>
+      )}
+      {workspace && (
+        <ConsoleWorkspace
+          key={section}
+          route={workspace}
+          input={workspaceInput}
+          active={!navFocused && !powerOpen && !playersOpen}
+          onContentFocus={() => setNavFocused(false)}
+          library={library}
+          emulators={emulators}
+          jobs={jobs}
+          refresh={refresh}
+          notify={feedback}
+          onRoute={setWorkspace}
+          onMenu={() => setNavFocused(true)}
+          onClose={() => {
+            setWorkspace(undefined);
+            if (section === "emulators" || section === "downloads")
+              selectSection("home");
+          }}
+          onImported={(game) => {
+            setWorkspace(undefined);
+            setQuery("");
+            setFilter("all");
+            setLibraryPlatform("all");
+            setLibrarySort("recent");
+            selectSection("library");
+            const ordered = [
+              ...(queryClient.getQueryData<LibraryGame[]>(["library"]) ??
+                library),
+            ].sort((a, b) =>
+              (b.item.lastPlayedAt ?? b.item.addedAt).localeCompare(
+                a.item.lastPlayedAt ?? a.item.addedAt,
+              ),
+            );
+            setSelected(
+              Math.max(
+                0,
+                ordered.findIndex((entry) => entry.game.id === game.id),
+              ),
+            );
+          }}
+          updateVersion={updateVersion}
+          updating={updating}
+          onUpdate={onUpdate}
+        />
+      )}
+      {!workspace && (
+        <main ref={content} className="tv-content" key={section}>
+          {(section === "catalog" || section === "home") && (
+            <BigPictureCatalog
+              mode={section === "home" ? "home" : "catalog"}
+              onLibrary={() => selectSection("library")}
+              library={library}
+              selected={selected}
+              setSelected={setSelected}
+              grid={grid}
+              input={catalogInput}
+              modal={catalogModal}
+              selectInput={selectInput}
+              onCount={setCatalogCount}
+              onPlay={(entry) => void launch(entry)}
+              onDownloads={() => selectSection("downloads")}
+              onManage={(game) => setWorkspace({ page: "game", game })}
+              notify={feedback}
+              memory={section === "home" ? homeMemory : catalogMemory}
+            />
+          )}
+          {section === "library" && (
+            <>
+              <section className="tv-hero">
+                {heroMetadata && <HeroArtwork game={heroMetadata} />}
+                <div className="tv-hero-shade" />
+                <div
+                  className="tv-hero-copy"
+                  key={heroGame?.item.id ?? "empty"}
+                >
+                  <h1>{heroGame?.game.title ?? "Sua coleção começa aqui"}</h1>
+                  <p className="tv-kicker">
+                    {heroGame?.item.lastPlayedAt
+                      ? "Continue jogando"
+                      : "Pronto para jogar"}
                   </p>
-                )}
-              </div>
-              {heroGame && (
-                <div className="tv-hero-stat">
-                  <Clock3 size={24} />
-                  <strong>
-                    {heroGame.item.playtime
-                      ? `${Math.floor(heroGame.item.playtime / 3600)}h ${Math.floor((heroGame.item.playtime % 3600) / 60)}m`
-                      : "0h"}
-                  </strong>
-                  <span>Tempo jogado</span>
+                  <p className="tv-hero-meta">
+                    {heroGame
+                      ? `${heroPlatform}  ·  ${heroGame.game.genre || "Jogo"}`
+                      : "Adicione seus arquivos ou encontre jogos no catálogo."}
+                  </p>
+                  {heroGame ? (
+                    <div className="tv-hero-actions">
+                      <button
+                        className="tv-play"
+                        disabled={launching}
+                        onClick={() => void launch()}
+                      >
+                        <Play size={19} fill="currentColor" />
+                        {launching ? "Iniciando…" : "Jogar"}
+                      </button>
+                      <button
+                        className="tv-secondary"
+                        onClick={() =>
+                          heroGame &&
+                          setWorkspace({ page: "game", game: heroGame.game })
+                        }
+                      >
+                        <Settings size={18} /> Gerenciar
+                      </button>
+                      <button
+                        className="tv-secondary"
+                        onClick={() => void favorite()}
+                      >
+                        <Heart
+                          size={18}
+                          fill={
+                            heroGame.item.favorite ? "currentColor" : "none"
+                          }
+                        />
+                        {heroGame.item.favorite ? "Favorito" : "Favoritar"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="tv-hero-actions">
+                      <button
+                        className="tv-secondary"
+                        onClick={() => setWorkspace({ page: "import" })}
+                      >
+                        Adicionar jogos
+                      </button>
+                      <button
+                        className="tv-play"
+                        onClick={() => selectSection("catalog")}
+                      >
+                        <Search size={19} />
+                        Encontrar jogos
+                      </button>
+                    </div>
+                  )}
+                  {hasRuntimeMenu(heroGame, emulators) && (
+                    <p className="tv-runtime-hint">
+                      Durante o jogo: PS abre o menu · Share + Options ou F1
+                      como alternativa
+                    </p>
+                  )}
                 </div>
-              )}
-            </section>
-            <section className="tv-library">
-              <div className="tv-library-tools">
-                <h2>Sua biblioteca</h2>
-                <label className="tv-search">
-                  <Search size={19} />
-                  <input
-                    aria-label="Pesquisar biblioteca"
-                    placeholder="Pesquisar biblioteca"
-                    value={query}
-                    onChange={(event) => {
-                      setQuery(event.target.value);
+                {heroGame && (
+                  <div className="tv-hero-stat">
+                    <Clock3 size={24} />
+                    <strong>
+                      {heroGame.item.playtime
+                        ? `${Math.floor(heroGame.item.playtime / 3600)}h ${Math.floor((heroGame.item.playtime % 3600) / 60)}m`
+                        : "0h"}
+                    </strong>
+                    <span>Tempo jogado</span>
+                  </div>
+                )}
+              </section>
+              <section className="tv-library">
+                <div className="tv-library-tools">
+                  <h2>Sua biblioteca</h2>
+                  <label className="tv-search">
+                    <Search size={19} />
+                    <input
+                      aria-label="Pesquisar biblioteca"
+                      placeholder="Pesquisar biblioteca"
+                      value={query}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setSelected(0);
+                      }}
+                    />
+                    <button
+                      className="tv-open-keyboard"
+                      aria-label="Buscar biblioteca com controle"
+                      title="Teclado na tela"
+                      onClick={() => setKeyboardOpen(true)}
+                    >
+                      <Keyboard size={20} />
+                    </button>
+                  </label>
+                  <ControllerSelect
+                    input={selectInput}
+                    label="Ordenar biblioteca"
+                    value={librarySort}
+                    onChange={(value) => {
+                      setLibrarySort(value);
                       setSelected(0);
                     }}
+                    options={[
+                      { value: "recent", label: "Jogado recentemente" },
+                      { value: "title", label: "Nome" },
+                      { value: "playtime", label: "Tempo jogado" },
+                    ]}
                   />
+                  <ControllerSelect
+                    input={selectInput}
+                    label="Filtrar biblioteca por console"
+                    value={libraryPlatform}
+                    onChange={(value) => {
+                      setLibraryPlatform(value);
+                      setSelected(0);
+                    }}
+                    options={[
+                      { value: "all", label: "Todos os consoles" },
+                      ...[
+                        ...new Set(
+                          library.map((entry) => entry.game.platformId),
+                        ),
+                      ].map((id) => ({
+                        value: id,
+                        label: platformById(id)?.name ?? id,
+                      })),
+                    ]}
+                  />
+                  <div className="tv-library-view">
+                    <button
+                      aria-label="Visualização em lista"
+                      aria-pressed={libraryView === "list"}
+                      onClick={() => setLibraryView("list")}
+                    >
+                      <List size={20} />
+                    </button>
+                    <button
+                      aria-label="Visualização em grade"
+                      aria-pressed={libraryView === "grid"}
+                      onClick={() => setLibraryView("grid")}
+                    >
+                      <LayoutGrid size={20} />
+                    </button>
+                  </div>
+                </div>
+                <div className="tv-tabs">
                   <button
-                    className="tv-open-keyboard"
-                    aria-label="Buscar biblioteca com controle"
-                    title="Teclado na tela"
-                    onClick={() => setKeyboardOpen(true)}
+                    className={filter === "all" ? "active" : ""}
+                    onClick={() => {
+                      setFilter("all");
+                      setSelected(0);
+                    }}
                   >
-                    <Keyboard size={20} />
-                  </button>
-                </label>
-                <ControllerSelect
-                  input={selectInput}
-                  label="Ordenar biblioteca"
-                  value={librarySort}
-                  onChange={(value) => {
-                    setLibrarySort(value);
-                    setSelected(0);
-                  }}
-                  options={[
-                    { value: "recent", label: "Jogado recentemente" },
-                    { value: "title", label: "Nome" },
-                    { value: "playtime", label: "Tempo jogado" },
-                  ]}
-                />
-                <ControllerSelect
-                  input={selectInput}
-                  label="Filtrar biblioteca por console"
-                  value={libraryPlatform}
-                  onChange={(value) => {
-                    setLibraryPlatform(value);
-                    setSelected(0);
-                  }}
-                  options={[
-                    { value: "all", label: "Todos os consoles" },
-                    ...[
-                      ...new Set(library.map((entry) => entry.game.platformId)),
-                    ].map((id) => ({
-                      value: id,
-                      label: platformById(id)?.name ?? id,
-                    })),
-                  ]}
-                />
-                <div className="tv-library-view">
-                  <button
-                    aria-label="Visualização em lista"
-                    aria-pressed={libraryView === "list"}
-                    onClick={() => setLibraryView("list")}
-                  >
-                    <List size={20} />
+                    Todos ({games.length})
                   </button>
                   <button
-                    aria-label="Visualização em grade"
-                    aria-pressed={libraryView === "grid"}
-                    onClick={() => setLibraryView("grid")}
+                    className={filter === "favorites" ? "active" : ""}
+                    onClick={() => {
+                      setFilter("favorites");
+                      setSelected(0);
+                    }}
                   >
-                    <LayoutGrid size={20} />
+                    Favoritos (
+                    {games.filter((entry) => entry.item.favorite).length})
                   </button>
                 </div>
+                {shelf("", visibleGames)}
+                {!visibleGames.length && (
+                  <p className="tv-empty">
+                    {query
+                      ? "Nenhum jogo encontrado. Tente outro nome."
+                      : "Adicione jogos à sua biblioteca para jogar aqui."}
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+          {section === "system" && (
+            <section className="tv-panel">
+              <div className="tv-section-title">
+                <div>
+                  <h1>Sistema</h1>
+                  <p>Ferramentas do OpenRetro.</p>
+                </div>
               </div>
-              <div className="tv-tabs">
-                <button
-                  className={filter === "all" ? "active" : ""}
-                  onClick={() => {
-                    setFilter("all");
-                    setSelected(0);
-                  }}
-                >
-                  Todos ({games.length})
-                </button>
-                <button
-                  className={filter === "favorites" ? "active" : ""}
-                  onClick={() => {
-                    setFilter("favorites");
-                    setSelected(0);
-                  }}
-                >
-                  Favoritos (
-                  {games.filter((entry) => entry.item.favorite).length})
-                </button>
-              </div>
-              {shelf("", visibleGames)}
-              {!visibleGames.length && (
-                <p className="tv-empty">
-                  {query
-                    ? "Nenhum jogo encontrado. Tente outro nome."
-                    : "Adicione jogos à sua biblioteca para jogar aqui."}
-                </p>
-              )}
-            </section>
-          </>
-        )}
-        {section === "downloads" && (
-          <section className="tv-panel">
-            <div className="tv-section-title">
-              <div>
-                <h1>Downloads</h1>
-                <p>O que está acontecendo agora.</p>
-              </div>
-              <span>{activeJobs} ativos</span>
-            </div>
-            {jobs.length ? (
-              <div className="tv-list">
-                {jobs.map((job, index) => (
-                  <article
-                    key={job.id}
+              <div className="tv-system-grid">
+                {[
+                  [
+                    "Jogadores",
+                    "Troque o perfil e mantenha seus saves separados",
+                    "players",
+                  ],
+                  ["Encontrar jogos", "Descubra títulos e fontes", "Discover"],
+                  ["Configurações", "Ajuste a experiência", "Settings"],
+                  [
+                    "Gerenciar emuladores",
+                    "Revise sistemas e cores",
+                    "Emulators",
+                  ],
+                  [
+                    "Adicionar jogos",
+                    "Importe arquivos ou uma pasta",
+                    "import",
+                  ],
+                  [
+                    "Fontes de download",
+                    "Adicione e gerencie suas fontes",
+                    "sources",
+                  ],
+                  [
+                    "Sair do modo console",
+                    "Voltar para o modo desktop",
+                    "exit",
+                  ],
+                ].map(([label, description, page], index) => (
+                  <button
+                    key={label}
                     className={
                       index === selected && !navFocused ? "focused" : ""
                     }
-                    onClick={() => {
-                      setSelected(index);
-                      setNavFocused(false);
-                    }}
+                    onClick={() =>
+                      page === "players"
+                        ? setPlayersOpen(true)
+                        : page === "exit"
+                          ? close()
+                          : page === "Discover"
+                            ? selectSection("catalog")
+                            : setWorkspace({
+                                page:
+                                  page === "Emulators"
+                                    ? "emulators"
+                                    : page === "sources"
+                                      ? "sources"
+                                      : page === "import"
+                                        ? "import"
+                                        : "settings",
+                              })
+                    }
                   >
-                    <Download size={22} />
-                    <div>
-                      <strong>{job.name}</strong>
-                      <span>
-                        {job.state} · {job.progress.toFixed(0)}%
-                      </span>
-                      <progress value={job.progress} max="100" />
-                    </div>
-                    <button
-                      title="Pausar ou retomar"
-                      onClick={() =>
-                        void bridge
-                          .controlDownload(
-                            job.id,
-                            activeDownload(job.state) ? "pause" : "resume",
-                          )
-                          .then(refresh)
-                      }
-                    >
-                      {activeDownload(job.state) ? (
-                        <Pause size={18} />
-                      ) : (
-                        <Play size={18} />
-                      )}
-                    </button>
-                    <button
-                      title="Remover download"
-                      onClick={() =>
-                        void bridge.removeDownload(job.id).then(refresh)
-                      }
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </article>
+                    <Settings size={25} />
+                    <strong>{label}</strong>
+                    <span>{description}</span>
+                  </button>
                 ))}
               </div>
-            ) : (
-              <p className="tv-empty">Não há downloads em andamento.</p>
-            )}
-          </section>
-        )}
-        {section === "emulators" && (
-          <section className="tv-panel">
-            <div className="tv-section-title">
-              <div>
-                <h1>Emuladores</h1>
-                <p>Configure uma vez. Jogue da biblioteca.</p>
-              </div>
-              <span>{emulators.length} configurados</span>
-            </div>
-            <div className="tv-emulator-grid">
-              {emulators.map((emulator, index) => (
-                <button
-                  className={index === selected && !navFocused ? "focused" : ""}
-                  key={emulator.id}
-                  onClick={() => onDesktop("Emulators")}
-                >
-                  <MonitorCog size={28} />
-                  <strong>{emulator.name}</strong>
-                  <span>
-                    {emulator.supportedPlatforms
-                      .map((id) => platformById(id)?.shortName ?? id)
-                      .join(" · ")}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <button
-              className="tv-wide-action"
-              onClick={() => onDesktop("Emulators")}
-            >
-              Gerenciar emuladores
-            </button>
-          </section>
-        )}
-        {section === "system" && (
-          <section className="tv-panel">
-            <div className="tv-section-title">
-              <div>
-                <h1>Sistema</h1>
-                <p>Ferramentas do OpenRetro.</p>
-              </div>
-            </div>
-            <div className="tv-system-grid">
-              {[
-                [
-                  "Jogadores",
-                  "Troque o perfil e mantenha seus saves separados",
-                  "players",
-                ],
-                ["Encontrar jogos", "Descubra títulos e fontes", "Discover"],
-                ["Configurações", "Ajuste a experiência", "Settings"],
-                [
-                  "Gerenciar emuladores",
-                  "Revise sistemas e cores",
-                  "Emulators",
-                ],
-                ["Sair do modo console", "Voltar para o modo desktop", "exit"],
-              ].map(([label, description, page], index) => (
-                <button
-                  key={label}
-                  className={index === selected && !navFocused ? "focused" : ""}
-                  onClick={() =>
-                    page === "players"
-                      ? setPlayersOpen(true)
-                      : page === "exit"
-                        ? close()
-                        : page === "Discover"
-                          ? selectSection("catalog")
-                          : onDesktop(
-                              page as "Discover" | "Settings" | "Emulators",
-                            )
-                  }
-                >
-                  <Settings size={25} />
-                  <strong>{label}</strong>
-                  <span>{description}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-      </main>
+            </section>
+          )}
+        </main>
+      )}
       <footer className="tv-controls">
         <span>
           <b>A</b> Selecionar
         </span>
         <span>
-          <b>B</b> Menu
+          <b>B</b> {workspace ? "Voltar / Menu" : "Menu"}
         </span>
-        {section === "catalog" ? (
+        {workspace ? (
+          <span>
+            <b>LB / RB</b> Campos
+          </span>
+        ) : section === "catalog" ? (
           <span>
             <b>LB / RB</b> Filtros
           </span>

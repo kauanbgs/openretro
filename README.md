@@ -33,6 +33,24 @@ uses automatic SDL mappings. Connect controllers before launching; supported
 player counts and multitap requirements depend on the game and core. Multitap is
 not forced. Physical controller order and automatic resume need device testing.
 
+## Big Picture tools
+
+Big Picture includes the same game details/configuration, file and folder import,
+emulator installers/detection/defaults, complete download controls, JSON sources,
+and application settings as desktop mode. Use **Gerenciar** on the library hero,
+**Detalhes e gerenciamento** in catalog details, or **Sistema** for tools. These
+screens stay inside the console shell and load only when opened.
+
+Use the D-pad/stick to focus controls and A to activate. Selects require A to open,
+Up/Down to highlight and A to apply; B cancels. Text fields open the virtual
+keyboard; Y cycles lowercase, uppercase and symbols. LB/RB moves through fields
+in document order. B closes the current dialog or opens the console sidebar.
+
+File selection for games, BIOS, executables, JSON sources and download folders
+uses an integrated controller-navigable browser in the native app. Directory
+listings show up to 500 entries; search by name to find entries beyond that limit.
+Native file access and emulation require the Tauri app, not browser preview.
+
 ## Automatic updates
 
 OpenRetro checks GitHub Releases after startup. When a signed newer release is
