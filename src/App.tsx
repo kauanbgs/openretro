@@ -34,6 +34,7 @@ import {
   defaultSettings,
   type GameMetadata,
   type ImportCandidate,
+  type LibraryGame,
 } from "./types";
 import { platformById } from "./db/platforms";
 type Page =
@@ -68,6 +69,7 @@ export function App() {
   const [bigPicture, setBigPicture] = useState(false);
   const [updateVersion, setUpdateVersion] = useState<string>();
   const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [playing, setPlaying] = useState<LibraryGame>();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [page, selected?.id]);
@@ -90,6 +92,22 @@ export function App() {
       void unlisten.then((fn) => fn());
     };
   }, [notify, refresh]);
+  useEffect(() => {
+    if (!isDesktop) return;
+    const started = listen<string>("game-started", ({ payload }) => {
+      setPlaying(library.find((entry) => entry.item.id === payload));
+    });
+    const finished = listen<string>("game-finished", ({ payload }) => {
+      setPlaying((current) =>
+        current?.item.id === payload ? undefined : current,
+      );
+      void refresh();
+    });
+    return () => {
+      void started.then((unlisten) => unlisten());
+      void finished.then((unlisten) => unlisten());
+    };
+  }, [library, refresh]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 6500);
@@ -235,6 +253,21 @@ export function App() {
       <main>
         <header className="topbar">
           <div className="topbar-actions">
+            {playing && (
+              <button
+                className="now-playing"
+                onClick={() => {
+                  setSelected(playing.game);
+                  setPage("Library");
+                }}
+              >
+                <span className="playing-indicator" />
+                <span>
+                  Playing now
+                  <strong>{playing.game.title}</strong>
+                </span>
+              </button>
+            )}
             <div className="global-search">
               <Search size={17} />
               <input

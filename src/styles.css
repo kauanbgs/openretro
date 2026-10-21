@@ -399,6 +399,23 @@ main {
   gap: 18px;
   width: 100%;
 }
+.now-playing {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin-right: 4px;
+  padding: 6px 11px;
+  color: var(--muted);
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 10px;
+}
+.now-playing span:last-child { display: grid; gap: 2px; }
+.now-playing strong { overflow: hidden; max-width: 190px; color: var(--text); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+.playing-indicator { width: 8px; height: 8px; border-radius: 50%; background: #53d98c; box-shadow: 0 0 0 4px #53d98c22; }
 .global-search {
   display: flex;
   align-items: center;
