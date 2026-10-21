@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -19,10 +26,10 @@ import {
   X,
   Keyboard,
   Info,
-  LoaderCircle,
   LayoutGrid,
   List,
   UserRound,
+  FolderPlus,
 } from "lucide-react";
 import type {
   DownloadJob,
@@ -37,6 +44,7 @@ import { GameResolver } from "../../services/GameResolver";
 import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
+import "./BigPictureFx.css";
 import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
 import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
 import { ControllerSelect } from "./ControllerSelect";
@@ -45,6 +53,15 @@ import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
 import { HeroArtwork } from "./HeroArtwork";
+import {
+  AmbientBackdrop,
+  BootSplash,
+  ConsoleClock,
+  fxLite,
+  LaunchSequence,
+  pulseGlyph,
+  useCardTilt,
+} from "./ConsoleFx";
 
 type Section =
   "home" | "catalog" | "library" | "downloads" | "emulators" | "system";
@@ -135,6 +152,8 @@ export function BigPicture({
   const [catalogCount, setCatalogCount] = useState(0);
   const [selected, setSelected] = useState(0);
   const [launching, setLaunching] = useState(false);
+  const [launchTarget, setLaunchTarget] = useState<GameMetadata>();
+  useCardTilt(root);
   // Existing notifications are ignored on entry; react to arrivals while this
   // console session is mounted, once the refreshed library contains the game.
   const handledImport = useRef(downloadArrival?.downloadId);
@@ -315,6 +334,7 @@ export function BigPicture({
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
     setLaunching(true);
+    setLaunchTarget(details[entry.game.id] ?? entry.game);
     setPreparing(true);
     try {
       const resolution = await new GameResolver(bridge.exists).resolve(
@@ -408,6 +428,7 @@ export function BigPicture({
   }, []);
   useEffect(() => {
     const handle = (key: string) => {
+      pulseGlyph(root.current, key);
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
       if (selectInput.current?.(key)) return;
@@ -659,6 +680,7 @@ export function BigPicture({
         {entries.map((entry, index) => (
           <button
             key={entry.item.id}
+            style={{ "--i": Math.min(index, 14) } as CSSProperties}
             className={index === selected && !navFocused ? "focused" : ""}
             onFocus={() => {
               setSelected(index);
@@ -711,11 +733,24 @@ export function BigPicture({
   return (
     <section
       ref={root}
-      className={`console-mode ${navFocused ? "menu-open" : ""}`}
+      className={`console-mode ${navFocused ? "menu-open" : ""} ${fxLite ? "fx-lite" : ""}`}
+      data-section={workspace ? workspace.page : section}
       aria-label="Modo console do OpenRetro"
       role="dialog"
       aria-modal="true"
     >
+      <AmbientBackdrop
+        root={root}
+        watch={`${section}-${workspace?.page ?? ""}`}
+        fallback={
+          section === "library" && heroMetadata
+            ? (heroMetadata.backgroundUrl ??
+              heroMetadata.screenshots?.[0] ??
+              heroMetadata.coverUrl)
+            : undefined
+        }
+      />
+      <BootSplash />
       {navFocused && (
         <button
           className="tv-menu-scrim"
@@ -752,6 +787,7 @@ export function BigPicture({
           {sections.map((item, index) => (
             <button
               key={item.id}
+              style={{ "--i": index } as CSSProperties}
               className={`${section === item.id ? "active" : ""} ${navFocused && navIndex === index ? "nav-focus" : ""}`}
               onClick={() => selectSection(item.id)}
               aria-label={item.label}
@@ -828,6 +864,7 @@ export function BigPicture({
               {players?.players.find((p) => p.id === players.activeId)?.name ??
                 "Jogadores"}
             </button>
+            <ConsoleClock />
             <span
               className="tv-controller-status"
               title={connected ? "Controle conectado" : "Teclado e mouse"}
@@ -1127,32 +1164,48 @@ export function BigPicture({
                     "Jogadores",
                     "Troque o perfil e mantenha seus saves separados",
                     "players",
-                  ],
-                  ["Encontrar jogos", "Descubra títulos e fontes", "Discover"],
-                  ["Configurações", "Ajuste a experiência", "Settings"],
+                    UserRound,
+                  ] as const,
+                  [
+                    "Encontrar jogos",
+                    "Descubra títulos e fontes",
+                    "Discover",
+                    Search,
+                  ] as const,
+                  [
+                    "Configurações",
+                    "Ajuste a experiência",
+                    "Settings",
+                    Settings,
+                  ] as const,
                   [
                     "Gerenciar emuladores",
                     "Revise sistemas e cores",
                     "Emulators",
-                  ],
+                    MonitorCog,
+                  ] as const,
                   [
                     "Adicionar jogos",
                     "Importe arquivos ou uma pasta",
                     "import",
-                  ],
+                    FolderPlus,
+                  ] as const,
                   [
                     "Fontes de download",
                     "Adicione e gerencie suas fontes",
                     "sources",
-                  ],
+                    Download,
+                  ] as const,
                   [
                     "Sair do modo console",
                     "Voltar para o modo desktop",
                     "exit",
-                  ],
-                ].map(([label, description, page], index) => (
+                    Power,
+                  ] as const,
+                ].map(([label, description, page, Icon], index) => (
                   <button
                     key={label}
+                    style={{ "--i": index } as CSSProperties}
                     className={
                       index === selected && !navFocused ? "focused" : ""
                     }
@@ -1175,7 +1228,7 @@ export function BigPicture({
                               })
                     }
                   >
-                    <Settings size={25} />
+                    <Icon size={25} />
                     <strong>{label}</strong>
                     <span>{description}</span>
                   </button>
@@ -1187,38 +1240,38 @@ export function BigPicture({
       )}
       <footer className="tv-controls">
         <span>
-          <b>A</b> Selecionar
+          <b data-glyph="a">A</b> Selecionar
         </span>
         <span>
-          <b>B</b> {workspace ? "Voltar / Menu" : "Menu"}
+          <b data-glyph="b">B</b> {workspace ? "Voltar / Menu" : "Menu"}
         </span>
         {workspace ? (
           <span>
-            <b>LB / RB</b> Campos
+            <b data-glyph="lb rb">LB / RB</b> Campos
           </span>
         ) : section === "catalog" ? (
           <span>
-            <b>LB / RB</b> Filtros
+            <b data-glyph="lb rb">LB / RB</b> Filtros
           </span>
         ) : section === "home" ? (
           <span>
-            <b>Share / View</b> Catálogo
+            <b data-glyph="search">Share / View</b> Catálogo
           </span>
         ) : section === "library" ? (
           <>
             <span>
-              <b>X</b> Favoritar
+              <b data-glyph="x">X</b> Favoritar
             </span>
             <span>
-              <b>Y</b> Remover
+              <b data-glyph="y">Y</b> Remover
             </span>
             <span>
-              <b>Share / View</b> Buscar
+              <b data-glyph="search">Share / View</b> Buscar
             </span>
           </>
         ) : null}
         <span>
-          <b>← ↑ ↓ →</b> Navegar
+          <b data-glyph="left right up down">← ↑ ↓ →</b> Navegar
         </span>
       </footer>
       {notice && (
@@ -1233,13 +1286,7 @@ export function BigPicture({
           </button>
         </div>
       )}
-      {preparing && (
-        <div className="tv-launching" role="status" aria-live="polite">
-          <LoaderCircle size={40} className="spin" />
-          <h2>Preparando o jogo</h2>
-          <p>Verificando o emulador e o core. O jogo abrirá automaticamente.</p>
-        </div>
-      )}
+      {preparing && <LaunchSequence game={launchTarget} />}
       {removeTarget && (
         <div
           className="tv-dialog-backdrop"

@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type RefObject,
 } from "react";
 import {
@@ -448,6 +449,7 @@ export function BigPictureCatalog({
           <HeroArtwork game={games[0]} />
           <div className="tv-hero-shade" />
           <div className="tv-home-feature-copy">
+            <p className="tv-kicker fx-feature-kicker">Em destaque</p>
             <h1>{games[0].title}</h1>
             <p>{games[0].description || games[0].genre}</p>
             <div className="tv-hero-actions">
@@ -589,8 +591,12 @@ export function BigPictureCatalog({
                     ),
                   )
                   .slice(0, 4)
-                  .map((recent) => (
-                    <button key={recent.item.id} onClick={() => onPlay(recent)}>
+                  .map((recent, index) => (
+                    <button
+                      key={recent.item.id}
+                      style={{ "--i": index } as CSSProperties}
+                      onClick={() => onPlay(recent)}
+                    >
                       <GameArtwork game={recent.game} loading="lazy" />
                       <span>
                         <strong>{recent.game.title}</strong>
@@ -638,6 +644,7 @@ export function BigPictureCatalog({
             {games.map((item, index) => (
               <button
                 key={item.id}
+                style={{ "--i": index % 20 } as CSSProperties}
                 className={`${index === selected ? "focused" : ""} ${item.backgroundUrl || item.screenshots?.length ? "" : "portrait-source"}`}
                 aria-label={`Ver ${item.title}`}
                 onFocus={() => setSelected(index)}

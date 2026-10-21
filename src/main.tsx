@@ -5,6 +5,7 @@ const App = lazy(() => import("./App").then(({ App }) => ({ default: App })));
 import "./fonts.css";
 import "./styles.css";
 import "./ui-refinements.css";
+import "./theme.css";
 import { isTizen } from "./platform/environment";
 import { initializeTizen } from "./platform/tizen/api";
 import { installTizenCompatibility } from "./platform/tizen/compatibility";
@@ -41,7 +42,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={client}>
       <Suspense
         fallback={
-          inGameWindow ? null : <div role="status">Iniciando OpenRetro…</div>
+          inGameWindow ? null : (
+            <div className="app-boot" role="status">
+              Iniciando OpenRetro…
+            </div>
+          )
         }
       >
         {inGameWindow ? <InGameOverlay /> : <App />}

@@ -1637,14 +1637,14 @@
 
 /* Console rendering budget: keep short opacity transitions, avoid repeated
    fullscreen backdrop compositing on low-power TV GPUs. */
-.console-mode *,
-.console-mode *::before,
-.console-mode *::after {
+.console-mode.fx-lite *,
+.console-mode.fx-lite *::before,
+.console-mode.fx-lite *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-.console-mode .tv-dialog-backdrop,
-.console-mode .tv-keyboard-backdrop {
+.console-mode.fx-lite .tv-dialog-backdrop,
+.console-mode.fx-lite .tv-keyboard-backdrop {
   background: #000e;
 }
 .tv-catalog-grid > button {
