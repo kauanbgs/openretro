@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   Download,
   Gamepad2,
+  Grid2X2,
   Heart,
   Clock3,
   Power,
@@ -28,10 +29,13 @@ import { GameResolver } from "../../services/GameResolver";
 import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
+import { BigPictureCatalog } from "./BigPictureCatalog";
 
-type Section = "home" | "library" | "downloads" | "emulators" | "system";
+type Section =
+  "home" | "catalog" | "library" | "downloads" | "emulators" | "system";
 const sections: { id: Section; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Início", icon: Home },
+  { id: "catalog", label: "Catálogo", icon: Grid2X2 },
   { id: "library", label: "Biblioteca", icon: Library },
   { id: "downloads", label: "Downloads", icon: Download },
   { id: "emulators", label: "Emuladores", icon: MonitorCog },
@@ -66,6 +70,8 @@ export function BigPicture({
   const [details, setDetails] = useState<Record<string, GameMetadata>>({});
   const root = useRef<HTMLElement>(null);
   const grid = useRef<HTMLDivElement>(null);
+  const catalogInput = useRef<((key: string) => boolean) | null>(null);
+  const [catalogCount, setCatalogCount] = useState(0);
   const [selected, setSelected] = useState(0);
   const [launching, setLaunching] = useState(false);
   const held = useRef(new Set<string>());
@@ -130,13 +136,15 @@ export function BigPicture({
     onClose();
   };
   const currentSize = () =>
-    section === "downloads"
-      ? jobs.length
-      : section === "emulators"
-        ? emulators.length
-        : section === "system"
-          ? 4
-          : visibleGames.length;
+    section === "catalog"
+      ? catalogCount
+      : section === "downloads"
+        ? jobs.length
+        : section === "emulators"
+          ? emulators.length
+          : section === "system"
+            ? 4
+            : visibleGames.length;
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
     setLaunching(true);
@@ -172,7 +180,7 @@ export function BigPicture({
   const activate = () => {
     if (powerOpen) return close();
     if (navFocused) {
-      if (navIndex === sections.length) return onDesktop("Discover");
+      if (navIndex === sections.length) return selectSection("catalog");
       if (navIndex === sections.length + 1) return setPowerOpen(true);
       return selectSection(sections[navIndex].id);
     }
@@ -193,13 +201,22 @@ export function BigPicture({
     const page = ["Discover", "Settings", "Emulators", "exit"][selected];
     page === "exit"
       ? close()
-      : onDesktop(page as "Discover" | "Settings" | "Emulators");
+      : page === "Discover"
+        ? selectSection("catalog")
+        : onDesktop(page as "Discover" | "Settings" | "Emulators");
   };
   useEffect(() => {
     void document.documentElement.requestFullscreen?.().catch(() => undefined);
   }, []);
   useEffect(() => {
     const handle = (key: string) => {
+      if (
+        section === "catalog" &&
+        !navFocused &&
+        !powerOpen &&
+        catalogInput.current?.(key)
+      )
+        return;
       if (key === "b") {
         if (powerOpen) return setPowerOpen(false);
         return setNavFocused((value) => !value);
@@ -244,7 +261,10 @@ export function BigPicture({
         void remove();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement) {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLSelectElement
+      ) {
         if (event.key === "Escape") event.target.blur();
         return;
       }
@@ -271,6 +291,7 @@ export function BigPicture({
         event.preventDefault();
         if (
           event.key.startsWith("Arrow") &&
+          !root.current?.querySelector(".tv-catalog-dialog") &&
           document.activeElement instanceof HTMLButtonElement
         )
           document.activeElement.blur();
@@ -305,6 +326,16 @@ export function BigPicture({
         if (edge("b", Boolean(pad.buttons[1]?.pressed))) handle("b");
         if (edge("x", Boolean(pad.buttons[2]?.pressed))) handle("x");
         if (edge("y", Boolean(pad.buttons[3]?.pressed))) handle("y");
+        if (
+          section === "catalog" &&
+          edge("lb", Boolean(pad.buttons[4]?.pressed))
+        )
+          catalogInput.current?.("previous-control");
+        if (
+          section === "catalog" &&
+          edge("rb", Boolean(pad.buttons[5]?.pressed))
+        )
+          catalogInput.current?.("next-control");
         held.current = active;
       }
       frame = requestAnimationFrame(poll);
@@ -434,7 +465,7 @@ export function BigPicture({
             className={
               navFocused && navIndex === sections.length ? "nav-focus" : ""
             }
-            onClick={() => onDesktop("Discover")}
+            onClick={() => selectSection("catalog")}
             aria-label="Catálogo"
           >
             <Search size={22} />
@@ -462,7 +493,7 @@ export function BigPicture({
         <div>
           <button
             aria-label="Pesquisar jogos"
-            onClick={() => onDesktop("Discover")}
+            onClick={() => selectSection("catalog")}
           >
             <Search size={22} />
           </button>
@@ -472,6 +503,19 @@ export function BigPicture({
         </div>
       </header>
       <main className="tv-content" key={section}>
+        {section === "catalog" && (
+          <BigPictureCatalog
+            library={library}
+            selected={selected}
+            setSelected={setSelected}
+            grid={grid}
+            input={catalogInput}
+            onCount={setCatalogCount}
+            onPlay={(entry) => void launch(entry)}
+            onDownloads={() => selectSection("downloads")}
+            notify={notify}
+          />
+        )}
         {(section === "home" || section === "library") && (
           <>
             <section className="tv-hero" key={heroGame?.item.id ?? "empty"}>
@@ -527,7 +571,7 @@ export function BigPicture({
                   <div className="tv-hero-actions">
                     <button
                       className="tv-play"
-                      onClick={() => onDesktop("Discover")}
+                      onClick={() => selectSection("catalog")}
                     >
                       <Search size={19} />
                       Encontrar jogos
@@ -720,7 +764,11 @@ export function BigPicture({
                   onClick={() =>
                     page === "exit"
                       ? close()
-                      : onDesktop(page as "Discover" | "Settings" | "Emulators")
+                      : page === "Discover"
+                        ? selectSection("catalog")
+                        : onDesktop(
+                            page as "Discover" | "Settings" | "Emulators",
+                          )
                   }
                 >
                   <Settings size={25} />
@@ -739,12 +787,20 @@ export function BigPicture({
         <span>
           <b>B</b> Menu
         </span>
-        <span>
-          <b>X</b> Favoritar
-        </span>
-        <span>
-          <b>Y</b> Remover
-        </span>
+        {section === "catalog" ? (
+          <span>
+            <b>LB / RB</b> Filtros
+          </span>
+        ) : (
+          <>
+            <span>
+              <b>X</b> Favoritar
+            </span>
+            <span>
+              <b>Y</b> Remover
+            </span>
+          </>
+        )}
         <span>
           <b>← ↑ ↓ →</b> Navegar
         </span>
