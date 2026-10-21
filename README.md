@@ -2,14 +2,20 @@
 
 A local, open-source launcher for classic games. Tauri 2 + React + TypeScript + Rust + SQLite. The first milestone focuses on **import → confirm platform and metadata → library → configure emulator → launch → record session**.
 
-## Bundled RetroArch runtime
+## OpenRetro Runtime
 
-The Windows installer packages a private RetroArch runtime for OpenRetro. Run
-`npm run bundle:windows` on the release machine: it obtains the official
-portable distribution, bundles it as an application resource, then OpenRetro
-copies and configures it on first use. The player never has to install
-RetroArch or select an executable. Include the RetroArch GPLv3 notice and the
-license notices for every included Libretro core with each release.
+The Windows installer contains **OpenRetro Runtime**, a minimal, reproducible
+RetroArch build made specifically for OpenRetro. It has no RetroArch menu,
+updater, catalog, network services, achievements, recording or media tools.
+OpenRetro owns the complete interface and downloads only the compatible
+Libretro core required by the game on first play.
+
+The build pins the exact RetroArch and controller-profile commits, keeps the
+GPL notice and dependency licenses in the package, and publishes the
+corresponding source archive beside every release. The player never has to
+install or configure another application. See
+[docs/OPENRETRO_RUNTIME.md](docs/OPENRETRO_RUNTIME.md) for the feature boundary,
+local build and update process.
 
 ## Players, resume and local co-op
 
@@ -251,6 +257,7 @@ com um DualShock 4 físico e uma partida real ainda está pendente.
 ## Validation
 
 ```powershell
+npm run test:runtime-recipe
 npm test
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -264,5 +271,9 @@ Local verification includes a frontend production build, frontend/database tests
 ## License
 
 Application code and original development illustrations: MIT, see [LICENSE](LICENSE). IGDB metadata and game artwork retain their respective providers' and owners' rights; they are not relicensed under MIT.
+
+OpenRetro Runtime is built from RetroArch and remains GPL-3.0-or-later. Its
+manifest, notices and corresponding source are distributed separately from the
+MIT application. Downloaded Libretro cores retain their individual licenses.
 
 Nunito Sans is bundled locally as a single Latin variable font; its SIL Open Font License notice are in `public/licenses/`. The visual system is documented in [docs/DESIGN.md](docs/DESIGN.md). librqbit is Apache-2.0; its dependency licensing remains separate from OpenRetro's MIT application code.

@@ -17,7 +17,23 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            make
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-vulkan-headers
+            mingw-w64-x86_64-vulkan-loader
+            mingw-w64-x86_64-ntldd
       - run: npm ci
+      - name: Build minimal OpenRetro Runtime
+        shell: msys2 {0}
+        run: ./runtime/retroarch/build-mingw64.sh
       - run: npm run prepare:runtime
       - uses: tauri-apps/tauri-action@v1
         env:
@@ -31,3 +47,12 @@ jobs:
           releaseDraft: false
           prerelease: false
           updaterJsonKeepRelease: true
+      - name: Attach runtime binary and corresponding source
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          Get-ChildItem dist-runtime -File | ForEach-Object {
+            gh release upload "v$version" $_.FullName --clobber
+          }

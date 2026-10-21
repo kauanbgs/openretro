@@ -12,7 +12,11 @@ export function hasRuntimeMenu(
     entry.item.platformId,
     entry.item.emulatorId,
   );
-  return emulator?.name.toLowerCase() === "retroarch";
+  return (
+    emulator?.id === "openretro-retroarch" ||
+    emulator?.name.toLowerCase() === "retroarch" ||
+    emulator?.name.toLowerCase() === "openretro runtime"
+  );
 }
 
 export function InGameMenuHelp({

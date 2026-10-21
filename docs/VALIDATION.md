@@ -1,5 +1,21 @@
 # OpenRetro validation record
 
+## 2026-10-21 — OpenRetro Runtime recipe
+
+- Replaced the release-time full RetroArch download with a commit-pinned,
+  source-built minimal Windows runtime.
+- Disabled the upstream menu, updater, networking, achievements, media tools
+  and unused services while preserving graphics backends, SDL2 controls,
+  saves, screenshots and OpenRetro's stdin command channel.
+- Added runtime/source archives, SHA-256 manifest, dependency notices and a
+  release upload step for corresponding GPL source.
+- The recipe validator checks pins, duplicate/incompatible flags and mandatory
+  package outputs. All configured flags were also checked against the pinned
+  upstream `config.params.sh`.
+- PowerShell and Bash syntax were checked locally. A full MinGW binary build is
+  delegated to the Windows release workflow because MSYS2 is not installed on
+  this development machine.
+
 ## Automated checks
 
 - `npm run build`: passes, including strict TypeScript checks for the UI and development proxy.

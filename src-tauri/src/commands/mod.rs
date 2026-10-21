@@ -19,16 +19,16 @@ struct InstallerSpec {
 const INSTALLERS: &[InstallerSpec] = &[
     InstallerSpec {
         id: "retroarch",
-        name: "RetroArch",
+        name: "OpenRetro Runtime",
         description:
-            "Base for classic consoles. OpenRetro configures compatible cores when you play.",
+            "Runtime mínimo integrado para consoles clássicos. Instala somente o core necessário ao jogar.",
         platforms: &[
             "nes", "snes", "n64", "gb", "gbc", "gba", "nds", "sms", "genesis", "gg", "psx", "psp",
             "arcade", "dos",
         ],
         is_base: true,
         winget_id: "Libretro.RetroArch",
-        source_url: "https://www.retroarch.com/?page=platforms",
+        source_url: "https://github.com/kauanbgs/openretro/tree/main/runtime/retroarch",
     },
     InstallerSpec {
         id: "pcsx2",
@@ -91,7 +91,12 @@ pub fn emulator_install_options() -> Vec<EmulatorInstall> {
                 .iter()
                 .map(|platform| (*platform).into())
                 .collect(),
-            source_name: "Official project download".into(),
+            source_name: if installer.id == "retroarch" {
+                "Integrado ao OpenRetro"
+            } else {
+                "Download oficial do projeto"
+            }
+            .into(),
             source_url: installer.source_url.into(),
             is_base: installer.is_base,
         })
@@ -112,7 +117,7 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
     return Err("The built-in emulator installer is currently available on Windows only.".into());
     #[cfg(windows)]
     {
-        // RetroArch is part of the OpenRetro installer. It is copied into the
+        // OpenRetro Runtime is part of the installer. It is copied into the
         // application data directory once so its configuration and cores never
         // touch a user-installed RetroArch instance.
         if installer.id == "retroarch" {
@@ -127,7 +132,7 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
             );
             register_retroarch(app, executable)?;
             emit_install_progress(app, id, installer.name, 100, "Ready to play");
-            return Ok("OpenRetro's built-in RetroArch runtime is ready. Compatible cores are installed automatically when you play.".into());
+            return Ok("O OpenRetro Runtime está pronto. O core compatível será instalado automaticamente ao jogar.".into());
         }
         emit_install_progress(
             app,
@@ -211,17 +216,26 @@ fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::path::PathBu
         .join("runtime")
         .join("retroarch");
     let executable = runtime.join("retroarch.exe");
-    if executable.is_file() {
-        return Ok(executable);
-    }
     let bundled = app
         .path()
         .resource_dir()
         .map_err(error)?
         .join("runtime")
         .join("retroarch");
-    if !bundled.join("retroarch.exe").is_file() {
-        return Err("The OpenRetro runtime is missing from this development build. Package the app with src-tauri/resources/runtime/retroarch populated from the official RetroArch Windows distribution.".into());
+    if executable.is_file() && !bundled.join("retroarch.exe").is_file() {
+        return Ok(executable);
+    }
+    if !bundled.join("retroarch.exe").is_file()
+        || !bundled.join("runtime-manifest.json").is_file()
+    {
+        return Err("O OpenRetro Runtime não está presente nesta build. Execute npm run build:runtime antes de empacotar o aplicativo.".into());
+    }
+    let bundled_manifest = std::fs::read(bundled.join("runtime-manifest.json")).map_err(error)?;
+    if executable.is_file()
+        && std::fs::read(runtime.join("runtime-manifest.json"))
+            .is_ok_and(|installed| installed == bundled_manifest)
+    {
+        return Ok(executable);
     }
     if runtime.exists() {
         std::fs::remove_dir_all(&runtime).map_err(error)?;
@@ -346,7 +360,7 @@ fn managed_pcsx2_path() -> Option<std::path::PathBuf> {
 fn register_retroarch(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {
     let emulator = Emulator {
         id: "openretro-retroarch".into(),
-        name: "RetroArch".into(),
+        name: "OpenRetro Runtime".into(),
         executable_path: filesystem::executable(&executable.to_string_lossy())?
             .to_string_lossy()
             .into_owned(),

@@ -2,6 +2,7 @@ node_modules/
 /src-tauri/resources/runtime/retroarch/*
 !/src-tauri/resources/runtime/retroarch/.gitkeep
 dist/
+dist-runtime/
 src-tauri/target/
 src-tauri/gen/
 *.log

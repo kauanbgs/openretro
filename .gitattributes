@@ -1,0 +1,4 @@
+runtime/retroarch/*.sh text eol=lf
+runtime/retroarch/*.env text eol=lf
+runtime/retroarch/*.txt text eol=lf
+runtime/retroarch/*.cfg text eol=lf

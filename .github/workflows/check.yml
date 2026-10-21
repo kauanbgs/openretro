@@ -10,6 +10,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:runtime-recipe
       - run: npm test
       - run: npm run build
   desktop:
@@ -34,3 +35,30 @@ jobs:
       - run: npm run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: cargo check --manifest-path src-tauri/Cargo.toml
+  runtime:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            make
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-vulkan-headers
+            mingw-w64-x86_64-vulkan-loader
+            mingw-w64-x86_64-ntldd
+      - name: Build minimal OpenRetro Runtime
+        shell: msys2 {0}
+        run: ./runtime/retroarch/build-mingw64.sh
+      - name: Verify runtime package
+        shell: pwsh
+        run: |
+          $manifest = Get-Content src-tauri/resources/runtime/retroarch/runtime-manifest.json -Raw | ConvertFrom-Json
+          if ($manifest.kind -ne "openretro-minimal" -or $manifest.menuIncluded -ne $false) { exit 1 }
+          if (-not (Test-Path dist-runtime/openretro-runtime-windows-x86_64.zip)) { exit 1 }
+          if (-not (Get-ChildItem dist-runtime/openretro-runtime-source-*.tar.gz)) { exit 1 }
