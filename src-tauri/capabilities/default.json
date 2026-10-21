@@ -1,1 +1,1 @@
-{"identifier":"default","description":"Main window file selection and core access","windows":["main"],"permissions":["core:default","dialog:allow-open"]}
+{"identifier":"default","description":"OpenRetro windows and core access","windows":["main","game-menu"],"permissions":["core:default","dialog:allow-open"]}

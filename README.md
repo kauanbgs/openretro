@@ -185,31 +185,28 @@ SHA-256 is unique in the library to prevent duplicate imports. Removing an emula
 - Autostart, folder scanning, complete gamepad navigation, automatic BIOS/core discovery and automatic emulator installation are not implemented. Settings label unavailable features as planned or reserved.
 - Appearance, density, reduced motion, and developer details persist. English is the only interface language in this milestone.
 
-## Menu durante a partida (runtime RetroArch)
+## Menu durante a partida (Windows / runtime RetroArch)
 
-Ao iniciar um jogo com o RetroArch gerenciado (sem argumentos personalizados),
-o OpenRetro prepara um menu rápido em português. Pressione **PS** no DualShock 4,
-**Share + Options** (Select + Start em outros controles) ou **F1** no teclado.
-O jogo pausa enquanto o menu está aberto. Ali é possível continuar, salvar/carregar
-estados, escolher o slot, desfazer operações de estado, tirar screenshot, reiniciar
-ou fechar o conteúdo e voltar ao launcher. A implementação usa o menu nativo do
-RetroArch, que recebe o controle mesmo com o OpenRetro em segundo plano.
+O RetroArch gerenciado, sem argumentos personalizados, usa uma janela do próprio
+OpenRetro para o menu de pausa. Abra com **PS** no DualShock 4,
+**Share + Options** (Select + Start) ou **F1**. O menu nativo do RetroArch fica
+sem atalho. Os comandos são enviados por um pipe privado para o processo.
 
-No teclado, **F2** salva, **F4** carrega e **F8** captura. O botão PS depende de
-o sistema/driver entregar o botão ao emulador; use a combinação alternativa quando
-ele for capturado pelo Steam, Game Bar ou por um mapeador de controles.
-Estados dependem de suporte do core. PCSX2 e outros emuladores mantêm seus próprios
-atalhos; esta configuração aplica-se ao runtime RetroArch.
+O menu permite continuar, salvar/carregar estados, escolher slot, desfazer um
+carregamento, capturar tela, reiniciar ou encerrar o jogo. Carregamento, reinício
+e encerramento pedem confirmação. Estados dependem do suporte do core.
+PCSX2 e emuladores personalizados ainda mantêm seus próprios atalhos.
 
-Capturas ficam em `app_data/screenshots/<SHA-256 do jogo>/`, acessíveis pelo botão
-**Minhas capturas** na página do jogo. Saves e estados continuam nas pastas já
-configuradas no runtime. A configuração adicional do OpenRetro fica em
-`app_data/runtime-config/` e não sobrescreve o `retroarch.cfg` do usuário.
-O menu Ozone é usado quando os assets/fontes estão instalados; em runtimes mínimos,
-o RGUI funciona sem baixar fontes adicionais.
+Se a Steam capturar o botão PS, use **Conflito com Steam?** no menu e desligue
+**Configurações → Controle → Botão Guia coloca a Steam em foco**.
+O OpenRetro não altera as preferências da Steam automaticamente. O botão PS
+precisa ser exposto pelo driver; Share + Options e F1 são alternativas.
 
-Referências: [menu rápido](https://docs.libretro.com/guides/quick-menu/),
-[mapeamento oficial do DualShock 4](https://github.com/libretro/retroarch-joypad-autoconfig/blob/master/sdl2/PS4%20Controller.cfg).
+Capturas ficam em `app_data/screenshots/<SHA-256 do jogo>/`, acessíveis por
+**Minhas capturas**. Saves e estados mantêm as pastas configuradas no runtime.
+A configuração adicional fica em `app_data/runtime-config/` e não sobrescreve
+`retroarch.cfg`. A integração foi compilada e testada por unidade; a validação
+com um DualShock 4 físico e uma partida real ainda está pendente.
 
 ## Validation
 

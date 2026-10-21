@@ -1,13 +1,6 @@
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import {
-  Download,
-  LoaderCircle,
-  Play,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { Download, Play, RefreshCw, Search, X, Keyboard } from "lucide-react";
 import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
 import type { CatalogRequest } from "../../providers/metadata/types";
 import type { GameMetadata, LibraryGame } from "../../types";
@@ -15,6 +8,14 @@ import { bridge } from "../../services/bridge";
 import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import { useCatalogPagination } from "../../hooks/useCatalogPagination";
+import { ControllerKeyboard } from "./ControllerKeyboard";
+import { createPortal } from "react-dom";
+export interface CatalogViewState {
+  query: string;
+  platform: string;
+  genre?: number;
+  sort: NonNullable<CatalogRequest["sort"]>;
+}
 
 export function BigPictureCatalog({
   library,
@@ -26,6 +27,7 @@ export function BigPictureCatalog({
   onPlay,
   onDownloads,
   notify,
+  memory,
 }: {
   library: LibraryGame[];
   selected: number;
@@ -36,17 +38,40 @@ export function BigPictureCatalog({
   onPlay: (entry: LibraryGame) => void;
   onDownloads: () => void;
   notify: (message: string) => void;
+  memory: RefObject<CatalogViewState | null>;
 }) {
-  const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [platform, setPlatform] = useState("all");
-  const [genre, setGenre] = useState<number>();
-  const [sort, setSort] =
-    useState<NonNullable<CatalogRequest["sort"]>>("popular");
+  const [query, setQuery] = useState(memory.current?.query ?? "");
+  const [debounced, setDebounced] = useState(memory.current?.query ?? "");
+  const [platform, setPlatform] = useState(memory.current?.platform ?? "all");
+  const [genre, setGenre] = useState<number | undefined>(memory.current?.genre);
+  const [sort, setSort] = useState<NonNullable<CatalogRequest["sort"]>>(
+    memory.current?.sort ?? "popular",
+  );
+  const filtersMounted = useRef(false);
+  useEffect(() => {
+    memory.current = { query, platform, genre, sort };
+  }, [query, platform, genre, sort, memory]);
   const [opened, setOpened] = useState<GameMetadata>();
   const [releasesOpen, setReleasesOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloadError, setDownloadError] = useState("");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const keyboardInput = useRef<((key: string) => boolean) | null>(null);
+  const closeGame = () => {
+    if (busy) return;
+    setOpened(undefined);
+    requestAnimationFrame(() => {
+      grid.current
+        ?.querySelectorAll<HTMLButtonElement>("button")
+        [selected]?.focus({ preventScroll: true });
+    });
+  };
+  useEffect(() => {
+    if (!opened) return;
+    document
+      .querySelector<HTMLButtonElement>(".tv-catalog-primary")
+      ?.focus({ preventScroll: true });
+  }, [opened?.id]);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(query), 300);
     return () => clearTimeout(timer);
@@ -58,7 +83,14 @@ export function BigPictureCatalog({
     retry: false,
   });
   const browse = useInfiniteQuery({
-    queryKey: ["catalog", debounced, platform, genre ?? null, sort],
+    queryKey: [
+      "catalog",
+      "artwork-v2",
+      debounced,
+      platform,
+      genre ?? null,
+      sort,
+    ],
     queryFn: ({ pageParam }) =>
       metadataProvider.browse(debounced, platform, pageParam, genre, sort),
     initialPageParam: 1,
@@ -79,7 +111,11 @@ export function BigPictureCatalog({
   );
   const sentinel = useCatalogPagination(
     Boolean(
-      browse.hasNextPage && !browse.isFetching && !browse.error && !opened,
+      browse.hasNextPage &&
+      !browse.isFetching &&
+      !browse.error &&
+      !opened &&
+      !keyboardOpen,
     ),
     browse.fetchNextPage,
   );
@@ -116,13 +152,25 @@ export function BigPictureCatalog({
     onCount(games.length);
   }, [games.length, onCount]);
   useEffect(() => {
+    if (!filtersMounted.current) {
+      filtersMounted.current = true;
+      return;
+    }
     setSelected(0);
   }, [debounced, platform, genre, sort, setSelected]);
   useEffect(() => {
     input.current = (key) => {
+      if (keyboardOpen) {
+        keyboardInput.current?.(key);
+        return true;
+      }
+      if (key === "open-search") {
+        setKeyboardOpen(true);
+        return true;
+      }
       if (key === "b" && opened) {
         if (releasesOpen) setReleasesOpen(false);
-        else setOpened(undefined);
+        else closeGame();
         return true;
       }
       if (opened) {
@@ -154,7 +202,7 @@ export function BigPictureCatalog({
       if (key === "previous-control" || key === "next-control") {
         const controls = Array.from(
           document.querySelectorAll<HTMLElement>(
-            ".tv-catalog-toolbar input, .tv-catalog-toolbar select:not(:disabled), .tv-catalog-load:not(:disabled)",
+            ".tv-catalog-toolbar input, .tv-catalog-toolbar button, .tv-catalog-toolbar select:not(:disabled), .tv-catalog-load:not(:disabled)",
           ),
         );
         const index = controls.indexOf(document.activeElement as HTMLElement);
@@ -165,6 +213,22 @@ export function BigPictureCatalog({
         return true;
       }
       const control = document.activeElement;
+      if (
+        key === "a" &&
+        control instanceof HTMLInputElement &&
+        control.closest(".tv-catalog-toolbar")
+      ) {
+        setKeyboardOpen(true);
+        return true;
+      }
+      if (
+        key === "a" &&
+        control instanceof HTMLButtonElement &&
+        control.closest(".tv-catalog-toolbar")
+      ) {
+        control.click();
+        return true;
+      }
       if (
         control instanceof HTMLSelectElement &&
         control.closest(".tv-catalog-toolbar")
@@ -207,7 +271,7 @@ export function BigPictureCatalog({
     return () => {
       input.current = null;
     };
-  }, [input, games, selected, opened, releasesOpen, sort]);
+  }, [input, games, selected, opened, releasesOpen, sort, keyboardOpen, busy]);
   const openGame = (next: GameMetadata, index: number) => {
     setSelected(index);
     setOpened(next);
@@ -222,9 +286,18 @@ export function BigPictureCatalog({
           <input
             aria-label="Pesquisar catálogo"
             placeholder="Pesquisar jogos"
+            maxLength={120}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
+          <button
+            className="tv-open-keyboard"
+            aria-label="Buscar catálogo com controle"
+            title="Teclado na tela"
+            onClick={() => setKeyboardOpen(true)}
+          >
+            <Keyboard size={20} />
+          </button>
         </label>
         <div
           className="tv-catalog-filters"
@@ -301,9 +374,18 @@ export function BigPictureCatalog({
         </div>
       </div>
       {browse.isPending ? (
-        <div className="tv-catalog-message" role="status">
-          <LoaderCircle className="spin" size={28} />
-          <p>Carregando catálogo…</p>
+        <div
+          className="tv-catalog-skeleton"
+          role="status"
+          aria-label="Carregando catálogo"
+        >
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} aria-hidden="true">
+              <i />
+              <span />
+              <small />
+            </div>
+          ))}
         </div>
       ) : browse.error && !games.length ? (
         <div className="tv-catalog-message" role="alert">
@@ -332,12 +414,21 @@ export function BigPictureCatalog({
             {games.map((item, index) => (
               <button
                 key={item.id}
-                className={index === selected ? "focused" : ""}
+                className={`${index === selected ? "focused" : ""} ${item.backgroundUrl || item.screenshots?.length ? "" : "portrait-source"}`}
                 aria-label={`Ver ${item.title}`}
                 onFocus={() => setSelected(index)}
+                onMouseEnter={() => setSelected(index)}
                 onClick={() => openGame(item, index)}
               >
-                <GameArtwork game={item} />
+                <GameArtwork
+                  game={{
+                    ...item,
+                    backgroundUrl: (
+                      item.backgroundUrl ?? item.screenshots?.[0]
+                    )?.replace("/t_1080p/", "/t_screenshot_med/"),
+                  }}
+                  hero={Boolean(item.backgroundUrl || item.screenshots?.length)}
+                />
                 <strong>{item.title}</strong>
                 <span>{item.genre || platformById(item.platformId)?.name}</span>
                 <div className="tv-catalog-badges">
@@ -394,109 +485,121 @@ export function BigPictureCatalog({
           <p className="tv-catalog-credit">Dados e imagens da IGDB</p>
         </>
       )}
-      {game && (
-        <div
-          className="tv-dialog-backdrop"
-          onClick={() => {
-            if (!busy) setOpened(undefined);
-          }}
-        >
-          <section
-            className="tv-catalog-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label={game.title}
-            onClick={(event) => event.stopPropagation()}
+      {game &&
+        createPortal(
+          <div
+            className="tv-dialog-backdrop"
+            onClick={() => {
+              closeGame();
+            }}
           >
-            <button
-              className="tv-dialog-close"
-              aria-label="Fechar detalhes"
-              disabled={busy}
-              onClick={() => setOpened(undefined)}
+            <section
+              className="tv-catalog-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-label={game.title}
+              onClick={(event) => event.stopPropagation()}
             >
-              <X size={22} />
-            </button>
-            <div className="tv-catalog-detail-art">
-              <GameArtwork
-                game={{
-                  ...game,
-                  backgroundUrl: game.backgroundUrl ?? game.screenshots?.[0],
-                }}
-                hero
-              />
-            </div>
-            <div className="tv-catalog-detail-copy">
-              <h1>{game.title}</h1>
-              <p className="tv-catalog-detail-meta">
-                {platformById(game.platformId)?.name} ·{" "}
-                {game.year || "Ano não informado"}
-              </p>
-              <p>{game.description}</p>
-              <div className="tv-catalog-detail-actions">
-                {entry && (
-                  <button
-                    className="tv-catalog-primary"
-                    onClick={() => onPlay(entry)}
-                  >
-                    <Play size={18} fill="currentColor" /> Jogar
-                  </button>
-                )}
-                <button
-                  className={entry ? "" : "tv-catalog-primary"}
-                  onClick={() => setReleasesOpen((value) => !value)}
-                >
-                  <Download size={18} />
-                  {releasesOpen ? "Ocultar versões" : "Ver opções de download"}
-                </button>
+              <button
+                className="tv-dialog-close"
+                aria-label="Fechar detalhes"
+                disabled={busy}
+                onClick={closeGame}
+              >
+                <X size={22} />
+              </button>
+              <div className="tv-catalog-detail-art">
+                <GameArtwork
+                  game={{
+                    ...game,
+                    backgroundUrl: game.backgroundUrl ?? game.screenshots?.[0],
+                  }}
+                  hero
+                />
               </div>
-              {releasesOpen && (
-                <section className="tv-catalog-releases">
-                  <h2>Opções de download</h2>
-                  {releases.isPending ? (
-                    <p>Buscando nas suas fontes…</p>
-                  ) : releases.error ? (
-                    <p role="alert">{String(releases.error)}</p>
-                  ) : releases.data?.length ? (
-                    releases.data.map((match) => (
-                      <button
-                        key={`${match.sourceId}-${match.id}`}
-                        disabled={busy}
-                        onClick={async () => {
-                          setBusy(true);
-                          setDownloadError("");
-                          try {
-                            await bridge.startDownload(match, 0, game);
-                            notify("Download iniciado.");
-                            onDownloads();
-                          } catch (error) {
-                            setDownloadError(String(error));
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        <span>
-                          <strong>{match.title}</strong>
-                          <small>
-                            {match.sourceName} ·{" "}
-                            {match.fileSize || "Tamanho não informado"}
-                          </small>
-                        </span>
-                        <Download size={18} />
-                      </button>
-                    ))
-                  ) : (
-                    <p>
-                      Nenhuma versão encontrada nas fontes ativas. Adicione
-                      fontes nas configurações.
-                    </p>
+              <div className="tv-catalog-detail-copy">
+                <h1>{game.title}</h1>
+                <p className="tv-catalog-detail-meta">
+                  {platformById(game.platformId)?.name} ·{" "}
+                  {game.year || "Ano não informado"}
+                </p>
+                <p>{game.description}</p>
+                <div className="tv-catalog-detail-actions">
+                  {entry && (
+                    <button
+                      className="tv-catalog-primary"
+                      onClick={() => onPlay(entry)}
+                    >
+                      <Play size={18} fill="currentColor" /> Jogar
+                    </button>
                   )}
-                  {downloadError && <p role="alert">{downloadError}</p>}
-                </section>
-              )}
-            </div>
-          </section>
-        </div>
+                  <button
+                    className={entry ? "" : "tv-catalog-primary"}
+                    onClick={() => setReleasesOpen((value) => !value)}
+                  >
+                    <Download size={18} />
+                    {releasesOpen
+                      ? "Ocultar versões"
+                      : "Ver opções de download"}
+                  </button>
+                </div>
+                {releasesOpen && (
+                  <section className="tv-catalog-releases">
+                    <h2>Opções de download</h2>
+                    {releases.isPending ? (
+                      <p>Buscando nas suas fontes…</p>
+                    ) : releases.error ? (
+                      <p role="alert">{String(releases.error)}</p>
+                    ) : releases.data?.length ? (
+                      releases.data.map((match) => (
+                        <button
+                          key={`${match.sourceId}-${match.id}`}
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setDownloadError("");
+                            try {
+                              await bridge.startDownload(match, 0, game);
+                              notify("Download iniciado.");
+                              onDownloads();
+                            } catch (error) {
+                              setDownloadError(String(error));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          <span>
+                            <strong>{match.title}</strong>
+                            <small>
+                              {match.sourceName} ·{" "}
+                              {match.fileSize || "Tamanho não informado"}
+                            </small>
+                          </span>
+                          <Download size={18} />
+                        </button>
+                      ))
+                    ) : (
+                      <p>
+                        Nenhuma versão encontrada nas fontes ativas. Adicione
+                        fontes nas configurações.
+                      </p>
+                    )}
+                    {downloadError && <p role="alert">{downloadError}</p>}
+                  </section>
+                )}
+              </div>
+            </section>
+          </div>,
+          document.querySelector(".console-mode") ?? document.body,
+        )}
+      {keyboardOpen && (
+        <ControllerKeyboard
+          value={query}
+          onChange={setQuery}
+          onClose={() => setKeyboardOpen(false)}
+          input={keyboardInput}
+        />
       )}
     </section>
   );

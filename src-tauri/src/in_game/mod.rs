@@ -1,0 +1,250 @@
+use crate::database::{error, Result};
+use serde::Serialize;
+use std::{io::Write, process::ChildStdin, sync::Mutex};
+use tauri::{Emitter, Manager};
+#[cfg(target_os = "windows")]
+mod controller;
+
+#[derive(Default)]
+pub struct InGameService(Mutex<Option<Session>>);
+struct Session {
+    info: SessionInfo,
+    stdin: Option<ChildStdin>,
+    pid: u32,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInfo {
+    id: String,
+    title: String,
+    open: bool,
+    slot: i32,
+}
+
+pub struct SessionGuard {
+    app: tauri::AppHandle,
+    id: String,
+}
+impl SessionGuard {
+    pub fn attach(&self, stdin: ChildStdin, pid: u32) -> Result<()> {
+        let service = self.app.state::<InGameService>();
+        let mut guard = service.0.lock().map_err(error)?;
+        let session = guard
+            .as_mut()
+            .filter(|session| session.info.id == self.id)
+            .ok_or("A sessão do jogo foi encerrada.")?;
+        session.stdin = Some(stdin);
+        session.pid = pid;
+        Ok(())
+    }
+}
+impl Drop for SessionGuard {
+    fn drop(&mut self) {
+        let service = self.app.state::<InGameService>();
+        if let Ok(mut guard) = service.0.lock() {
+            if guard
+                .as_ref()
+                .is_some_and(|session| session.info.id == self.id)
+            {
+                *guard = None;
+            }
+        }
+        if let Some(window) = self.app.get_webview_window("game-menu") {
+            let _ = window.hide();
+        }
+        let _ = self.app.emit("in-game-state", Option::<SessionInfo>::None);
+    }
+}
+pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str) -> Result<SessionGuard> {
+    let service = app.state::<InGameService>();
+    let mut guard = service.0.lock().map_err(error)?;
+    if guard.is_some() {
+        return Err("Um jogo já está em execução. Encerre-o antes de iniciar outro.".into());
+    }
+    *guard = Some(Session {
+        info: SessionInfo {
+            id: id.into(),
+            title: title.into(),
+            open: false,
+            slot: 0,
+        },
+        stdin: None,
+        pid: 0,
+    });
+    Ok(SessionGuard {
+        app: app.clone(),
+        id: id.into(),
+    })
+}
+
+fn write_command(session: &mut Session, command: &str) -> Result<()> {
+    let stdin = session
+        .stdin
+        .as_mut()
+        .ok_or("O emulador ainda está sendo iniciado.")?;
+    writeln!(stdin, "{command}")
+        .map_err(|_| "O emulador não está mais conectado ao OpenRetro.".to_string())?;
+    stdin.flush().map_err(error)
+}
+fn command_for(action: &str, slot: i32) -> Result<&'static str> {
+    match action {
+        "save" => Ok("SAVE_STATE"),
+        "load" => Ok("LOAD_STATE"),
+        "screenshot" => Ok("SCREENSHOT"),
+        "reset" => Ok("RESET"),
+        "quit" => Ok("QUIT"),
+        "undo_load" => Ok("UNDO_LOAD_STATE"),
+        "slot_next" if slot < 99 => Ok("STATE_SLOT_PLUS"),
+        "slot_previous" if slot > 0 => Ok("STATE_SLOT_MINUS"),
+        _ => Err("Ação de jogo inválida.".into()),
+    }
+}
+pub fn toggle(app: &tauri::AppHandle) -> Result<()> {
+    let service = app.state::<InGameService>();
+    let (info, pid) = {
+        let mut guard = service.0.lock().map_err(error)?;
+        let session = guard.as_mut().ok_or("Nenhum jogo em execução.")?;
+        write_command(session, "PAUSE_TOGGLE")?;
+        session.info.open = !session.info.open;
+        (session.info.clone(), session.pid)
+    };
+    let window = app
+        .get_webview_window("game-menu")
+        .ok_or("A janela do menu não está disponível.")?;
+    if info.open {
+        window.set_always_on_top(true).map_err(error)?;
+        window.show().map_err(error)?;
+        window.set_focus().map_err(error)?;
+    } else {
+        window.hide().map_err(error)?;
+        #[cfg(target_os = "windows")]
+        controller::focus_process(pid);
+    }
+    app.emit("in-game-state", Some(info)).map_err(error)
+}
+
+#[tauri::command]
+pub fn in_game_status(app: tauri::AppHandle) -> Result<Option<SessionInfo>> {
+    Ok(app
+        .state::<InGameService>()
+        .0
+        .lock()
+        .map_err(error)?
+        .as_ref()
+        .map(|session| session.info.clone()))
+}
+#[tauri::command]
+pub fn in_game_action(app: tauri::AppHandle, action: String) -> Result<SessionInfo> {
+    if action == "resume" {
+        let open = in_game_status(app.clone())?.is_some_and(|session| session.open);
+        if open {
+            toggle(&app)?;
+        }
+        return in_game_status(app)?.ok_or("O jogo já foi encerrado.".into());
+    }
+    let service = app.state::<InGameService>();
+    let info = {
+        let mut guard = service.0.lock().map_err(error)?;
+        let session = guard.as_mut().ok_or("Nenhum jogo em execução.")?;
+        if !session.info.open {
+            return Err("Abra o menu do jogo antes de usar esta ação.".into());
+        }
+        let command = command_for(&action, session.info.slot)?;
+        write_command(session, command)?;
+        if action == "slot_next" {
+            session.info.slot += 1;
+        }
+        if action == "slot_previous" {
+            session.info.slot -= 1;
+        }
+        session.info.clone()
+    };
+    app.emit("in-game-state", Some(info.clone()))
+        .map_err(error)?;
+    Ok(info)
+}
+
+#[tauri::command]
+pub fn open_steam_controller_settings(app: tauri::AppHandle) -> Result<()> {
+    if let Some(window) = app.get_webview_window("game-menu") {
+        window.set_always_on_top(false).map_err(error)?;
+    }
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("explorer.exe")
+        .arg("steam://settings/controller")
+        .spawn()
+        .map_err(error)?;
+    #[cfg(not(target_os = "windows"))]
+    return Err(
+        "Abra Steam → Configurações → Controle e desligue ‘Botão Guia coloca a Steam em foco’."
+            .into(),
+    );
+    Ok(())
+}
+
+pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let window = tauri::WebviewWindowBuilder::new(
+        app,
+        "game-menu",
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title("OpenRetro · Menu do jogo")
+    .initialization_script("window.__OPENRETRO_GAME_MENU__ = true;")
+    .visible(false)
+    .focused(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .fullscreen(true)
+    .resizable(false)
+    .build()?;
+    let target = app.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            if in_game_status(target.clone())
+                .ok()
+                .flatten()
+                .is_some_and(|session| session.open)
+            {
+                let _ = toggle(&target);
+            }
+        }
+    });
+    #[cfg(target_os = "windows")]
+    controller::start(app.clone());
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn rejects_arbitrary_commands_and_slot_overflow() {
+        assert!(super::command_for("SAVE_STATE\nQUIT", 0).is_err());
+        assert!(super::command_for("slot_previous", 0).is_err());
+        assert!(super::command_for("slot_next", 99).is_err());
+        assert_eq!(
+            super::command_for("slot_previous", 1).unwrap(),
+            "STATE_SLOT_MINUS"
+        );
+        assert_eq!(
+            super::command_for("slot_next", 98).unwrap(),
+            "STATE_SLOT_PLUS"
+        );
+    }
+    #[test]
+    fn cannot_control_a_session_before_the_process_is_attached() {
+        let mut session = super::Session {
+            info: super::SessionInfo {
+                id: "test".into(),
+                title: "Test".into(),
+                open: false,
+                slot: 0,
+            },
+            stdin: None,
+            pid: 0,
+        };
+        assert!(super::write_command(&mut session, "SAVE_STATE").is_err());
+    }
+}

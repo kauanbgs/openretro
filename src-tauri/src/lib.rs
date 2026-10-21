@@ -2,6 +2,7 @@ mod commands;
 mod database;
 mod downloads;
 mod filesystem;
+mod in_game;
 mod launcher;
 mod metadata;
 mod models;
@@ -13,6 +14,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
+                window.app_handle().exit(0);
+            }
+        })
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -26,6 +32,8 @@ pub fn run() {
             app.manage(db);
             app.manage(metadata::CatalogService::default());
             app.manage(downloads::DownloadService::default());
+            app.manage(in_game::InGameService::default());
+            in_game::setup(app.handle())?;
             log::info!(
                 "OpenRetro initialized; network downloads: {}",
                 downloads::NETWORK_DOWNLOADS_ENABLED
@@ -67,7 +75,10 @@ pub fn run() {
             commands::save_settings,
             commands::app_paths,
             launcher::launch_game,
-            launcher::runtime_menu::open_game_screenshots
+            launcher::runtime_menu::open_game_screenshots,
+            in_game::in_game_status,
+            in_game::in_game_action,
+            in_game::open_steam_controller_settings
         ])
         .run(tauri::generate_context!())
         .expect("OpenRetro failed to start");

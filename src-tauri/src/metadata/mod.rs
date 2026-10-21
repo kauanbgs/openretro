@@ -11,7 +11,7 @@ use std::{
 };
 use tauri::Manager;
 
-const FIELDS:&str="id,name,slug,summary,first_release_date,genres.id,genres.name,platforms.id,platforms.name,cover.image_id,total_rating,total_rating_count";
+const FIELDS:&str="id,name,slug,summary,first_release_date,genres.id,genres.name,platforms.id,platforms.name,cover.image_id,total_rating,total_rating_count,artworks.image_id,screenshots.image_id";
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CatalogRequest {
@@ -103,7 +103,7 @@ fn build_query(request: &CatalogRequest) -> Result<(&'static str, String)> {
             if ids.len() != 1 {
                 return Err("Choose one game.".into());
             }
-            return Ok(("games",format!("fields {FIELDS},storyline,artworks.image_id,screenshots.image_id,involved_companies.developer,involved_companies.company.name; where id = {}; limit 1;",ids[0])));
+            return Ok(("games",format!("fields {FIELDS},storyline,involved_companies.developer,involved_companies.company.name; where id = {}; limit 1;",ids[0])));
         }
         "games" => {}
         _ => return Err("Unsupported catalog operation.".into()),

@@ -31,8 +31,8 @@ export function InGameMenuHelp({
       <div>
         <h2>Menu durante o jogo</h2>
         <p>
-          Aperte <strong>PS</strong> para pausar e abrir o menu. Alternativas:{" "}
-          <strong>Share + Options</strong> (Select + Start) ou{" "}
+          Aperte <strong>PS</strong> para pausar e abrir o menu do OpenRetro.
+          Alternativas: <strong>Share + Options</strong> (Select + Start) ou{" "}
           <strong>F1</strong>.
         </p>
         <p>

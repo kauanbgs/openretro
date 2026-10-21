@@ -53,7 +53,7 @@ export function DiscoverPage({
     staleTime: 86400000,
   });
   const browse = useInfiniteQuery({
-    queryKey: ["catalog", debounced, platform, genre, sort],
+    queryKey: ["catalog", "artwork-v2", debounced, platform, genre, sort],
     queryFn: ({ pageParam }) =>
       metadataProvider.browse(
         debounced,

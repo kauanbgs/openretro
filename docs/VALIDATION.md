@@ -36,6 +36,13 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 
 ## Remaining validation
 
+### Big Picture and OpenRetro in-game menu — 2026-10-20
+
+- Production frontend build passed; frontend suite: 38 tests passed; Rust library suite: 15 tests passed.
+- Browser check with live IGDB: catalog pagination loaded 48 games; opening details after scrolling focused the primary action immediately. Arrow navigation and Escape returned focus to the same card; Enter reopened details. Filters scroll away instead of covering the catalog. Landscape artwork was visible in cards and details.
+- Added an independent native OpenRetro pause window, private stdin commands, Windows controller polling and disabled RetroArch's menu shortcut. Tests cover command allowlisting, slot bounds and unattached sessions.
+- Actual controller input, emulator save/load/capture commands, overlay focus over a running game, and Steam behavior still require a physical gameplay check. Steam preferences were not changed automatically. PCSX2/custom emulators do not use this overlay yet.
+
 - A real game/emulator session has not been exercised on this machine.
 - Production installer packaging, Linux execution, macOS support and remote CI execution have not been verified.
 - Automatic token renewal and one-time 401 recovery are implemented; natural token expiry was not awaited during live validation.

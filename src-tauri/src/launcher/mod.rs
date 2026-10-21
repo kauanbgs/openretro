@@ -116,6 +116,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  let executable=filesystem::executable(&emulator.executable_path)?;
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
  let managed_retroarch=emulator.name.eq_ignore_ascii_case("RetroArch") && entry.item.runtime_args.is_empty();
+ let runtime_session=if managed_retroarch { Some(crate::in_game::reserve(&app, &id, &entry.game.title)?) } else { None };
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
  let mut args:Vec<String>=if managed_retroarch {
     let config=runtime_menu::prepare(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256)?;
@@ -130,8 +131,11 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  }
  let timer=Instant::now();
  // Command passes each argument directly to the executable. No shell interprets paths or arguments.
- let child=Command::new(&executable).args(&args).current_dir(executable.parent().ok_or("Invalid emulator directory")?).spawn();
+ let child=Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?).spawn();
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
+ if let Some(runtime_session)=&runtime_session {
+    if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id())?; }
+ }
  db.0.lock().map_err(error)?.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?;
  let _=app.emit("game-started",&id); log::info!("Started game session {session}");
  let status=child.wait(); let elapsed=timer.elapsed().as_secs() as i64;

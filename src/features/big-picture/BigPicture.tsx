@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import {
   ChevronLeft,
   Download,
@@ -16,6 +17,9 @@ import {
   Settings,
   Trash2,
   X,
+  Keyboard,
+  Info,
+  LoaderCircle,
 } from "lucide-react";
 import type {
   DownloadJob,
@@ -24,13 +28,15 @@ import type {
   GameMetadata,
 } from "../../types";
 import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
-import { bridge } from "../../services/bridge";
+import { bridge, isDesktop } from "../../services/bridge";
 import { GameResolver } from "../../services/GameResolver";
 import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
-import { BigPictureCatalog } from "./BigPictureCatalog";
+import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
 import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
+import { ControllerKeyboard } from "./ControllerKeyboard";
+import { HeroArtwork } from "./HeroArtwork";
 
 type Section =
   "home" | "catalog" | "library" | "downloads" | "emulators" | "system";
@@ -68,14 +74,62 @@ export function BigPicture({
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [query, setQuery] = useState("");
   const [powerOpen, setPowerOpen] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const keyboardInput = useRef<((key: string) => boolean) | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<LibraryGame>();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [notice, setNotice] = useState<{ text: string; id: number }>();
+  const feedback = useCallback(
+    (text: string) => {
+      setNotice({ text, id: Date.now() });
+      notify(text);
+    },
+    [notify],
+  );
+  const content = useRef<HTMLElement>(null);
+  const positions = useRef<
+    Partial<Record<Section, { selected: number; scroll: number }>>
+  >({});
+  const holdTimers = useRef(new Map<string, number>());
+  const [connected, setConnected] = useState(false);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const [details, setDetails] = useState<Record<string, GameMetadata>>({});
   const root = useRef<HTMLElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const catalogInput = useRef<((key: string) => boolean) | null>(null);
+  const catalogMemory = useRef<CatalogViewState | null>(null);
   const [catalogCount, setCatalogCount] = useState(0);
   const [selected, setSelected] = useState(0);
   const [launching, setLaunching] = useState(false);
   const held = useRef(new Set<string>());
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(undefined), 4200);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => {
+    if (!isDesktop) return;
+    const listener = listen("game-started", () => setPreparing(false));
+    return () => {
+      void listener.then((stop) => stop());
+    };
+  }, []);
+  useEffect(() => () => clearTimeout(previewTimer.current), []);
+  useEffect(() => {
+    const update = () =>
+      setConnected(Boolean(navigator.getGamepads?.().find(Boolean)));
+    update();
+    window.addEventListener("gamepadconnected", update);
+    window.addEventListener("gamepaddisconnected", update);
+    return () => {
+      window.removeEventListener("gamepadconnected", update);
+      window.removeEventListener("gamepaddisconnected", update);
+    };
+  }, []);
   const games = useMemo(
     () =>
       [...library].sort((a, b) =>
@@ -98,8 +152,6 @@ export function BigPicture({
     visibleGames[Math.min(selected, Math.max(visibleGames.length - 1, 0))];
   const heroGame = selectedGame ?? games[0];
   const heroMetadata = heroGame && (details[heroGame.game.id] ?? heroGame.game);
-  const backdrop =
-    heroMetadata?.backgroundUrl ?? heroMetadata?.screenshots?.[0];
   useEffect(() => {
     const game = heroGame?.game;
     if (
@@ -125,13 +177,25 @@ export function BigPicture({
     };
   }, [heroGame?.game.id, details]);
   const selectSection = (next: Section) => {
+    positions.current[section] = {
+      selected,
+      scroll: content.current?.scrollTop ?? 0,
+    };
     setSection(next);
     setNavIndex(sections.findIndex((item) => item.id === next));
-    setSelected(0);
+    setSelected(positions.current[next]?.selected ?? 0);
     setNavFocused(false);
+    requestAnimationFrame(() =>
+      content.current?.scrollTo({
+        top: positions.current[next]?.scroll ?? 0,
+        behavior: "instant",
+      }),
+    );
   };
   const move = (amount: number, size: number) =>
-    setSelected((current) => (size ? (current + amount + size) % size : 0));
+    setSelected((current) =>
+      Math.max(0, Math.min(Math.max(0, size - 1), current + amount)),
+    );
   const close = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     onClose();
@@ -149,6 +213,7 @@ export function BigPicture({
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
     setLaunching(true);
+    setPreparing(true);
     try {
       const resolution = await new GameResolver(bridge.exists).resolve(
         entry.game,
@@ -158,25 +223,45 @@ export function BigPicture({
       if (resolution.state !== "READY") throw new Error(resolution.message);
       await bridge.launch(entry.item.id);
     } catch (error) {
-      notify(String(error));
+      feedback(String(error));
     } finally {
       setLaunching(false);
+      setPreparing(false);
     }
   };
   const favorite = async () => {
     if (!selectedGame) return;
-    await bridge.favorite(selectedGame.item.id, !selectedGame.item.favorite);
-    await refresh();
+    try {
+      await bridge.favorite(selectedGame.item.id, !selectedGame.item.favorite);
+      await refresh();
+      feedback(
+        selectedGame.item.favorite
+          ? "Removido dos favoritos."
+          : "Adicionado aos favoritos.",
+      );
+    } catch (error) {
+      feedback(String(error));
+    }
   };
   const remove = async () => {
-    if (
-      !selectedGame ||
-      !confirm(`Remover ${selectedGame.game.title} da biblioteca?`)
-    )
-      return;
-    await bridge.removeGame(selectedGame.item.id);
-    await refresh();
-    setSelected(0);
+    if (!selectedGame) return;
+    setRemoveTarget(selectedGame);
+    setConfirmRemove(false);
+  };
+  const doRemove = async () => {
+    if (!removeTarget || removing) return;
+    setRemoving(true);
+    try {
+      await bridge.removeGame(removeTarget.item.id);
+      await refresh();
+      setSelected(0);
+      setRemoveTarget(undefined);
+      feedback("Jogo removido da biblioteca. O arquivo foi mantido.");
+    } catch (error) {
+      feedback(String(error));
+    } finally {
+      setRemoving(false);
+    }
   };
   const activate = () => {
     if (powerOpen) return close();
@@ -195,7 +280,7 @@ export function BigPicture({
             activeDownload(job.state) ? "pause" : "resume",
           )
           .then(refresh)
-          .catch((error) => notify(String(error)));
+          .catch((error) => feedback(String(error)));
       return;
     }
     if (section === "emulators") return onDesktop("Emulators");
@@ -211,6 +296,24 @@ export function BigPicture({
   }, []);
   useEffect(() => {
     const handle = (key: string) => {
+      // The foreground emulator owns the controller for the entire game session.
+      if (launching) return;
+      if (keyboardOpen) {
+        keyboardInput.current?.(key);
+        return;
+      }
+      if (removeTarget) {
+        if (removing) return;
+        if (key === "b") setRemoveTarget(undefined);
+        if (["left", "right", "up", "down"].includes(key))
+          setConfirmRemove((value) => !value);
+        if (key === "a") {
+          if (confirmRemove) void doRemove();
+          else setRemoveTarget(undefined);
+        }
+        return;
+      }
+      if (preparing) return;
       if (
         section === "catalog" &&
         !navFocused &&
@@ -224,6 +327,11 @@ export function BigPicture({
       }
       if (powerOpen) return key === "a" ? close() : undefined;
       if (key === "a") return activate();
+      if (key === "search") {
+        if (section === "home" || section === "library") setKeyboardOpen(true);
+        else if (section === "catalog") catalogInput.current?.("open-search");
+        return;
+      }
       if (navFocused) {
         if (key === "up" || key === "down")
           setNavIndex(
@@ -242,6 +350,14 @@ export function BigPicture({
           ? setNavFocused(true)
           : move(-1, currentSize());
       if (key === "right") return move(1, currentSize());
+      if (key === "up" && selected < columns) {
+        if (section === "catalog") catalogInput.current?.("next-control");
+        else if (section === "home" || section === "library") {
+          content.current?.scrollTo({ top: 0, behavior: "smooth" });
+          root.current?.querySelector<HTMLButtonElement>(".tv-play")?.focus();
+        }
+        return;
+      }
       if (key === "up")
         return setSelected((value) => Math.max(0, value - columns));
       if (key === "down")
@@ -262,6 +378,38 @@ export function BigPicture({
         void remove();
     };
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Tab") {
+        const scope =
+          root.current?.querySelector(
+            ".tv-keyboard, .tv-confirm-dialog, .tv-power-dialog, .tv-catalog-dialog",
+          ) ??
+          (navFocused
+            ? root.current?.querySelector(".tv-side-rail")
+            : root.current);
+        const elements = Array.from(
+          scope?.querySelectorAll<HTMLElement>(
+            "button:not(:disabled), input:not(:disabled), select:not(:disabled)",
+          ) ?? [],
+        ).filter((element) => element.getClientRects().length > 0);
+        const first = elements[0],
+          last = elements[elements.length - 1];
+        if (
+          event.shiftKey &&
+          (document.activeElement === first ||
+            !scope?.contains(document.activeElement))
+        ) {
+          event.preventDefault();
+          last?.focus();
+        } else if (
+          !event.shiftKey &&
+          (document.activeElement === last ||
+            !scope?.contains(document.activeElement))
+        ) {
+          event.preventDefault();
+          first?.focus();
+        }
+        return;
+      }
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLSelectElement
@@ -287,6 +435,7 @@ export function BigPicture({
         X: "x",
         y: "y",
         Y: "y",
+        "/": "search",
       };
       if (keys[event.key]) {
         event.preventDefault();
@@ -306,8 +455,24 @@ export function BigPicture({
       if (pad) {
         const active = new Set<string>();
         const edge = (id: string, pressed: boolean) => {
-          if (pressed) active.add(id);
-          return pressed && !held.current.has(id);
+          if (!pressed) {
+            holdTimers.current.delete(id);
+            return false;
+          }
+          active.add(id);
+          const now = performance.now();
+          if (!held.current.has(id)) {
+            holdTimers.current.set(id, now + 380);
+            return true;
+          }
+          if (
+            ["left", "right", "up", "down"].includes(id) &&
+            now >= (holdTimers.current.get(id) ?? Infinity)
+          ) {
+            holdTimers.current.set(id, now + 125);
+            return true;
+          }
+          return false;
         };
         if (
           edge("left", Boolean(pad.buttons[14]?.pressed || pad.axes[0] < -0.7))
@@ -327,17 +492,24 @@ export function BigPicture({
         if (edge("b", Boolean(pad.buttons[1]?.pressed))) handle("b");
         if (edge("x", Boolean(pad.buttons[2]?.pressed))) handle("x");
         if (edge("y", Boolean(pad.buttons[3]?.pressed))) handle("y");
+        if (edge("search", Boolean(pad.buttons[8]?.pressed))) handle("search");
+        if (edge("menu", Boolean(pad.buttons[9]?.pressed))) handle("b");
         if (
+          !launching &&
           section === "catalog" &&
           edge("lb", Boolean(pad.buttons[4]?.pressed))
         )
           catalogInput.current?.("previous-control");
         if (
+          !launching &&
           section === "catalog" &&
           edge("rb", Boolean(pad.buttons[5]?.pressed))
         )
           catalogInput.current?.("next-control");
         held.current = active;
+      } else {
+        held.current.clear();
+        holdTimers.current.clear();
       }
       frame = requestAnimationFrame(poll);
     };
@@ -373,14 +545,27 @@ export function BigPicture({
               setSelected(index);
               setNavFocused(false);
             }}
-            onClick={() => {
-              setSelected(index);
-              setNavFocused(false);
+            onMouseEnter={() => {
+              clearTimeout(previewTimer.current);
+              previewTimer.current = setTimeout(() => {
+                setSelected(index);
+                setNavFocused(false);
+              }, 150);
             }}
-            onDoubleClick={() => void launch(entry)}
-            aria-label={`Selecionar ${entry.game.title}`}
+            onMouseLeave={() => clearTimeout(previewTimer.current)}
+            onClick={() => void launch(entry)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setSelected(index);
+              setRemoveTarget(entry);
+              setConfirmRemove(false);
+            }}
+            aria-label={`Jogar ${entry.game.title}`}
           >
             <GameArtwork game={entry.game} />
+            <i className="tv-card-play">
+              <Play size={20} fill="currentColor" /> Jogar
+            </i>
             <span>{entry.game.title}</span>
             <small>
               {platformById(entry.game.platformId)?.shortName ??
@@ -428,6 +613,14 @@ export function BigPicture({
           className={`tv-nav ${navFocused ? "focused" : ""}`}
           aria-label="Navegação principal"
         >
+          <span
+            className="tv-nav-cursor"
+            aria-hidden="true"
+            style={{
+              transform: `translateY(${(navFocused ? navIndex : sections.findIndex((item) => item.id === section)) * 52}px)`,
+              opacity: navFocused && navIndex >= sections.length ? 0 : 1,
+            }}
+          />
           {sections.map((item, index) => (
             <button
               key={item.id}
@@ -492,6 +685,14 @@ export function BigPicture({
             : sections.find((item) => item.id === section)?.label}
         </span>
         <div>
+          <span
+            className="tv-controller-status"
+            title={connected ? "Controle conectado" : "Teclado e mouse"}
+          >
+            <Gamepad2 size={17} />
+            <i className={connected ? "connected" : ""} />
+            {connected ? "Controle conectado" : "Teclado e mouse"}
+          </span>
           <button
             aria-label="Pesquisar jogos"
             onClick={() => selectSection("catalog")}
@@ -503,7 +704,7 @@ export function BigPicture({
           </button>
         </div>
       </header>
-      <main className="tv-content" key={section}>
+      <main ref={content} className="tv-content" key={section}>
         {section === "catalog" && (
           <BigPictureCatalog
             library={library}
@@ -514,29 +715,16 @@ export function BigPicture({
             onCount={setCatalogCount}
             onPlay={(entry) => void launch(entry)}
             onDownloads={() => selectSection("downloads")}
-            notify={notify}
+            notify={feedback}
+            memory={catalogMemory}
           />
         )}
         {(section === "home" || section === "library") && (
           <>
-            <section className="tv-hero" key={heroGame?.item.id ?? "empty"}>
-              <div
-                className={`tv-hero-media ${backdrop ? "" : "cover-only"}`}
-                aria-hidden="true"
-              >
-                {heroMetadata && (
-                  <GameArtwork
-                    key={heroMetadata.id}
-                    game={{
-                      ...heroMetadata,
-                      backgroundUrl: backdrop,
-                    }}
-                    hero
-                  />
-                )}
-              </div>
+            <section className="tv-hero">
+              {heroMetadata && <HeroArtwork game={heroMetadata} />}
               <div className="tv-hero-shade" />
-              <div className="tv-hero-copy">
+              <div className="tv-hero-copy" key={heroGame?.item.id ?? "empty"}>
                 <p className="tv-kicker">
                   {heroGame?.item.lastPlayedAt
                     ? "Continue jogando"
@@ -553,7 +741,11 @@ export function BigPicture({
                 )}
                 {heroGame ? (
                   <div className="tv-hero-actions">
-                    <button className="tv-play" onClick={() => void launch()}>
+                    <button
+                      className="tv-play"
+                      disabled={launching}
+                      onClick={() => void launch()}
+                    >
                       <Play size={19} fill="currentColor" />
                       {launching ? "Iniciando…" : "Jogar"}
                     </button>
@@ -614,6 +806,14 @@ export function BigPicture({
                       setSelected(0);
                     }}
                   />
+                  <button
+                    className="tv-open-keyboard"
+                    aria-label="Buscar biblioteca com controle"
+                    title="Teclado na tela"
+                    onClick={() => setKeyboardOpen(true)}
+                  >
+                    <Keyboard size={20} />
+                  </button>
                 </label>
                 <span>{visibleGames.length} jogos</span>
               </div>
@@ -798,7 +998,7 @@ export function BigPicture({
           <span>
             <b>LB / RB</b> Filtros
           </span>
-        ) : (
+        ) : section === "home" || section === "library" ? (
           <>
             <span>
               <b>X</b> Favoritar
@@ -806,12 +1006,86 @@ export function BigPicture({
             <span>
               <b>Y</b> Remover
             </span>
+            <span>
+              <b>Share / View</b> Buscar
+            </span>
           </>
-        )}
+        ) : null}
         <span>
           <b>← ↑ ↓ →</b> Navegar
         </span>
       </footer>
+      {notice && (
+        <div key={notice.id} className="tv-notice" role="status">
+          <Info size={19} />
+          <span>{notice.text}</span>
+          <button
+            aria-label="Fechar aviso"
+            onClick={() => setNotice(undefined)}
+          >
+            <X size={17} />
+          </button>
+        </div>
+      )}
+      {preparing && (
+        <div className="tv-launching" role="status" aria-live="polite">
+          <LoaderCircle size={40} className="spin" />
+          <h2>Preparando o jogo</h2>
+          <p>Verificando o emulador e o core. O jogo abrirá automaticamente.</p>
+        </div>
+      )}
+      {removeTarget && (
+        <div
+          className="tv-dialog-backdrop"
+          onClick={() => {
+            if (!removing) setRemoveTarget(undefined);
+          }}
+        >
+          <section
+            className="tv-confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Remover jogo"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Trash2 size={27} />
+            <h2>Remover {removeTarget.game.title}?</h2>
+            <p>
+              O jogo sai da biblioteca. O arquivo no seu computador será
+              mantido.
+            </p>
+            <div>
+              <button
+                autoFocus
+                disabled={removing}
+                className={!confirmRemove ? "focused" : ""}
+                onClick={() => setRemoveTarget(undefined)}
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={removing}
+                className={`danger ${confirmRemove ? "focused" : ""}`}
+                onClick={() => void doRemove()}
+              >
+                {removing ? "Removendo…" : "Remover da biblioteca"}
+              </button>
+            </div>
+            <small>A confirma a opção selecionada · B cancela</small>
+          </section>
+        </div>
+      )}
+      {keyboardOpen && (
+        <ControllerKeyboard
+          value={query}
+          onChange={(value) => {
+            setQuery(value);
+            setSelected(0);
+          }}
+          onClose={() => setKeyboardOpen(false)}
+          input={keyboardInput}
+        />
+      )}
       {powerOpen && (
         <div className="tv-dialog-backdrop" onClick={() => setPowerOpen(false)}>
           <section

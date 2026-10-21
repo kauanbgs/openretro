@@ -446,12 +446,10 @@
   background: #080808;
 }
 .tv-catalog-toolbar {
-  position: sticky;
-  top: 72px;
+  position: relative;
   z-index: 3;
   padding: 18px 0 14px;
   background: #080808f5;
-  backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1147,6 +1145,484 @@
   .tv-emulator-grid,
   .tv-system-grid {
     grid-template-columns: 1fr;
+  }
+}
+/* Motion responds to navigation, loading and explicit actions. */
+.tv-topbar {
+  background: #080808;
+  border-bottom: 1px solid #ffffff0d;
+}
+.tv-content {
+  scroll-padding-top: 86px;
+}
+.tv-catalog-grid > button {
+  scroll-margin-top: 90px;
+}
+.tv-catalog-grid > button.focused,
+.tv-catalog-grid > button:hover {
+  transform: none;
+}
+.tv-catalog-grid > button.focused .artwork,
+.tv-catalog-grid > button:hover .artwork {
+  outline-width: 2px;
+  outline-color: #e5c6a6;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.tv-catalog-grid > button:hover .artwork img {
+  transform: none;
+}
+.tv-catalog-grid .portrait-source .artwork img {
+  object-fit: contain;
+  object-position: center;
+}
+.tv-catalog-grid .portrait-source .artwork {
+  background: #161616;
+}
+.tv-catalog-grid > button.focused > strong {
+  color: #f1c18e;
+}
+.console-mode {
+  animation: tv-fade 220ms ease both;
+}
+.tv-content {
+  animation: tv-page-enter 200ms cubic-bezier(0.2, 0.75, 0.3, 1) both;
+}
+.tv-nav {
+  position: relative;
+}
+.tv-nav button {
+  position: relative;
+  z-index: 1;
+}
+.tv-nav button.active {
+  background: transparent;
+}
+.tv-nav-cursor {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  right: 0;
+  height: 48px;
+  border-radius: 5px;
+  background: #ffffff16;
+  pointer-events: none;
+  transition:
+    transform 190ms cubic-bezier(0.2, 0.85, 0.3, 1),
+    opacity 150ms ease;
+}
+.tv-controller-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #999;
+  font-size: 11px;
+}
+.tv-controller-status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #777;
+}
+.tv-controller-status i.connected {
+  background: #5aca97;
+}
+.tv-topbar > div {
+  gap: 18px;
+}
+.tv-hero-media {
+  animation: none;
+}
+.tv-hero-image {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.tv-hero-image .artwork {
+  width: 100%;
+  height: 100%;
+}
+.tv-hero-image.current {
+  animation: tv-fade 420ms ease both;
+}
+.tv-hero-image.previous {
+  pointer-events: none;
+}
+.tv-hero-image.cover-only {
+  left: 40%;
+}
+.tv-hero-image.cover-only img {
+  object-fit: contain;
+  object-position: 70% 36%;
+  padding: 45px 4vw 24px;
+}
+.tv-game-grid > button {
+  isolation: isolate;
+}
+.tv-game-grid .tv-card-play {
+  position: absolute;
+  inset: auto 0 58px 0;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  padding-top: 12px;
+  border-radius: 0 0 7px 7px;
+  background: linear-gradient(transparent, #000c);
+  color: white;
+  font-size: 13px;
+  font-weight: 750;
+  font-style: normal;
+  opacity: 0;
+  transform: translateY(5px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  pointer-events: none;
+}
+.tv-game-grid > button.focused .tv-card-play,
+.tv-game-grid > button:hover .tv-card-play,
+.tv-game-grid > button:focus-visible .tv-card-play {
+  opacity: 1;
+  transform: translateY(0);
+}
+.tv-game-grid > button:active,
+.tv-catalog-grid > button:active {
+  transform: scale(0.98);
+}
+.tv-search:focus-within {
+  border-color: #d7b28b;
+  box-shadow: 0 0 0 3px #e7a15c17;
+}
+.console-mode .tv-open-keyboard {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  margin-right: -6px;
+  border-radius: 4px;
+  color: #b6b6b6;
+}
+.console-mode .tv-open-keyboard:hover {
+  color: white;
+  background: #ffffff12;
+}
+.tv-tabs button {
+  transition: color 140ms ease;
+}
+.tv-tabs button.active::after {
+  animation: tv-tab-enter 180ms ease both;
+  transform-origin: left;
+}
+.tv-catalog-grid > button {
+  transition: transform 180ms cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+.tv-catalog-grid .artwork img {
+  transition: transform 350ms ease;
+}
+.tv-catalog-grid > button:hover .artwork img {
+  transform: none;
+}
+.tv-catalog-skeleton {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px 20px;
+}
+.tv-catalog-skeleton > div {
+  min-width: 0;
+}
+.tv-catalog-skeleton i,
+.tv-catalog-skeleton span,
+.tv-catalog-skeleton small {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(100deg, #151515 20%, #232323 45%, #151515 70%);
+  background-size: 240% 100%;
+  animation: tv-loading 1.8s linear infinite;
+}
+.tv-catalog-skeleton i {
+  aspect-ratio: 1.9;
+}
+.tv-catalog-skeleton span {
+  width: 75%;
+  height: 14px;
+  margin-top: 14px;
+}
+.tv-catalog-skeleton small {
+  width: 45%;
+  height: 12px;
+  margin-top: 10px;
+}
+.tv-notice {
+  position: absolute;
+  z-index: 80;
+  bottom: 68px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: min(700px, 86vw);
+  padding: 15px 18px;
+  border: 1px solid #ffffff24;
+  border-radius: 9px;
+  color: #eee;
+  background: #202020f5;
+  box-shadow: 0 16px 50px #0008;
+  transform: translateX(-50%);
+  font-size: 13px;
+  line-height: 1.5;
+  animation: tv-notice-enter 220ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.tv-notice > svg {
+  color: var(--tv-accent);
+}
+.tv-notice button {
+  display: grid;
+  place-items: center;
+  margin-left: 8px;
+  color: #aaa;
+}
+.tv-launching {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 19px;
+  background: #080808e8;
+  backdrop-filter: blur(20px);
+  animation: tv-fade 180ms ease both;
+}
+.tv-launching > svg {
+  color: var(--tv-accent);
+}
+.tv-launching h2 {
+  font-size: 28px;
+  font-weight: 700;
+}
+.tv-launching p {
+  max-width: 460px;
+  padding: 0 25px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.6;
+  font-size: 14px;
+}
+.tv-confirm-dialog {
+  width: min(510px, 90vw);
+  padding: 30px;
+  border: 1px solid #ffffff24;
+  border-radius: 13px;
+  background: #121212;
+  box-shadow: 0 30px 100px #0008;
+  animation: tv-dialog-enter 200ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.tv-confirm-dialog > svg {
+  color: #d2a17e;
+  margin-bottom: 18px;
+}
+.tv-confirm-dialog h2 {
+  font-size: 23px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+.tv-confirm-dialog p {
+  margin-top: 12px;
+  color: #aaa;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.tv-confirm-dialog > div {
+  display: flex;
+  gap: 13px;
+  margin-top: 25px;
+}
+.tv-confirm-dialog button {
+  min-height: 44px;
+  padding: 0 17px;
+  border: 1px solid #ffffff20;
+  border-radius: 6px;
+  background: #202020;
+  font-size: 13px;
+}
+.tv-confirm-dialog button.danger {
+  color: #efb7aa;
+}
+.tv-confirm-dialog button.focused {
+  outline: 2px solid #ddd;
+  outline-offset: 3px;
+}
+.tv-confirm-dialog small {
+  display: block;
+  margin-top: 22px;
+  color: #777;
+  font-size: 11px;
+}
+.tv-power-dialog,
+.tv-catalog-dialog {
+  animation: tv-dialog-enter 200ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.tv-keyboard-backdrop {
+  z-index: 40;
+}
+.tv-keyboard {
+  width: min(820px, 92vw);
+  padding: 28px;
+  border: 1px solid #ffffff20;
+  border-radius: 14px;
+  background: #111;
+  box-shadow: 0 30px 100px #0008;
+  animation: tv-dialog-enter 200ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.tv-keyboard-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.tv-keyboard-heading h2 {
+  font-size: 22px;
+  font-weight: 750;
+}
+.tv-keyboard-heading button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: #999;
+}
+.tv-keyboard .tv-search {
+  width: 100%;
+  height: 50px;
+  margin-bottom: 22px;
+}
+.tv-keyboard-keys {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 9px;
+}
+.tv-keyboard-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+.tv-keyboard-keys button,
+.tv-keyboard-actions button {
+  display: grid;
+  place-items: center;
+  min-height: 47px;
+  border: 1px solid #ffffff10;
+  border-radius: 5px;
+  background: #202020;
+  transition:
+    background 100ms ease,
+    transform 100ms ease;
+}
+.tv-keyboard-actions button {
+  font-size: 12px;
+}
+.tv-keyboard-keys button.focused,
+.tv-keyboard-actions button.focused {
+  color: #17100a;
+  background: var(--tv-accent);
+  border-color: var(--tv-accent);
+  transform: translateY(-2px);
+}
+.tv-keyboard-actions button.primary {
+  color: #e7b886;
+  border-color: #e7a15c60;
+}
+.tv-keyboard-actions button.primary.focused {
+  color: #17100a;
+}
+.tv-keyboard .tv-keyboard-help {
+  margin-top: 20px;
+  color: #8c8c8c;
+  font-size: 12px;
+  text-align: center;
+}
+@keyframes tv-page-enter {
+  from {
+    opacity: 0.3;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes tv-dialog-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.975) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes tv-tab-enter {
+  from {
+    transform: scaleX(0.3);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes tv-notice-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes tv-loading {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -40% 0;
+  }
+}
+@media (max-width: 1100px) {
+  .tv-controller-status {
+    display: none;
+  }
+  .tv-catalog-skeleton {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .tv-keyboard {
+    padding: 18px;
+  }
+  .tv-keyboard-keys {
+    gap: 5px;
+  }
+  .tv-keyboard-keys button {
+    min-height: 36px;
+    font-size: 13px;
+  }
+  .tv-keyboard-actions button {
+    padding: 0 4px;
+    font-size: 10px;
+  }
+  .tv-catalog-skeleton {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tv-controls {
+    font-size: 9px;
+    gap: 9px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

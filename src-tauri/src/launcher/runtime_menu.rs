@@ -22,6 +22,9 @@ pub fn open_game_screenshots(app: tauri::AppHandle, id: String) -> Result<()> {
     let mut command = std::process::Command::new("open");
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     let mut command = std::process::Command::new("xdg-open");
+    if let Some(window) = app.get_webview_window("game-menu") {
+        window.set_always_on_top(false).map_err(error)?;
+    }
     command.arg(directory).spawn().map_err(error)?;
     Ok(())
 }
@@ -91,14 +94,19 @@ video_windowed_fullscreen = "true"
 video_window_show_decorations = "false"
 input_joypad_driver = "sdl2"
 input_autodetect_enable = "true"
-input_menu_toggle = "f1"
-input_menu_toggle_btn = "5"
+input_menu_toggle = "nul"
+input_menu_toggle_btn = "999"
 input_enable_hotkey = "nul"
 input_enable_hotkey_btn = "nul"
-input_menu_toggle_gamepad_combo = "4"
+input_menu_toggle_gamepad_combo = "0"
 input_quit_gamepad_combo = "0"
 all_users_control_menu = "true"
 menu_pause_libretro = "true"
+pause_nonactive = "false"
+stdin_cmd_enable = "true"
+network_cmd_enable = "false"
+state_slot = "0"
+input_pause_toggle = "nul"
 menu_savestate_resume = "false"
 menu_mouse_enable = "true"
 menu_show_advanced_settings = "false"
@@ -188,7 +196,9 @@ mod tests {
         )
         .unwrap();
         let text = std::fs::read_to_string(config).unwrap();
-        assert!(text.contains("input_menu_toggle_gamepad_combo = \"4\""));
+        assert!(text.contains("input_menu_toggle_gamepad_combo = \"0\""));
+        assert!(text.contains("stdin_cmd_enable = \"true\""));
+        assert!(text.contains("network_cmd_enable = \"false\""));
         assert!(text.contains("menu_pause_libretro = \"true\""));
         assert!(text.contains("menu_driver = \"rgui\""));
         assert!(!text.contains("savefile_directory"));

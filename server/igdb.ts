@@ -9,8 +9,8 @@ import type {
 } from "../src/providers/metadata/types";
 
 const fields =
-  "id,name,slug,summary,first_release_date,genres.id,genres.name,platforms.id,platforms.name,cover.image_id,total_rating,total_rating_count";
-const detailFields = `${fields},storyline,artworks.image_id,screenshots.image_id,involved_companies.developer,involved_companies.company.name`;
+  "id,name,slug,summary,first_release_date,genres.id,genres.name,platforms.id,platforms.name,cover.image_id,total_rating,total_rating_count,artworks.image_id,screenshots.image_id";
+const detailFields = `${fields},storyline,involved_companies.developer,involved_companies.company.name`;
 const sorts = {
   popular: "total_rating_count desc",
   rating: "total_rating desc",
