@@ -604,7 +604,8 @@ export function BigPicture({
         Y: "y",
         "/": "search",
       };
-      if (keys[event.key]) {
+      const key = event.keyCode === 10009 ? "Escape" : event.key;
+      if (keys[key]) {
         event.preventDefault();
         if (
           event.key.startsWith("Arrow") &&
@@ -615,7 +616,7 @@ export function BigPicture({
           document.activeElement instanceof HTMLButtonElement
         )
           document.activeElement.blur();
-        dispatchInput.current(keys[event.key]);
+        dispatchInput.current(keys[key]);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -628,6 +629,7 @@ export function BigPicture({
     // One persistent loop: opening a dialog or refreshing downloads must not
     // restart sampling or lose a held button. 30 Hz is enough for launcher UI.
     const timer = window.setInterval(() => {
+      if (document.querySelector(".tizen-player")) return;
       if (document.hidden || !document.hasFocus()) {
         wasActive = false;
         return;

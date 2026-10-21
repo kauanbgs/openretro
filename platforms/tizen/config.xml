@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+  xmlns:tizen="http://tizen.org/ns/widgets"
+  id="https://openretro.org/tv"
+  version="0.1.0"
+  viewmodes="maximized">
+  <tizen:application id="A1b2C3d4E5.OpenRetroTV" package="A1b2C3d4E5" required_version="5.5" />
+  <content src="index.html" />
+  <name>OpenRetro</name>
+  <icon src="icon.png" />
+  <access origin="*" subdomains="true" />
+  <tizen:profile name="tv-samsung" />
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable" />
+  <tizen:feature name="http://tizen.org/feature/screen.size.normal.1080.1920" />
+  <tizen:privilege name="http://tizen.org/privilege/internet" />
+  <tizen:privilege name="http://tizen.org/privilege/download" />
+  <tizen:privilege name="http://tizen.org/privilege/filesystem.read" />
+  <tizen:privilege name="http://tizen.org/privilege/filesystem.write" />
+  <tizen:privilege name="http://tizen.org/privilege/mediastorage" />
+  <tizen:privilege name="http://tizen.org/privilege/externalstorage" />
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice" />
+  <tizen:privilege name="http://tizen.org/privilege/unlimitedstorage" />
+</widget>

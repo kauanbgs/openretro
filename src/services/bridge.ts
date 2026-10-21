@@ -18,6 +18,18 @@ import type {
   DownloadedFile,
 } from "../types";
 import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
+import { isTizen } from "../platform/environment";
+import { timeoutSignal } from "../platform/tizen/compatibility";
+const tizenPlatforms = [
+  "nes",
+  "snes",
+  "gb",
+  "gbc",
+  "gba",
+  "sms",
+  "genesis",
+  "gg",
+];
 const sourcesKey = "openretro-download-sources-v1";
 export interface FilePickerRequest {
   title: string;
@@ -172,7 +184,7 @@ export const bridge = {
       if (!url || new URL(url).protocol !== "https:")
         throw new Error("Enter an HTTPS source URL.");
       const response = await fetch(url, {
-        signal: AbortSignal.timeout(45000),
+        signal: timeoutSignal(45000),
       }).catch(() => {
         throw new Error(
           "This source cannot be fetched by the browser. Paste/import its JSON, or use the desktop app.",
@@ -272,6 +284,31 @@ export const bridge = {
     autoExtract = true,
     autoAddToLibrary = true,
   ): Promise<string> {
+    if (isTizen) {
+      const { startTizenDownload } =
+        await import("../platform/tizen/downloads");
+      return startTizenDownload(
+        match,
+        uriIndex,
+        game,
+        autoExtract,
+        async (path) => {
+          if (!game || !autoAddToLibrary) return;
+          const { tizenReadFile } = await import("../platform/tizen/api");
+          const bytes = await tizenReadFile(path);
+          const hash = await crypto.subtle.digest("SHA-256", bytes);
+          await bridge.addGame(game, {
+            path,
+            filename: path.split("/").pop() ?? game.title,
+            sha256: Array.from(new Uint8Array(hash))
+              .map((value) => value.toString(16).padStart(2, "0"))
+              .join(""),
+            platformIds: detectPlatforms(path),
+          });
+          window.dispatchEvent(new Event("openretro:tizen-library"));
+        },
+      );
+    }
     if (!isDesktop)
       throw new Error(
         "Use the OpenRetro desktop app to download files. Source management is available in this preview.",
@@ -287,16 +324,26 @@ export const bridge = {
     });
   },
   async downloadJobs(): Promise<DownloadJob[]> {
-    return isDesktop ? invoke("list_download_jobs") : [];
+    if (isDesktop) return invoke("list_download_jobs");
+    return isTizen
+      ? (await import("../platform/tizen/downloads")).tizenDownloadJobs()
+      : [];
   },
   async controlDownload(
     id: string,
     action: "pause" | "resume" | "cancel",
   ): Promise<void> {
     if (isDesktop) return invoke("control_download", { id, action });
+    if (isTizen)
+      (await import("../platform/tizen/downloads")).controlTizenDownload(
+        id,
+        action,
+      );
   },
   async removeDownload(id: string): Promise<void> {
     if (isDesktop) return invoke("remove_download", { id });
+    if (isTizen)
+      (await import("../platform/tizen/downloads")).removeTizenDownload(id);
   },
   async downloadFiles(id: string): Promise<DownloadedFile[]> {
     return isDesktop ? invoke("download_files", { id }) : [];
@@ -316,7 +363,22 @@ export const bridge = {
   library: (): Promise<LibraryGame[]> =>
     isDesktop ? invoke("list_library") : Promise.resolve(read().library),
   emulators: (): Promise<Emulator[]> =>
-    isDesktop ? invoke("list_emulators") : Promise.resolve(read().emulators),
+    isDesktop
+      ? invoke("list_emulators")
+      : Promise.resolve(
+          isTizen
+            ? [
+                {
+                  id: "openretro-tizen-runtime",
+                  name: "OpenRetro Runtime TV",
+                  executablePath: "wasm://openretro-runtime",
+                  supportedPlatforms: [...tizenPlatforms],
+                  defaultPlatforms: [...tizenPlatforms],
+                  version: "1",
+                },
+              ]
+            : read().emulators,
+        ),
   emulatorInstallOptions: (): Promise<EmulatorInstall[]> =>
     isDesktop ? invoke("emulator_install_options") : Promise.resolve([]),
   async installEmulator(id: string): Promise<string> {
@@ -460,7 +522,10 @@ export const bridge = {
     );
   },
   async exists(path: string): Promise<boolean> {
-    return isDesktop ? invoke("file_exists", { path }) : false;
+    if (isDesktop) return invoke("file_exists", { path });
+    return isTizen
+      ? (await import("../platform/tizen/api")).tizenFileExists(path)
+      : false;
   },
   async saveEmulator(emulator: Emulator) {
     if (isDesktop) return invoke("save_emulator", { emulator });
@@ -478,6 +543,11 @@ export const bridge = {
   },
   async launch(id: string): Promise<number> {
     if (isDesktop) return invoke("launch_game", { id });
+    if (isTizen) {
+      const entry = read().library.find((game) => game.item.id === id);
+      if (!entry) throw new Error("Este jogo não está mais na biblioteca.");
+      return (await import("../platform/tizen/runtime")).launchTizenGame(entry);
+    }
     throw new Error(
       "Open the desktop app to launch a game with your configured emulator.",
     );

@@ -3,6 +3,8 @@ node_modules/
 !/src-tauri/resources/runtime/retroarch/.gitkeep
 dist/
 dist-runtime/
+dist-tizen/
+.tizen-stage/
 src-tauri/target/
 src-tauri/gen/
 *.log

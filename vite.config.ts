@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { igdbPlugin } from "./server/igdb";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), igdbPlugin()],
   clearScreen: false,
   server: {
@@ -12,5 +12,9 @@ export default defineConfig({
     watch: { ignored: ["**/src-tauri/**", "**/.cache/**"] },
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
-  build: { target: "es2022" },
-});
+  base: mode === "tizen" ? "./" : "/",
+  build: {
+    target: mode === "tizen" ? "chrome69" : "es2022",
+    outDir: mode === "tizen" ? "dist-tizen" : "dist",
+  },
+}));

@@ -143,7 +143,9 @@ export async function catalogTransport(
     return invoke("igdb_query", { request });
   let response: Response;
   try {
-    response = await fetch("/api/igdb/query", {
+    const base =
+      import.meta.env.VITE_OPENRETRO_API_URL?.replace(/\/$/, "") ?? "";
+    response = await fetch(`${base}/api/igdb/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -163,7 +165,8 @@ export async function catalogTransport(
 export async function catalogStatus(): Promise<{ configured: boolean }> {
   if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window)
     return invoke("igdb_status");
-  const response = await fetch("/api/igdb/status");
+  const base = import.meta.env.VITE_OPENRETRO_API_URL?.replace(/\/$/, "") ?? "";
+  const response = await fetch(`${base}/api/igdb/status`);
   if (!response.ok)
     throw new Error(
       "Catalog service is unavailable. Use npm run dev or the desktop app.",

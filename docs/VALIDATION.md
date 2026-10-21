@@ -1,5 +1,18 @@
 # OpenRetro validation record
 
+## 2026-10-21 — Samsung Tizen target
+
+- Added a Tizen 5.5 Web application target that opens directly in Big Picture,
+  maps the TV Return key and Gamepad API, and renders RetroArch WebAssembly in
+  an OpenRetro canvas with an OpenRetro-owned in-game menu.
+- Added direct HTTPS download progress, pause/resume/cancel, ZIP extraction and
+  automatic library import through mandatory Tizen device APIs.
+- Added a commit-pinned Emscripten recipe for five lightweight Libretro cores
+  serving eight systems, plus an unsigned CI artifact for later Samsung signing.
+- The Chrome 69-targeted frontend build, XML manifest parsing, TypeScript checks
+  and recipe validation pass locally. Emscripten binaries and signed WGT output
+  require the CI toolchain/Tizen Studio; physical TV validation remains pending.
+
 ## 2026-10-21 — Embedded game surface
 
 - The managed runtime now starts windowed and its native render window is
@@ -120,7 +133,6 @@ Browser imports remain isolated in localStorage; desktop library data and catalo
 - Native desktop startup succeeded with network downloads enabled. Read-only inspection confirmed migrations **1, 2 and 3**, plus the source/job tables. No test sources or jobs were inserted into the user's desktop database.
 - Public-swarm availability and a real game/emulator session remain unverified. Archive extraction, automatic emulator installation, queue limits and speed limits are not implemented.
 
-
 ### Big Picture functional parity — 2026-10-21
 
 - Reuses the desktop game, import, emulator, download, source and settings components inside a console workspace; desktop redirects were removed.
@@ -128,7 +140,6 @@ Browser imports remain isolated in localStorage; desktop library data and catalo
 - File browsing is read-only, requires absolute paths, filters folders/names and bounds listings to 500 entries. JSON reads are limited to regular `.json` files and 16 MB.
 - Frontend suite: 44 tests passed. Rust library suite: 17 tests passed. Production build passed.
 - No browsers or native app windows are exposed to the UI tools in this session; a visual review and physical controller/file-dialog walkthrough remain unverified. Existing tests do not establish end-to-end input correctness.
-
 
 ### Shared UI/UX and idle work — 2026-10-21
 
