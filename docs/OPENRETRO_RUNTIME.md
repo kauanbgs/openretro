@@ -3,6 +3,9 @@
 OpenRetro Runtime is a downstream, minimal build of RetroArch used only as the
 native Libretro host. It is launched as a private child process; every visible
 screen, download, update, profile and in-game action belongs to OpenRetro.
+On Windows, its native video window is reparented into the main OpenRetro HWND,
+resized to the client area and removed from the taskbar. Keeping the runtime in
+a child process preserves crash isolation without exposing a second app window.
 
 ## Included boundary
 

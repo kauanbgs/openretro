@@ -5,6 +5,8 @@ use tauri::{Emitter, Manager};
 #[cfg(target_os = "windows")]
 mod controller;
 #[cfg(target_os = "windows")]
+mod host;
+#[cfg(target_os = "windows")]
 mod sdl;
 
 #[derive(Default)]
@@ -14,6 +16,8 @@ struct Session {
     stdin: Option<ChildStdin>,
     pid: u32,
     sdl_library: Option<std::path::PathBuf>,
+    embedded_window: Option<isize>,
+    main_was_fullscreen: bool,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,22 +43,41 @@ impl SessionGuard {
         session.stdin = Some(stdin);
         session.pid = pid;
         session.sdl_library = executable.parent().map(|path| path.join("SDL2.dll"));
+        drop(guard);
+        #[cfg(target_os = "windows")]
+        {
+            let window = host::embed(&self.app, pid)?;
+            let mut guard = service.0.lock().map_err(error)?;
+            let session = guard
+                .as_mut()
+                .filter(|session| session.info.id == self.id)
+                .ok_or("A sessão do jogo foi encerrada.")?;
+            session.embedded_window = Some(window);
+        }
         Ok(())
     }
 }
 impl Drop for SessionGuard {
     fn drop(&mut self) {
         let service = self.app.state::<InGameService>();
+        let mut was_fullscreen = None;
         if let Ok(mut guard) = service.0.lock() {
             if guard
                 .as_ref()
                 .is_some_and(|session| session.info.id == self.id)
             {
+                was_fullscreen = guard.as_ref().map(|session| session.main_was_fullscreen);
                 *guard = None;
             }
         }
         if let Some(window) = self.app.get_webview_window("game-menu") {
             let _ = window.hide();
+        }
+        if let (Some(fullscreen), Some(window)) =
+            (was_fullscreen, self.app.get_webview_window("main"))
+        {
+            let _ = window.set_fullscreen(fullscreen);
+            let _ = window.set_focus();
         }
         let _ = self.app.emit("in-game-state", Option::<SessionInfo>::None);
     }
@@ -65,6 +88,10 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str) -> Result<SessionG
     if guard.is_some() {
         return Err("Um jogo já está em execução. Encerre-o antes de iniciar outro.".into());
     }
+    let main_was_fullscreen = app
+        .get_webview_window("main")
+        .and_then(|window| window.is_fullscreen().ok())
+        .unwrap_or(false);
     *guard = Some(Session {
         info: SessionInfo {
             id: id.into(),
@@ -75,6 +102,8 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str) -> Result<SessionG
         stdin: None,
         pid: 0,
         sdl_library: None,
+        embedded_window: None,
+        main_was_fullscreen,
     });
     Ok(SessionGuard {
         app: app.clone(),
@@ -106,12 +135,12 @@ fn command_for(action: &str, slot: i32) -> Result<&'static str> {
 }
 pub fn toggle(app: &tauri::AppHandle) -> Result<()> {
     let service = app.state::<InGameService>();
-    let (info, pid) = {
+    let (info, pid, embedded_window) = {
         let mut guard = service.0.lock().map_err(error)?;
         let session = guard.as_mut().ok_or("Nenhum jogo em execução.")?;
         write_command(session, "PAUSE_TOGGLE")?;
         session.info.open = !session.info.open;
-        (session.info.clone(), session.pid)
+        (session.info.clone(), session.pid, session.embedded_window)
     };
     let window = app
         .get_webview_window("game-menu")
@@ -123,7 +152,9 @@ pub fn toggle(app: &tauri::AppHandle) -> Result<()> {
     } else {
         window.hide().map_err(error)?;
         #[cfg(target_os = "windows")]
-        controller::focus_process(pid);
+        if !embedded_window.is_some_and(host::focus) {
+            controller::focus_process(pid);
+        }
     }
     app.emit("in-game-state", Some(info)).map_err(error)
 }
@@ -250,6 +281,8 @@ mod tests {
             stdin: None,
             pid: 0,
             sdl_library: None,
+            embedded_window: None,
+            main_was_fullscreen: false,
         };
         assert!(super::write_command(&mut session, "SAVE_STATE").is_err());
     }

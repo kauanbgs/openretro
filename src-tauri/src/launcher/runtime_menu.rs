@@ -128,8 +128,8 @@ fn render(runtime: &Path, screenshots: &Path, profiles: &Path) -> String {
     let mut config = String::from(
         r#"# OpenRetro in-game controls. Regenerated on launch.
 config_save_on_exit = "false"
-video_fullscreen = "true"
-video_windowed_fullscreen = "true"
+video_fullscreen = "false"
+video_windowed_fullscreen = "false"
 video_window_show_decorations = "false"
 input_joypad_driver = "sdl2"
 input_autodetect_enable = "true"
@@ -264,6 +264,7 @@ mod tests {
         )
         .unwrap();
         let text = std::fs::read_to_string(config).unwrap();
+        assert!(text.contains("video_fullscreen = \"false\""));
         assert!(text.contains("input_menu_toggle_gamepad_combo = \"0\""));
         assert!(text.contains("stdin_cmd_enable = \"true\""));
         assert!(text.contains("network_cmd_enable = \"false\""));

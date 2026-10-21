@@ -1,5 +1,17 @@
 # OpenRetro validation record
 
+## 2026-10-21 — Embedded game surface
+
+- The managed runtime now starts windowed and its native render window is
+  attached to OpenRetro's main Windows window, with top-level chrome and taskbar
+  presence removed.
+- The existing OpenRetro pause overlay stays above the embedded game and focus
+  returns to the game surface when the overlay closes.
+- Startup failures terminate the child runtime and remove the unfinished play
+  session instead of leaving an orphan process.
+- Rust unit tests and compilation pass. Physical gameplay and controller
+  validation remain pending because no runtime/game session was available.
+
 ## 2026-10-21 — OpenRetro Runtime recipe
 
 - Replaced the release-time full RetroArch download with a commit-pinned,

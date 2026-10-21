@@ -123,7 +123,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
  let mut args:Vec<String>=if managed_retroarch {
     let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume)?;
-    vec!["--fullscreen".into(),"--appendconfig".into(),config.to_string_lossy().into_owned(),"-L".into(),retroarch_core(&app,&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()]
+    vec!["--appendconfig".into(),config.to_string_lossy().into_owned(),"-L".into(),retroarch_core(&app,&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()]
  } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
  if !managed_retroarch && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
  let session=uuid::Uuid::new_v4().to_string(); let started=chrono::Utc::now().to_rfc3339();
@@ -137,7 +137,14 @@ pub async fn launch_game(app: tauri::AppHandle, id: String) -> Result<i64> {
  let child=Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?).spawn();
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {
-    if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable)?; }
+    if let Some(stdin)=child.stdin.take() {
+      if let Err(message)=runtime_session.attach(stdin,child.id(),&executable) {
+        let _=child.kill();
+        let _=child.wait();
+        db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?;
+        return Err(message);
+      }
+    }
  }
  {
  let conn=db.0.lock().map_err(error)?;
