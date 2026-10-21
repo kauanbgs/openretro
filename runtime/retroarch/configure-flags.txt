@@ -41,7 +41,7 @@
 --enable-d3d11
 --disable-opengl1
 --enable-opengl
---enable-opengl_core
+--disable-opengl_core
 --enable-vulkan
 --disable-vulkan_display
 --disable-glsl
