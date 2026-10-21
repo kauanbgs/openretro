@@ -134,6 +134,10 @@ export interface DownloadJob {
   autoExtract?: boolean;
   autoAddToLibrary?: boolean;
 }
+export interface DownloadImported {
+  gameId: string;
+  downloadId: string;
+}
 export interface DownloadSourceEntry {
   title: string;
   uris: string[];

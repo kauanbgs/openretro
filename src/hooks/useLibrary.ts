@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { bridge } from "../services/bridge";
 export function useLibrary() {
   return useQuery({ queryKey: ["library"], queryFn: bridge.library });
@@ -8,10 +9,10 @@ export function useEmulators() {
 }
 export function useRefresh() {
   const client = useQueryClient();
-  return async () => {
+  return useCallback(async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: ["library"] }),
       client.invalidateQueries({ queryKey: ["emulators"] }),
     ]);
-  };
+  }, [client]);
 }

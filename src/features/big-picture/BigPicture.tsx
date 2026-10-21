@@ -28,6 +28,7 @@ import type {
   Emulator,
   LibraryGame,
   GameMetadata,
+  DownloadImported,
 } from "../../types";
 import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
 import { bridge, isDesktop } from "../../services/bridge";
@@ -59,6 +60,7 @@ export function BigPicture({
   library,
   emulators,
   jobs,
+  downloadArrival,
   refresh,
   onClose,
   onDesktop,
@@ -67,6 +69,7 @@ export function BigPicture({
   library: LibraryGame[];
   emulators: Emulator[];
   jobs: DownloadJob[];
+  downloadArrival?: DownloadImported;
   refresh: () => Promise<void>;
   onClose: () => void;
   onDesktop: (page: "Discover" | "Settings" | "Emulators") => void;
@@ -115,6 +118,50 @@ export function BigPicture({
   const [catalogCount, setCatalogCount] = useState(0);
   const [selected, setSelected] = useState(0);
   const [launching, setLaunching] = useState(false);
+  // Existing notifications are ignored on entry; react to arrivals while this
+  // console session is mounted, once the refreshed library contains the game.
+  const handledImport = useRef(downloadArrival?.downloadId);
+  useEffect(() => {
+    if (
+      !downloadArrival ||
+      handledImport.current === downloadArrival.downloadId ||
+      launching
+    )
+      return;
+    const ordered = [...library].sort((a, b) =>
+      (b.item.lastPlayedAt ?? "").localeCompare(a.item.lastPlayedAt ?? ""),
+    );
+    const platform = jobs.find((job) => job.id === downloadArrival.downloadId)
+      ?.game?.platformId;
+    const index = ordered.findIndex(
+      (entry) =>
+        entry.game.id === downloadArrival.gameId &&
+        (!platform || entry.game.platformId === platform),
+    );
+    if (index < 0) return;
+    handledImport.current = downloadArrival.downloadId;
+    selectInput.current?.("b");
+    setKeyboardOpen(false);
+    setRemoveTarget(undefined);
+    setPowerOpen(false);
+    setFilter("all");
+    setQuery("");
+    setLibraryPlatform("all");
+    setLibrarySort("recent");
+    setSection("library");
+    setNavIndex(sections.findIndex((item) => item.id === "library"));
+    setNavFocused(false);
+    setSelected(index);
+    feedback(
+      `${ordered[index].game.title} foi adicionado à biblioteca. Pronto para jogar.`,
+    );
+    requestAnimationFrame(() => {
+      content.current?.scrollTo({ top: 0, behavior: "instant" });
+      root.current
+        ?.querySelector<HTMLButtonElement>(".tv-play")
+        ?.focus({ preventScroll: true });
+    });
+  }, [downloadArrival, library, jobs, launching, feedback]);
 
   useEffect(() => {
     if (!notice) return;

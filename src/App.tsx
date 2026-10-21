@@ -35,6 +35,7 @@ import {
   type GameMetadata,
   type ImportCandidate,
   type LibraryGame,
+  type DownloadImported,
 } from "./types";
 import { platformById } from "./db/platforms";
 type Page =
@@ -67,6 +68,7 @@ export function App() {
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
   const [bigPicture, setBigPicture] = useState(false);
+  const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [updateVersion, setUpdateVersion] = useState<string>();
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [playing, setPlaying] = useState<LibraryGame>();
@@ -83,11 +85,15 @@ export function App() {
   });
   useEffect(() => {
     if (!isDesktop) return;
-    const unlisten = listen("download-imported", async () => {
-      await refresh();
-      setPage("Library");
-      notify("Download finished and was added to your library.");
-    });
+    const unlisten = listen<DownloadImported>(
+      "download-imported",
+      async ({ payload }) => {
+        await refresh();
+        setDownloadArrival(payload);
+        setPage("Library");
+        notify("Download finished and was added to your library.");
+      },
+    );
     return () => {
       void unlisten.then((fn) => fn());
     };
@@ -176,6 +182,7 @@ export function App() {
         library={library}
         emulators={emulators}
         jobs={jobs}
+        downloadArrival={downloadArrival}
         refresh={refresh}
         onClose={() => setBigPicture(false)}
         onDesktop={(destination) => {

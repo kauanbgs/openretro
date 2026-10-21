@@ -36,6 +36,14 @@ The file fingerprint was independently checked as `e2c6c891837226d98f911eb1d735f
 
 ## Remaining validation
 
+### Completed downloads in Big Picture
+
+- Read-only inspection confirmed the latest completed download was already registered in the native library. The completion handler previously changed only the hidden desktop page.
+- The shared completion event now reaches Big Picture after query refresh. The console opens Library, clears filters/search that could hide the arrival, selects the imported game/platform and focuses Play. It waits until a running game exits before changing focus.
+- Memoized the shared refresh callback so completion subscriptions remain stable across download polling renders.
+- An isolated browser fixture simulated completion while on Downloads, including library data arriving after the event. The UI switched to Library and focused Play for the imported title. No user library entries or download files were changed by this check.
+- Frontend tests: 41 passed; production frontend build passed. No backend transfer behavior changed.
+
 ### Explicit selects, library scrolling and typography
 
 - Replaced console filter controls with shared combobox/listbox controls: confirmation opens the menu, Up/Down highlights a draft, confirmation applies, and Back/Escape cancels. Closed controls navigate focus instead of changing values.
