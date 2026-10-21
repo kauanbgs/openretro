@@ -105,6 +105,19 @@ export function ConsoleWorkspace({
 }) {
   const root = useRef<HTMLElement>(null);
   const current = useRef<HTMLElement | null>(null);
+  const controlCache = useRef<
+    { scope: HTMLElement | null | undefined; nodes: HTMLElement[] } | undefined
+  >(undefined);
+  const routeHistory = useRef<WorkspaceRoute[]>([]);
+  const navigate = (next: WorkspaceRoute) => {
+    routeHistory.current.push(route);
+    onRoute(next);
+  };
+  const back = () => {
+    const previous = routeHistory.current.pop();
+    if (previous) onRoute(previous);
+    else onClose();
+  };
   const keyboardInput = useRef<((key: string) => boolean) | null>(null);
   const [editing, setEditing] = useState<{
     field: HTMLInputElement | HTMLTextAreaElement;
@@ -151,19 +164,22 @@ export function ConsoleWorkspace({
     );
     return dialogs?.length ? dialogs[dialogs.length - 1] : root.current;
   }, []);
-  const controls = useCallback(
-    () =>
-      Array.from(
-        scope()?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled):not([type="hidden"]):not([type="file"]), select:not(:disabled), textarea:not(:disabled), a[href], summary',
-        ) ?? [],
-      ).filter(
-        (node) =>
-          node.getClientRects().length &&
-          !node.closest('[hidden], [inert], [aria-hidden="true"]'),
-      ),
-    [scope],
-  );
+  const controls = useCallback(() => {
+    const currentScope = scope();
+    if (controlCache.current?.scope === currentScope)
+      return controlCache.current.nodes;
+    const nodes = Array.from(
+      currentScope?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled):not([type="hidden"]):not([type="file"]), select:not(:disabled), textarea:not(:disabled), a[href], summary',
+      ) ?? [],
+    ).filter(
+      (node) =>
+        node.getClientRects().length &&
+        !node.closest('[hidden], [inert], [aria-hidden="true"]'),
+    );
+    controlCache.current = { scope: currentScope, nodes };
+    return nodes;
+  }, [scope]);
   const focus = useCallback((node?: HTMLElement) => {
     if (!node) return;
     current.current?.removeAttribute("data-console-focus");
@@ -183,6 +199,7 @@ export function ConsoleWorkspace({
     let previousScope: HTMLElement | null | undefined;
     const history: (HTMLElement | null)[] = [];
     const repair = () => {
+      controlCache.current = undefined;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         if (!active || editing || select) return;
@@ -215,10 +232,12 @@ export function ConsoleWorkspace({
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["disabled", "hidden"],
+        attributeFilter: ["disabled", "hidden", "open", "aria-hidden", "style"],
       });
     repair();
+    window.addEventListener("resize", repair);
     return () => {
+      window.removeEventListener("resize", repair);
       observer.disconnect();
       cancelAnimationFrame(frame);
     };
@@ -258,7 +277,8 @@ export function ConsoleWorkspace({
             'header button[aria-label], button[aria-label="Close dialog"]',
           )
           ?.click();
-      } else onMenu();
+      } else if (routeHistory.current.length) back();
+      else onMenu();
       return true;
     }
     const nodes = controls();
@@ -418,14 +438,14 @@ export function ConsoleWorkspace({
       }}
     >
       <header className="tv-workspace-header">
-        <button onClick={onClose}>
+        <button onClick={back}>
           <ChevronLeft size={20} />
           Voltar
         </button>
         <strong>{titles[route.page]}</strong>
         <div>
           {route.page === "downloads" && (
-            <button onClick={() => onRoute({ page: "sources" })}>
+            <button onClick={() => navigate({ page: "sources" })}>
               Gerenciar fontes
             </button>
           )}
@@ -458,7 +478,7 @@ export function ConsoleWorkspace({
         >
           {route.page === "settings" && (
             <SettingsPage
-              onEmulators={() => onRoute({ page: "emulators" })}
+              onEmulators={() => navigate({ page: "emulators" })}
               notify={notify}
             />
           )}
@@ -490,9 +510,9 @@ export function ConsoleWorkspace({
               game={route.game}
               entry={entry}
               emulators={emulators}
-              onBack={onClose}
+              onBack={back}
               onImport={(game) => setImporting({ game })}
-              onEmulators={() => onRoute({ page: "emulators" })}
+              onEmulators={() => navigate({ page: "emulators" })}
               refresh={refresh}
               notify={notify}
             />

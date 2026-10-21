@@ -1,12 +1,20 @@
 import { BrandMark } from "../../components/Brand";
 import { PageHeader } from "../../components/PageHeader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Check, ExternalLink, Folder } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, AlertCircle, ExternalLink, Folder } from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { SourceManager } from "../downloads/SourceManager";
 import { PlayerPicker } from "../../components/PlayerPicker";
+const sectionLabels: Record<string, string> = {
+  General: "Geral",
+  Library: "Biblioteca",
+  Emulators: "Emuladores",
+  Downloads: "Downloads",
+  Appearance: "Aparência",
+  Advanced: "Avançado",
+};
 export function SettingsPage({
   onEmulators,
   notify,
@@ -16,6 +24,9 @@ export function SettingsPage({
 }) {
   const [section, setSection] = useState("General");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const writes = useRef(Promise.resolve());
+  const version = useRef(0);
   const [playersOpen, setPlayersOpen] = useState(false);
   const { data: players } = useQuery({
     queryKey: ["players"],
@@ -31,29 +42,62 @@ export function SettingsPage({
     queryFn: bridge.appPaths,
   });
   async function save(patch: Partial<AppSettings>) {
+    const revision = ++version.current;
     setSaving(true);
+    setSaveError("");
+    await client.cancelQueries({ queryKey: ["settings"] });
+    const next = {
+      ...defaultSettings,
+      ...client.getQueryData<AppSettings>(["settings"]),
+      ...patch,
+    };
+    client.setQueryData(["settings"], next);
+    // Preserve consecutive edits and serialize native writes instead of racing snapshots.
+    writes.current = writes.current
+      .catch(() => undefined)
+      .then(async () => {
+        await bridge.saveSettings(next);
+      });
     try {
-      await bridge.saveSettings({ ...settings, ...patch });
-      await client.invalidateQueries({ queryKey: ["settings"] });
+      await writes.current;
+      if (revision === version.current) client.setQueryData(["settings"], next);
     } catch (e) {
-      notify(String(e));
+      if (revision === version.current) {
+        setSaveError(String(e));
+        notify(String(e));
+        await client.invalidateQueries({ queryKey: ["settings"] });
+      }
     } finally {
-      setSaving(false);
+      if (revision === version.current) setSaving(false);
     }
   }
   return (
     <div className="page-content">
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
       <PageHeader
-        title="Settings"
-        description="Manage your library and application preferences."
+        title="Configurações"
+        description="Personalize como você organiza e joga."
         actions={
-          <span className="saved-status">
-            <Check size={15} />
-            {saving ? "Saving…" : "All changes saved"}
+          <span
+            className="saved-status"
+            data-error={Boolean(saveError)}
+            role="status"
+          >
+            {saveError ? <AlertCircle size={15} /> : <Check size={15} />}
+            {saving
+              ? "Salvando…"
+              : saveError
+                ? "Alteração não salva"
+                : "Salvamento automático"}
           </span>
         }
       />
+      {saveError && (
+        <p className="error-message" role="alert">
+          Não foi possível salvar. As preferências foram recarregadas.{" "}
+          {saveError}
+        </p>
+      )}
       <div className="settings-layout">
         <nav className="settings-nav">
           {[
@@ -69,12 +113,12 @@ export function SettingsPage({
               key={s}
               onClick={() => setSection(s)}
             >
-              {s}
+              {sectionLabels[s]}
             </button>
           ))}
         </nav>
         <div className="settings-panel">
-          <h2>{section}</h2>
+          <h2>{sectionLabels[section]}</h2>
           {section === "General" ? (
             <>
               <div className="setting-row">
@@ -127,27 +171,30 @@ export function SettingsPage({
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Application language</strong>
-                  <p>The interface is currently available in English.</p>
+                  <strong>Idioma da interface</strong>
+                  <p>
+                    Algumas telas e mensagens dos emuladores aparecem em inglês.
+                  </p>
                 </div>
-                <select disabled aria-label="Application language">
-                  <option>English</option>
+                <select disabled aria-label="Idioma da interface">
+                  <option>Português / English</option>
                 </select>
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Start with system / Start minimized</strong>
+                  <strong>Iniciar com o sistema</strong>
                   <p>
-                    System startup integration is planned for a future release.
+                    A inicialização junto com o sistema ainda não está
+                    disponível.
                   </p>
                 </div>
-                <span className="badge">Planned</span>
+                <span className="badge">Em breve</span>
               </div>
               <div className="about-box">
                 <BrandMark />
                 <div>
                   <strong>OpenRetro</strong>
-                  <p>Version 0.1.0</p>
+                  <p>Versão 0.1.0</p>
                 </div>
               </div>
             </>
@@ -155,41 +202,42 @@ export function SettingsPage({
             <>
               <div className="setting-row">
                 <div>
-                  <strong>Library folders</strong>
+                  <strong>Pastas da biblioteca</strong>
                   <p>
-                    Imported files remain in their original locations.
+                    Seus arquivos permanecem nas pastas em que foram importados.
                     <br />
-                    Manage each path from the game’s Details tab.
+                    Altere o caminho na aba de detalhes do jogo.
                   </p>
                 </div>
                 <Folder size={21} />
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Scan automatically</strong>
+                  <strong>Buscar novos jogos automaticamente</strong>
                   <p>
-                    Automatic scans are not available yet. Use Add game to
-                    import a file.
+                    Use Adicionar jogo para importar um arquivo ou uma pasta.
                   </p>
                 </div>
-                <span className="badge">Planned</span>
+                <span className="badge">Em breve</span>
               </div>
             </>
           ) : section === "Emulators" ? (
             <div className="setting-row">
               <div>
-                <strong>Installed emulators & platform defaults</strong>
-                <p>Add executables, test their paths, and choose defaults.</p>
+                <strong>Emuladores e consoles</strong>
+                <p>
+                  Instale, teste e escolha o emulador padrão para cada console.
+                </p>
               </div>
               <button className="button secondary" onClick={onEmulators}>
-                Manage <ExternalLink size={15} />
+                Gerenciar <ExternalLink size={15} />
               </button>
             </div>
           ) : section === "Downloads" ? (
             <>
               <SourceManager />
               <label>
-                Download directory
+                Pasta de downloads
                 <input
                   disabled
                   value={settings.downloadDirectory}
@@ -208,14 +256,14 @@ export function SettingsPage({
                     .catch((e) => notify(String(e)))
                 }
               >
-                <Folder size={16} /> Choose download directory
+                <Folder size={16} /> Escolher pasta de downloads
               </button>
               <div className="setting-row">
                 <div>
-                  <strong>Concurrent downloads</strong>
+                  <strong>Downloads simultâneos</strong>
                   <p>
-                    Torrents run independently. Queue limits are not available
-                    yet.
+                    Os downloads são independentes. O limite da fila ainda não
+                    está disponível.
                   </p>
                 </div>
                 <input
@@ -227,8 +275,8 @@ export function SettingsPage({
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Bandwidth limit</strong>
-                  <p>0 = unlimited · reserved setting.</p>
+                  <strong>Limite de velocidade</strong>
+                  <p>O controle de velocidade ainda não está disponível.</p>
                 </div>
                 <input
                   disabled
@@ -242,8 +290,8 @@ export function SettingsPage({
             <>
               <div className="setting-row">
                 <div>
-                  <strong>Theme</strong>
-                  <p>A quiet backdrop for your collection.</p>
+                  <strong>Tema</strong>
+                  <p>Escolha a aparência da interface.</p>
                 </div>
                 <select
                   aria-label="Theme"
@@ -252,17 +300,17 @@ export function SettingsPage({
                     void save({ theme: e.target.value as AppSettings["theme"] })
                   }
                 >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
+                  <option value="dark">Escuro</option>
+                  <option value="light">Claro</option>
                 </select>
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Library density</strong>
-                  <p>Choose how much of your collection you see.</p>
+                  <strong>Densidade da biblioteca</strong>
+                  <p>Ajuste o tamanho dos jogos exibidos na biblioteca.</p>
                 </div>
                 <select
-                  aria-label="Library density"
+                  aria-label="Densidade da biblioteca"
                   value={settings.density}
                   onChange={(e) =>
                     void save({
@@ -270,19 +318,19 @@ export function SettingsPage({
                     })
                   }
                 >
-                  <option value="comfortable">Comfortable</option>
-                  <option value="compact">Compact</option>
+                  <option value="comfortable">Confortável</option>
+                  <option value="compact">Compacta</option>
                 </select>
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Subtle animations</strong>
-                  <p>Animate loading indicators and control transitions.</p>
+                  <strong>Animações da interface</strong>
+                  <p>Transições curtas ao navegar e abrir menus.</p>
                 </div>
                 <button
                   role="switch"
                   aria-checked={settings.animations}
-                  aria-label="Subtle animations"
+                  aria-label="Animações da interface"
                   className={`switch ${settings.animations ? "on" : ""}`}
                   onClick={() =>
                     void save({ animations: !settings.animations })
@@ -310,13 +358,13 @@ export function SettingsPage({
               ))}
               <div className="setting-row">
                 <div>
-                  <strong>Developer mode</strong>
-                  <p>Show runtime and storage details in the sidebar.</p>
+                  <strong>Modo de desenvolvedor</strong>
+                  <p>Mostre informações técnicas na barra lateral.</p>
                 </div>
                 <button
                   role="switch"
                   aria-checked={settings.developerMode}
-                  aria-label="Developer mode"
+                  aria-label="Modo de desenvolvedor"
                   className={`switch ${settings.developerMode ? "on" : ""}`}
                   onClick={() =>
                     void save({ developerMode: !settings.developerMode })

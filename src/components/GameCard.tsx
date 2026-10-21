@@ -24,7 +24,7 @@ export function GameCard({
           <Heart className="card-heart" size={15} fill="currentColor" />
         )}
         {downloadAvailable && !item && (
-          <span className="card-download" title="Download available">
+          <span className="card-download" title="Download disponível">
             <Download size={13} /> Download
           </span>
         )}
@@ -35,11 +35,11 @@ export function GameCard({
       <div className="card-title">{game.title}</div>
       <div className="card-meta">
         {platformById(game.platformId)?.name}
-        <span className="card-year">{game.year || "Year unknown"}</span>
+        <span className="card-year">{game.year || "Ano desconhecido"}</span>
       </div>
       <div className="card-status">
         <i className={item ? "installed" : ""} />
-        {item ? "Local file" : game.genre}
+        {item ? "Na biblioteca" : game.genre}
       </div>
     </button>
   );

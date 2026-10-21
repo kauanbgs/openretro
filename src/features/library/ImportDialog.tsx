@@ -188,14 +188,14 @@ export function ImportDialog({
     }
   }
   return (
-    <Modal title="Add game" onClose={onClose}>
+    <Modal title="Adicionar jogo" onClose={onClose}>
       <div className="steps">
         <span className="active">
-          1 <b>Locate file</b>
+          1 <b>Escolher arquivo</b>
         </span>
         <ArrowRight size={14} />
         <span className={candidate ? "active" : ""}>
-          2 <b>Confirm details</b>
+          2 <b>Confirmar dados</b>
         </span>
       </div>
       {!candidate ? (
@@ -270,13 +270,13 @@ export function ImportDialog({
             </p>
           )}
           <label>
-            Search IGDB
+            Buscar na IGDB
             <div className="input-action">
               <input
                 maxLength={120}
                 value={metadataSearch}
                 onChange={(e) => setMetadataSearch(e.target.value)}
-                placeholder="Find matching game metadata"
+                placeholder="Buscar informações do jogo"
               />
               <button
                 className="button secondary"
@@ -315,7 +315,7 @@ export function ImportDialog({
                 setSelected(e.target.value);
               }}
             >
-              <option value="custom">Use my own title</option>
+              <option value="custom">Usar meu próprio título</option>
               {matches
                 .filter(
                   (g) =>
@@ -340,7 +340,7 @@ export function ImportDialog({
             </label>
           )}
           <details>
-            <summary>File fingerprint</summary>
+            <summary>Identificação do arquivo</summary>
             <code className="hash">{candidate.sha256}</code>
           </details>
           {!isDesktop && (
@@ -359,7 +359,7 @@ export function ImportDialog({
             ) : (
               <Check size={17} />
             )}{" "}
-            {busy ? "Adding to your library…" : "Add to library"}
+            {busy ? "Adding to your library…" : "Adicionar à biblioteca"}
           </button>
         </div>
       )}

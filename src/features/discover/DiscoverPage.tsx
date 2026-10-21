@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -13,6 +13,7 @@ import { platforms } from "../../db/platforms";
 import { GameCard } from "../../components/GameCard";
 import { bridge } from "../../services/bridge";
 import { PageHeader } from "../../components/PageHeader";
+import { PageLoading } from "../../components/PageLoading";
 import { CatalogConnection } from "./CatalogConnection";
 import type { CatalogRequest } from "../../providers/metadata/types";
 import type { GameMetadata } from "../../types";
@@ -68,14 +69,17 @@ export function DiscoverPage({
     retry: false,
     staleTime: 86400000,
   });
-  const games = [
-    ...new Map(
-      (browse.data?.pages.flatMap((p) => p.games) ?? []).map((game) => [
-        game.id,
-        game,
-      ]),
-    ).values(),
-  ];
+  const games = useMemo(
+    () => [
+      ...new Map(
+        (browse.data?.pages.flatMap((p) => p.games) ?? []).map((game) => [
+          game.id,
+          game,
+        ]),
+      ).values(),
+    ],
+    [browse.data],
+  );
   const available = taxonomy.data?.platforms ?? [];
   const sentinel = useCatalogPagination(
     Boolean(browse.hasNextPage && !browse.isFetching && !browse.error),
@@ -95,7 +99,10 @@ export function DiscoverPage({
     enabled: games.length > 0,
     staleTime: 30000,
   });
-  const availableDownloads = new Set(availability.data ?? []);
+  const availableDownloads = useMemo(
+    () => new Set(availability.data ?? []),
+    [availability.data],
+  );
   async function retry() {
     await client.invalidateQueries({ queryKey: ["catalog-status"] });
     await client.invalidateQueries({ queryKey: ["catalog-taxonomy"] });
@@ -104,8 +111,8 @@ export function DiscoverPage({
   return (
     <div className="page-content discover-page">
       <PageHeader
-        title="Discover"
-        description="Browse the games that made their generation."
+        title="Catálogo"
+        description="Explore clássicos por console, gênero e época."
         actions={
           <a
             className="catalog-attribution"
@@ -120,7 +127,7 @@ export function DiscoverPage({
       {status.isPending ? (
         <div className="catalog-loading">
           <LoaderCircle className="spin" size={24} />
-          <p>Connecting to IGDB…</p>
+          <p>Conectando à IGDB…</p>
         </div>
       ) : !status.data?.configured || status.error ? (
         <CatalogConnection
@@ -140,7 +147,7 @@ export function DiscoverPage({
                 aria-pressed={platform === "all"}
                 onClick={() => setPlatform("all")}
               >
-                All consoles
+                Todos os consoles
               </button>
               {consoles.map((p) => (
                 <button
@@ -160,14 +167,14 @@ export function DiscoverPage({
             <div className="catalog-context">
               <h2>
                 {debounced
-                  ? "Search results"
+                  ? "Resultados da busca"
                   : platform === "all"
-                    ? "All games"
+                    ? "Todos os jogos"
                     : platforms.find((p) => p.id === platform)?.name}
               </h2>
               <p>
                 {browse.isFetching
-                  ? "Loading games…"
+                  ? "Carregando jogos…"
                   : `${games.length} games loaded`}
                 {debounced && ` for “${debounced}”`}
                 {selectedGenre && ` / ${selectedGenre}`}
@@ -208,10 +215,10 @@ export function DiscoverPage({
                   <option value="popular">
                     {debounced ? "Relevance" : "Most rated"}
                   </option>
-                  <option value="rating">Highest rated</option>
+                  <option value="rating">Melhor avaliados</option>
                   <option value="title">Title</option>
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
+                  <option value="newest">Mais recentes</option>
+                  <option value="oldest">Mais antigos</option>
                 </select>
               </label>
               <div className="view-toggle">
@@ -240,19 +247,16 @@ export function DiscoverPage({
             </p>
           )}
           {browse.isPending ? (
-            <div className="catalog-loading">
-              <LoaderCircle size={24} className="spin" />
-              <p>Loading games…</p>
-            </div>
+            <PageLoading embedded label="Carregando jogos…" />
           ) : browse.error && games.length === 0 ? (
             <div className="catalog-error">
-              <h3>Couldn’t load the catalog</h3>
+              <h3>Não foi possível carregar o catálogo</h3>
               <p role="alert">{String(browse.error)}</p>
               <button
                 className="button secondary"
                 onClick={() => void browse.refetch()}
               >
-                <RefreshCw size={16} /> Try again
+                <RefreshCw size={16} /> Tentar novamente
               </button>
             </div>
           ) : games.length ? (
@@ -273,8 +277,8 @@ export function DiscoverPage({
           ) : (
             <div className="empty-state">
               <Search size={34} />
-              <h2>No games match these filters</h2>
-              <p>Try another title, console, or genre.</p>
+              <h2>Nenhum jogo com esses filtros</h2>
+              <p>Tente outro título, console ou gênero.</p>
               <button
                 className="button secondary"
                 onClick={() => {
@@ -283,7 +287,7 @@ export function DiscoverPage({
                   setPlatform("all");
                 }}
               >
-                Clear filters
+                Limpar filtros
               </button>
             </div>
           )}
@@ -302,7 +306,9 @@ export function DiscoverPage({
                 {browse.isFetchingNextPage && (
                   <LoaderCircle size={16} className="spin" />
                 )}{" "}
-                {browse.isFetchingNextPage ? "Loading…" : "Load more games"}
+                {browse.isFetchingNextPage
+                  ? "Carregando…"
+                  : "Carregar mais jogos"}
               </button>
             </div>
           )}

@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download, Pause, Play, FolderOpen, Trash2 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
+import { activeTransferStates } from "../../services/activity";
+import { formatBytes as bytes, formatRemaining } from "../../utils/format";
 import type {
   DownloadJob,
   DownloadedFile,
@@ -13,19 +15,16 @@ import type {
 const active = (state: string) =>
   ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING"].includes(state);
 const labels: Record<string, string> = {
-  RESOLVING: "Looking for peers and metadata (up to 90 seconds)",
-  QUEUED: "Queued",
-  DOWNLOADING: "Downloading",
-  VERIFYING: "Checking torrent pieces",
-  PAUSED: "Paused",
-  COMPLETED: "Downloaded",
-  CANCELLED: "Cancelled",
-  FAILED: "Failed",
+  RESOLVING: "Buscando conexões e metadados",
+  QUEUED: "Na fila",
+  DOWNLOADING: "Baixando",
+  VERIFYING: "Verificando arquivos",
+  INSTALLING: "Preparando para jogar",
+  PAUSED: "Pausado",
+  COMPLETED: "Concluído",
+  CANCELLED: "Cancelado",
+  FAILED: "Falhou",
 };
-const bytes = (n = 0) =>
-  n >= 1073741824
-    ? `${(n / 1073741824).toFixed(2)} GB`
-    : `${(n / 1048576).toFixed(1)} MB`;
 export function DownloadsPage({
   jobs,
   onImport,
@@ -40,6 +39,30 @@ export function DownloadsPage({
   const client = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("all");
+  const summary = useMemo(
+    () => ({
+      active: jobs.filter((job) => activeTransferStates.has(job.state)).length,
+      completed: jobs.filter((job) => job.state === "COMPLETED").length,
+      speed: jobs.reduce(
+        (speed, job) =>
+          speed + (job.state === "DOWNLOADING" ? job.bytesPerSecond : 0),
+        0,
+      ),
+    }),
+    [jobs],
+  );
+  const visible = useMemo(
+    () =>
+      jobs.filter(
+        (job) =>
+          filter === "all" ||
+          (filter === "active"
+            ? activeTransferStates.has(job.state)
+            : job.state === filter),
+      ),
+    [jobs, filter],
+  );
   const [files, setFiles] = useState<{
     job: DownloadJob;
     files: DownloadedFile[];
@@ -60,13 +83,48 @@ export function DownloadsPage({
     <div className="page-content downloads-page">
       <PageHeader
         title="Downloads"
-        description="Track downloads, imports, and transfer progress."
+        description="Acompanhe seus jogos, da transferência até a biblioteca."
       />
+      <div className="transfer-overview">
+        <div>
+          <strong>{summary.active}</strong>
+          <span>Em andamento</span>
+        </div>
+        <div>
+          <strong>{bytes(summary.speed)}/s</strong>
+          <span>Velocidade total</span>
+        </div>
+        <div>
+          <strong>{summary.completed}</strong>
+          <span>Concluídos</span>
+        </div>
+      </div>
+      <div
+        className="filter-tabs transfer-filters"
+        aria-label="Filtrar downloads"
+      >
+        {[
+          ["all", "Todos"],
+          ["active", "Em andamento"],
+          ["PAUSED", "Pausados"],
+          ["COMPLETED", "Concluídos"],
+          ["FAILED", "Com erro"],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            className={filter === value ? "selected" : ""}
+            aria-pressed={filter === value}
+            onClick={() => setFilter(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <section className="transfer-section">
         <div className="section-heading">
-          <h2>Your downloads</h2>
+          <h2>Seus downloads</h2>
           <span className="muted">
-            {jobs.filter((j) => active(j.state)).length} active
+            {visible.length} {visible.length === 1 ? "item" : "itens"}
           </span>
         </div>
         {error && (
@@ -76,37 +134,49 @@ export function DownloadsPage({
         )}
         {!isDesktop && (
           <p className="notice">
-            Manage and search sources here. Torrent downloads run in the
-            OpenRetro desktop app.
+            As transferências de arquivos estão disponíveis no aplicativo
+            OpenRetro.
           </p>
         )}
-        {jobs.length ? (
+        {visible.length ? (
           <div className="download-list">
-            {jobs.map((j) => (
-              <article className="download-job" key={j.id}>
+            {visible.map((j) => (
+              <article
+                className="download-job"
+                key={j.id}
+                aria-busy={activeTransferStates.has(j.state)}
+              >
                 <Download size={24} />
                 <div>
                   <h3>{j.name}</h3>
                   <p>{j.sourceName}</p>
+                  <span className="transfer-state" data-state={j.state}>
+                    {labels[j.state] ?? j.state}
+                  </span>
                   <progress
-                    aria-label={`${j.name} download progress`}
+                    aria-label={`Progresso de ${j.name}`}
                     value={j.progress}
                     max={100}
                   />
                   <p>
-                    {labels[j.state] ?? j.state} / {j.progress.toFixed(1)}%{" "}
+                    {j.progress.toFixed(1)}%{" "}
                     {j.totalBytes
-                      ? ` / ${bytes(j.downloadedBytes)} of ${bytes(j.totalBytes)}`
+                      ? ` · ${bytes(j.downloadedBytes)} de ${bytes(j.totalBytes)}`
                       : ""}
                     {j.state === "DOWNLOADING"
-                      ? ` / ${bytes(j.bytesPerSecond)}/s`
+                      ? ` · ${bytes(j.bytesPerSecond)}/s`
                       : ""}
                     {j.remainingSeconds != null && j.bytesPerSecond > 0
-                      ? ` / ${Math.ceil(j.remainingSeconds / 60)} min remaining`
+                      ? ` · ${formatRemaining(j.remainingSeconds)}`
                       : ""}
                   </p>
                   {j.error && <p className="error-message">{j.error}</p>}
-                  <small className="path-text">{j.directory}</small>
+                  {j.directory && (
+                    <details>
+                      <summary>Pasta de destino</summary>
+                      <small className="path-text">{j.directory}</small>
+                    </details>
+                  )}
                   <div className="transfer-actions">
                     {active(j.state) ? (
                       <button
@@ -116,7 +186,7 @@ export function DownloadsPage({
                           void run(() => bridge.controlDownload(j.id, "pause"))
                         }
                       >
-                        <Pause size={15} /> Pause
+                        <Pause size={15} /> Pausar
                       </button>
                     ) : ["PAUSED", "FAILED", "CANCELLED"].includes(j.state) ? (
                       <button
@@ -126,7 +196,7 @@ export function DownloadsPage({
                           void run(() => bridge.controlDownload(j.id, "resume"))
                         }
                       >
-                        <Play size={15} /> Resume
+                        <Play size={15} /> Retomar
                       </button>
                     ) : null}
                     {j.state === "COMPLETED" ? (
@@ -141,14 +211,16 @@ export function DownloadsPage({
                                 await bridge.inspect(downloaded[0].path),
                                 j.game,
                               );
-                              notify("Game added to your library.");
+                              notify(
+                                "Confirme os dados para adicionar o jogo.",
+                              );
                               return;
                             }
                             setFiles({ job: j, files: downloaded });
                           })
                         }
                       >
-                        <FolderOpen size={15} /> Add to library
+                        <FolderOpen size={15} /> Adicionar à biblioteca
                       </button>
                     ) : j.state !== "CANCELLED" ? (
                       <button
@@ -158,14 +230,14 @@ export function DownloadsPage({
                           void run(() => bridge.controlDownload(j.id, "cancel"))
                         }
                       >
-                        Cancel
+                        Cancelar
                       </button>
                     ) : null}
                     <button
                       disabled={busy}
                       className="icon-button"
                       aria-label={`Remove ${j.name} from downloads`}
-                      title="Remove from downloads"
+                      title="Remover da lista de downloads"
                       onClick={() =>
                         void run(() => bridge.removeDownload(j.id))
                       }
@@ -179,13 +251,15 @@ export function DownloadsPage({
           </div>
         ) : (
           <p className="notice">
-            No downloads are running or have finished yet.
+            {jobs.length
+              ? "Nenhum download nesta categoria."
+              : "Nenhum download ainda. Escolha um jogo no catálogo para começar."}
           </p>
         )}
       </section>
       {files && (
         <Modal
-          title="Choose the downloaded game file"
+          title="Escolher arquivo do jogo"
           onClose={() => {
             setFiles(undefined);
             setError("");
@@ -213,9 +287,10 @@ export function DownloadsPage({
               ))
             ) : (
               <p className="notice">
-                No playable console files were found. If this torrent contains
-                an archive, extract it first, then use Add local game. PC
-                installers are not launched automatically.
+                Nenhum arquivo de console foi encontrado. Se o download está
+                compactado, use a extração automática ao baixar ou importe o
+                arquivo já extraído. Instaladores de PC não são executados
+                automaticamente.
               </p>
             )}
             {error && (
@@ -230,7 +305,7 @@ export function DownloadsPage({
                 onImport();
               }}
             >
-              Add local game
+              Adicionar jogo local
             </button>
           </div>
         </Modal>

@@ -75,8 +75,8 @@ export function EmulatorsPage({
   return (
     <div className="page-content">
       <PageHeader
-        title="Emulators"
-        description="Choose the applications that run your games."
+        title="Emuladores"
+        description="Instale, configure e escolha o emulador de cada console."
         actions={
           <>
             <button
@@ -88,13 +88,13 @@ export function EmulatorsPage({
                 )
               }
             >
-              <Search size={17} /> Detect installed
+              <Search size={17} /> Detectar instalados
             </button>
             <button
               className="button primary"
               onClick={() => setEditing(blank())}
             >
-              <Plus size={18} /> Add emulator
+              <Plus size={18} /> Adicionar emulador
             </button>
           </>
         }
@@ -239,7 +239,7 @@ export function EmulatorsPage({
             className="button primary"
             onClick={() => setEditing(blank())}
           >
-            <Plus size={17} /> Add emulator
+            <Plus size={17} /> Adicionar emulador
           </button>
           <small>Bring your own executable from its official project.</small>
         </div>

@@ -57,7 +57,9 @@ const sections: { id: Section; label: string; icon: typeof Home }[] = [
   { id: "system", label: "Configurações", icon: Settings },
 ];
 const activeDownload = (state: string) =>
-  ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING"].includes(state);
+  ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING", "INSTALLING"].includes(
+    state,
+  );
 
 export function BigPicture({
   library,

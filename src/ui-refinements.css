@@ -1,0 +1,444 @@
+/* Shared visual foundation: artwork leads; controls and status stay quiet. */
+:root {
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --focus-ring: #e7a15c;
+}
+body {
+  line-height: 1.5;
+}
+.app .page-content {
+  padding-bottom: 60px;
+}
+.app .page-heading {
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+.app .page-heading h1 {
+  font-size: clamp(28px, 2.5vw, 38px);
+  font-weight: 760;
+  letter-spacing: -0.9px;
+  line-height: 1.2;
+}
+.app .page-heading p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 8px;
+  max-width: 70ch;
+  line-height: 1.6;
+}
+.app .main-nav button {
+  height: 46px;
+  font-size: 14px;
+}
+.app .brand {
+  margin-bottom: 34px;
+}
+.app .topbar {
+  height: 76px;
+}
+.app .topbar-actions {
+  gap: 12px;
+}
+.app .global-search {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  height: 44px;
+}
+.app .global-search:focus-within {
+  border-color: var(--accent);
+}
+.app .button,
+.modal .button {
+  min-height: 42px;
+  border-radius: var(--radius-control);
+  font-weight: 650;
+  gap: 8px;
+}
+.app .button.secondary {
+  border-color: var(--border);
+  background: var(--panel);
+}
+.app .button.secondary:hover {
+  background: var(--panel2);
+  border-color: #494949;
+}
+.app .icon-button,
+.modal .icon-button {
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 7px;
+}
+.app .icon-button:hover,
+.modal .icon-button:hover {
+  background: #ffffff0c;
+}
+.app :is(input, select, textarea),
+.modal :is(input, select, textarea) {
+  border-color: #353535;
+  border-radius: var(--radius-control);
+}
+.app :is(.library-toolbar, .catalog-toolbar) {
+  gap: 18px;
+  align-items: center;
+}
+.app :is(.filter-tabs, .toolbar-right, .catalog-filters) {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.app .view-toggle button {
+  min-width: 36px;
+  min-height: 36px;
+}
+.app .game-card {
+  text-align: left;
+  border-radius: 8px;
+}
+.app .game-card .cover {
+  border: 1px solid #ffffff12;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.app .card-title {
+  font-weight: 720;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-top: 12px;
+}
+.app .card-meta {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.app .card-status {
+  font-size: 12px;
+  margin-top: 7px;
+}
+.app .games-list .card-title {
+  margin-top: 0;
+}
+.app .game-card:focus-visible .cover {
+  border-color: var(--accent);
+}
+.app .empty-state {
+  max-width: 620px;
+  margin: 48px auto;
+  padding: 44px 28px;
+}
+.app .empty-state h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 18px 0 10px;
+}
+.app .empty-state p {
+  max-width: 48ch;
+  margin: 0 auto 24px;
+  line-height: 1.7;
+}
+.app .settings-panel h2 {
+  font-size: 26px;
+  font-weight: 730;
+  margin-bottom: 12px;
+}
+.app .settings-nav {
+  top: 100px;
+}
+.app .settings-nav button {
+  font-size: 13px;
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+.app .setting-row {
+  padding: 22px 0;
+  gap: 24px;
+}
+.app .setting-row strong {
+  font-weight: 700;
+}
+.app .setting-row p {
+  max-width: 64ch;
+  line-height: 1.65;
+  margin-top: 5px;
+}
+.saved-status[data-error="true"] {
+  color: var(--danger);
+}
+.modal-backdrop {
+  backdrop-filter: none;
+  background: #000b;
+}
+.modal {
+  border-radius: var(--radius-panel);
+  border-color: #383838;
+  padding: 28px;
+  box-shadow: 0 20px 70px #0006;
+}
+.modal > header {
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.modal h2 {
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+}
+.modal p {
+  line-height: 1.65;
+}
+.modal .form-stack {
+  gap: 20px;
+}
+.modal label {
+  line-height: 1.6;
+}
+.modal :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.modal .form-stack > .button.primary:last-child {
+  margin-top: 6px;
+}
+.app .notice,
+.modal .notice {
+  border-left: 2px solid var(--accent);
+  border-radius: 6px;
+  padding: 16px 18px;
+  line-height: 1.6;
+}
+.app .error-message,
+.modal .error-message {
+  border-radius: 8px;
+  padding: 14px 16px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.app .emulator-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.app .source-row {
+  gap: 18px;
+  padding: 22px 0;
+}
+.app .toast {
+  border-radius: 10px;
+  background: #181818;
+  border: 1px solid #3b3b3b;
+}
+.transfer-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 40px;
+  padding: 20px 0 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.transfer-overview > div {
+  display: grid;
+  gap: 5px;
+  min-width: 100px;
+}
+.transfer-overview strong {
+  font-size: 24px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.transfer-overview span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.download-job {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 22px;
+  margin-bottom: 14px;
+  gap: 18px;
+}
+.download-job > div {
+  min-width: 0;
+}
+.download-job h3 {
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.download-job progress {
+  height: 5px;
+  margin: 18px 0 10px;
+}
+.download-job .transfer-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.download-job .path-text {
+  display: block;
+  font-size: 11px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.transfer-state {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.transfer-state::before {
+  content: "";
+  height: 6px;
+  width: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+.transfer-state[data-state="DOWNLOADING"],
+.transfer-state[data-state="INSTALLING"] {
+  color: var(--accent);
+}
+.transfer-state[data-state="COMPLETED"] {
+  color: var(--success);
+}
+.transfer-state[data-state="FAILED"] {
+  color: var(--danger);
+}
+.download-job details {
+  margin-top: 12px;
+  color: var(--muted);
+}
+.download-job summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: 12px;
+}
+.page-loading > p {
+  color: var(--muted);
+  margin-bottom: 22px;
+}
+.loading-heading {
+  width: 210px;
+  height: 28px;
+  margin-bottom: 32px;
+  background: var(--panel2);
+  border-radius: 6px;
+}
+.loading-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 24px;
+}
+.loading-grid > div {
+  display: grid;
+  gap: 10px;
+}
+.loading-grid i {
+  aspect-ratio: 3/4;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.loading-grid span,
+.loading-grid small {
+  height: 12px;
+  background: var(--panel2);
+  border-radius: 4px;
+  width: 80%;
+}
+.loading-grid small {
+  width: 50%;
+  height: 9px;
+}
+/* Browser skips painting distant desktop cards; DOM order and keyboard focus remain intact. */
+@supports (content-visibility: auto) {
+  .app .games-grid > .game-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 340px;
+  }
+  .app .games-list > .game-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 98px;
+  }
+  .app .game-card:focus-within {
+    content-visibility: visible;
+  }
+}
+@media (max-width: 1100px) {
+  .app .topbar-actions {
+    flex-wrap: wrap;
+  }
+  .app .topbar {
+    height: auto;
+    min-height: 76px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 900px) {
+  .app .settings-nav {
+    position: static;
+  }
+  .app .page-heading {
+    align-items: flex-start;
+  }
+  .app .card-title {
+    font-size: 13px;
+  }
+}
+@media (max-width: 680px) {
+  .app .page-heading {
+    flex-direction: column;
+    gap: 18px;
+  }
+  .app .topbar-actions .global-search {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .transfer-overview {
+    gap: 20px;
+  }
+  .transfer-overview strong {
+    font-size: 21px;
+  }
+  .download-job {
+    padding: 16px;
+    gap: 12px;
+  }
+  .modal {
+    padding: 22px;
+    max-width: 100%;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .modal {
+    animation: openretro-dialog 140ms ease-out both;
+  }
+  @keyframes openretro-dialog {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.app .page-loading.embedded,
+.tv-workspace .page-loading.embedded {
+  padding: 8px 0 24px;
+  margin: 0;
+}
+.transfer-filters {
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.transfer-filters button {
+  min-height: 42px;
+}

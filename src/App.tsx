@@ -1,4 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Home,
@@ -14,6 +21,11 @@ import {
   CircleHelp,
   CheckCircle2,
 } from "lucide-react";
+import { PageLoading } from "./components/PageLoading";
+import {
+  activeTransferStates,
+  downloadPollInterval,
+} from "./services/activity";
 import { Modal } from "./components/Modal";
 import { BrandMark } from "./components/Brand";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
@@ -76,6 +88,14 @@ const BigPicture = lazy(() =>
 );
 type Page =
   "Home" | "Library" | "Discover" | "Downloads" | "Emulators" | "Settings";
+const pageLabels: Record<Page, string> = {
+  Home: "Início",
+  Library: "Biblioteca",
+  Discover: "Catálogo",
+  Downloads: "Downloads",
+  Emulators: "Emuladores",
+  Settings: "Configurações",
+};
 const navItems = [
   { page: "Home" as Page, icon: Home },
   { page: "Library" as Page, icon: Library },
@@ -90,29 +110,16 @@ export function App() {
   const [importing, setImporting] = useState(false);
   const [importGame, setImportGame] = useState<GameMetadata>();
   const [importCandidate, setImportCandidate] = useState<ImportCandidate>();
+  const [playing, setPlaying] = useState<LibraryGame>();
   const downloads = useQuery({
     queryKey: ["download-jobs"],
     queryFn: bridge.downloadJobs,
     refetchInterval: (query) =>
-      !isDesktop
-        ? false
-        : query.state.data?.some((job) =>
-              [
-                "QUEUED",
-                "RESOLVING",
-                "DOWNLOADING",
-                "VERIFYING",
-                "INSTALLING",
-              ].includes(job.state),
-            )
-          ? 2000
-          : 10000,
+      downloadPollInterval(query.state.data, isDesktop, Boolean(playing)),
     refetchIntervalInBackground: false,
   });
   const jobs = downloads.data ?? [];
-  const activeDownloads = jobs.filter((j) =>
-    ["QUEUED", "RESOLVING", "DOWNLOADING", "VERIFYING"].includes(j.state),
-  );
+  const activeDownloads = jobs.filter((j) => activeTransferStates.has(j.state));
   const [query, setQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [toast, setToast] = useState("");
@@ -121,13 +128,14 @@ export function App() {
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [updateVersion, setUpdateVersion] = useState<string>();
   const [installingUpdate, setInstallingUpdate] = useState(false);
-  const [playing, setPlaying] = useState<LibraryGame>();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [page, selected?.id]);
   const { data: library = [], isPending, error } = useLibrary();
   const { data: emulators = [] } = useEmulators();
   const refresh = useRefresh();
+  const libraryRef = useRef(library);
+  libraryRef.current = library;
   const notify = useCallback((s: string) => setToast(s), []);
   const { data: settings = defaultSettings } = useQuery({
     queryKey: ["settings"],
@@ -151,7 +159,7 @@ export function App() {
   useEffect(() => {
     if (!isDesktop) return;
     const started = listen<string>("game-started", ({ payload }) => {
-      setPlaying(library.find((entry) => entry.item.id === payload));
+      setPlaying(libraryRef.current.find((entry) => entry.item.id === payload));
     });
     const finished = listen<string>("game-finished", ({ payload }) => {
       setPlaying((current) =>
@@ -163,7 +171,7 @@ export function App() {
       void started.then((unlisten) => unlisten());
       void finished.then((unlisten) => unlisten());
     };
-  }, [library, refresh]);
+  }, [refresh]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 6500);
@@ -263,19 +271,19 @@ export function App() {
           <BrandMark />
           <span>OpenRetro</span>
         </button>
-        <div className="sidebar-label">Collection</div>
+        <div className="sidebar-label">Sua coleção</div>
         <nav className="main-nav">
           {navItems.map((n, i) => (
             <div key={n.page} className={i === 3 || i === 5 ? "nav-group" : ""}>
               <button
-                aria-label={n.page}
-                title={n.page}
+                aria-label={pageLabels[n.page]}
+                title={pageLabels[n.page]}
                 aria-current={page === n.page ? "page" : undefined}
                 className={page === n.page ? "active" : ""}
                 onClick={() => navigate(n.page)}
               >
                 <n.icon size={19} strokeWidth={1.65} />
-                <span>{n.page}</span>
+                <span>{pageLabels[n.page]}</span>
                 {n.page === "Library" && library.length > 0 && (
                   <small>{library.length}</small>
                 )}
@@ -285,7 +293,7 @@ export function App() {
         </nav>
         <div className="sidebar-collection">
           {library.length > 0 && (
-            <span className="sidebar-label">Your consoles</span>
+            <span className="sidebar-label">Seus consoles</span>
           )}
           {[...new Set(library.map((x) => x.game.platformId))]
             .slice(0, 4)
@@ -346,7 +354,7 @@ export function App() {
               >
                 <span className="playing-indicator" />
                 <span>
-                  Playing now
+                  Jogando agora
                   <strong>{playing.game.title}</strong>
                 </span>
               </button>
@@ -355,9 +363,9 @@ export function App() {
               <Search size={17} />
               <input
                 id="global-search"
-                aria-label="Search games"
+                aria-label="Buscar jogos"
                 placeholder={
-                  page === "Library" ? "Search your library" : "Search games"
+                  page === "Library" ? "Buscar na biblioteca" : "Buscar jogos"
                 }
                 value={query}
                 onChange={(e) => {
@@ -370,7 +378,7 @@ export function App() {
               {query && (
                 <button
                   className="icon-button"
-                  aria-label="Clear search"
+                  aria-label="Limpar busca"
                   onClick={() => setQuery("")}
                 >
                   <X size={13} />
@@ -397,11 +405,11 @@ export function App() {
               className="button primary add-game"
               onClick={() => openImport()}
             >
-              <Plus size={18} /> Add game
+              <Plus size={18} /> Adicionar jogo
             </button>
             <button
               className="icon-button topbar-settings"
-              aria-label="Open settings"
+              aria-label="Abrir configurações"
               onClick={() => navigate("Settings")}
             >
               <Settings size={19} />
@@ -416,13 +424,7 @@ export function App() {
             </button>
           </div>
         )}
-        <Suspense
-          fallback={
-            <div className="page-content" role="status">
-              Carregando…
-            </div>
-          }
-        >
+        <Suspense fallback={<PageLoading />}>
           {selected ? (
             <GamePage
               game={selected}
@@ -513,22 +515,21 @@ export function App() {
         </Suspense>
       )}
       {help && (
-        <Modal title="About OpenRetro" onClose={() => setHelp(false)}>
-          <p className="muted">
-            OpenRetro 0.1.0 brings your legally obtained game files and
-            installed emulators together. Add JSON download sources in Downloads
-            to acquire games through magnet links. No game files, BIOS files, or
-            emulators are bundled.
+        <Modal title="Sobre o OpenRetro" onClose={() => setHelp(false)}>
+          <p>
+            Organize sua biblioteca, descubra jogos e gerencie seus emuladores.
+            O runtime integrado configura os consoles compatíveis ao jogar.
+            Jogos e BIOS não estão incluídos.
           </p>
           <p className="notice">
             {isDesktop
-              ? "Desktop mode · local SQLite database"
-              : "Browser preview · localStorage. Use the Tauri desktop build to launch games."}
+              ? "Aplicativo desktop · dados salvos neste dispositivo"
+              : "Prévia no navegador · abra o aplicativo para jogar e baixar arquivos."}
           </p>
           <p className="hint">
-            Discover uses IGDB metadata and artwork. Add your Twitch application
-            credentials to .env.local to connect the catalog. Press Ctrl K to
-            search.
+            Adicione suas fontes em Configurações → Downloads. Use Ctrl K para
+            buscar ou entre no Big Picture para navegar pelo controle.
+            Informações e imagens dos jogos vêm da IGDB.
           </p>
         </Modal>
       )}

@@ -162,11 +162,13 @@ export function GamePage({
         </div>
         <div className="detail-download-ribbon">
           <div className="download-ribbon-copy">
-            <span>{entry ? "Available in your library" : "Ready to add"}</span>
+            <span>
+              {entry ? "Disponível na biblioteca" : "Adicionar à coleção"}
+            </span>
             <strong>
               {entry
-                ? "Your local copy is ready to launch"
-                : "Choose a source to download this game"}
+                ? "Seu jogo está pronto para iniciar"
+                : "Escolha uma versão para baixar"}
             </strong>
           </div>
           <div className="hero-actions">
@@ -191,16 +193,16 @@ export function GamePage({
                 <Download size={18} />
               )}{" "}
               {running
-                ? "Game running"
+                ? "Jogo em execução"
                 : entry
                   ? resolution?.state === "MISSING_EMULATOR"
-                    ? "Set up emulator"
-                    : "Play game"
-                  : "Find download"}
+                    ? "Configurar emulador"
+                    : "Jogar"
+                  : "Opções de download"}
             </button>
             {!entry && (
               <button className="button glass" onClick={() => onImport(game)}>
-                <FolderOpen size={17} /> Add local file
+                <FolderOpen size={17} /> Adicionar arquivo local
               </button>
             )}
             {entry && (
@@ -208,7 +210,9 @@ export function GamePage({
                 <button
                   className={`button glass ${entry.item.favorite ? "favorited" : ""}`}
                   aria-label={
-                    entry.item.favorite ? "Remove favorite" : "Favorite game"
+                    entry.item.favorite
+                      ? "Remover dos favoritos"
+                      : "Favoritar jogo"
                   }
                   onClick={() =>
                     void action(() =>
@@ -225,7 +229,7 @@ export function GamePage({
                   className="button glass"
                   onClick={() => setConfig(true)}
                 >
-                  <Settings2 size={18} /> Configure
+                  <Settings2 size={18} /> Configurar
                 </button>
               </>
             )}
@@ -263,10 +267,10 @@ export function GamePage({
               }
             >
               {resolution.state === "MISSING_EMULATOR"
-                ? "Configure emulator"
+                ? "Configurar emulador"
                 : resolution.state === "MISSING_GAME"
                   ? "Locate file"
-                  : "Configure"}
+                  : "Configurar"}
             </button>
           </div>
         )}
@@ -323,14 +327,20 @@ export function GamePage({
                   key={t}
                   onClick={() => setTab(t)}
                 >
-                  {t}
+                  {
+                    {
+                      Overview: "Visão geral",
+                      Screenshots: "Imagens",
+                      Details: "Detalhes",
+                    }[t]
+                  }
                 </button>
               ))}
             </nav>
             {tab === "Overview" ? (
               <div className="overview">
                 <div>
-                  <h2>About this game</h2>
+                  <h2>Sobre o jogo</h2>
                   <p>{game.description}</p>
                   {details.error && (
                     <p className="hint">
@@ -350,7 +360,7 @@ export function GamePage({
                   )}
                 </div>
                 <aside>
-                  <h3>Game details</h3>
+                  <h3>Detalhes do jogo</h3>
                   <dl>
                     <dt>Platform</dt>
                     <dd>{platform?.name}</dd>
@@ -420,7 +430,7 @@ export function GamePage({
                           })
                         }
                       >
-                        <ShieldCheck size={16} /> Verify file
+                        <ShieldCheck size={16} /> Verificar arquivo
                       </button>
                       <button
                         disabled={busy}
@@ -441,7 +451,7 @@ export function GamePage({
                           setRemove(true);
                         }}
                       >
-                        <Trash2 size={16} /> Remove from library
+                        <Trash2 size={16} /> Remover da biblioteca
                       </button>
                     </div>
                   </>
@@ -451,7 +461,7 @@ export function GamePage({
           </div>
           <aside className="detail-aside">
             <section className="detail-aside-card">
-              <h2>Game information</h2>
+              <h2>Informações do jogo</h2>
               <dl>
                 <dt>Platform</dt>
                 <dd>{platform?.name ?? game.platformId}</dd>
@@ -467,7 +477,7 @@ export function GamePage({
               <section className="detail-aside-card source-note">
                 <Download size={18} />
                 <div>
-                  <strong>Downloads from your sources</strong>
+                  <strong>Downloads nas suas fontes</strong>
                   <p>
                     OpenRetro shows HTTPS links and magnet links from the JSON
                     sources you add.
@@ -477,7 +487,7 @@ export function GamePage({
             )}
             {game.screenshots?.length ? (
               <section className="detail-aside-card gallery-strip">
-                <h2>Images</h2>
+                <h2>Imagens</h2>
                 {game.screenshots.slice(0, 3).map((url, i) => (
                   <button
                     key={url}
@@ -581,7 +591,7 @@ export function GamePage({
         </Modal>
       )}
       {config && entry && (
-        <Modal title="Game configuration" onClose={() => setConfig(false)}>
+        <Modal title="Configurar jogo" onClose={() => setConfig(false)}>
           <div className="form-stack">
             <label>
               Emulator
@@ -605,11 +615,11 @@ export function GamePage({
                 <input
                   value={bios}
                   onChange={(e) => setBios(e.target.value)}
-                  placeholder="No BIOS selected"
+                  placeholder="Nenhuma BIOS selecionada"
                 />
                 <button
                   className="icon-button"
-                  aria-label="Locate BIOS"
+                  aria-label="Selecionar BIOS"
                   onClick={() =>
                     void action(async () => {
                       const p = await bridge.pickBios();
@@ -647,17 +657,17 @@ export function GamePage({
                     args.split("\n").filter(Boolean),
                   );
                   setConfig(false);
-                  notify("Game configuration saved.");
+                  notify("Configurar jogo saved.");
                 })
               }
             >
-              Save configuration
+              Salvar configuração
             </button>
           </div>
         </Modal>
       )}
       {remove && entry && (
-        <Modal title="Remove this game?" onClose={() => setRemove(false)}>
+        <Modal title="Remover este jogo?" onClose={() => setRemove(false)}>
           <p className="muted">
             {game.title} and its play history will be removed from OpenRetro.
           </p>
@@ -686,7 +696,7 @@ export function GamePage({
                 })
               }
             >
-              Remove from library
+              Remover da biblioteca
             </button>
           </div>
         </Modal>

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const App = lazy(() => import("./App").then(({ App }) => ({ default: App })));
 import "./fonts.css";
 import "./styles.css";
+import "./ui-refinements.css";
 const InGameOverlay = lazy(() =>
   import("./features/in-game/InGameOverlay").then(({ InGameOverlay }) => ({
     default: InGameOverlay,

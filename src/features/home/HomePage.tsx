@@ -35,11 +35,15 @@ export function HomePage({
   onDiscover,
   onDownloads,
 }: Props) {
-  const played = [...library]
-    .filter((x) => x.item.lastPlayedAt)
-    .sort((a, b) =>
-      (b.item.lastPlayedAt ?? "").localeCompare(a.item.lastPlayedAt ?? ""),
-    );
+  const played = useMemo(
+    () =>
+      [...library]
+        .filter((x) => x.item.lastPlayedAt)
+        .sort((a, b) =>
+          (b.item.lastPlayedAt ?? "").localeCompare(a.item.lastPlayedAt ?? ""),
+        ),
+    [library],
+  );
   const status = useQuery({
     queryKey: ["catalog-status"],
     queryFn: catalogStatus,
@@ -76,18 +80,18 @@ export function HomePage({
   return (
     <div className="page-content home-content">
       <PageHeader
-        title="Home"
-        description="Your games, within reach."
+        title="Início"
+        description="Continue sua última partida ou descubra o próximo jogo."
         actions={
           <button className="text-button" onClick={onLibrary}>
-            <Library size={16} /> Open library
+            <Library size={16} /> Abrir biblioteca
           </button>
         }
       />
       <div className="home-lead">
         <section
           className="feature-stage"
-          aria-label={played.length ? "Continue playing" : "Featured game"}
+          aria-label={played.length ? "Continue jogando" : "Jogo em destaque"}
         >
           {featured ? (
             <GameArtwork game={featured} hero />
@@ -97,7 +101,7 @@ export function HomePage({
           <div className="feature-shade" />
           <div className="feature-topline">
             <span className="feature-label">
-              {played.length ? "Continue playing" : "From the catalog"}
+              {played.length ? "Continue jogando" : "From the catalog"}
             </span>
             {featured && (
               <span className="feature-system">
@@ -135,7 +139,7 @@ export function HomePage({
               </button>
               {featured && (
                 <button className="button on-art" onClick={onDiscover}>
-                  Browse catalog
+                  Explorar catálogo
                 </button>
               )}
             </div>
@@ -193,9 +197,9 @@ export function HomePage({
       {played.length > 0 && (
         <section className="game-section">
           <div className="section-heading">
-            <h2>Continue playing</h2>
+            <h2>Continue jogando</h2>
             <button className="text-button" onClick={onLibrary}>
-              View library
+              Ver biblioteca
             </button>
           </div>
           <div className="games-grid home-game-grid">
@@ -213,14 +217,16 @@ export function HomePage({
       <section className="game-section">
         <div className="section-heading">
           <div>
-            <h2>{library.length ? "Recently added" : "Worth a look"}</h2>
+            <h2>
+              {library.length ? "Adicionados recentemente" : "Worth a look"}
+            </h2>
             {!library.length && <p>Classics from the IGDB catalog.</p>}
           </div>
           <button
             className="text-button"
             onClick={library.length ? onLibrary : onDiscover}
           >
-            {library.length ? "View library" : "Browse all games"}
+            {library.length ? "Ver biblioteca" : "Browse all games"}
             <ArrowUpRight size={15} />
           </button>
         </div>

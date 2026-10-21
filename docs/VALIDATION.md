@@ -100,3 +100,13 @@ Browser imports remain isolated in localStorage; desktop library data and catalo
 - File browsing is read-only, requires absolute paths, filters folders/names and bounds listings to 500 entries. JSON reads are limited to regular `.json` files and 16 MB.
 - Frontend suite: 44 tests passed. Rust library suite: 17 tests passed. Production build passed.
 - No browsers or native app windows are exposed to the UI tools in this session; a visual review and physical controller/file-dialog walkthrough remain unverified. Existing tests do not establish end-to-end input correctness.
+
+
+### Shared UI/UX and idle work — 2026-10-21
+
+- Refined desktop shell, cards, forms, dialogs, settings, transfer status and empty/loading states. Shared components carry changes into the console workspace. Main navigation and common actions use Portuguese labels; external metadata/runtime messages may remain English.
+- Downloads add state filters, aggregate active/completed counts, transfer speed and expandable destination paths. Tiny files now display KB/B correctly. Opening import no longer incorrectly reports a completed library addition before confirmation.
+- Settings writes are serialized, optimistic state merges consecutive edits, and the last failed write reloads persisted settings and shows failure. Dialogs handle nesting, visible focus targets and background scroll locking.
+- Periodic download queries now stop when idle or playing. Read-only inspection confirmed native start/resume persists QUEUED/RESOLVING before returning, so explicit query invalidation restarts active polling. Native transfer workers continue independently.
+- Memoized artwork and derived catalog/library lists reduce repeated work. Desktop offscreen cards use content-visibility where supported (painting optimization, not DOM virtualization). Console field navigation caches focusable controls and invalidates on structural/visibility changes and resize.
+- Production build and 45 frontend tests passed. Native code was unchanged; Rust tests were not rerun. No hardware CPU/RAM/FPS benchmark or live visual/controller walkthrough was performed for this change.

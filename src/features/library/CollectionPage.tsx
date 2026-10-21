@@ -1,5 +1,6 @@
 import { PageHeader } from "../../components/PageHeader";
-import { useState } from "react";
+import { PageLoading } from "../../components/PageLoading";
+import { useMemo, useState } from "react";
 import {
   Plus,
   Heart,
@@ -35,38 +36,42 @@ export function CollectionPage({
   const [filter, setFilter] = useState("all"),
     [layout, setLayout] = useState("grid"),
     [sort, setSort] = useState("recent");
-  const visible = library
-    .filter(
-      (x) =>
-        (filter !== "favorites" || x.item.favorite) &&
-        (filter !== "unplayed" || !x.item.lastPlayedAt) &&
-        (filter !== "recent" || Boolean(x.item.lastPlayedAt)) &&
-        (platform === "all" || x.game.platformId === platform) &&
-        x.game.title.toLowerCase().includes(query.toLowerCase()),
-    )
-    .sort((a, b) =>
-      sort === "title"
-        ? a.game.title.localeCompare(b.game.title)
-        : sort === "played"
-          ? b.item.playtime - a.item.playtime
-          : sort === "lastPlayed"
-            ? (b.item.lastPlayedAt ?? "").localeCompare(
-                a.item.lastPlayedAt ?? "",
-              )
-            : b.item.addedAt.localeCompare(a.item.addedAt),
-    );
+  const visible = useMemo(
+    () =>
+      library
+        .filter(
+          (x) =>
+            (filter !== "favorites" || x.item.favorite) &&
+            (filter !== "unplayed" || !x.item.lastPlayedAt) &&
+            (filter !== "recent" || Boolean(x.item.lastPlayedAt)) &&
+            (platform === "all" || x.game.platformId === platform) &&
+            x.game.title.toLowerCase().includes(query.toLowerCase()),
+        )
+        .sort((a, b) =>
+          sort === "title"
+            ? a.game.title.localeCompare(b.game.title)
+            : sort === "played"
+              ? b.item.playtime - a.item.playtime
+              : sort === "lastPlayed"
+                ? (b.item.lastPlayedAt ?? "").localeCompare(
+                    a.item.lastPlayedAt ?? "",
+                  )
+                : b.item.addedAt.localeCompare(a.item.addedAt),
+        ),
+    [library, filter, platform, query, sort],
+  );
   return (
     <div className="page-content">
       <PageHeader
-        title="Library"
+        title="Biblioteca"
         description={
           library.length
-            ? `${library.length} game${library.length === 1 ? "" : "s"} in your collection.`
-            : "Your games live here."
+            ? `${library.length} ${library.length === 1 ? "jogo na sua coleção" : "jogos na sua coleção"}.`
+            : "Sua próxima partida começa aqui."
         }
         actions={
           <button className="button primary" onClick={onImport}>
-            <Plus size={18} /> Add game
+            <Plus size={18} /> Adicionar jogo
           </button>
         }
       />
@@ -76,25 +81,25 @@ export function CollectionPage({
             className={filter === "all" ? "selected" : ""}
             onClick={() => setFilter("all")}
           >
-            All games <span>{library.length}</span>
+            Todos os jogos <span>{library.length}</span>
           </button>
           <button
             className={filter === "favorites" ? "selected" : ""}
             onClick={() => setFilter("favorites")}
           >
-            <Heart size={14} /> Favorites
+            <Heart size={14} /> Favoritos
           </button>
           <button
             className={filter === "recent" ? "selected" : ""}
             onClick={() => setFilter("recent")}
           >
-            Recently played
+            Jogados recentemente
           </button>
           <button
             className={filter === "unplayed" ? "selected" : ""}
             onClick={() => setFilter("unplayed")}
           >
-            Never played{" "}
+            Nunca jogados{" "}
             <span>{library.filter((x) => !x.item.lastPlayedAt).length}</span>
           </button>
         </div>
@@ -105,7 +110,7 @@ export function CollectionPage({
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
           >
-            <option value="all">All platforms</option>
+            <option value="all">Todos os consoles</option>
             {platforms.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -117,10 +122,10 @@ export function CollectionPage({
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
-            <option value="recent">Recently added</option>
-            <option value="lastPlayed">Last played</option>
-            <option value="title">Title A–Z</option>
-            <option value="played">Most played</option>
+            <option value="recent">Adicionados recentemente</option>
+            <option value="lastPlayed">Última partida</option>
+            <option value="title">Título A–Z</option>
+            <option value="played">Mais jogados</option>
           </select>
           <div className="view-toggle">
             <button
@@ -141,7 +146,7 @@ export function CollectionPage({
         </div>
       </div>
       {isPending ? (
-        <p className="muted">Opening your collection…</p>
+        <PageLoading embedded label="Abrindo sua coleção…" />
       ) : visible.length ? (
         <div
           className={
@@ -164,13 +169,13 @@ export function CollectionPage({
           </div>
           <h2>
             {library.length
-              ? "No games match this view."
-              : "No games added yet"}
+              ? "Nenhum jogo nesta seleção."
+              : "Sua biblioteca está vazia"}
           </h2>
           <p>
             {library.length
-              ? "Try a different search or platform filter."
-              : "Download a game from your sources in Downloads, or add a file from your computer."}
+              ? "Tente outro nome ou remova os filtros."
+              : "Encontre jogos no catálogo ou importe seus arquivos para começar."}
           </p>
           <button
             className="button primary"
@@ -183,10 +188,10 @@ export function CollectionPage({
             }}
           >
             {library.length ? (
-              "Clear filters"
+              "Limpar filtros"
             ) : (
               <>
-                <FolderOpen size={17} /> Add game
+                <FolderOpen size={17} /> Adicionar jogo
               </>
             )}
           </button>

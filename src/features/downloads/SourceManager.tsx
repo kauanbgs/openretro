@@ -49,7 +49,7 @@ export function SourceManager() {
     <section className="source-manager">
       <div className="section-heading">
         <div>
-          <h2>Download sources</h2>
+          <h2>Fontes de download</h2>
           <p className="muted">
             Add a Hydra-compatible JSON file or URL containing HTTPS links and
             magnet links.
@@ -71,7 +71,8 @@ export function SourceManager() {
       )}
       {!sources.isPending && !sources.data?.length && (
         <p className="notice">
-          No sources added. Add your JSON to find downloadable games.
+          Nenhuma fonte adicionada. Importe um JSON ou uma URL para encontrar
+          jogos.
         </p>
       )}
       <div className="source-list">
@@ -129,7 +130,7 @@ export function SourceManager() {
       </div>
       {editing !== undefined && (
         <Modal
-          title={editing ? "Update download source" : "Add download source"}
+          title={editing ? "Atualizar fonte" : "Adicionar fonte"}
           onClose={() => {
             if (!busy) setEditing(undefined);
           }}
@@ -162,14 +163,14 @@ export function SourceManager() {
                 className={mode === "json" ? "selected" : ""}
                 onClick={() => setMode("json")}
               >
-                <FileJson size={15} /> JSON file or text
+                <FileJson size={15} /> Arquivo ou texto JSON
               </button>
             </div>
             {mode === "url" ? (
               <label>
-                Source URL
+                URL da fonte
                 <input
-                  aria-label="Source URL"
+                  aria-label="URL da fonte"
                   type="url"
                   required
                   placeholder="https://example.com/source.json"
@@ -216,12 +217,12 @@ export function SourceManager() {
                     });
                   }}
                 >
-                  <Upload size={16} /> Choose JSON file
+                  <Upload size={16} /> Escolher arquivo JSON
                 </button>
                 <label>
-                  Source JSON
+                  Conteúdo JSON
                   <textarea
-                    aria-label="Source JSON"
+                    aria-label="Conteúdo JSON"
                     rows={10}
                     value={text}
                     required
@@ -247,7 +248,7 @@ export function SourceManager() {
                 ? "Importing…"
                 : editing
                   ? "Update source"
-                  : "Import source"}
+                  : "Importar fonte"}
             </button>
           </form>
         </Modal>
