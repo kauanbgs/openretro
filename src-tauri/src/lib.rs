@@ -8,6 +8,7 @@ mod launcher;
 mod metadata;
 mod models;
 mod profiles;
+mod remote_play;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,6 +39,7 @@ pub fn run() {
             app.manage(downloads::DownloadService::default());
             app.manage(downloads::sources::SourceIndex::default());
             app.manage(in_game::InGameService::default());
+            app.manage(remote_play::RemotePlay::default());
             in_game::setup(app.handle())?;
             log::info!(
                 "OpenRetro initialized; network downloads: {}",
@@ -93,6 +95,9 @@ pub fn run() {
             commands::app_paths,
             launcher::launch_game,
             launcher::netplay::netplay_local_address,
+            remote_play::remote_play_status,
+            remote_play::remote_play_start,
+            remote_play::remote_play_stop,
             launcher::runtime_menu::open_game_screenshots,
             launcher::runtime_menu::list_game_screenshots,
             launcher::save_states::list_save_states,

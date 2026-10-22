@@ -66,6 +66,13 @@ export const NETPLAY_PLATFORMS = [
   "arcade",
 ];
 export const NETPLAY_DEFAULT_PORT = 55435;
+export interface RemotePlayStatus {
+  running: boolean;
+  url: string | null;
+  /** The pairing URL as an SVG QR code. */
+  qr: string | null;
+  devices: number;
+}
 export interface PlayerProfile {
   id: string;
   name: string;

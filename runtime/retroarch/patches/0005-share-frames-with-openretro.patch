@@ -1,0 +1,183 @@
+diff --git a/gfx/drivers/gl2.c b/gfx/drivers/gl2.c
+index 977110c..e3383df 100644
+--- a/gfx/drivers/gl2.c
++++ b/gfx/drivers/gl2.c
+@@ -3371,6 +3371,61 @@ static void gl2_pbo_async_readback(gl2_t *gl)
+    gl2_renderchain_unbind_pbo();
+ }
+ 
++#if defined(_WIN32) && !defined(HAVE_OPENGLES)
++bool openretro_frame_wanted(void);
++void openretro_publish_frame(const void *data, unsigned width,
++      unsigned height, size_t pitch, unsigned format);
++
++/* OpenRetro: cores that draw on the GPU hand the CPU no frame, so while a
++ * phone watches, read the finished picture back through two pixel buffers.
++ * Each frame starts one copy and publishes the previous one, so the GPU
++ * never stalls. Buffers follow the viewport when the window is resized. */
++static void openretro_gpu_readback(gl2_t *gl)
++{
++   static GLuint pbo[2];
++   static unsigned width[2], height[2];
++   static bool ready[2];
++   static unsigned index;
++   unsigned previous = index ^ 1;
++   unsigned w        = gl->vp.width;
++   unsigned h        = gl->vp.height;
++
++   if (!(gl->flags & GL2_FLAG_HW_RENDER_USE) || !openretro_frame_wanted()
++         || !w || !h)
++   {
++      ready[0] = ready[1] = false;
++      return;
++   }
++   if (!pbo[0])
++      glGenBuffers(2, pbo);
++
++   glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[index]);
++   if (width[index] != w || height[index] != h)
++      glBufferData(GL_PIXEL_PACK_BUFFER, (GLsizeiptr)w * h * 4, NULL,
++            GL_STREAM_READ);
++   glPixelStorei(GL_PACK_ALIGNMENT, 4);
++   glReadPixels(gl->vp.x, gl->vp.y, w, h, GL_BGRA,
++         GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
++   width[index]  = w;
++   height[index] = h;
++   ready[index]  = true;
++
++   if (ready[previous])
++   {
++      const void *pixels;
++      glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[previous]);
++      if ((pixels = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY)))
++      {
++         openretro_publish_frame(pixels, width[previous], height[previous],
++               width[previous] * 4, 100);
++         glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
++      }
++   }
++   glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
++   index = previous;
++}
++#endif
++
+ static bool gl2_frame(void *data, const void *frame,
+       unsigned frame_width, unsigned frame_height,
+       uint64_t frame_count,
+@@ -3660,6 +3715,10 @@ static bool gl2_frame(void *data, const void *frame,
+ #endif
+             gl2_pbo_async_readback(gl);
+ 
++#if defined(_WIN32) && !defined(HAVE_OPENGLES)
++   openretro_gpu_readback(gl);
++#endif
++
+     if (gl->ctx_driver->swap_buffers)
+         gl->ctx_driver->swap_buffers(gl->ctx_data);
+ 
+diff --git a/gfx/video_driver.c b/gfx/video_driver.c
+index 7310eda..4235f0c 100644
+--- a/gfx/video_driver.c
++++ b/gfx/video_driver.c
+@@ -16,6 +16,9 @@
+ 
+ #include <stdlib.h>
+ #include <math.h>
++#ifdef _WIN32
++#include <windows.h>
++#endif
+ 
+ #include <retro_inline.h>
+ #include <string/stdstring.h>
+@@ -3732,6 +3735,80 @@ bool video_driver_init_internal(bool *video_is_threaded, bool verbosity_enabled)
+    return true;
+ }
+ 
++#ifdef _WIN32
++/* OpenRetro: publish frames in shared memory named after this process, so
++ * OpenRetro can stream them to a phone. The sequence number is odd while a
++ * frame is written. OpenRetro stamps `wanted` with GetTickCount() while a
++ * phone watches; GPU frames are read back only then. */
++#define OPENRETRO_FRAME_MAGIC 0x3246524fu /* "ORF2" */
++#define OPENRETRO_FRAME_BYTES (16u * 1024u * 1024u)
++struct openretro_frame_header
++{
++   uint32_t magic;
++   volatile LONG sequence;
++   uint32_t width;
++   uint32_t height;
++   uint32_t pitch;
++   uint32_t format;
++   volatile LONG wanted;
++   uint32_t reserved;
++};
++
++static struct openretro_frame_header *openretro_frames(void)
++{
++   static struct openretro_frame_header *shared = NULL;
++   static bool unavailable                      = false;
++   if (!shared && !unavailable)
++   {
++      char name[64];
++      HANDLE mapping;
++      snprintf(name, sizeof(name), "Local\\OpenRetroFrames-%lu",
++            (unsigned long)GetCurrentProcessId());
++      mapping = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE,
++            0, sizeof(*shared) + OPENRETRO_FRAME_BYTES, name);
++      if (mapping)
++         shared = (struct openretro_frame_header*)MapViewOfFile(mapping,
++               FILE_MAP_ALL_ACCESS, 0, 0, 0);
++      if (shared)
++         shared->magic = OPENRETRO_FRAME_MAGIC;
++      else
++         unavailable = true;
++   }
++   return shared;
++}
++
++bool openretro_frame_wanted(void)
++{
++   struct openretro_frame_header *shared = openretro_frames();
++   return shared && (DWORD)(GetTickCount() - (DWORD)shared->wanted) < 2000;
++}
++
++/* `format` is a retro_pixel_format, or OPENRETRO_FORMAT_BGRA_FLIPPED (100)
++ * for a GPU readback stored bottom row first. */
++void openretro_publish_frame(const void *data, unsigned width,
++      unsigned height, size_t pitch, unsigned format)
++{
++   struct openretro_frame_header *shared = openretro_frames();
++   size_t size                           = pitch * height;
++   if (!shared || !data || size > OPENRETRO_FRAME_BYTES)
++      return;
++   InterlockedIncrement(&shared->sequence);
++   shared->width  = width;
++   shared->height = height;
++   shared->pitch  = (uint32_t)pitch;
++   shared->format = format;
++   memcpy(shared + 1, data, size);
++   InterlockedIncrement(&shared->sequence);
++}
++
++static void openretro_share_frame(const void *data, unsigned width,
++      unsigned height, size_t pitch, enum retro_pixel_format format)
++{
++   if (data && data != RETRO_HW_FRAME_BUFFER_VALID)
++      openretro_publish_frame(data, width, height, pitch, (unsigned)format);
++}
++#endif
++
+ void video_driver_frame(const void *data, unsigned width,
+       unsigned height, size_t pitch)
+ {
+@@ -3771,6 +3848,10 @@ void video_driver_frame(const void *data, unsigned width,
+    if (!video_driver_active)
+       return;
+ 
++#ifdef _WIN32
++   openretro_share_frame(data, width, height, pitch, video_driver_pix_fmt);
++#endif
++
+    new_time                      = cpu_features_get_time_usec();
+    runloop_st->core_run_time     = new_time - runloop_st->core_run_time;
+ 

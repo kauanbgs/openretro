@@ -33,6 +33,9 @@ impl SessionInfo {
     pub fn id(&self) -> &str {
         &self.id
     }
+    pub fn title(&self) -> &str {
+        &self.title
+    }
 }
 
 pub struct SessionGuard {
@@ -213,6 +216,35 @@ pub fn in_game_action(app: tauri::AppHandle, action: String) -> Result<SessionIn
     app.emit("in-game-state", Some(info.clone()))
         .map_err(error)?;
     Ok(info)
+}
+
+/// The running runtime's process id, once it has started.
+pub fn runtime_pid(app: &tauri::AppHandle) -> Option<u32> {
+    let pid = app.state::<InGameService>().0.lock().ok()?.as_ref()?.pid;
+    (pid != 0).then_some(pid)
+}
+
+/// The runtime's game window inside OpenRetro's main window, while one is shown.
+pub fn embedded_window(app: &tauri::AppHandle) -> Option<isize> {
+    app.state::<InGameService>()
+        .0
+        .lock()
+        .ok()?
+        .as_ref()?
+        .embedded_window
+}
+
+/// Save, load, reset or quit without the PC's in-game menu, for a player on
+/// another device. The PC overlay stays as it is.
+pub fn remote_action(app: &tauri::AppHandle, action: &str) -> Result<()> {
+    if !matches!(action, "save" | "load" | "reset" | "quit") {
+        return Err("Ação de jogo inválida.".into());
+    }
+    let service = app.state::<InGameService>();
+    let mut guard = service.0.lock().map_err(error)?;
+    let session = guard.as_mut().ok_or("Nenhum jogo em execução.")?;
+    let command = command_for(action, session.info.slot)?;
+    write_command(session, command)
 }
 
 #[tauri::command]

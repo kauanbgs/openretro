@@ -469,7 +469,8 @@ input[type="radio"] {
   padding: 24px;
 }
 .hero-content small {
-  color: var(--muted);
+  /* The banner art is always dark, whatever the theme. */
+  color: #c0c1c7;
   font-size: 12px;
 }
 .hero-content h2 {
@@ -1273,4 +1274,41 @@ input[type="radio"] {
 }
 .app .download-job > .artwork {
   height: auto;
+}
+
+/* Phone play */
+.phone-play {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  text-align: center;
+}
+.phone-play > svg {
+  color: var(--muted);
+}
+.phone-play p {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+.phone-play-qr {
+  padding: 12px;
+  border-radius: var(--radius);
+  background: #fff;
+  line-height: 0;
+}
+.phone-play .input-action {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.phone-play .input-action input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.phone-play p.phone-play-devices {
+  color: var(--muted);
+  font-weight: 600;
 }

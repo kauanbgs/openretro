@@ -171,6 +171,7 @@ pub async fn launch_game(
  if let Some(netplay)=&netplay {
     if !managed_retroarch { return Err("O jogo online só funciona no OpenRetro Runtime.".into()); }
     netplay.validate(&entry.item.platform_id)?;
+    netplay.check_host()?;
     // Players who join receive the host's state, so they never load or save their own.
     if !netplay.hosting() && slot.is_some() { return Err("Quem entra na partida joga a partir do estado de quem hospeda.".into()); }
  }

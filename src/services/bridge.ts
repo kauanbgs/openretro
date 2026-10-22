@@ -10,6 +10,7 @@ import type {
   LibraryGame,
   NetplaySession,
   PlayerProfile,
+  RemotePlayStatus,
   SaveState,
 } from "../types";
 import { defaultSettings } from "../types";
@@ -494,6 +495,20 @@ export const bridge = {
     throw new Error(
       "Open the desktop app to launch a game with your configured emulator.",
     );
+  },
+  /** Phone play: the pairing page phones open from the QR code. */
+  async remotePlayStatus(): Promise<RemotePlayStatus> {
+    return isDesktop
+      ? invoke("remote_play_status")
+      : { running: false, url: null, qr: null, devices: 0 };
+  },
+  async remotePlayStart(): Promise<RemotePlayStatus> {
+    if (!isDesktop)
+      throw new Error("Abra o aplicativo desktop para jogar no celular.");
+    return invoke("remote_play_start");
+  },
+  async remotePlayStop(): Promise<void> {
+    if (isDesktop) return invoke("remote_play_stop");
   },
   /** This computer's local network address, shared by the netplay host. */
   async netplayLocalAddress(): Promise<string | null> {

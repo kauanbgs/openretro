@@ -15,6 +15,7 @@ import {
   Cpu,
   Settings,
   Search,
+  Smartphone,
   Plus,
   X,
   Gamepad2,
@@ -28,6 +29,7 @@ import {
 import { Modal } from "./components/Modal";
 import { PlayerAvatar } from "./components/PlayerAvatar";
 import { PlayerPicker } from "./components/PlayerPicker";
+import { PhonePlayDialog } from "./components/PhonePlayDialog";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop } from "./services/bridge";
 import { listen } from "@tauri-apps/api/event";
@@ -127,6 +129,7 @@ export function App() {
   const [updateVersion, setUpdateVersion] = useState<string>();
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState("");
   const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
   useEffect(() => {
@@ -386,6 +389,12 @@ export function App() {
             )}
             <button
               className="button secondary"
+              onClick={() => setPhoneOpen(true)}
+            >
+              <Smartphone size={16} /> Celular
+            </button>
+            <button
+              className="button secondary"
               onClick={() => setBigPicture(true)}
             >
               <Gamepad2 size={16} /> Big Picture
@@ -511,6 +520,9 @@ export function App() {
         </button>
       </footer>
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
+      {phoneOpen && (
+        <PhonePlayDialog onClose={() => setPhoneOpen(false)} notify={notify} />
+      )}
       {importing && (
         <Suspense
           fallback={

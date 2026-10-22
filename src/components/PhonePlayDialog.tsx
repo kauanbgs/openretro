@@ -1,0 +1,120 @@
+import { useEffect, useState, type RefObject } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy, LoaderCircle, Smartphone } from "lucide-react";
+import { Modal } from "./Modal";
+import { bridge } from "../services/bridge";
+
+/** Pairs a phone on the same network to watch, hear and play the PC's game. */
+export function PhonePlayDialog({
+  onClose,
+  notify,
+  input,
+}: {
+  onClose: () => void;
+  notify: (message: string) => void;
+  /** Big Picture's controller: A turns phone play on or off, B closes. */
+  input?: RefObject<((key: string) => boolean) | null>;
+}) {
+  const client = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const status = useQuery({
+    queryKey: ["remote-play"],
+    queryFn: bridge.remotePlayStatus,
+    refetchInterval: 2000,
+  });
+  async function toggle(start: boolean) {
+    setBusy(true);
+    try {
+      if (start) await bridge.remotePlayStart();
+      else await bridge.remotePlayStop();
+      await client.invalidateQueries({ queryKey: ["remote-play"] });
+    } catch (error) {
+      notify(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const running = status.data?.running;
+  useEffect(() => {
+    if (!input) return;
+    const handler = (key: string) => {
+      if (key === "b") onClose();
+      if (key === "a" && !busy) void toggle(!running);
+      return true;
+    };
+    input.current = handler;
+    return () => {
+      if (input.current === handler) input.current = null;
+    };
+  });
+  return (
+    <Modal title="Jogar no celular" onClose={onClose}>
+      <div className="phone-play">
+        {running && status.data?.qr ? (
+          <>
+            <div
+              className="phone-play-qr"
+              role="img"
+              aria-label="QR code para abrir o OpenRetro no celular"
+              dangerouslySetInnerHTML={{ __html: status.data.qr }}
+            />
+            <p>
+              Aponte a câmera do celular para o código. O celular precisa estar
+              na mesma rede Wi-Fi deste computador.
+            </p>
+            <div className="input-action">
+              <input readOnly value={status.data.url ?? ""} />
+              <button
+                className="icon-button"
+                aria-label="Copiar endereço"
+                onClick={() =>
+                  void navigator.clipboard
+                    .writeText(status.data?.url ?? "")
+                    .then(() => notify("Endereço copiado."))
+                }
+              >
+                <Copy size={16} />
+              </button>
+            </div>
+            <p className="phone-play-devices">
+              {status.data.devices
+                ? `${status.data.devices} ${status.data.devices === 1 ? "celular conectado" : "celulares conectados"}`
+                : "Nenhum celular conectado ainda"}
+            </p>
+            <p className="hint">
+              Cada celular escolhe o jogador (J1 a J4) no menu da página. O jogo
+              continua aparecendo neste computador.
+            </p>
+            <button
+              className="button outline full"
+              disabled={busy}
+              onClick={() => void toggle(false)}
+            >
+              Desativar
+            </button>
+          </>
+        ) : (
+          <>
+            <Smartphone size={36} />
+            <p>
+              Jogue no navegador do celular, com imagem, som e controle na tela,
+              enquanto o jogo roda neste computador. Funciona na mesma rede
+              Wi-Fi; prefira a rede de 5 GHz.
+            </p>
+            <p className="hint">
+              Na primeira vez, o Windows pergunta se o OpenRetro pode usar a
+              rede. Permita em redes privadas.
+            </p>
+            <button
+              className="button primary full"
+              disabled={busy || status.isPending}
+              onClick={() => void toggle(true)}
+            >
+              {busy && <LoaderCircle className="spin" size={16} />} Ativar
+            </button>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}

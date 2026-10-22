@@ -1,0 +1,42 @@
+diff --git a/input/input_driver.c b/input/input_driver.c
+index beba85e1b2..8e00c4d047 100644
+--- a/input/input_driver.c
++++ b/input/input_driver.c
+@@ -1351,7 +1351,8 @@ static bool input_remote_init_network(input_remote_t *handle,
+    RARCH_LOG("[Network] Bringing up remote interface on port %hu.\n",
+          (unsigned short)port);
+ 
+-   if ((fd = socket_init((void**)&res, port, NULL, SOCKET_TYPE_DATAGRAM, AF_INET)) >= 0)
++   /* OpenRetro relays phone input locally; nothing on the network may reach it. */
++   if ((fd = socket_init((void**)&res, port, "127.0.0.1", SOCKET_TYPE_DATAGRAM, AF_INET)) >= 0)
+    {
+       handle->net_fd[user] = fd;
+ 
+@@ -6453,22 +6454,14 @@ void input_driver_poll(void)
+             FD_ZERO(&fds);
+             FD_SET(input_st->remote->net_fd[user], &fds);
+ 
+-            ret = recvfrom(input_st->remote->net_fd[user],
++            /* Each packet changes one button or axis, so drain the queue
++             * every frame. The sender releases everything when it leaves;
++             * an empty queue (EWOULDBLOCK on Windows) keeps the state. */
++            while ((ret = recvfrom(input_st->remote->net_fd[user],
+                   (char*)&msg,
+-                  sizeof(msg), 0, NULL, NULL);
+-
+-            if (ret == sizeof(msg))
++                  sizeof(msg), 0, NULL, NULL)) == sizeof(msg))
+                input_remote_parse_packet(&input_st->remote_st_ptr, &msg, user);
+-            else if ((ret != -1) || ((errno != EAGAIN) && (errno != ENOENT)))
+ #endif
+-            {
+-               input_remote_state_t *input_state  = &input_st->remote_st_ptr;
+-               input_state->buttons[user]         = 0;
+-               input_state->analog[0][user]       = 0;
+-               input_state->analog[1][user]       = 0;
+-               input_state->analog[2][user]       = 0;
+-               input_state->analog[3][user]       = 0;
+-            }
+          }
+       }
+    }

@@ -290,12 +290,10 @@ const DISABLED_HOTKEYS: &[&str] = &[
 fn keyboard_bindings() -> String {
     let mut config = String::new();
     for (key, value) in KEYBOARD_BINDINGS {
-        config.push_str(&format!("{key} = \"{value}\"
-"));
+        config.push_str(&format!("{key} = \"{value}\"\n"));
     }
     for key in DISABLED_HOTKEYS {
-        config.push_str(&format!("{key} = \"nul\"
-"));
+        config.push_str(&format!("{key} = \"nul\"\n"));
     }
     config
 }
@@ -365,6 +363,14 @@ input_state_slot_decrease = "f6"
 "#,
     );
     config.push_str(&keyboard_bindings());
+    // Phone play relays each phone's buttons to these loopback ports, one per player.
+    config.push_str(&format!(
+        "network_remote_enable = \"true\"\nnetwork_remote_base_port = \"{}\"\n",
+        crate::remote_play::REMOTE_PAD_BASE_PORT
+    ));
+    for player in 1..=4 {
+        config.push_str(&format!("network_remote_enable_user_p{player} = \"true\"\n"));
+    }
     // Preserve the runtime's normal autoconfig library (Xbox, 8BitDo, etc.)
     // when supplied. The bundled SDL profiles are a fallback for small runtimes.
     let supplied = runtime.join("autoconfig");
@@ -538,6 +544,7 @@ mod tests {
         assert!(text.contains("input_player1_l2 = \"e\""));
         assert!(text.contains("input_player1_l_x_plus = \"l\""));
         assert!(text.contains("input_exit_emulator = \"nul\""));
+        assert!(text.contains("network_remote_enable_user_p4 = \"true\""));
         assert!(text.contains("menu_driver = \"rgui\""));
         assert!(!text.contains("savefile_directory"));
         assert!(!text.contains("savestate_directory"));

@@ -35,7 +35,18 @@ librqbit = { version = "=8.1.1", default-features = false, features = ["rust-tls
 tokio = { version = "1", features = ["sync", "time", "macros"] }
 tokio-util = "0.7"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws", "query"] }
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+
+[target.'cfg(windows)'.dependencies]
+# Phone play: screen capture for OpenRetro's own screens, and the PC's sound.
+windows-capture = "2"
+cpal = "0.18"
 
 [target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
 # Upstream SHA-1 uses AWS-LC. Use its shipped assembly objects on Windows.
 aws-lc-sys = { version = "0.46", features = ["prebuilt-nasm"] }
+
+# Phone play encodes every frame as JPEG; keep that fast in debug builds too.
+[profile.dev.package.image]
+opt-level = 3

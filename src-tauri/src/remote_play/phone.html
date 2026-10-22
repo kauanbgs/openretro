@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#151515">
+<title>OpenRetro no celular</title>
+<style>
+  :root {
+    --bg: #151515; --panel: #1c1c1c; --border: #ffffff26; --text: #e9eaee;
+    --muted: #c0c1c7; --body: #8e919b; --pad: #ffffff1f; --pad-on: #ffffff59;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--muted); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; }
+  #screen { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); background: linear-gradient(#000c, #0000); z-index: 5; }
+  #title { flex: 1; overflow: hidden; color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+  .chip { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: #0008; font-size: 13px; font-weight: 600; }
+  .chip.on { background: var(--muted); color: #1c1c1c; border-color: transparent; }
+  #menu { position: fixed; top: 52px; right: 12px; z-index: 6; display: none; min-width: 190px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  #menu.open { display: grid; }
+  #menu button { padding: 10px 12px; border-radius: 6px; text-align: left; font-size: 14px; }
+  #menu button:active { background: #ffffff14; }
+  #menu .players { display: flex; gap: 6px; padding: 6px; }
+  #menu .players button { flex: 1; padding: 8px 0; border: 1px solid var(--border); text-align: center; }
+  #menu .players button.on { background: var(--muted); color: #1c1c1c; }
+  #menu small { padding: 8px 12px 0; color: var(--body); font-size: 11px; }
+  /* Touch controls */
+  #controls { position: fixed; inset: 0; z-index: 4; }
+  #controls.hidden { display: none; }
+  .btn, #dpad { position: absolute; display: grid; place-items: center; border: 1px solid var(--border); background: var(--pad); color: #fffc; font-weight: 700; touch-action: none; }
+  .btn.on { background: var(--pad-on); }
+  #dpad { left: max(24px, env(safe-area-inset-left)); bottom: 28px; width: 150px; height: 150px; border-radius: 50%; }
+  #dpad i { position: absolute; width: 0; height: 0; border: 10px solid transparent; opacity: .7; }
+  #dpad .u { top: 14px; border-bottom-color: #fff; } #dpad .d { bottom: 14px; border-top-color: #fff; }
+  #dpad .l { left: 14px; border-right-color: #fff; } #dpad .r { right: 14px; border-left-color: #fff; }
+  #dpad.u .u, #dpad.d .d, #dpad.l .l, #dpad.r .r { opacity: 1; border-width: 12px; }
+  .face { width: 58px; height: 58px; border-radius: 50%; font-size: 18px; }
+  #a { right: max(24px, env(safe-area-inset-right)); bottom: 74px; }
+  #b { right: calc(max(24px, env(safe-area-inset-right)) + 62px); bottom: 20px; }
+  #x { right: calc(max(24px, env(safe-area-inset-right)) + 62px); bottom: 128px; }
+  #y { right: calc(max(24px, env(safe-area-inset-right)) + 124px); bottom: 74px; }
+  .shoulder { top: 58px; width: 84px; height: 40px; border-radius: 10px; font-size: 14px; }
+  .shoulder.small { top: 104px; width: 60px; height: 32px; font-size: 12px; }
+  #l { left: max(24px, env(safe-area-inset-left)); } #l2 { left: max(24px, env(safe-area-inset-left)); }
+  #r { right: max(24px, env(safe-area-inset-right)); } #r2 { right: max(24px, env(safe-area-inset-right)); }
+  .meta { bottom: 16px; width: 76px; height: 28px; border-radius: 14px; background: #000000a6; font-size: 11px; }
+  .meta.on { background: #000000d9; border-color: #ffffff80; }
+  #select { left: calc(50% - 84px); } #start { left: calc(50% + 8px); }
+  /* Overlays */
+  .sheet { position: fixed; inset: 0; z-index: 8; display: none; overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) 20px 20px; background: var(--bg); }
+  .sheet.open { display: block; }
+  .sheet h1 { margin: 8px 0 4px; color: var(--text); font-size: 20px; }
+  .sheet p { margin: 0 0 16px; color: var(--body); font-size: 14px; }
+  #games { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+  #games { align-items: start; }
+  #games button { overflow: hidden; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); text-align: left; }
+  #games img, #games .art { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #222; }
+  #games span { display: block; padding: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+  #games small { display: block; padding: 0 8px 8px; color: var(--body); font-size: 11px; }
+  #start-overlay { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: #000d; text-align: center; }
+  #start-overlay strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 20px; }
+  #start-overlay span { color: var(--body); font-size: 14px; }
+  #notice { position: fixed; left: 50%; bottom: 60px; z-index: 7; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: #000c; color: var(--muted); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #notice.show { opacity: 1; }
+  @media (orientation: portrait) {
+    #dpad { bottom: 120px; } #a, #b, #x, #y { transform: translateY(-96px); }
+    .shoulder { top: auto; bottom: 300px; } .shoulder.small { bottom: 346px; }
+    #screen { top: 56px; bottom: auto; height: auto; max-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+<img id="screen" alt="">
+<div id="bar">
+  <span id="title">OpenRetro</span>
+  <button class="chip" id="player-chip">J1</button>
+  <button class="chip" id="menu-chip" aria-label="Menu">☰</button>
+</div>
+<div id="menu" role="menu">
+  <div class="players" id="players"></div>
+  <button data-action="save">Salvar estado</button>
+  <button data-action="load">Carregar estado</button>
+  <button id="library-button">Escolher outro jogo</button>
+  <button id="fullscreen">Tela cheia</button>
+  <button id="touch-toggle">Esconder controles</button>
+  <button data-action="quit">Sair do jogo</button>
+  <small id="stats"></small>
+</div>
+<div id="controls">
+  <div id="dpad"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i></div>
+  <button class="btn face" id="a" data-bit="8">A</button>
+  <button class="btn face" id="b" data-bit="0">B</button>
+  <button class="btn face" id="x" data-bit="9">X</button>
+  <button class="btn face" id="y" data-bit="1">Y</button>
+  <button class="btn shoulder" id="l" data-bit="10">L</button>
+  <button class="btn shoulder" id="r" data-bit="11">R</button>
+  <button class="btn shoulder small" id="l2" data-bit="12">L2</button>
+  <button class="btn shoulder small" id="r2" data-bit="13">R2</button>
+  <button class="btn meta" id="select" data-bit="2">SELECT</button>
+  <button class="btn meta" id="start" data-bit="3">START</button>
+</div>
+<section class="sheet" id="library">
+  <h1>Escolha um jogo</h1>
+  <p id="library-hint">O jogo abre no computador e aparece aqui.</p>
+  <div id="games"></div>
+</section>
+<div id="start-overlay"><div><strong>Toque para começar</strong><span>O som e a tela cheia precisam de um toque.</span></div></div>
+<div id="notice"></div>
+<script>
+(() => {
+  const token = new URLSearchParams(location.search).get("t") || "";
+  const $ = (id) => document.getElementById(id);
+  const screen = $("screen"), title = $("title"), notice = $("notice");
+  let ws, game = null, library = [], player = Number(localStorage.getItem("openretro-player") || 1);
+  let touchButtons = 0, dpadBits = 0, padButtons = 0, axes = [0, 0, 0, 0], sent = "";
+  let frames = 0, bytes = 0, objectUrl = null, decoding = false, pending = null;
+
+  function toast(text) {
+    notice.textContent = text; notice.classList.add("show");
+    clearTimeout(toast.timer); toast.timer = setTimeout(() => notice.classList.remove("show"), 2200);
+  }
+  function send(message) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(message)); }
+  function sendPad(force) {
+    const state = { type: "pad", player, buttons: touchButtons | dpadBits | padButtons, axes };
+    const key = JSON.stringify(state);
+    if (force || key !== sent) { sent = key; send(state); }
+  }
+
+  // Video: show the newest frame; skip frames that arrive while one decodes.
+  function showFrame(data) {
+    if (decoding) { pending = data; return; }
+    decoding = true;
+    const url = URL.createObjectURL(new Blob([data], { type: "image/jpeg" }));
+    screen.onload = screen.onerror = () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = url; decoding = false;
+      if (pending) { const next = pending; pending = null; showFrame(next); }
+    };
+    screen.src = url;
+  }
+
+  // Audio: schedule PCM chunks just ahead of the clock and drop backlog.
+  let audio = null, playAt = 0;
+  function playSound(view) {
+    if (!audio || audio.state !== "running") return;
+    const rate = view.getUint32(1, true), count = (view.byteLength - 5) / 4;
+    if (count <= 0) return;
+    const buffer = audio.createBuffer(2, count, rate);
+    const left = buffer.getChannelData(0), right = buffer.getChannelData(1);
+    for (let i = 0; i < count; i++) {
+      left[i] = view.getInt16(5 + i * 4, true) / 32768;
+      right[i] = view.getInt16(7 + i * 4, true) / 32768;
+    }
+    const now = audio.currentTime;
+    if (playAt < now + 0.03 || playAt > now + 0.25) playAt = now + 0.06;
+    const source = audio.createBufferSource();
+    source.buffer = buffer; source.connect(audio.destination); source.start(playAt);
+    playAt += buffer.duration;
+  }
+
+  function connect() {
+    ws = new WebSocket(`ws://${location.host}/ws?t=${encodeURIComponent(token)}`);
+    ws.binaryType = "arraybuffer";
+    ws.onopen = () => { title.textContent = game || "Conectado"; sendPad(true); };
+    ws.onmessage = (event) => {
+      if (typeof event.data === "string") return status(JSON.parse(event.data));
+      const view = new DataView(event.data);
+      bytes += event.data.byteLength;
+      if (view.getUint8(0) === 1) { frames++; showFrame(new Uint8Array(event.data, 1)); }
+      else if (view.getUint8(0) === 2) playSound(view);
+    };
+    ws.onclose = () => { title.textContent = "Reconectando…"; setTimeout(connect, 1000); };
+  }
+
+  function status(message) {
+    if (message.type !== "status") return;
+    game = message.game; library = message.library || [];
+    title.textContent = game || "Nenhum jogo aberto";
+    renderLibrary();
+    $("library").classList.toggle("open", !game);
+  }
+
+  function renderLibrary() {
+    const list = $("games"); list.textContent = "";
+    $("library-hint").textContent = library.length
+      ? (game ? `Jogando ${game}. Escolher outro fecha o atual no computador.` : "O jogo abre no computador e aparece aqui.")
+      : "Adicione jogos à biblioteca no computador para jogar aqui.";
+    for (const entry of library) {
+      const button = document.createElement("button");
+      const art = entry.cover ? Object.assign(document.createElement("img"), { src: entry.cover, loading: "lazy", referrerPolicy: "no-referrer", alt: "" }) : Object.assign(document.createElement("div"), { className: "art" });
+      const name = Object.assign(document.createElement("span"), { textContent: entry.title });
+      const platform = Object.assign(document.createElement("small"), { textContent: entry.platform.toUpperCase() });
+      button.append(art, name, platform);
+      button.onclick = () => {
+        if (game) { send({ type: "action", action: "quit" }); setTimeout(() => send({ type: "launch", id: entry.id }), 1500); }
+        else send({ type: "launch", id: entry.id });
+        $("library").classList.remove("open");
+        toast(`Abrindo ${entry.title}…`);
+      };
+      list.append(button);
+    }
+  }
+
+  // Touch: each pointer presses whatever control is under it, sliding included.
+  const controls = $("controls"), dpad = $("dpad"), held = new Map();
+  function dpadFrom(x, y) {
+    const box = dpad.getBoundingClientRect();
+    const dx = x - (box.left + box.width / 2), dy = y - (box.top + box.height / 2);
+    if (Math.hypot(dx, dy) < box.width * 0.14) return 0;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    let bits = 0;
+    if (angle > -157.5 && angle < -22.5) bits |= 1 << 4;
+    if (angle > 22.5 && angle < 157.5) bits |= 1 << 5;
+    if (angle > 112.5 || angle < -112.5) bits |= 1 << 6;
+    if (angle > -67.5 && angle < 67.5) bits |= 1 << 7;
+    return bits;
+  }
+  function refreshTouch() {
+    touchButtons = 0; dpadBits = 0;
+    for (const target of held.values()) {
+      if (target.kind === "dpad") dpadBits |= target.bits;
+      else touchButtons |= 1 << target.bit;
+    }
+    controls.querySelectorAll(".btn").forEach((b) => b.classList.toggle("on", [...held.values()].some((t) => t.el === b)));
+    dpad.className = ["u", "d", "l", "r"].filter((_, i) => dpadBits & (1 << (4 + i))).join(" ");
+    sendPad();
+  }
+  function track(event) {
+    const el = document.elementFromPoint(event.clientX, event.clientY);
+    const button = el && el.closest && el.closest(".btn");
+    if (el && el.closest && el.closest("#dpad")) held.set(event.pointerId, { kind: "dpad", bits: dpadFrom(event.clientX, event.clientY) });
+    else if (button) held.set(event.pointerId, { el: button, bit: Number(button.dataset.bit) });
+    else held.delete(event.pointerId);
+    refreshTouch();
+  }
+  controls.addEventListener("pointerdown", (e) => { e.preventDefault(); controls.setPointerCapture(e.pointerId); track(e); if (navigator.vibrate) navigator.vibrate(8); });
+  controls.addEventListener("pointermove", (e) => { if (held.has(e.pointerId)) track(e); });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) controls.addEventListener(type, (e) => { held.delete(e.pointerId); refreshTouch(); });
+
+  // Bluetooth or USB controllers paired with the phone, in the standard layout.
+  const standard = [0, 8, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7];
+  function pollGamepads() {
+    let buttons = 0, sticks = [0, 0, 0, 0], any = false;
+    for (const pad of (navigator.getGamepads ? navigator.getGamepads() : [])) {
+      if (!pad) continue; any = true;
+      pad.buttons.forEach((b, i) => { if (b.pressed && standard[i] !== undefined) buttons |= 1 << standard[i]; });
+      sticks = sticks.map((value, i) => {
+        const v = pad.axes[i] || 0;
+        return value || (Math.abs(v) > 0.15 ? Math.round(v * 32767) : 0);
+      });
+    }
+    if (any && !controls.classList.contains("hidden") && !pollGamepads.seen) { pollGamepads.seen = true; controls.classList.add("hidden"); toast("Controle conectado"); }
+    padButtons = buttons; axes = sticks;
+    sendPad();
+    requestAnimationFrame(pollGamepads);
+  }
+
+  // Menu
+  const players = $("players");
+  for (let n = 1; n <= 4; n++) {
+    const b = Object.assign(document.createElement("button"), { textContent: `J${n}` });
+    b.onclick = () => { player = n; localStorage.setItem("openretro-player", n); updatePlayer(); sendPad(true); };
+    players.append(b);
+  }
+  function updatePlayer() {
+    $("player-chip").textContent = `J${player}`;
+    [...players.children].forEach((b, i) => b.classList.toggle("on", i + 1 === player));
+  }
+  $("player-chip").onclick = () => { player = player % 4 + 1; localStorage.setItem("openretro-player", player); updatePlayer(); sendPad(true); toast(`Você é o jogador ${player}`); };
+  $("menu-chip").onclick = () => $("menu").classList.toggle("open");
+  document.querySelectorAll("[data-action]").forEach((b) => b.onclick = () => {
+    const action = b.dataset.action;
+    if (action === "quit" && !confirm("Sair do jogo no computador?")) return;
+    send({ type: "action", action });
+    toast({ save: "Estado salvo", load: "Estado carregado", quit: "Saindo do jogo…" }[action]);
+    $("menu").classList.remove("open");
+  });
+  $("library-button").onclick = () => { $("library").classList.add("open"); $("menu").classList.remove("open"); };
+  $("fullscreen").onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); $("menu").classList.remove("open"); };
+  $("touch-toggle").onclick = () => {
+    const hidden = controls.classList.toggle("hidden");
+    $("touch-toggle").textContent = hidden ? "Mostrar controles" : "Esconder controles";
+    $("menu").classList.remove("open");
+  };
+  $("start-overlay").onclick = () => {
+    $("start-overlay").remove();
+    try { audio = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" }); audio.resume(); } catch {}
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    window.screen.orientation?.lock?.("landscape").catch(() => {});
+  };
+  setInterval(() => {
+    $("stats").textContent = `${frames} quadros/s · ${(bytes * 8 / 1e6).toFixed(1)} Mbit/s`;
+    frames = 0; bytes = 0;
+  }, 1000);
+  updatePlayer();
+  connect();
+  requestAnimationFrame(pollGamepads);
+})();
+</script>
+</body>
+</html>

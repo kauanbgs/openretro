@@ -57,6 +57,24 @@ host's state and never load or overwrite their own resume state. NES, SNES,
 Game Boy, GBA, Master System, Genesis, Game Gear, PlayStation and Arcade games
 are supported.
 
+## Play on your phone
+
+**Celular → Ativar** in the header shows a QR code. A phone on the same Wi-Fi
+opens it in the browser, no app needed, and gets the game's picture and sound,
+touch controls, and the library to start a game. Each phone picks a player
+(J1 to J4); a controller paired with the phone also works where the browser
+allows it. The game keeps running on the PC.
+
+The page only opens with the random token in the QR code, which changes each
+time phone play starts. The runtime publishes each frame in shared memory, so
+the picture reaches the phone even with the PC's screen off: frames from
+software cores at the console's own resolution, and frames from GPU-drawn
+games (N64, PSP, PS2) read back only while a phone watches. Screen capture
+shows OpenRetro itself when no game runs. Sound is the PC's output. Phone
+buttons reach the runtime's remote gamepad, which listens on loopback only.
+Windows asks once whether OpenRetro may use the network; allow private
+networks.
+
 ## Big Picture tools
 
 Big Picture includes the same game details/configuration, file and folder import,

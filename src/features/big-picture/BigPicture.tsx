@@ -21,6 +21,7 @@ import {
   MonitorCog,
   Play,
   Search,
+  Smartphone,
   Settings,
   Trash2,
   X,
@@ -54,6 +55,7 @@ import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
+import { PhonePlayDialog } from "../../components/PhonePlayDialog";
 import { PlayerAvatar, playerAccent } from "../../components/PlayerAvatar";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
 import { HeroArtwork } from "./HeroArtwork";
@@ -114,6 +116,7 @@ export function BigPicture({
   const [libraryPlatform, setLibraryPlatform] = useState("all");
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
   const [playersOpen, setPlayersOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceRoute>();
   const workspaceInput = useRef<((key: string) => boolean) | null>(null);
   const { data: players } = useQuery({
@@ -332,7 +335,7 @@ export function BigPicture({
         : section === "emulators"
           ? emulators.length
           : section === "system"
-            ? 7
+            ? 8
             : visibleGames.length;
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
@@ -403,6 +406,7 @@ export function BigPicture({
     if (selected === 0) return setPlayersOpen(true);
     const page = [
       "players",
+      "phone",
       "Discover",
       "Settings",
       "Emulators",
@@ -410,6 +414,7 @@ export function BigPicture({
       "sources",
       "exit",
     ][selected];
+    if (page === "phone") return setPhoneOpen(true);
     page === "exit"
       ? close()
       : page === "Discover"
@@ -434,7 +439,13 @@ export function BigPicture({
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
       if (selectInput.current?.(key)) return;
-      if (workspace && !navFocused && !powerOpen && !playersOpen) {
+      if (
+        workspace &&
+        !navFocused &&
+        !powerOpen &&
+        !playersOpen &&
+        !phoneOpen
+      ) {
         workspaceInput.current?.(key);
         return;
       }
@@ -843,6 +854,13 @@ export function BigPicture({
           </button>
         </div>
       </div>
+      {phoneOpen && (
+        <PhonePlayDialog
+          input={selectInput}
+          notify={notify}
+          onClose={() => setPhoneOpen(false)}
+        />
+      )}
       {playersOpen && (
         <PlayerPicker
           input={selectInput}
@@ -1168,6 +1186,12 @@ export function BigPicture({
                     UserRound,
                   ] as const,
                   [
+                    "Jogar no celular",
+                    "Jogue pelo navegador do celular na mesma rede",
+                    "phone",
+                    Smartphone,
+                  ] as const,
+                  [
                     "Encontrar jogos",
                     "Descubra títulos e fontes",
                     "Discover",
@@ -1213,20 +1237,22 @@ export function BigPicture({
                     onClick={() =>
                       page === "players"
                         ? setPlayersOpen(true)
-                        : page === "exit"
-                          ? close()
-                          : page === "Discover"
-                            ? selectSection("catalog")
-                            : setWorkspace({
-                                page:
-                                  page === "Emulators"
-                                    ? "emulators"
-                                    : page === "sources"
-                                      ? "sources"
-                                      : page === "import"
-                                        ? "import"
-                                        : "settings",
-                              })
+                        : page === "phone"
+                          ? setPhoneOpen(true)
+                          : page === "exit"
+                            ? close()
+                            : page === "Discover"
+                              ? selectSection("catalog")
+                              : setWorkspace({
+                                  page:
+                                    page === "Emulators"
+                                      ? "emulators"
+                                      : page === "sources"
+                                        ? "sources"
+                                        : page === "import"
+                                          ? "import"
+                                          : "settings",
+                                })
                     }
                   >
                     <Icon size={25} />

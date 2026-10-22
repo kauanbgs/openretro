@@ -91,6 +91,28 @@ impl Netplay {
         self.target().map(|_| ())
     }
 
+    /// Before joining, makes sure someone is hosting at the address. Without
+    /// this the runtime starts the game alone and the player sees no error.
+    pub fn check_host(&self) -> Result<()> {
+        let (Some(host), port) = self.target()? else {
+            return Ok(());
+        };
+        let unreachable = || {
+            format!(
+                "Ninguém está hospedando em {host}:{port}. Confira o endereço e se o \
+                 anfitrião já abriu a partida; pela internet, a porta precisa estar aberta \
+                 no roteador dele."
+            )
+        };
+        let address = std::net::ToSocketAddrs::to_socket_addrs(&(host.as_str(), port))
+            .map_err(|_| unreachable())?
+            .next()
+            .ok_or_else(unreachable)?;
+        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(4))
+            .map(drop)
+            .map_err(|_| unreachable().into())
+    }
+
     pub fn args(&self) -> Result<Vec<String>> {
         let (host, port) = self.target()?;
         let mut args = match host {
@@ -167,6 +189,21 @@ mod tests {
         }
         assert!(join("10.0.0.2").validate("ps2").is_err());
         assert!(join("10.0.0.2").validate("snes").is_ok());
+    }
+
+    #[test]
+    fn joining_checks_that_someone_hosts() {
+        let host = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = host.local_addr().unwrap().port();
+        let mut session = join("127.0.0.1");
+        session.port = Some(port);
+        assert!(session.check_host().is_ok());
+        drop(host);
+        let error = session.check_host().unwrap_err();
+        assert!(error.contains(&format!("127.0.0.1:{port}")), "{error}");
+        let mut hosting = join("");
+        hosting.role = "host".into();
+        assert!(hosting.check_host().is_ok());
     }
 
     #[test]

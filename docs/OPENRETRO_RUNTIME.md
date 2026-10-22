@@ -15,7 +15,13 @@ and XAudio, threading, ZIP/7z/CHD support, save data, save states, screenshots
 and the command channel used by OpenRetro's in-game menu. Networking is built
 only for direct-IP netplay: OpenRetro starts it with `--host` or `--connect`,
 turns off lobby announcements and relay servers, and lets the host open its
-port through UPnP. The build has no SSL, LAN discovery or network gamepad.
+port through UPnP. The remote gamepad is built so phone play can relay each
+phone's buttons; OpenRetro's patches bind it to loopback and make it read every
+queued packet. On Windows another patch publishes frames in shared memory
+named after the runtime's process, which OpenRetro streams to phones: every
+software frame from the core, and, while OpenRetro marks a phone as watching,
+an asynchronous readback of GPU-drawn frames. The build has no SSL or LAN
+discovery.
 
 It excludes the RetroArch menu drivers, widgets, database, playlists, online
 updater, netplay lobby and discovery, achievements, Discord, recording, streaming,
