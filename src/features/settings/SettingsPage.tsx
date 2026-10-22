@@ -377,6 +377,45 @@ export function SettingsPage({
                   <span />
                 </button>
               </div>
+              <div className="setting-row">
+                <div>
+                  <strong>Sons de navegação</strong>
+                  <p>Sons curtos ao mover e escolher no modo console.</p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={settings.navigationSounds !== false}
+                  aria-label="Sons de navegação"
+                  className={`switch ${settings.navigationSounds !== false ? "on" : ""}`}
+                  onClick={() =>
+                    void save({
+                      navigationSounds: settings.navigationSounds === false,
+                    })
+                  }
+                >
+                  <span />
+                </button>
+              </div>
+              <div className="setting-row">
+                <div>
+                  <strong>Atualizar automaticamente</strong>
+                  <p>
+                    Baixa novas versões em segundo plano e instala ao abrir o
+                    OpenRetro.
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={settings.autoUpdate !== false}
+                  aria-label="Atualizar automaticamente"
+                  className={`switch ${settings.autoUpdate !== false ? "on" : ""}`}
+                  onClick={() =>
+                    void save({ autoUpdate: settings.autoUpdate === false })
+                  }
+                >
+                  <span />
+                </button>
+              </div>
             </>
           ) : (
             <>

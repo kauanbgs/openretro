@@ -37,8 +37,7 @@ import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop, isRemote } from "./services/bridge";
 import { invoke, isTauri } from "./services/transport";
 import { listen } from "./services/transport";
-import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { useUpdates } from "./services/updates";
 import {
   defaultSettings,
   type GameMetadata,
@@ -143,8 +142,6 @@ export function App() {
   const [help, setHelp] = useState(false);
   const [bigPicture, setBigPicture] = useState(false);
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
-  const [updateVersion, setUpdateVersion] = useState<string>();
-  const [installingUpdate, setInstallingUpdate] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -159,10 +156,20 @@ export function App() {
   const libraryRef = useRef(library);
   libraryRef.current = library;
   const notify = useCallback((s: string) => setToast(s), []);
-  const { data: settings = defaultSettings } = useQuery({
-    queryKey: ["settings"],
-    queryFn: bridge.settings,
+  const { data: settings = defaultSettings, isSuccess: settingsLoaded } =
+    useQuery({
+      queryKey: ["settings"],
+      queryFn: bridge.settings,
+    });
+  const updates = useUpdates({
+    enabled: isTauri && settingsLoaded,
+    automatic: settings.autoUpdate !== false,
+    playing: Boolean(playing),
+    notify,
   });
+  const updateVersion = updates.phase === "idle" ? undefined : updates.version;
+  const updating =
+    updates.phase === "downloading" || updates.phase === "installing";
   useEffect(() => {
     if (!isDesktop) return;
     const unlisten = listen<DownloadImported>(
@@ -215,21 +222,6 @@ export function App() {
     document.documentElement.dataset.animations = String(settings.animations);
   }, [settings]);
   useEffect(() => {
-    if (!isTauri) return;
-    let alive = true;
-    const timer = window.setTimeout(() => {
-      void check()
-        .then((update) => {
-          if (alive && update) setUpdateVersion(update.version);
-        })
-        .catch(() => undefined);
-    }, 3500);
-    return () => {
-      alive = false;
-      window.clearTimeout(timer);
-    };
-  }, []);
-  useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
@@ -255,47 +247,42 @@ export function App() {
     setImportGame(g);
     setImporting(true);
   };
-  const installUpdate = async () => {
-    setInstallingUpdate(true);
-    try {
-      const update = await check();
-      if (!update) {
-        setUpdateVersion(undefined);
-        setInstallingUpdate(false);
-        notify("OpenRetro já está atualizado.");
-        return;
-      }
-      await update.downloadAndInstall();
-      await relaunch();
-    } catch (error) {
-      notify(`Could not install the update: ${String(error)}`);
-      setInstallingUpdate(false);
-    }
-  };
+  const updateOverlay = updates.phase === "installing" && (
+    <div className="update-overlay" role="status">
+      <Download size={28} />
+      <strong>
+        Atualizando o OpenRetro{updates.version && ` para ${updates.version}`}
+      </strong>
+      <span>O app reabre sozinho em alguns segundos.</span>
+    </div>
+  );
   // Unmount desktop pages while the console owns the screen: no hidden catalog,
   // images, observers or page queries behind Big Picture.
   if (bigPicture)
     return (
-      <Suspense
-        fallback={
-          <div className="console-loading" role="status">
-            Abrindo modo console…
-          </div>
-        }
-      >
-        <BigPicture
-          library={library}
-          emulators={emulators}
-          jobs={jobs}
-          downloadArrival={downloadArrival}
-          refresh={refresh}
-          onClose={() => setBigPicture(false)}
-          onUpdate={() => void installUpdate()}
-          updateVersion={updateVersion}
-          updating={installingUpdate}
-          notify={notify}
-        />
-      </Suspense>
+      <>
+        {updateOverlay}
+        <Suspense
+          fallback={
+            <div className="console-loading" role="status">
+              Abrindo modo console…
+            </div>
+          }
+        >
+          <BigPicture
+            library={library}
+            emulators={emulators}
+            jobs={jobs}
+            downloadArrival={downloadArrival}
+            refresh={refresh}
+            onClose={() => setBigPicture(false)}
+            onUpdate={() => void updates.install()}
+            updateVersion={updateVersion}
+            updating={updating}
+            notify={notify}
+          />
+        </Suspense>
+      </>
     );
   const activeEntry = library.find((x) => x.game.id === selected?.id);
   const activePlayer = players.data?.players.find(
@@ -307,6 +294,7 @@ export function App() {
   const downloading = activeDownloads[0];
   return (
     <div className={`app density-${settings.density}`}>
+      {updateOverlay}
       <aside className="sidebar">
         <button
           className="sidebar-profile"
@@ -420,13 +408,17 @@ export function App() {
             {updateVersion && (
               <button
                 className="button primary"
-                disabled={installingUpdate}
-                onClick={() => void installUpdate()}
+                disabled={updating}
+                onClick={() => void updates.install()}
               >
                 <Download size={16} />
-                {installingUpdate
-                  ? "Atualizando…"
-                  : `Atualizar para ${updateVersion}`}
+                {updates.phase === "downloading"
+                  ? `Baixando ${updateVersion}…`
+                  : updates.phase === "installing"
+                    ? "Atualizando…"
+                    : updates.phase === "ready"
+                      ? `Reiniciar e atualizar para ${updateVersion}`
+                      : `Atualizar para ${updateVersion}`}
               </button>
             )}
             {isRemote ? (

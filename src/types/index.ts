@@ -153,6 +153,10 @@ export interface AppSettings {
   concurrentDownloads: number;
   bandwidthLimit: number;
   developerMode: boolean;
+  /** Short sounds when moving and choosing in Big Picture. */
+  navigationSounds?: boolean;
+  /** Download updates in the background and install them on the next start. */
+  autoUpdate?: boolean;
   /** Internal resolution of PS2 games in the managed runtime. */
   ps2Resolution?: "1x" | "2x" | "4x" | "8x";
 }
@@ -167,6 +171,8 @@ export const defaultSettings: AppSettings = {
   bandwidthLimit: 0,
   developerMode: false,
   ps2Resolution: "2x",
+  navigationSounds: true,
+  autoUpdate: true,
 };
 export type DownloadState =
   | "RESOLVING"

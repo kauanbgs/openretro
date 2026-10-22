@@ -54,6 +54,7 @@ import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
 import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
 import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
+import { playUiSound, setNavigationSounds, soundFor } from "./navigationSounds";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
 import { PhonePlayDialog } from "../../components/PhonePlayDialog";
@@ -126,6 +127,11 @@ export function BigPicture({
     queryFn: bridge.profiles,
   });
   const activePlayer = players?.players.find((p) => p.id === players.activeId);
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: bridge.settings,
+  });
+  setNavigationSounds(settings?.navigationSounds !== false);
   const [powerOpen, setPowerOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const keyboardInput = useRef<((key: string) => boolean) | null>(null);
@@ -652,6 +658,7 @@ export function BigPicture({
           document.activeElement instanceof HTMLButtonElement
         )
           document.activeElement.blur();
+        playUiSound(soundFor(keys[key]));
         dispatchInput.current(keys[key]);
       }
     };
@@ -676,7 +683,9 @@ export function BigPicture({
         return;
       }
       for (const key of device.sample(pad, performance.now())) {
-        dispatchInput.current(key === "menu" ? "b" : key);
+        const input = key === "menu" ? "b" : key;
+        playUiSound(soundFor(input));
+        dispatchInput.current(input);
       }
     }, 33);
     return () => window.clearInterval(timer);
@@ -751,6 +760,10 @@ export function BigPicture({
       style={playerAccent(activePlayer)}
       data-section={workspace ? workspace.page : section}
       aria-label="Modo console do OpenRetro"
+      onClickCapture={(event) => {
+        if ((event.target as Element).closest("button:not(:disabled)"))
+          playUiSound("select");
+      }}
       role="dialog"
       aria-modal="true"
     >
