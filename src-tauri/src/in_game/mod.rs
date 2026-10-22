@@ -17,6 +17,8 @@ struct Session {
     pid: u32,
     sdl_library: Option<std::path::PathBuf>,
     embedded_window: Option<isize>,
+    /// Launcher views hidden so they cannot paint over the embedded game.
+    covered_views: Vec<isize>,
     main_was_fullscreen: bool,
 }
 #[derive(Clone, Serialize)]
@@ -51,13 +53,17 @@ impl SessionGuard {
         drop(guard);
         #[cfg(target_os = "windows")]
         {
-            let window = host::embed(&self.app, pid)?;
+            let embedded = host::embed(&self.app, pid)?;
             let mut guard = service.0.lock().map_err(error)?;
-            let session = guard
+            let Some(session) = guard
                 .as_mut()
                 .filter(|session| session.info.id == self.id)
-                .ok_or("A sessão do jogo foi encerrada.")?;
-            session.embedded_window = Some(window);
+            else {
+                host::reveal(&embedded.covered);
+                return Err("A sessão do jogo foi encerrada.".into());
+            };
+            session.embedded_window = Some(embedded.window);
+            session.covered_views = embedded.covered;
         }
         Ok(())
     }
@@ -71,8 +77,11 @@ impl Drop for SessionGuard {
                 .as_ref()
                 .is_some_and(|session| session.info.id == self.id)
             {
-                was_fullscreen = guard.as_ref().map(|session| session.main_was_fullscreen);
-                *guard = None;
+                if let Some(session) = guard.take() {
+                    was_fullscreen = Some(session.main_was_fullscreen);
+                    #[cfg(target_os = "windows")]
+                    host::reveal(&session.covered_views);
+                }
             }
         }
         if let Some(window) = self.app.get_webview_window("game-menu") {
@@ -108,6 +117,7 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Resu
         pid: 0,
         sdl_library: None,
         embedded_window: None,
+        covered_views: Vec::new(),
         main_was_fullscreen,
     });
     Ok(SessionGuard {
@@ -287,6 +297,7 @@ mod tests {
             pid: 0,
             sdl_library: None,
             embedded_window: None,
+            covered_views: Vec::new(),
             main_was_fullscreen: false,
         };
         assert!(super::write_command(&mut session, "SAVE_STATE").is_err());

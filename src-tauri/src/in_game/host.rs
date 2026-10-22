@@ -30,6 +30,12 @@ extern "system" {
         callback: unsafe extern "system" fn(*mut c_void, isize) -> i32,
         data: isize,
     ) -> i32;
+    fn EnumChildWindows(
+        parent: *mut c_void,
+        callback: unsafe extern "system" fn(*mut c_void, isize) -> i32,
+        data: isize,
+    ) -> i32;
+    fn GetParent(window: *mut c_void) -> *mut c_void;
     fn GetWindowThreadProcessId(window: *mut c_void, pid: *mut u32) -> u32;
     fn IsWindowVisible(window: *mut c_void) -> i32;
     fn IsWindow(window: *mut c_void) -> i32;
@@ -63,6 +69,8 @@ const WS_CAPTION: isize = 0x00c00000;
 const WS_THICKFRAME: isize = 0x00040000;
 const WS_EX_APPWINDOW: isize = 0x00040000;
 const WS_EX_TOOLWINDOW: isize = 0x00000080;
+const SW_HIDE: i32 = 0;
+const SW_SHOWNA: i32 = 8;
 const SW_RESTORE: i32 = 9;
 const SWP_FRAMECHANGED: u32 = 0x0020;
 const SWP_SHOWWINDOW: u32 = 0x0040;
@@ -99,11 +107,61 @@ fn process_window(pid: u32) -> Option<*mut c_void> {
     (!search.window.is_null()).then_some(search.window)
 }
 
+struct Siblings {
+    parent: *mut c_void,
+    except: *mut c_void,
+    found: Vec<isize>,
+}
+
+unsafe extern "system" fn find_sibling(window: *mut c_void, data: isize) -> i32 {
+    let search = &mut *(data as *mut Siblings);
+    if window != search.except
+        && GetParent(window) == search.parent
+        && IsWindowVisible(window) != 0
+    {
+        search.found.push(window as isize);
+    }
+    1
+}
+
+/// WebView2 composes its content with DirectComposition above every sibling
+/// HWND, so the launcher UI would cover the game even with the game on top of
+/// the z-order. Its host windows stay hidden while the game is embedded.
+fn hide_siblings(parent: *mut c_void, child: *mut c_void) -> Vec<isize> {
+    let mut search = Siblings {
+        parent,
+        except: child,
+        found: Vec::new(),
+    };
+    unsafe {
+        EnumChildWindows(parent, find_sibling, &mut search as *mut Siblings as isize);
+        for window in &search.found {
+            ShowWindow(*window as *mut c_void, SW_HIDE);
+        }
+    }
+    search.found
+}
+
+/// Shows the launcher views again once the game window is gone.
+pub fn reveal(windows: &[isize]) {
+    for window in windows {
+        let window = *window as *mut c_void;
+        if unsafe { IsWindow(window) } != 0 {
+            unsafe { ShowWindow(window, SW_SHOWNA) };
+        }
+    }
+}
+
+pub struct Embedded {
+    pub window: isize,
+    pub covered: Vec<isize>,
+}
+
 fn child_style(style: isize) -> isize {
     (style | WS_CHILD) & !(WS_POPUP | WS_CAPTION | WS_THICKFRAME)
 }
 
-pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<isize> {
+pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<Embedded> {
     let main = app
         .get_webview_window("main")
         .ok_or("A janela principal do OpenRetro não está disponível.")?;
@@ -130,8 +188,12 @@ pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<isize> {
             (extended & !WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW,
         );
         SetParent(child, parent);
+    }
+    let covered = hide_siblings(parent, child);
+    unsafe {
         let mut bounds = Rect::default();
         if GetClientRect(parent, &mut bounds) == 0 {
+            reveal(&covered);
             return Err("O OpenRetro não conseguiu medir a área do jogo.".into());
         }
         SetWindowPos(
@@ -148,7 +210,10 @@ pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<isize> {
         SetForegroundWindow(parent);
         SetFocus(child);
     }
-    Ok(child as isize)
+    Ok(Embedded {
+        window: child as isize,
+        covered,
+    })
 }
 
 pub fn focus(window: isize) -> bool {
