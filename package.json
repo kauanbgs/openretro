@@ -11,6 +11,7 @@
     "test:runtime-recipe": "pwsh -NoProfile -File scripts/test-runtime-recipe.ps1",
     "tauri": "powershell -ExecutionPolicy Bypass -File scripts/tauri.ps1",
     "build:runtime": "powershell -ExecutionPolicy Bypass -File scripts/build-openretro-runtime.ps1",
+    "build:runtime:dev": "powershell -ExecutionPolicy Bypass -File scripts/build-openretro-runtime.ps1 -Incremental",
     "prepare:runtime": "powershell -ExecutionPolicy Bypass -File scripts/vendor-retroarch-runtime.ps1",
     "prepare:runtime:official": "powershell -ExecutionPolicy Bypass -File scripts/vendor-retroarch-runtime.ps1 -AllowOfficialFallback",
     "bundle:windows": "npm run prepare:runtime && tauri build",

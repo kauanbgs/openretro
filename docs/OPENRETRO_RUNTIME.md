@@ -65,6 +65,17 @@ The build writes the installable runtime under
 `src-tauri/resources/runtime/retroarch` and distributable archives under
 `dist-runtime`. Both directories contain generated files and stay outside Git.
 
+To iterate faster, also install `mingw-w64-x86_64-ccache`; the build uses it
+automatically when present. `npm run build:runtime:dev` keeps the previous
+objects and only reruns `configure` when `configure-flags.txt` changes, so a
+rebuild without source changes takes seconds. Release packages always use the
+clean `npm run build:runtime`.
+
+The runtime must be built with the stdin command interface: OpenRetro pauses,
+saves states, takes screenshots, resets and quits through it. MinGW's
+`configure` drops it because `fcntl()` is missing, so the build forces it on
+and fails if it is absent.
+
 For development only, `npm run prepare:runtime:official` prepares the trimmed
 official distribution. Release builds reject that fallback and require a
 manifest whose kind is `openretro-minimal`.
