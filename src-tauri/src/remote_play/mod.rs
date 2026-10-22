@@ -34,11 +34,13 @@ pub struct RemotePlayStatus {
     /// The URL as an SVG QR code.
     qr: Option<String>,
     devices: usize,
+    /// The player each connected phone chose, one entry per phone.
+    players: Vec<u8>,
 }
 
 fn status_of(running: Option<&server::Running>) -> RemotePlayStatus {
     let Some(running) = running else {
-        return RemotePlayStatus { running: false, url: None, qr: None, devices: 0 };
+        return RemotePlayStatus { running: false, url: None, qr: None, devices: 0, players: vec![] };
     };
     let qr = qrcode::QrCode::new(running.url.as_bytes()).ok().map(|code| {
         code.render::<qrcode::render::svg::Color>()
@@ -51,6 +53,7 @@ fn status_of(running: Option<&server::Running>) -> RemotePlayStatus {
         url: Some(running.url.clone()),
         qr,
         devices: running.devices(),
+        players: running.players(),
     }
 }
 

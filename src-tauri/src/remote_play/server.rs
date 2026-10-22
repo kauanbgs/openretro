@@ -22,11 +22,10 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-#[cfg(windows)]
-use std::sync::Mutex;
+use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+    atomic::{AtomicU64, AtomicUsize, Ordering},
+    Arc, Mutex,
 };
 use tauri::{Listener, Manager};
 use tokio::sync::{broadcast, oneshot};
@@ -43,8 +42,31 @@ struct Shared {
     audio: broadcast::Sender<Bytes>,
     events: broadcast::Sender<String>,
     devices: Arc<AtomicUsize>,
+    /// The player each connected phone controls, by connection.
+    players: Arc<Mutex<HashMap<u64, u8>>>,
+    next_connection: AtomicU64,
     #[cfg(windows)]
     media: Mutex<Option<Media>>,
+}
+
+impl Shared {
+    /// Players other phones already control, so a phone can pick a free one.
+    fn taken_by_others(&self, connection: u64) -> Vec<u8> {
+        let mut taken: Vec<u8> = self
+            .players
+            .lock()
+            .map(|players| {
+                players
+                    .iter()
+                    .filter(|(id, _)| **id != connection)
+                    .map(|(_, player)| *player)
+                    .collect()
+            })
+            .unwrap_or_default();
+        taken.sort_unstable();
+        taken.dedup();
+        taken
+    }
 }
 
 #[cfg(windows)]
@@ -58,6 +80,7 @@ struct Media {
 pub struct Running {
     pub url: String,
     devices: Arc<AtomicUsize>,
+    players: Arc<Mutex<HashMap<u64, u8>>>,
     shutdown: oneshot::Sender<()>,
     app: tauri::AppHandle,
     listeners: Vec<tauri::EventId>,
@@ -66,6 +89,16 @@ pub struct Running {
 impl Running {
     pub fn devices(&self) -> usize {
         self.devices.load(Ordering::Acquire)
+    }
+    /// The players phones control, in order, one entry per phone.
+    pub fn players(&self) -> Vec<u8> {
+        let mut players: Vec<u8> = self
+            .players
+            .lock()
+            .map(|players| players.values().copied().collect())
+            .unwrap_or_default();
+        players.sort_unstable();
+        players
     }
     pub fn stop(self) {
         for id in self.listeners {
@@ -83,6 +116,7 @@ struct Pairing {
 pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
     let token = super::new_token();
     let devices = Arc::new(AtomicUsize::new(0));
+    let players = Arc::new(Mutex::new(HashMap::new()));
     let events = broadcast::channel(64).0;
     let listeners = EVENTS
         .iter()
@@ -102,6 +136,8 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         audio: broadcast::channel(64).0,
         events,
         devices: devices.clone(),
+        players: players.clone(),
+        next_connection: AtomicU64::new(0),
         #[cfg(windows)]
         media: Mutex::new(None),
     });
@@ -131,6 +167,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
     Ok(Running {
         url: format!("http://{address}:{SERVER_PORT}/?t={token}"),
         devices,
+        players,
         shutdown,
         app,
         listeners,
@@ -464,6 +501,7 @@ enum Incoming {
 
 async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
     connected(&shared, true);
+    let connection = shared.next_connection.fetch_add(1, Ordering::Relaxed);
     let mut choice = ScreenChoice::default();
     let mut selected = View::default();
     let mut active_layout = Layout::Full;
@@ -498,7 +536,8 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
                 if last_pad.elapsed() > std::time::Duration::from_millis(750) {
                     if let Some(relay) = relay.as_mut() { relay.release(); }
                 }
-                let now = status(&shared.app);
+                let mut now = status(&shared.app);
+                now["taken"] = json!(shared.taken_by_others(connection));
                 active_layout = serde_json::from_value(now["layout"].clone()).unwrap_or_default();
                 let view = choice.view(active_layout);
                 if view != selected {
@@ -515,6 +554,11 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
                     if let Ok(message) = serde_json::from_str::<Incoming>(&text) {
                         if matches!(message, Incoming::Pad { .. }) { last_pad = std::time::Instant::now(); }
                         let layout_changed = matches!(message, Incoming::Layout { .. });
+                        if let Incoming::Pad { player, .. } = message {
+                            if let Ok(mut players) = shared.players.lock() {
+                                players.insert(connection, player.clamp(1, 4));
+                            }
+                        }
                         if let Err(error) = handle(&shared, relay.as_mut(), &mut choice, message) {
                             if socket.send(Message::Text(json!({"type":"error","message":error}).to_string().into())).await.is_err() { break; }
                         }
@@ -539,6 +583,9 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
     }
     // Dropping the relay releases every button this phone held.
     drop(relay);
+    if let Ok(mut players) = shared.players.lock() {
+        players.remove(&connection);
+    }
     connected(&shared, false);
 }
 

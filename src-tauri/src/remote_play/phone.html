@@ -72,6 +72,13 @@
   #start-overlay { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: #000d; text-align: center; }
   #start-overlay strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 20px; }
   #start-overlay span { color: var(--body); font-size: 14px; }
+  #who-players { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+  #who-players button { display: grid; gap: 2px; min-width: 72px; padding: 12px 8px; border: 1px solid var(--border); border-radius: 10px; background: #ffffff12; color: var(--text); font-size: 20px; font-weight: 700; }
+  #who-players button small { color: var(--body); font-size: 11px; font-weight: 500; }
+  #who-players button.on { border-color: transparent; background: var(--muted); color: #1c1c1c; }
+  #who-players button.on small { color: #1c1c1c; }
+  #who-players button:disabled { opacity: .4; }
+  #menu .players button.taken { opacity: .45; }
   #notice { position: absolute; left: 50%; bottom: 60px; z-index: 7; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: #000c; color: var(--muted); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #notice.show { opacity: 1; }
 </style>
@@ -111,6 +118,7 @@
   <button id="library-button">Escolher outro jogo</button>
   <button id="fullscreen">Tela cheia</button>
   <button id="touch-toggle">Esconder controles</button>
+  <button id="sound-toggle">Som no celular: ligado</button>
   <label for="control-opacity">Visibilidade dos controles <output id="opacity-value">55%</output>
     <input id="control-opacity" type="range" min="20" max="85" value="55">
   </label>
@@ -135,7 +143,11 @@
   <p id="library-hint">O jogo abre no computador e aparece aqui.</p>
   <div id="games"></div>
 </section>
-<div id="start-overlay"><div><strong>Toque para começar</strong><span>O som e a tela cheia precisam de um toque.</span></div></div>
+<div id="start-overlay"><div class="who">
+  <strong>Quem é você?</strong>
+  <span>Quem joga no computador usa o controle ou o teclado como Jogador 1.</span>
+  <div id="who-players"></div>
+</div></div>
 <div id="notice"></div>
 </div>
 <script>
@@ -154,6 +166,8 @@
   $("control-opacity").oninput = applyOpacity;
   applyOpacity();
   let ws, game = null, library = [], player = Number(localStorage.getItem("openretro-player") || 1);
+  // Until the phone picks a player it sends no input and claims no player.
+  let chosen = false, taken = [];
   player = Number.isInteger(player) && player >= 1 && player <= 4 ? player : 1;
   let layoutMode = "full", wholeScreen = false, region = null, gameId = null;
   let touchButtons = 0, dpadBits = 0, padButtons = 0, axes = [0, 0, 0, 0], sent = "";
@@ -206,6 +220,7 @@
     return false;
   }
   function sendPad(force) {
+    if (!chosen) return;
     const state = { type: "pad", player, buttons: touchButtons | dpadBits | padButtons, axes };
     const key = JSON.stringify(state);
     if (force || key !== sent) {
@@ -262,8 +277,10 @@
 
   // Audio: schedule PCM chunks just ahead of the clock and drop backlog.
   let audio = null, playAt = 0;
+  // Off when the phone sits next to the PC, which plays the same sound.
+  let soundOn = localStorage.getItem("openretro-sound") !== "off";
   function playSound(view) {
-    if (!audio || audio.state !== "running") return;
+    if (!soundOn || !audio || audio.state !== "running") return;
     const rate = view.getUint32(1, true), count = (view.byteLength - 5) / 4;
     if (count <= 0) return;
     const buffer = audio.createBuffer(2, count, rate);
@@ -304,6 +321,9 @@
     if (game && !message.game) return void location.assign("/");
     game = message.game; library = message.library || [];
     gameId = message.gameId || null;
+    taken = message.taken || [];
+    renderWho();
+    updatePlayer();
     layoutMode = message.layout || "full";
     updateView();
     title.textContent = game || "Nenhum jogo aberto";
@@ -414,12 +434,18 @@
   const players = $("players");
   for (let n = 1; n <= 4; n++) {
     const b = Object.assign(document.createElement("button"), { textContent: `J${n}` });
-    b.onclick = () => { player = n; localStorage.setItem("openretro-player", n); updatePlayer(); sendPad(true); };
+    b.onclick = () => {
+      player = n; localStorage.setItem("openretro-player", n); updatePlayer(); sendPad(true);
+      if (taken.includes(n)) toast(`Outro celular também controla o J${n}`);
+    };
     players.append(b);
   }
   function updatePlayer() {
     $("player-chip").textContent = `J${player}`;
-    [...players.children].forEach((b, i) => b.classList.toggle("on", i + 1 === player));
+    [...players.children].forEach((b, i) => {
+      b.classList.toggle("on", i + 1 === player);
+      b.classList.toggle("taken", taken.includes(i + 1));
+    });
     updateView();
   }
   $("view-chip").onclick = () => { wholeScreen = !wholeScreen; sendView(); };
@@ -431,7 +457,12 @@
     region = Number($("view-region").value) || null;
     sendView();
   };
-  $("player-chip").onclick = () => { player = player % 4 + 1; localStorage.setItem("openretro-player", player); updatePlayer(); sendPad(true); toast(`Você é o jogador ${player}`); };
+  $("player-chip").onclick = () => {
+    // Next free player; with all taken, simply the next one.
+    const order = [1, 2, 3, 4].map((step) => (player - 1 + step) % 4 + 1);
+    player = order.find((n) => !taken.includes(n)) || order[0];
+    localStorage.setItem("openretro-player", player); updatePlayer(); sendPad(true); toast(`Você é o jogador ${player}`);
+  };
   $("menu-chip").onclick = () => { releaseInput(); $("menu").classList.toggle("open"); };
   document.querySelectorAll("[data-action]").forEach((b) => b.onclick = () => {
     const action = b.dataset.action;
@@ -449,11 +480,48 @@
     $("touch-toggle").textContent = hidden ? "Mostrar controles" : "Esconder controles";
     $("menu").classList.remove("open");
   };
-  $("start-overlay").onclick = () => {
+  // Choosing a player is also the tap the browser needs for sound and full screen.
+  function suggested() {
+    const stored = Number(localStorage.getItem("openretro-player"));
+    if (stored >= 1 && stored <= 4 && !taken.includes(stored)) return stored;
+    return [2, 3, 4, 1].find((n) => !taken.includes(n)) || 2;
+  }
+  function renderWho() {
+    const box = $("who-players");
+    if (!box) return;
+    box.textContent = "";
+    const pick = suggested();
+    for (let n = 1; n <= 4; n++) {
+      const button = document.createElement("button");
+      const busy = taken.includes(n);
+      button.className = n === pick ? "on" : "";
+      button.disabled = busy;
+      button.append(`J${n}`, Object.assign(document.createElement("small"), {
+        textContent: busy ? "ocupado" : n === 1 ? "computador" : "livre",
+      }));
+      button.onclick = () => start(n);
+      box.append(button);
+    }
+  }
+  function start(n) {
+    player = n;
+    chosen = true;
+    localStorage.setItem("openretro-player", n);
+    updatePlayer();
+    sendPad(true);
     $("start-overlay").remove();
     try { audio = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" }); audio.resume(); } catch {}
     void goFullscreen();
+    toast(`Você é o jogador ${n}`);
+  }
+  $("sound-toggle").onclick = () => {
+    soundOn = !soundOn;
+    localStorage.setItem("openretro-sound", soundOn ? "on" : "off");
+    $("sound-toggle").textContent = `Som no celular: ${soundOn ? "ligado" : "desligado"}`;
+    $("menu").classList.remove("open");
   };
+  $("sound-toggle").textContent = `Som no celular: ${soundOn ? "ligado" : "desligado"}`;
+  renderWho();
   setInterval(() => {
     $("stats").textContent = `${frames} quadros/s · ${(bytes * 8 / 1e6).toFixed(1)} Mbit/s`;
     frames = 0; bytes = 0;

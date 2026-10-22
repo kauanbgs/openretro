@@ -503,7 +503,7 @@ export const bridge = {
   async remotePlayStatus(): Promise<RemotePlayStatus> {
     return isDesktop
       ? invoke("remote_play_status")
-      : { running: false, url: null, qr: null, devices: 0 };
+      : { running: false, url: null, qr: null, devices: 0, players: [] };
   },
   async remotePlayStart(): Promise<RemotePlayStatus> {
     if (!isDesktop)

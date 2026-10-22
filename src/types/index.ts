@@ -72,6 +72,8 @@ export interface RemotePlayStatus {
   /** The pairing URL as an SVG QR code. */
   qr: string | null;
   devices: number;
+  /** The player each connected phone chose, one entry per phone. */
+  players: number[];
 }
 export interface PlayerProfile {
   id: string;

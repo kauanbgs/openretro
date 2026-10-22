@@ -80,11 +80,17 @@ export function PhonePlayDialog({
               {status.data.devices
                 ? `${status.data.devices} ${status.data.devices === 1 ? "celular conectado" : "celulares conectados"}`
                 : "Nenhum celular conectado ainda"}
+              {status.data.players.length > 0 &&
+                ` · celular como ${status.data.players.map((p) => `J${p}`).join(", ")}`}
+              {status.data.players.length > 0 &&
+                !status.data.players.includes(1) &&
+                " · o computador joga como J1"}
             </p>
             <p className="hint">
-              Cada celular escolhe o jogador (J1 a J4) no menu da página. O jogo
-              continua aparecendo neste computador. Assim, até quatro amigos
-              podem jogar pelo próprio celular usando um único PC.
+              Ao abrir a página, cada celular escolhe o jogador. O J1 fica com o
+              controle ou teclado deste computador, então dá para jogar um aqui
+              e outro no celular. O jogo continua aparecendo neste computador, e
+              até quatro pessoas podem jogar usando um único PC.
             </p>
             <p className="hint">
               Para amigos fora do Wi-Fi, conectem o PC e os celulares na mesma

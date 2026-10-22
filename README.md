@@ -61,10 +61,12 @@ are supported.
 
 **Celular → Ativar** in the header shows a QR code. A phone on the same Wi-Fi
 opens it in the browser, no app needed, and gets the game's picture and sound,
-touch controls, and the library to start a game. Each phone picks a player
-(J1 to J4); a controller paired with the phone also works where the browser
-allows it. Up to four phones can therefore play the same local multiplayer
-game from one PC. The game keeps running on the PC.
+touch controls, and the library to start a game. When it opens, each phone
+picks a player; players already taken by another phone are greyed out, and J1
+is left to the PC's controller or keyboard by default, so one person can play
+on the PC and another on the phone. A controller paired with the phone also
+works where the browser allows it. Up to four people can therefore play the
+same local multiplayer game from one PC. The game keeps running on the PC.
 
 To play this one-PC mode over the internet, connect the PC and phones through
 a gaming VPN or forward TCP port 47820 to the PC and share its reachable
