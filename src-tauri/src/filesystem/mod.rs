@@ -4,10 +4,74 @@ use crate::{
 };
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     fs::File,
     io::Read,
     path::{Component, Path, PathBuf},
+    sync::{Mutex, OnceLock},
+    time::SystemTime,
 };
+type PlatformExtensions = HashMap<String, Vec<String>>;
+fn platform_extensions() -> &'static PlatformExtensions {
+    static EXTENSIONS: OnceLock<PlatformExtensions> = OnceLock::new();
+    EXTENSIONS.get_or_init(|| {
+        let platforms: serde_json::Value =
+            serde_json::from_str(include_str!("../../../src/db/platforms.json"))
+                .expect("bundled platform catalog");
+        let mut extensions = HashMap::<String, Vec<String>>::new();
+        for platform in platforms.as_array().expect("platform array") {
+            for ext in platform["extensions"]
+                .as_array()
+                .expect("platform extensions")
+            {
+                extensions
+                    .entry(ext.as_str().unwrap().into())
+                    .or_default()
+                    .push(platform["id"].as_str().unwrap().into());
+            }
+        }
+        extensions
+    })
+}
+pub fn platform_ids_for_extension(extension: &str) -> Vec<String> {
+    platform_extensions()
+        .get(extension)
+        .cloned()
+        .unwrap_or_default()
+}
+#[derive(Clone)]
+struct InspectedFile {
+    candidate: ImportCandidate,
+    size: u64,
+    modified: SystemTime,
+}
+fn inspected_files() -> &'static Mutex<HashMap<String, InspectedFile>> {
+    static FILES: OnceLock<Mutex<HashMap<String, InspectedFile>>> = OnceLock::new();
+    FILES.get_or_init(Mutex::default)
+}
+/// Only reuse fingerprints computed by this process while size and modification time match.
+/// Client-supplied fingerprints and platforms are never trusted.
+pub fn reuse_inspected(candidate: &ImportCandidate) -> Result<ImportCandidate> {
+    let path = canonical_file(&candidate.path)?;
+    let metadata = std::fs::metadata(&path).map_err(error)?;
+    if let Some(cached) = inspected_files()
+        .lock()
+        .map_err(error)?
+        .get(&path.to_string_lossy().into_owned())
+    {
+        if cached.candidate.sha256 == candidate.sha256
+            && cached.size == metadata.len()
+            && metadata.modified().ok() == Some(cached.modified)
+        {
+            return Ok(cached.candidate.clone());
+        }
+    }
+    let inspected = inspect(&candidate.path)?;
+    if inspected.sha256 != candidate.sha256 {
+        return Err("O arquivo mudou durante a importação. Selecione-o novamente.".into());
+    }
+    Ok(inspected)
+}
 pub fn canonical_file(path: &str) -> Result<PathBuf> {
     if path.contains('\0')
         || Path::new(path)
@@ -61,23 +125,12 @@ pub fn inspect_with_progress(
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    let platforms: serde_json::Value =
-        serde_json::from_str(include_str!("../../../src/db/platforms.json")).map_err(error)?;
-    let ids = platforms
-        .as_array()
-        .ok_or("Invalid platform catalog")?
-        .iter()
-        .filter(|p| {
-            p["extensions"]
-                .as_array()
-                .is_some_and(|extensions| extensions.iter().any(|e| e.as_str() == Some(&extension)))
-        })
-        .filter_map(|p| p["id"].as_str().map(String::from))
-        .collect::<Vec<_>>();
+    let ids = platform_ids_for_extension(&extension);
     if ids.is_empty() {
         return Err(format!("The .{extension} format is not recognized. Choose a supported game file; archives are not automatically extracted."));
     }
-    Ok(ImportCandidate {
+    let before = std::fs::metadata(&path).map_err(error)?;
+    let candidate = ImportCandidate {
         sha256: hash_with_progress(&path, progress)?,
         filename: path
             .file_name()
@@ -86,7 +139,26 @@ pub fn inspect_with_progress(
             .into_owned(),
         path: path.to_string_lossy().into_owned(),
         platform_ids: ids,
-    })
+    };
+    let after = std::fs::metadata(&path).map_err(error)?;
+    if before.len() != after.len() || before.modified().ok() != after.modified().ok() {
+        return Err("O arquivo mudou durante a leitura. Selecione-o novamente.".into());
+    }
+    if let Ok(modified) = after.modified() {
+        let mut cache = inspected_files().lock().map_err(error)?;
+        if cache.len() >= 1000 {
+            cache.clear();
+        }
+        cache.insert(
+            candidate.path.clone(),
+            InspectedFile {
+                candidate: candidate.clone(),
+                size: after.len(),
+                modified,
+            },
+        );
+    }
+    Ok(candidate)
 }
 pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
     if path.contains('\0') || !Path::new(path).is_absolute() {
@@ -121,22 +193,11 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
                 .and_then(|value| value.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            let platform_catalog: serde_json::Value =
-                serde_json::from_str(include_str!("../../../src/db/platforms.json"))
-                    .map_err(error)?;
-            let supported = platform_catalog.as_array().is_some_and(|platforms| {
-                platforms.iter().any(|platform| {
-                    platform["extensions"].as_array().is_some_and(|extensions| {
-                        extensions
-                            .iter()
-                            .any(|item| item.as_str() == Some(&extension))
-                    })
-                })
-            });
+            let supported = platform_extensions().contains_key(&extension);
             if !supported {
                 continue;
             }
-            found.push(inspect(&entry_path.to_string_lossy())?);
+            found.push(entry_path);
             if found.len() >= 500 {
                 return Err("This folder has more than 500 supported games. Import smaller folders to keep the library responsive.".into());
             }
@@ -145,6 +206,36 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
     if found.is_empty() {
         return Err("No supported game files were found in this folder.".into());
     }
+    // Bound disk contention and memory: at most four 1 MiB hash buffers at once.
+    let workers = std::thread::available_parallelism()
+        .map_or(1, |n| n.get())
+        .min(4);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut results = Vec::new();
+                    loop {
+                        let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(path) = found.get(index) else { break };
+                        results.push(inspect(&path.to_string_lossy()));
+                    }
+                    results
+                })
+            })
+            .collect();
+        let mut results = Vec::new();
+        for handle in handles {
+            results.extend(
+                handle
+                    .join()
+                    .map_err(|_| "Não foi possível ler a pasta.".to_string())?,
+            );
+        }
+        Ok::<_, String>(results)
+    })?;
+    let mut found = results.into_iter().collect::<Result<Vec<_>>>()?;
     found.sort_by(|left, right| {
         left.filename
             .to_lowercase()
@@ -170,6 +261,27 @@ pub fn executable(path: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn folder_fingerprints_are_reused_and_modified_or_forged_files_are_rechecked() {
+        let root = std::env::temp_dir().join(format!("openretro-folder-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("nested")).unwrap();
+        let path = root.join("A.nes");
+        std::fs::write(&path, b"abc").unwrap();
+        std::fs::write(root.join("nested/B.gba"), b"def").unwrap();
+        std::fs::write(root.join("ignore.txt"), b"ignored").unwrap();
+        let candidates = inspect_folder(&root.to_string_lossy()).unwrap();
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].filename, "A.nes");
+        assert_eq!(candidates[1].platform_ids, vec!["gba"]);
+        let mut forged = candidates[0].clone();
+        forged.platform_ids = vec!["ps2".into()];
+        assert_eq!(reuse_inspected(&forged).unwrap().platform_ids, vec!["nes"]);
+        forged.sha256 = "0".repeat(64);
+        assert!(reuse_inspected(&forged).is_err());
+        std::fs::write(&path, b"modified content").unwrap();
+        assert!(reuse_inspected(&candidates[0]).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn progress_hash_matches_and_reaches_the_file_size() {
         let path = std::env::temp_dir().join(format!("openretro-hash-{}", uuid::Uuid::new_v4()));

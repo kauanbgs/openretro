@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   FileCheck2,
@@ -11,7 +11,7 @@ import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
 import { LibraryManager } from "../../services/LibraryManager";
 import { platforms } from "../../db/platforms";
-import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
+import { metadataProvider } from "../../providers/metadata/LaunchboxMetadataProvider";
 import type { GameMetadata, ImportCandidate } from "../../types";
 export function ImportDialog({
   initial,
@@ -45,6 +45,38 @@ export function ImportDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [folderQueue, setFolderQueue] = useState<ImportCandidate[]>([]);
+  useEffect(() => {
+    if (!candidate || initial) return;
+    let cancelled = false;
+    setMetadataError("");
+    const stem = candidate.filename
+      .replace(/\.[^.]+$/, "")
+      .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
+      .trim();
+    setMetadataSearch(stem);
+    void Promise.all(
+      candidate.platformIds.map(async (id) => {
+        const exact = await metadataProvider.match(id, candidate.filename);
+        return exact ? [exact] : metadataProvider.search(stem, id);
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const games = results.flat();
+        setMatches(games);
+        setSelected(games[0]?.id ?? "custom");
+        if (games[0]) setPlatform(games[0].platformId);
+      })
+      .catch(() => {
+        if (!cancelled)
+          setMetadataError(
+            "O catálogo está indisponível. Você pode importar usando seu próprio título.",
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [candidate, initial]);
   async function pick() {
     setBusy(true);
     setError("");
@@ -67,28 +99,6 @@ export function ImportDialog({
           setTitle(stem);
           setMetadataSearch(stem);
           setSelected("custom");
-          try {
-            const results = await metadataProvider.search(stem);
-            const compatible = results.filter((g) =>
-              c.platformIds.some(
-                (p) => g.platformId === p || g.platformIds?.includes(p),
-              ),
-            );
-            setMatches(compatible);
-            setSelected(compatible[0]?.id ?? "custom");
-            if (compatible[0])
-              setPlatform(
-                c.platformIds.find(
-                  (p) =>
-                    p === compatible[0].platformId ||
-                    compatible[0].platformIds?.includes(p),
-                )!,
-              );
-          } catch {
-            setMetadataError(
-              "Online matching is unavailable. You can still import with your own title, or connect IGDB in Discover.",
-            );
-          }
         } else if (
           !c.platformIds.some(
             (p) => p === initial.platformId || initial.platformIds?.includes(p),
@@ -111,7 +121,7 @@ export function ImportDialog({
     setBusy(true);
     setError("");
     try {
-      // A custom title must never retain an old IGDB match after its platform changes.
+      // A custom title must never retain an old catalog match after its platform changes.
       const match =
         selected === "custom"
           ? undefined
@@ -270,7 +280,7 @@ export function ImportDialog({
             </p>
           )}
           <label>
-            Buscar na IGDB
+            Buscar no LaunchBox
             <div className="input-action">
               <input
                 maxLength={120}
@@ -296,7 +306,7 @@ export function ImportDialog({
                     })
                     .catch(() =>
                       setMetadataError(
-                        "IGDB could not be reached. You can import using your own title.",
+                        "O catálogo está indisponível. Você pode importar usando seu próprio título.",
                       ),
                     )
                     .finally(() => setBusy(false));
@@ -324,7 +334,7 @@ export function ImportDialog({
                 )
                 .map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.title} · {g.year || "Year unknown"} · IGDB
+                    {g.title} · {g.year || "Year unknown"} · LaunchBox
                   </option>
                 ))}
             </select>

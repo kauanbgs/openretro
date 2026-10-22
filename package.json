@@ -15,8 +15,8 @@
     "prepare:runtime": "powershell -ExecutionPolicy Bypass -File scripts/vendor-retroarch-runtime.ps1",
     "prepare:runtime:official": "powershell -ExecutionPolicy Bypass -File scripts/vendor-retroarch-runtime.ps1 -AllowOfficialFallback",
     "bundle:windows": "npm run prepare:runtime && tauri build",
-    "format": "prettier --write src server tests index.html vite.config.ts *.json .github/workflows/*.yml",
-    "format:check": "prettier --check src server tests index.html vite.config.ts *.json .github/workflows/*.yml"
+    "format": "prettier --write src tests index.html vite.config.ts *.json .github/workflows/*.yml",
+    "format:check": "prettier --check src tests index.html vite.config.ts *.json .github/workflows/*.yml"
   },
   "dependencies": {
     "@fontsource-variable/nunito-sans": "^5.3.0",

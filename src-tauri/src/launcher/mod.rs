@@ -172,7 +172,7 @@ pub async fn launch_game(app: tauri::AppHandle, id: String, slot: Option<i32>) -
  if emulator.id=="openretro-retroarch" { if let Err(message)=crate::commands::install_bundled_retroarch(&app) { log::warn!("Keeping the installed runtime: {message}"); } }
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
  if managed_retroarch && entry.item.platform_id=="ps2" {
-    runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "LRPS2", &[("pcsx2_upscale_multiplier", runtime_menu::ps2_upscale(ps2_resolution.as_deref()))])?;
+    runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "LRPS2", &runtime_menu::ps2_options(ps2_resolution.as_deref(), num_cpus::get_physical()))?;
  }
  let mut args:Vec<String>=if managed_retroarch {
     let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume && boot_states, (auto_resume || slot==Some(-1)) && boot_states)?;

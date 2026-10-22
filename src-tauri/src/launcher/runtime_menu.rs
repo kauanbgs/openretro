@@ -34,14 +34,13 @@ pub fn open_game_screenshots(app: tauri::AppHandle, id: String) -> Result<()> {
 pub struct Capture {
     name: String,
     taken_at: String,
-    data: String,
+    path: String,
 }
 
-/// The newest captures of a game, inlined so the page needs no file access.
+/// The newest captures of a game, served lazily through the scoped asset protocol.
 #[tauri::command]
 pub async fn list_game_screenshots(app: tauri::AppHandle, id: String) -> Result<Vec<Capture>> {
     tauri::async_runtime::spawn_blocking(move || {
-        use base64::Engine;
         let hash = {
             let database = app.state::<crate::database::Database>();
             let connection = database.0.lock().map_err(error)?;
@@ -71,14 +70,10 @@ pub async fn list_game_screenshots(app: tauri::AppHandle, id: String) -> Result<
             .into_iter()
             .take(24)
             .filter_map(|(path, modified)| {
-                let bytes = std::fs::read(&path).ok()?;
                 Some(Capture {
                     name: path.file_name()?.to_string_lossy().into_owned(),
                     taken_at: chrono::DateTime::<chrono::Utc>::from(modified).to_rfc3339(),
-                    data: format!(
-                        "data:image/png;base64,{}",
-                        base64::engine::general_purpose::STANDARD.encode(bytes)
-                    ),
+                    path: path.to_string_lossy().into_owned(),
                 })
             })
             .collect())
@@ -194,6 +189,16 @@ pub fn ps2_upscale(setting: Option<&str>) -> &'static str {
         Some("8x") => "8x",
         _ => "2x",
     }
+}
+
+pub fn ps2_options(setting: Option<&str>, cores: usize) -> [(&'static str, &'static str); 2] {
+    [
+        ("pcsx2_upscale_multiplier", ps2_upscale(setting)),
+        (
+            "pcsx2_mtvu",
+            if cores >= 3 { "enabled" } else { "disabled" },
+        ),
+    ]
 }
 
 /// Sets OpenRetro-owned keys in a core's options file before launch and
@@ -330,6 +335,20 @@ input_state_slot_decrease = "f6"
 mod tests {
     use super::*;
     #[test]
+    fn ps2_mtvu_follows_the_cpu_threshold_and_is_written_with_resolution() {
+        let root = std::env::temp_dir().join(format!("openretro-mtvu-{}", uuid::Uuid::new_v4()));
+        set_core_options(&root, "LRPS2", &ps2_options(Some("4x"), 3)).unwrap();
+        let file = root.join("LRPS2/LRPS2.opt");
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.contains("pcsx2_mtvu = \"enabled\""));
+        assert!(text.contains("pcsx2_upscale_multiplier = \"4x\""));
+        set_core_options(&root, "LRPS2", &ps2_options(None, 2)).unwrap();
+        let text = std::fs::read_to_string(file).unwrap();
+        assert!(text.contains("pcsx2_mtvu = \"disabled\""));
+        assert!(!text.contains("enabled"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn core_options_update_owned_keys_and_keep_the_rest() {
         let root = std::env::temp_dir().join(format!("openretro-opt-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(root.join("LRPS2")).unwrap();
@@ -338,11 +357,24 @@ mod tests {
             "pcsx2_bios = \"scph.bin\"\npcsx2_upscale_multiplier = \"1x (Native)\"\n",
         )
         .unwrap();
-        set_core_options(&root, "LRPS2", &[("pcsx2_upscale_multiplier", ps2_upscale(Some("4x")))]).unwrap();
+        set_core_options(
+            &root,
+            "LRPS2",
+            &[("pcsx2_upscale_multiplier", ps2_upscale(Some("4x")))],
+        )
+        .unwrap();
         let text = std::fs::read_to_string(root.join("LRPS2/LRPS2.opt")).unwrap();
-        assert_eq!(text, "pcsx2_bios = \"scph.bin\"\npcsx2_upscale_multiplier = \"4x\"\n");
+        assert_eq!(
+            text,
+            "pcsx2_bios = \"scph.bin\"\npcsx2_upscale_multiplier = \"4x\"\n"
+        );
         std::fs::remove_dir_all(root.join("LRPS2")).unwrap();
-        set_core_options(&root, "LRPS2", &[("pcsx2_upscale_multiplier", ps2_upscale(None))]).unwrap();
+        set_core_options(
+            &root,
+            "LRPS2",
+            &[("pcsx2_upscale_multiplier", ps2_upscale(None))],
+        )
+        .unwrap();
         assert_eq!(
             std::fs::read_to_string(root.join("LRPS2/LRPS2.opt")).unwrap(),
             "pcsx2_upscale_multiplier = \"2x\"\n"
@@ -370,7 +402,10 @@ mod tests {
         assert!(text.contains("savestate_auto_load = \"true\""));
         assert!(text.contains(&format!("players/{player}/{hash}/saves")));
         assert!(text.contains(&format!("players/{player}/{hash}/states")));
-        assert!(text.contains(&format!("system_directory = \"{}\"", quoted_path(&root.join("players").join(&player).join("system")))));
+        assert!(text.contains(&format!(
+            "system_directory = \"{}\"",
+            quoted_path(&root.join("players").join(&player).join("system"))
+        )));
         assert!(text.contains("input_player4_joypad_index = \"3\""));
         let default = prepare_player(
             &root,
@@ -385,7 +420,10 @@ mod tests {
         assert!(text.contains("savestate_auto_load = \"false\""));
         assert!(!text.contains("savefile_directory"));
         assert!(!text.contains("savestate_directory"));
-        assert!(text.contains(&format!("system_directory = \"{}\"", quoted_path(&root.join("system")))));
+        assert!(text.contains(&format!(
+            "system_directory = \"{}\"",
+            quoted_path(&root.join("system"))
+        )));
         assert!(prepare_player(
             &root,
             &root.join("retroarch.exe"),

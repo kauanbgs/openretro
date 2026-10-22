@@ -1,3 +1,4 @@
+import { CatalogConnection } from "../discover/CatalogConnection";
 import {
   useEffect,
   useLayoutEffect,
@@ -21,7 +22,11 @@ import {
   Keyboard,
   SlidersHorizontal,
 } from "lucide-react";
-import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
+import {
+  metadataProvider,
+  catalogStatus,
+  catalogRefresh,
+} from "../../providers/metadata/LaunchboxMetadataProvider";
 import type { CatalogRequest } from "../../providers/metadata/types";
 import type { GameMetadata, LibraryGame } from "../../types";
 import { bridge } from "../../services/bridge";
@@ -135,10 +140,19 @@ export function BigPictureCatalog({
     const timer = setTimeout(() => setDebounced(query), 300);
     return () => clearTimeout(timer);
   }, [query]);
+  const status = useQuery({
+    queryKey: ["catalog-status"],
+    queryFn: catalogStatus,
+    retry: false,
+    refetchInterval: (query) =>
+      ["building", "missing"].includes(query.state.data?.state ?? "")
+        ? 1000
+        : false,
+  });
   const taxonomy = useQuery({
     queryKey: ["catalog-taxonomy"],
     queryFn: () => metadataProvider.getTaxonomy(),
-    enabled: mode === "catalog",
+    enabled: mode === "catalog" && status.data?.configured === true,
     staleTime: 86400000,
     retry: false,
   });
@@ -153,6 +167,7 @@ export function BigPictureCatalog({
     ],
     queryFn: ({ pageParam }) =>
       metadataProvider.browse(debounced, platform, pageParam, genre, sort),
+    enabled: status.data?.configured === true,
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasNext ? last.page + 1 : undefined),
     staleTime: 86400000,
@@ -612,11 +627,23 @@ export function BigPictureCatalog({
           )}
           <div className="tv-home-shelf-title">
             <h2>Descubra seu próximo jogo</h2>
-            <span>Clássicos populares na IGDB</span>
+            <span>Clássicos populares no LaunchBox</span>
           </div>
         </>
       )}
-      {browse.isPending ? (
+      {!status.isPending && !status.data?.configured ? (
+        <CatalogConnection
+          status={status.data}
+          error={status.error ? String(status.error) : undefined}
+          onRetry={() => {
+            void catalogRefresh()
+              .then(() =>
+                queryClient.invalidateQueries({ queryKey: ["catalog-status"] }),
+              )
+              .catch((e) => notify(String(e)));
+          }}
+        />
+      ) : browse.isPending ? (
         <div
           className="tv-catalog-skeleton"
           role="status"
@@ -712,7 +739,9 @@ export function BigPictureCatalog({
           {browse.error && games.length > 0 && (
             <p role="alert">{String(browse.error)}</p>
           )}
-          <p className="tv-catalog-credit">Dados e imagens da IGDB</p>
+          <p className="tv-catalog-credit">
+            Dados e imagens do LaunchBox Games Database
+          </p>
         </>
       )}
       {game &&

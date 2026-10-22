@@ -8,7 +8,8 @@ import { Grid2X2, List, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import {
   metadataProvider,
   catalogStatus,
-} from "../../providers/metadata/IgdbMetadataProvider";
+  catalogRefresh,
+} from "../../providers/metadata/LaunchboxMetadataProvider";
 import { platforms } from "../../db/platforms";
 import { GameCard } from "../../components/GameCard";
 import { bridge } from "../../services/bridge";
@@ -44,6 +45,10 @@ export function DiscoverPage({
   const status = useQuery({
     queryKey: ["catalog-status"],
     queryFn: catalogStatus,
+    refetchInterval: (query) =>
+      ["building", "missing"].includes(query.state.data?.state ?? "")
+        ? 1000
+        : false,
     retry: false,
   });
   const taxonomy = useQuery({
@@ -104,6 +109,11 @@ export function DiscoverPage({
     [availability.data],
   );
   async function retry() {
+    try {
+      await catalogRefresh();
+    } catch {
+      /* Status polling exposes a retry if IPC is unavailable. */
+    }
     await client.invalidateQueries({ queryKey: ["catalog-status"] });
     await client.invalidateQueries({ queryKey: ["catalog-taxonomy"] });
     await client.invalidateQueries({ queryKey: ["catalog"] });
@@ -116,21 +126,22 @@ export function DiscoverPage({
         actions={
           <a
             className="catalog-attribution"
-            href="https://www.igdb.com/"
+            href="https://gamesdb.launchbox-app.com/"
             target="_blank"
             rel="noreferrer"
           >
-            <span className="provider-mark">IGDB</span> Game catalog
+            <span className="provider-mark">LaunchBox</span> Games Database
           </a>
         }
       />
       {status.isPending ? (
         <div className="catalog-loading">
           <LoaderCircle className="spin" size={24} />
-          <p>Conectando à IGDB…</p>
+          <p>Consultando o catálogo…</p>
         </div>
       ) : !status.data?.configured || status.error ? (
         <CatalogConnection
+          status={status.data}
           error={status.error ? String(status.error) : undefined}
           onRetry={() => void retry()}
         />
@@ -313,7 +324,7 @@ export function DiscoverPage({
             </div>
           )}
           <footer className="page-footer">
-            <span>Game data and artwork from IGDB.</span>
+            <span>Dados e imagens do LaunchBox Games Database.</span>
             <span>Open a game to find downloads in your sources.</span>
           </footer>
         </>

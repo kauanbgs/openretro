@@ -6,6 +6,12 @@ export function enrichGameMetadata(
   remote?: GameMetadata,
 ): GameMetadata {
   return remote
-    ? { ...remote, id: local.id, platformId: local.platformId }
+    ? {
+        ...remote,
+        id: local.id,
+        platformId: local.platformId,
+        coverUrl: remote.coverUrl ?? local.coverUrl,
+        backgroundUrl: remote.backgroundUrl ?? local.backgroundUrl,
+      }
     : local;
 }

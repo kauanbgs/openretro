@@ -33,7 +33,8 @@ pub fn run() {
                 .map_err(std::io::Error::other)?;
             commands::sync_runtime_platforms(&db).map_err(std::io::Error::other)?;
             app.manage(db);
-            app.manage(metadata::CatalogService::default());
+            app.manage(metadata::LaunchboxCatalog::default());
+            metadata::start(app.handle());
             app.manage(downloads::DownloadService::default());
             app.manage(downloads::sources::SourceIndex::default());
             app.manage(in_game::InGameService::default());
@@ -51,8 +52,13 @@ pub fn run() {
             profiles::create_profile,
             profiles::select_profile,
             profiles::update_profile,
-            metadata::igdb_status,
-            metadata::igdb_query,
+            metadata::catalog_status,
+            metadata::catalog_refresh,
+            metadata::catalog_genres,
+            metadata::catalog_browse,
+            metadata::catalog_game,
+            metadata::catalog_match,
+            metadata::catalog_thumbnail,
             downloads::sources::list_download_sources,
             downloads::sources::save_download_source,
             downloads::sources::set_download_source,

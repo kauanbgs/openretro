@@ -16,7 +16,7 @@ export interface GameMetadata {
   genre: string;
   artwork: string;
   color: string;
-  metadataProvider?: "igdb" | "mock";
+  metadataProvider?: "launchbox" | "igdb" | "mock";
   externalId?: number;
   coverUrl?: string;
   backgroundUrl?: string;

@@ -476,20 +476,10 @@ pub async fn add_game(
     game: GameMetadata,
     candidate: ImportCandidate,
 ) -> Result<()> {
-    tauri::async_runtime::spawn_blocking(move || add_game_blocking(&app, game, candidate))
-        .await
-        .map_err(error)?
-}
-pub fn add_game_blocking(
-    app: &tauri::AppHandle,
-    game: GameMetadata,
-    candidate: ImportCandidate,
-) -> Result<()> {
-    let inspected = filesystem::inspect(&candidate.path)?;
-    if inspected.sha256 != candidate.sha256 {
-        return Err("The file changed during import. Select it again.".into());
-    }
-    insert_library_game(app, game, inspected)
+    tauri::async_runtime::spawn_blocking(move || {
+        let inspected = filesystem::reuse_inspected(&candidate)?;
+        insert_library_game(&app, game, inspected)
+    }).await.map_err(error)?
 }
 /// Adds a file the backend has just inspected itself, without hashing it again.
 pub fn insert_library_game(

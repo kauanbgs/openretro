@@ -14,8 +14,10 @@ import { GameCard } from "../../components/GameCard";
 import { PageHeader } from "../../components/PageHeader";
 import {
   metadataProvider,
+  catalogGameDetails,
+  isCatalogGame,
   catalogStatus,
-} from "../../providers/metadata/IgdbMetadataProvider";
+} from "../../providers/metadata/LaunchboxMetadataProvider";
 import { platformById } from "../../db/platforms";
 import { enrichGameMetadata } from "../../utils/metadata";
 import type { GameMetadata, LibraryGame } from "../../types";
@@ -47,6 +49,10 @@ export function HomePage({
   const status = useQuery({
     queryKey: ["catalog-status"],
     queryFn: catalogStatus,
+    refetchInterval: (query) =>
+      ["building", "missing"].includes(query.state.data?.state ?? "")
+        ? 1000
+        : false,
     retry: false,
   });
   const spotlight = useQuery({
@@ -59,16 +65,16 @@ export function HomePage({
   const suggestions = spotlight.data?.games ?? [];
   const primary = played[0]?.game ?? suggestions[0];
   const details = useQuery({
-    queryKey: ["game-detail", primary?.externalId, primary?.platformId],
-    queryFn: () =>
-      metadataProvider.getGame(
-        `igdb-${primary!.externalId}`,
-        primary!.platformId,
-      ),
+    queryKey: [
+      "game-detail",
+      primary?.metadataProvider,
+      primary?.id,
+      primary?.platformId,
+    ],
+    queryFn: () => catalogGameDetails(primary!),
     enabled:
       status.data?.configured === true &&
-      primary?.metadataProvider === "igdb" &&
-      Boolean(primary?.externalId),
+      Boolean(primary && isCatalogGame(primary)),
     retry: false,
     staleTime: 86400000,
   });
@@ -220,7 +226,7 @@ export function HomePage({
             <h2>
               {library.length ? "Adicionados recentemente" : "Worth a look"}
             </h2>
-            {!library.length && <p>Classics from the IGDB catalog.</p>}
+            {!library.length && <p>Clássicos do LaunchBox Games Database.</p>}
           </div>
           <button
             className="text-button"
@@ -249,24 +255,28 @@ export function HomePage({
             <div>
               <h3>
                 {status.data?.configured
-                  ? "The catalog is unavailable right now."
-                  : "Connect your game catalog."}
+                  ? "O catálogo está indisponível no momento."
+                  : status.data?.state === "building"
+                    ? "Preparando o catálogo…"
+                    : "Explore o catálogo de jogos."}
               </h3>
               <p>
                 {status.data?.configured
-                  ? "You can still add and play local games."
-                  : "Set up IGDB to browse games and cover art."}
+                  ? "Você pode continuar adicionando e jogando seus jogos locais."
+                  : status.data?.state === "unavailable"
+                    ? "O catálogo está disponível no app desktop."
+                    : "Acompanhe o preparo da base na tela Catálogo."}
               </p>
             </div>
             <button className="button secondary" onClick={onDiscover}>
-              {status.data?.configured ? "Open Discover" : "Connect IGDB"}
+              Abrir catálogo
             </button>
           </div>
         )}
       </section>
       <footer className="page-footer">
         <span>OpenRetro</span>
-        <span>Game data and artwork from IGDB.</span>
+        <span>Dados e imagens do LaunchBox Games Database.</span>
       </footer>
     </div>
   );

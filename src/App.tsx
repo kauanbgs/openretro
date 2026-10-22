@@ -534,7 +534,7 @@ export function App() {
           <p className="hint">
             Adicione suas fontes em Configurações → Downloads. Use Ctrl K para
             buscar ou entre no Big Picture para navegar pelo controle.
-            Informações e imagens dos jogos vêm da IGDB.
+            Informações e imagens dos jogos vêm do LaunchBox Games Database.
           </p>
         </Modal>
       )}

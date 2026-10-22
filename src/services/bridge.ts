@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { detectPlatforms } from "../db/platforms";
 import type {
@@ -511,7 +511,14 @@ export const bridge = {
       : null;
   },
   async gameCaptures(id: string): Promise<GameCapture[]> {
-    return isDesktop ? invoke("list_game_screenshots", { id }) : [];
+    if (!isDesktop) return [];
+    const captures = await invoke<
+      { name: string; takenAt: string; path: string }[]
+    >("list_game_screenshots", { id });
+    return captures.map(({ path, ...capture }) => ({
+      ...capture,
+      data: convertFileSrc(path),
+    }));
   },
   async openGameScreenshots(id: string): Promise<void> {
     if (!isDesktop)

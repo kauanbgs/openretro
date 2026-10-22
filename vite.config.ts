@@ -1,10 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { igdbPlugin } from "./server/igdb";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), igdbPlugin()],
+  plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {
     port: 1420,

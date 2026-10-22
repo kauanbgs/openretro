@@ -1,3 +1,4 @@
+import { CatalogScreenshot } from "../../components/CatalogScreenshot";
 import { useEffect, useMemo, useState } from "react";
 import { enrichGameMetadata } from "../../utils/metadata";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +31,10 @@ import type {
   SourceMatch,
 } from "../../types";
 import { GameArtwork } from "../../components/GameArtwork";
-import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
+import {
+  catalogGameDetails,
+  isCatalogGame,
+} from "../../providers/metadata/LaunchboxMetadataProvider";
 import { Modal } from "../../components/Modal";
 import { platformById } from "../../db/platforms";
 import { GameResolver, MANAGED_RUNTIME_ID } from "../../services/GameResolver";
@@ -71,15 +75,14 @@ export function GamePage({
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("Overview");
   const details = useQuery({
-    queryKey: ["game-detail", initialGame.externalId, initialGame.platformId],
-    queryFn: () =>
-      metadataProvider.getGame(
-        `igdb-${initialGame.externalId}`,
-        initialGame.platformId,
-      ),
-    enabled:
-      initialGame.metadataProvider === "igdb" &&
-      Boolean(initialGame.externalId),
+    queryKey: [
+      "game-detail",
+      initialGame.metadataProvider,
+      initialGame.id,
+      initialGame.platformId,
+    ],
+    queryFn: () => catalogGameDetails(initialGame),
+    enabled: isCatalogGame(initialGame),
     retry: false,
     staleTime: 86400000,
   });
@@ -229,7 +232,7 @@ export function GamePage({
               {game.rating !== undefined && (
                 <span
                   className="detail-rating"
-                  title={`${game.ratingCount ?? 0} avaliações no IGDB`}
+                  title={`${game.ratingCount ?? 0} avaliações no LaunchBox`}
                 >
                   <Star size={14} fill="currentColor" /> {game.rating}
                 </span>
@@ -410,8 +413,8 @@ export function GamePage({
                   <strong>
                     {entry
                       ? "Your local file"
-                      : game.metadataProvider === "igdb"
-                        ? "IGDB"
+                      : game.metadataProvider === "launchbox"
+                        ? "LaunchBox"
                         : "Local metadata"}
                   </strong>
                 </span>
@@ -457,14 +460,14 @@ export function GamePage({
                       catalog information.
                     </p>
                   )}
-                  {game.sourceUrl && (
+                  {game.metadataProvider === "launchbox" && game.sourceUrl && (
                     <a
                       className="metadata-source"
                       href={game.sourceUrl}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      View on IGDB <ExternalLink size={14} />
+                      Ver no LaunchBox <ExternalLink size={14} />
                     </a>
                   )}
                 </div>
@@ -529,10 +532,9 @@ export function GamePage({
                         onClick={() => setLightbox(i)}
                         aria-label={`Ampliar ${image.caption}`}
                       >
-                        <img
+                        <CatalogScreenshot
                           src={image.src}
                           alt=""
-                          loading="lazy"
                           referrerPolicy={image.referrer}
                         />
                       </button>
@@ -546,7 +548,10 @@ export function GamePage({
                       ? "Screenshots could not be loaded. Check your connection."
                       : "No gameplay screenshots are available for this game."}
                   </p>
-                  <small>Artwork and metadata are provided by IGDB.</small>
+                  <small>
+                    Imagens e metadados fornecidos pelo LaunchBox Games
+                    Database.
+                  </small>
                 </div>
               )
             ) : (

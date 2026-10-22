@@ -1,3 +1,4 @@
+import { isCatalogGame } from "../providers/metadata/LaunchboxMetadataProvider";
 import { memo, useState } from "react";
 import type { GameMetadata } from "../types";
 import { Artwork } from "./Artwork";
@@ -29,7 +30,7 @@ export const GameArtwork = memo(
           />
         </div>
       );
-    if (game.metadataProvider !== "igdb" && game.artwork !== "neutral")
+    if (!isCatalogGame(game) && game.artwork !== "neutral")
       return <Artwork kind={game.artwork} title={!hero} />;
     return (
       <div className="artwork missing-artwork">

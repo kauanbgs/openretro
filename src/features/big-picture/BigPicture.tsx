@@ -38,7 +38,10 @@ import type {
   GameMetadata,
   DownloadImported,
 } from "../../types";
-import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
+import {
+  catalogGameDetails,
+  isCatalogGame,
+} from "../../providers/metadata/LaunchboxMetadataProvider";
 import { bridge, isDesktop } from "../../services/bridge";
 import { GameResolver } from "../../services/GameResolver";
 import { platformById } from "../../db/platforms";
@@ -261,17 +264,16 @@ export function BigPicture({
     if (
       section !== "library" ||
       !game ||
-      game.metadataProvider !== "igdb" ||
+      !isCatalogGame(game) ||
       game.backgroundUrl ||
       details[game.id]
     )
       return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      void metadataProvider
-        .getGame(game.id, game.platformId)
+      void catalogGameDetails(game)
         .then((metadata) => {
-          if (!cancelled)
+          if (!cancelled && metadata)
             setDetails((current) => ({ ...current, [game.id]: metadata }));
         })
         .catch(() => undefined);

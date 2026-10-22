@@ -21,7 +21,14 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: asset: https://images.igdb.com https://i.ytimg.com; frame-src https://www.youtube-nocookie.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; font-src 'self' data:"
+      "csp": "default-src 'self'; img-src 'self' data: asset: http://asset.localhost https://asset.localhost https://images.launchbox-app.com https://images.igdb.com https://i.ytimg.com; frame-src https://www.youtube-nocookie.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; font-src 'self' data:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/screenshots/**",
+          "$APPCACHE/launchbox-thumbnails/**"
+        ]
+      }
     }
   },
   "bundle": {
@@ -36,7 +43,9 @@
       "icons/icon.ico"
     ],
     "shortDescription": "Your classic games, at home.",
-    "resources": { "resources/runtime/retroarch": "runtime/retroarch" }
+    "resources": {
+      "resources/runtime/retroarch": "runtime/retroarch"
+    }
   },
   "plugins": {
     "updater": {
@@ -44,7 +53,9 @@
       "endpoints": [
         "https://github.com/kauanbgs/openretro/releases/latest/download/latest.json"
       ],
-      "windows": { "installMode": "passive" }
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
