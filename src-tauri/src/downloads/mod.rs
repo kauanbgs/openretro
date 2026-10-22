@@ -1,3 +1,4 @@
+mod direct;
 pub mod region;
 pub mod sources;
 use crate::{
@@ -10,12 +11,9 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, Write},
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager, State};
@@ -58,11 +56,17 @@ struct ActiveTask {
     cancel: CancellationToken,
     task: tauri::async_runtime::JoinHandle<()>,
 }
-#[derive(Default)]
 pub struct DownloadService {
+    http: OnceCell<reqwest::Client>,
+    http_slots: Arc<tokio::sync::Semaphore>,
     session: OnceCell<Arc<Session>>,
     active: Mutex<HashMap<String, ActiveTask>>,
     operations: tokio::sync::Mutex<()>,
+}
+impl Default for DownloadService {
+    fn default() -> Self {
+        Self { session: OnceCell::new(), http: OnceCell::new(), http_slots: Arc::new(tokio::sync::Semaphore::new(12)), active: Mutex::default(), operations: tokio::sync::Mutex::new(()) }
+    }
 }
 fn save_job(app: &tauri::AppHandle, job: &DownloadJob) -> Result<()> {
     app.state::<Database>().0.lock().map_err(error)?.execute(
@@ -102,6 +106,7 @@ async fn session(app: &tauri::AppHandle) -> Result<Arc<Session>> {
                     disable_dht_persistence: false,
                     dht_config: Some(dht_config),
                     enable_upnp_port_forwarding: false,
+                    defer_writes_up_to: Some(32),
                     ..Default::default()
                 },
             )
@@ -286,10 +291,6 @@ fn spawn_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result<()> {
     Ok(())
 }
 const MAX_DIRECT_DOWNLOAD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
-/// Files at least this large are fetched as parallel ranges when the host allows it.
-const SEGMENTED_MIN_BYTES: u64 = 16 * 1024 * 1024;
-const SEGMENTS: u64 = 6;
-const SEGMENT_ATTEMPTS: u32 = 4;
 fn safe_download_filename(candidate: &str) -> Option<String> {
     let name: String = candidate
         .chars()
@@ -314,9 +315,8 @@ fn direct_filename(url: &reqwest::Url) -> String {
         .and_then(safe_download_filename)
         .unwrap_or_else(|| "download.bin".into())
 }
-fn response_filename(response: &reqwest::blocking::Response) -> Option<String> {
-    let header = response
-        .headers()
+fn response_filename(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    let header = headers
         .get(reqwest::header::CONTENT_DISPOSITION)?
         .to_str()
         .ok()?;
@@ -420,106 +420,26 @@ fn extract_playable_zip(
     }
     Ok(())
 }
-fn direct_transfer(
-    app: &tauri::AppHandle,
-    job: &mut DownloadJob,
-    cancel: &CancellationToken,
-) -> Result<()> {
+async fn direct_transfer(app: &tauri::AppHandle, job: &mut DownloadJob, cancel: &CancellationToken) -> Result<()> {
     let url = sources::direct_url(&job.magnet)?;
-    let requested_filename = direct_filename(&url);
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(120))
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() >= 5 || sources::direct_url(attempt.url().as_str()).is_err()
-            {
-                attempt.stop()
-            } else {
-                attempt.follow()
-            }
-        }))
-        .build()
-        .map_err(error)?;
+    let service = app.state::<DownloadService>();
+    let client = service.http.get_or_try_init(|| async { direct::client() }).await?;
+    let directory = PathBuf::from(&job.directory);
     job.state = "DOWNLOADING".into();
     job.error = None;
+    job.bytes_per_second = 0.0;
     save_job(app, job)?;
-    let mut response = client
-        .get(url)
-        .send()
-        .map_err(|_| "Could not start the direct download. Check the link and your connection.")?
-        .error_for_status()
-        .map_err(|_| "The direct download link is unavailable.")?;
-    sources::direct_url(response.url().as_str())?;
-    let total = response.content_length().unwrap_or(0);
-    if total > MAX_DIRECT_DOWNLOAD_BYTES {
-        return Err("The direct download is unexpectedly large.".into());
+    let mut meter = RateMeter::default();
+    let target = direct::download(client, &url, &directory, service.http_slots.clone(), cancel, |done, total| {
+        meter.update(job, done, total);
+        save_job(app, job)
+    }).await?;
+    if let Some(target) = target {
+        // Extraction and hashing remain outside the async network workers.
+        let app = app.clone();
+        let mut completed = job.clone();
+        *job = tauri::async_runtime::spawn_blocking(move || { finish_download(&app, &mut completed, Some(&target)); completed }).await.map_err(error)?;
     }
-    let response_name = response_filename(&response);
-    let requested_is_archive = requested_filename
-        .rsplit_once('.')
-        .is_some_and(|(_, extension)| {
-            matches!(
-                extension.to_ascii_lowercase().as_str(),
-                "zip" | "7z" | "rar"
-            )
-        });
-    let target = PathBuf::from(&job.directory).join(if requested_is_archive {
-        requested_filename
-    } else {
-        response_name.unwrap_or(requested_filename)
-    });
-    let temporary = target.with_file_name(format!(
-        "{}.part",
-        target
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("download.bin")
-    ));
-    let ranged = total >= SEGMENTED_MIN_BYTES
-        && response
-            .headers()
-            .get(reqwest::header::ACCEPT_RANGES)
-            .is_some_and(|value| value.as_bytes().eq_ignore_ascii_case(b"bytes"));
-    if ranged {
-        // The redirects are already resolved; every range goes to the final host.
-        let url = response.url().clone();
-        drop(response);
-        segmented_transfer(app, job, &client, &url, total, &temporary, cancel)?;
-        if cancel.is_cancelled() {
-            return Ok(());
-        }
-    } else {
-        let mut output = File::create(&temporary).map_err(error)?;
-        let mut buffer = [0u8; 64 * 1024];
-        let started = Instant::now();
-        let mut saved_at = Instant::now();
-        loop {
-            if cancel.is_cancelled() {
-                return Ok(());
-            }
-            let read = response
-                .read(&mut buffer)
-                .map_err(|_| "The direct download stopped unexpectedly.")?;
-            if read == 0 {
-                break;
-            }
-            output.write_all(&buffer[..read]).map_err(error)?;
-            job.downloaded_bytes = job.downloaded_bytes.saturating_add(read as u64);
-            if job.downloaded_bytes > MAX_DIRECT_DOWNLOAD_BYTES {
-                return Err("The direct download is unexpectedly large.".into());
-            }
-            update_rate(job, total, started);
-            if saved_at.elapsed() >= Duration::from_millis(750) {
-                save_job(app, job)?;
-                saved_at = Instant::now();
-            }
-        }
-        output.flush().map_err(error)?;
-    }
-    std::fs::rename(&temporary, &target).map_err(error)?;
-    if total == 0 {
-        job.total_bytes = job.downloaded_bytes;
-    }
-    finish_download(app, job, Some(&target));
     Ok(())
 }
 /// Saves a post-transfer step at most a few times per second.
@@ -592,149 +512,20 @@ fn finish_download(app: &tauri::AppHandle, job: &mut DownloadJob, archive: Optio
     job.remaining_seconds = None;
     let _ = save_job(app, job);
 }
-fn update_rate(job: &mut DownloadJob, total: u64, started: Instant) {
-    job.total_bytes = total;
-    let elapsed = started.elapsed().as_secs_f64().max(0.1);
-    job.bytes_per_second = job.downloaded_bytes as f64 / elapsed;
-    job.progress = if total == 0 {
-        0.0
-    } else {
-        (job.downloaded_bytes as f64 / total as f64 * 100.0).min(100.0)
-    };
-    job.remaining_seconds = if total > job.downloaded_bytes && job.bytes_per_second > 0.0 {
-        Some(((total - job.downloaded_bytes) as f64 / job.bytes_per_second) as u64)
-    } else {
-        None
-    };
+#[derive(Default)]
+struct RateMeter {
+    previous: Option<(Instant, u64)>,
 }
-/// Hosts such as archive.org cap the speed of each connection, so a large
-/// file is fetched as parallel byte ranges written straight into place.
-fn segmented_transfer(
-    app: &tauri::AppHandle,
-    job: &mut DownloadJob,
-    client: &reqwest::blocking::Client,
-    url: &reqwest::Url,
-    total: u64,
-    temporary: &Path,
-    cancel: &CancellationToken,
-) -> Result<()> {
-    File::create(temporary)
-        .and_then(|file| file.set_len(total))
-        .map_err(error)?;
-    let downloaded = AtomicU64::new(0);
-    let failure = Mutex::new(None::<String>);
-    // One failed range stops the others instead of downloading in vain.
-    let abort = cancel.child_token();
-    let chunk = total.div_ceil(SEGMENTS);
-    let started = Instant::now();
-    job.downloaded_bytes = 0;
-    let mut progress = Ok(());
-    std::thread::scope(|scope| {
-        let workers: Vec<_> = (0..SEGMENTS)
-            .map(|index| (index * chunk, ((index + 1) * chunk).min(total)))
-            .filter(|(start, end)| start < end)
-            .map(|(start, end)| {
-                let (downloaded, failure, abort) = (&downloaded, &failure, &abort);
-                scope.spawn(move || {
-                    if let Err(message) =
-                        fetch_range(client, url, temporary, start, end, downloaded, abort)
-                    {
-                        failure
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .get_or_insert(message);
-                        abort.cancel();
-                    }
-                })
-            })
-            .collect();
-        let mut saved_at = Instant::now();
-        while !workers.iter().all(|worker| worker.is_finished()) {
-            std::thread::sleep(Duration::from_millis(250));
-            job.downloaded_bytes = downloaded.load(Ordering::Relaxed);
-            update_rate(job, total, started);
-            if saved_at.elapsed() >= Duration::from_millis(750) {
-                if let Err(message) = save_job(app, job) {
-                    progress = Err(message);
-                    abort.cancel();
-                }
-                saved_at = Instant::now();
-            }
-        }
-    });
-    progress?;
-    if let Some(message) = failure.into_inner().unwrap_or_else(|p| p.into_inner()) {
-        return Err(message);
+impl RateMeter {
+    fn update(&mut self, job: &mut DownloadJob, done: u64, total: u64) {
+        let now = Instant::now();
+        job.bytes_per_second = self.previous.map(|(at, bytes)| done.saturating_sub(bytes) as f64 / now.duration_since(at).as_secs_f64().max(0.001)).unwrap_or(0.0);
+        self.previous = Some((now, done));
+        job.downloaded_bytes = done;
+        job.total_bytes = total;
+        job.progress = if total > 0 { (done as f64 / total as f64 * 100.0).min(100.0) } else { 0.0 };
+        job.remaining_seconds = if total > done && job.bytes_per_second > 0.0 { Some(((total - done) as f64 / job.bytes_per_second) as u64) } else { None };
     }
-    if !cancel.is_cancelled() && downloaded.load(Ordering::Relaxed) != total {
-        return Err("The direct download ended before the whole file arrived.".into());
-    }
-    job.downloaded_bytes = downloaded.load(Ordering::Relaxed);
-    Ok(())
-}
-/// Downloads `start..end` into its place, resuming from the last byte on retries.
-fn fetch_range(
-    client: &reqwest::blocking::Client,
-    url: &reqwest::Url,
-    path: &Path,
-    start: u64,
-    end: u64,
-    downloaded: &AtomicU64,
-    abort: &CancellationToken,
-) -> Result<()> {
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .open(path)
-        .map_err(error)?;
-    let mut position = start;
-    let mut buffer = vec![0u8; 256 * 1024];
-    let mut last_error = String::new();
-    for attempt in 0..SEGMENT_ATTEMPTS {
-        if attempt > 0 {
-            std::thread::sleep(Duration::from_millis(500 * u64::from(attempt)));
-        }
-        let response = client
-            .get(url.clone())
-            .header(reqwest::header::RANGE, format!("bytes={position}-{}", end - 1))
-            .send();
-        let mut response = match response {
-            Ok(response) if response.status() == reqwest::StatusCode::PARTIAL_CONTENT => response,
-            Ok(_) => return Err("The download host stopped accepting partial downloads.".into()),
-            Err(_) => {
-                last_error = "The direct download stopped unexpectedly.".into();
-                continue;
-            }
-        };
-        file.seek(SeekFrom::Start(position)).map_err(error)?;
-        loop {
-            if abort.is_cancelled() {
-                return Ok(());
-            }
-            let read = match response.read(&mut buffer) {
-                Ok(read) => read,
-                Err(_) => {
-                    last_error = "The direct download stopped unexpectedly.".into();
-                    break;
-                }
-            };
-            if read == 0 {
-                break;
-            }
-            // Never write past this range, even if the host sends extra bytes.
-            let read = (read as u64).min(end - position) as usize;
-            file.write_all(&buffer[..read]).map_err(error)?;
-            position += read as u64;
-            downloaded.fetch_add(read as u64, Ordering::Relaxed);
-            if position >= end {
-                return Ok(());
-            }
-        }
-    }
-    Err(if last_error.is_empty() {
-        "The direct download ended before the whole file arrived.".into()
-    } else {
-        last_error
-    })
 }
 /// Adds the single playable file of a download. Returns the library status
 /// and a message for the player, or None when automatic adding was not asked.
@@ -862,22 +653,16 @@ fn spawn_direct_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result
     save_job(app, &job)?;
     let cancel = CancellationToken::new();
     let worker_cancel = cancel.clone();
-    let completion_cancel = cancel.clone();
     let app_clone = app.clone();
-    let failure_app = app.clone();
     let id = job.id.clone();
     let task = tauri::async_runtime::spawn(async move {
-        let result = tauri::async_runtime::spawn_blocking(move || {
-            let result = direct_transfer(&app_clone, &mut job, &worker_cancel);
-            (job, result)
-        })
-        .await;
-        if !completion_cancel.is_cancelled() {
-            if let Ok((mut failed_job, Err(message))) = result {
-                failed_job.state = "FAILED".into();
-                failed_job.error = Some(message);
-                failed_job.bytes_per_second = 0.0;
-                let _ = save_job(&failure_app, &failed_job);
+        if let Err(message) = direct_transfer(&app_clone, &mut job, &worker_cancel).await {
+            if !worker_cancel.is_cancelled() {
+                job.state = "FAILED".into();
+                job.error = Some(message);
+                job.bytes_per_second = 0.0;
+                job.remaining_seconds = None;
+                let _ = save_job(&app_clone, &job);
             }
         }
     });
@@ -1103,22 +888,7 @@ fn collect_files(
             ]
             .contains(&extension.as_str())
             {
-                let catalog: serde_json::Value =
-                    serde_json::from_str(include_str!("../../../src/db/platforms.json"))
-                        .map_err(error)?;
-                let ids = catalog
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .filter(|p| {
-                        p["extensions"]
-                            .as_array()
-                            .unwrap()
-                            .iter()
-                            .any(|e| e.as_str() == Some(extension.as_str()))
-                    })
-                    .filter_map(|p| p["id"].as_str().map(String::from))
-                    .collect();
+                let ids = crate::filesystem::platform_ids_for_extension(&extension);
                 files.push(DownloadedFile {
                     path: path.to_string_lossy().into_owned(),
                     filename: entry.file_name().to_string_lossy().into_owned(),
@@ -1133,45 +903,6 @@ fn collect_files(
 #[cfg(test)]
 mod tests {
     use super::*;
-    /// Serves `body` with Range support; the first response is cut short to
-    /// exercise the resume path.
-    fn range_server(body: Arc<Vec<u8>>) -> reqwest::Url {
-        use std::io::{BufRead, BufReader};
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let first = Arc::new(std::sync::atomic::AtomicBool::new(true));
-        std::thread::spawn(move || {
-            for stream in listener.incoming().flatten() {
-                let (body, first) = (body.clone(), first.clone());
-                std::thread::spawn(move || {
-                    let mut reader = BufReader::new(stream.try_clone().unwrap());
-                    let mut range = None;
-                    loop {
-                        let mut line = String::new();
-                        if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
-                            break;
-                        }
-                        if let Some(value) = line.to_ascii_lowercase().strip_prefix("range: bytes=") {
-                            let (start, end) = value.trim().split_once('-').unwrap();
-                            range = Some((start.parse::<usize>().unwrap(), end.parse::<usize>().unwrap()));
-                        }
-                    }
-                    let (start, end) = range.unwrap();
-                    let slice = &body[start..=end];
-                    let mut stream = stream;
-                    let _ = write!(
-                        stream,
-                        "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {start}-{end}/{}\r\nConnection: close\r\n\r\n",
-                        slice.len(),
-                        body.len()
-                    );
-                    let cut = first.swap(false, Ordering::SeqCst);
-                    let _ = stream.write_all(if cut { &slice[..slice.len() / 3] } else { slice });
-                });
-            }
-        });
-        reqwest::Url::parse(&format!("http://127.0.0.1:{port}/file.bin")).unwrap()
-    }
     #[test]
     fn extraction_reports_progress_and_keeps_only_playable_files() {
         let root = std::env::temp_dir().join(format!("openretro-extract-{}", uuid::Uuid::new_v4()));
@@ -1195,28 +926,6 @@ mod tests {
         assert_eq!(*reports.last().unwrap(), (game.len() as u64, game.len() as u64));
         std::fs::remove_dir_all(root).unwrap();
     }
-    #[test]
-    fn ranges_resume_after_a_dropped_connection_and_rebuild_the_file() {
-        let body: Arc<Vec<u8>> = Arc::new((0..3_000_000u32).map(|i| (i % 251) as u8).collect());
-        let url = range_server(body.clone());
-        let path = std::env::temp_dir().join(format!("openretro-range-{}.part", uuid::Uuid::new_v4()));
-        File::create(&path).unwrap().set_len(body.len() as u64).unwrap();
-        let client = reqwest::blocking::Client::new();
-        let downloaded = AtomicU64::new(0);
-        let abort = CancellationToken::new();
-        let total = body.len() as u64;
-        let chunk = total.div_ceil(4);
-        std::thread::scope(|scope| {
-            for index in 0..4 {
-                let (start, end) = (index * chunk, ((index + 1) * chunk).min(total));
-                let (client, url, path, downloaded, abort) = (&client, &url, &path, &downloaded, &abort);
-                scope.spawn(move || fetch_range(client, url, path, start, end, downloaded, abort).unwrap());
-            }
-        });
-        assert_eq!(downloaded.load(Ordering::Relaxed), total);
-        assert_eq!(std::fs::read(&path).unwrap(), *body);
-        std::fs::remove_file(path).unwrap();
-    }
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn downloads_magnet_from_local_seed_and_verifies_contents() {
         use librqbit::{create_torrent, CreateTorrentOptions};
@@ -1234,6 +943,7 @@ mod tests {
             .await
             .unwrap();
         let opts = || SessionOptions {
+            defer_writes_up_to: Some(32),
             disable_dht: true,
             disable_dht_persistence: true,
             enable_upnp_port_forwarding: false,

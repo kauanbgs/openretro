@@ -32,7 +32,7 @@ num_cpus = "1"
 quick-xml = "0.37"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 librqbit = { version = "=8.1.1", default-features = false, features = ["rust-tls"] }
-tokio = { version = "1", features = ["sync", "time", "macros"] }
+tokio = { version = "1", features = ["sync", "time", "macros", "fs", "io-util"] }
 tokio-util = "0.7"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws", "query", "json"] }
