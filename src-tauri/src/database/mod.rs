@@ -100,3 +100,30 @@ pub fn emulators(db: &Connection) -> Result<Vec<Emulator>> {
     rows.map(|r| serde_json::from_str(&r.map_err(error)?).map_err(error))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn migrations_can_run_again_on_an_existing_database() {
+        let path = std::env::temp_dir().join(format!("openretro-db-{}.sqlite", uuid::Uuid::new_v4()));
+        drop(super::initialize(&path).unwrap());
+        // Every boot replays the idempotent migrations against the upgraded schema.
+        let db = super::initialize(&path).unwrap();
+        let (avatar, color): (String, String) = db
+            .0
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT avatar,color FROM player_profiles WHERE id='default'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(avatar, "gamepad");
+        assert!(color.starts_with('#'));
+        drop(db);
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+        }
+    }
+}
