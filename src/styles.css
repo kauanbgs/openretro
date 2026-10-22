@@ -3894,3 +3894,27 @@ html[data-animations="false"] *:after {
     grid-column: 1 / -1;
   }
 }
+
+/* Download jobs: post-transfer status. */
+.transfer-state .spin {
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+.library-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.library-status.added {
+  color: var(--success);
+}
+.library-status.manual {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  line-height: 1.5;
+}

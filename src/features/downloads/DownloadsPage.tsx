@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, Pause, Play, FolderOpen, Trash2 } from "lucide-react";
+import {
+  Download,
+  Pause,
+  Play,
+  FolderOpen,
+  Trash2,
+  CheckCircle2,
+  LoaderCircle,
+} from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
@@ -151,25 +159,52 @@ export function DownloadsPage({
                   <h3>{j.name}</h3>
                   <p>{j.sourceName}</p>
                   <span className="transfer-state" data-state={j.state}>
-                    {labels[j.state] ?? j.state}
+                    {j.state === "INSTALLING" && (
+                      <LoaderCircle className="spin" size={13} />
+                    )}
+                    {j.state === "INSTALLING" && j.stage
+                      ? j.stage
+                      : (labels[j.state] ?? j.state)}
                   </span>
                   <progress
                     aria-label={`Progresso de ${j.name}`}
                     value={j.progress}
                     max={100}
                   />
-                  <p>
-                    {j.progress.toFixed(1)}%{" "}
-                    {j.totalBytes
-                      ? ` · ${bytes(j.downloadedBytes)} de ${bytes(j.totalBytes)}`
-                      : ""}
-                    {j.state === "DOWNLOADING"
-                      ? ` · ${bytes(j.bytesPerSecond)}/s`
-                      : ""}
-                    {j.remainingSeconds != null && j.bytesPerSecond > 0
-                      ? ` · ${formatRemaining(j.remainingSeconds)}`
-                      : ""}
-                  </p>
+                  {j.state === "INSTALLING" ? (
+                    <p>
+                      {j.progress.toFixed(0)}% · o jogo já foi baixado, falta
+                      prepará-lo para a biblioteca
+                    </p>
+                  ) : (
+                    <p>
+                      {j.progress.toFixed(1)}%{" "}
+                      {j.totalBytes
+                        ? ` · ${bytes(j.downloadedBytes)} de ${bytes(j.totalBytes)}`
+                        : ""}
+                      {j.state === "DOWNLOADING"
+                        ? ` · ${bytes(j.bytesPerSecond)}/s`
+                        : ""}
+                      {j.state === "DOWNLOADING" &&
+                      j.remainingSeconds != null &&
+                      j.bytesPerSecond > 0
+                        ? ` · ${formatRemaining(j.remainingSeconds)}`
+                        : ""}
+                    </p>
+                  )}
+                  {j.state === "COMPLETED" && j.libraryStatus === "added" && (
+                    <p className="library-status added">
+                      <CheckCircle2 size={15} />{" "}
+                      {j.libraryMessage ?? "Adicionado à sua biblioteca."}
+                    </p>
+                  )}
+                  {j.state === "COMPLETED" &&
+                    j.libraryStatus === "manual" &&
+                    j.libraryMessage && (
+                      <p className="library-status manual">
+                        {j.libraryMessage}
+                      </p>
+                    )}
                   {j.error && <p className="error-message">{j.error}</p>}
                   {j.directory && (
                     <details>
@@ -199,14 +234,22 @@ export function DownloadsPage({
                         <Play size={15} /> Retomar
                       </button>
                     ) : null}
-                    {j.state === "COMPLETED" ? (
+                    {j.state === "COMPLETED" &&
+                    j.libraryStatus === "added" ? null : j.state ===
+                      "COMPLETED" ? (
                       <button
                         disabled={busy}
                         className="button primary"
                         onClick={() =>
                           void run(async () => {
+                            // With game data the backend imports in the
+                            // background and the job shows each step.
+                            if (j.game && j.libraryStatus !== "manual") {
+                              await bridge.addDownloadToLibrary(j.id);
+                              return;
+                            }
                             const downloaded = await bridge.downloadFiles(j.id);
-                            if (downloaded.length === 1) {
+                            if (downloaded.length === 1 && !j.game) {
                               onDownloaded(
                                 await bridge.inspect(downloaded[0].path),
                                 j.game,
@@ -220,9 +263,16 @@ export function DownloadsPage({
                           })
                         }
                       >
-                        <FolderOpen size={15} /> Adicionar à biblioteca
+                        {busy ? (
+                          <LoaderCircle className="spin" size={15} />
+                        ) : (
+                          <FolderOpen size={15} />
+                        )}{" "}
+                        {busy
+                          ? "Verificando o arquivo…"
+                          : "Adicionar à biblioteca"}
                       </button>
-                    ) : j.state !== "CANCELLED" ? (
+                    ) : j.state !== "CANCELLED" && j.state !== "INSTALLING" ? (
                       <button
                         disabled={busy}
                         className="text-button"
@@ -275,6 +325,11 @@ export function DownloadsPage({
                   disabled={busy}
                   onClick={() =>
                     void run(async () => {
+                      if (files.job.game) {
+                        await bridge.addDownloadToLibrary(files.job.id, f.path);
+                        setFiles(undefined);
+                        return;
+                      }
                       const candidate = await bridge.inspect(f.path);
                       onDownloaded(candidate, files.job.game);
                       setFiles(undefined);

@@ -459,6 +459,14 @@ pub fn add_game_blocking(
     if inspected.sha256 != candidate.sha256 {
         return Err("The file changed during import. Select it again.".into());
     }
+    insert_library_game(app, game, inspected)
+}
+/// Adds a file the backend has just inspected itself, without hashing it again.
+pub fn insert_library_game(
+    app: &tauri::AppHandle,
+    game: GameMetadata,
+    inspected: ImportCandidate,
+) -> Result<()> {
     if !inspected.platform_ids.contains(&game.platform_id) {
         return Err("The selected platform does not match this file extension.".into());
     }

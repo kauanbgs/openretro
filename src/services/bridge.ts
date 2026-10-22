@@ -293,6 +293,12 @@ export const bridge = {
   async removeDownload(id: string): Promise<void> {
     if (isDesktop) return invoke("remove_download", { id });
   },
+  /** Runs the import in the background; progress appears on the job. */
+  async addDownloadToLibrary(id: string, path?: string): Promise<void> {
+    if (!isDesktop)
+      throw new Error("Use o aplicativo desktop para adicionar downloads.");
+    return invoke("add_download_to_library", { id, path: path ?? null });
+  },
   async downloadFiles(id: string): Promise<DownloadedFile[]> {
     return isDesktop ? invoke("download_files", { id }) : [];
   },

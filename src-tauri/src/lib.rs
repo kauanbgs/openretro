@@ -63,6 +63,7 @@ pub fn run() {
             downloads::control_download,
             downloads::remove_download,
             downloads::download_files,
+            downloads::add_download_to_library,
             commands::list_library,
             commands::list_emulators,
             commands::emulator_install_options,

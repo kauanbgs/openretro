@@ -28,19 +28,33 @@ pub fn canonical_file(path: &str) -> Result<PathBuf> {
     Ok(p)
 }
 pub fn hash(path: &Path) -> Result<String> {
+    hash_with_progress(path, |_, _| {})
+}
+/// Large reads keep multi-gigabyte games fast; progress is (bytes read, total).
+pub fn hash_with_progress(path: &Path, mut progress: impl FnMut(u64, u64)) -> Result<String> {
     let mut file = File::open(path).map_err(error)?;
+    let total = file.metadata().map_err(error)?.len();
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 65536];
+    let mut buffer = vec![0u8; 1024 * 1024];
+    let mut done = 0u64;
     loop {
         let count = file.read(&mut buffer).map_err(error)?;
         if count == 0 {
             break;
         }
         hasher.update(&buffer[..count]);
+        done += count as u64;
+        progress(done, total);
     }
     Ok(format!("{:x}", hasher.finalize()))
 }
 pub fn inspect(path: &str) -> Result<ImportCandidate> {
+    inspect_with_progress(path, |_, _| {})
+}
+pub fn inspect_with_progress(
+    path: &str,
+    progress: impl FnMut(u64, u64),
+) -> Result<ImportCandidate> {
     let path = canonical_file(path)?;
     let extension = path
         .extension()
@@ -64,7 +78,7 @@ pub fn inspect(path: &str) -> Result<ImportCandidate> {
         return Err(format!("The .{extension} format is not recognized. Choose a supported game file; archives are not automatically extracted."));
     }
     Ok(ImportCandidate {
-        sha256: hash(&path)?,
+        sha256: hash_with_progress(&path, progress)?,
         filename: path
             .file_name()
             .unwrap_or_default()
@@ -156,6 +170,16 @@ pub fn executable(path: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn progress_hash_matches_and_reaches_the_file_size() {
+        let path = std::env::temp_dir().join(format!("openretro-hash-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&path, vec![42u8; 2_500_000]).unwrap();
+        let mut last = (0, 0);
+        let hashed = hash_with_progress(&path, |done, total| last = (done, total)).unwrap();
+        assert_eq!(hashed, hash(&path).unwrap());
+        assert_eq!(last, (2_500_000, 2_500_000));
+        std::fs::remove_file(path).unwrap();
+    }
     #[test]
     fn rejects_relative_and_traversal() {
         assert!(canonical_file("../game.nes").is_err());

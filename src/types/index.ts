@@ -158,6 +158,10 @@ export interface DownloadJob {
   game?: GameMetadata;
   autoExtract?: boolean;
   autoAddToLibrary?: boolean;
+  /** Post-transfer step, e.g. "Extraindo arquivos", while state is INSTALLING. */
+  stage?: string | null;
+  libraryStatus?: "added" | "manual" | null;
+  libraryMessage?: string | null;
 }
 export interface DownloadImported {
   gameId: string;
