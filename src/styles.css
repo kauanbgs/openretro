@@ -3679,3 +3679,218 @@ html[data-animations="false"] *:after {
     grid-column: 1 / -1;
   }
 }
+
+/* Emulators page: configured emulators, then the install catalog. */
+.emu-section {
+  margin-top: 8px;
+  margin-bottom: 40px;
+}
+.emu-section-heading {
+  margin-bottom: 16px;
+}
+.emu-section-heading h2 {
+  font-size: 20px;
+}
+.emu-section-heading p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.emu-section-heading svg {
+  color: var(--accent);
+}
+.emu-list {
+  display: grid;
+  gap: 10px;
+}
+.emu-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel2));
+}
+.emu-row {
+  display: grid;
+  grid-template-columns: 46px minmax(180px, 0.9fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--hairline, var(--border));
+  border-radius: 14px;
+  background: var(--glass, var(--panel));
+}
+.emu-identity {
+  min-width: 0;
+}
+.emu-identity h3 {
+  font-size: 17px;
+}
+.emu-path {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.emu-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.emu-platforms span,
+.emu-offer-consoles span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--panel2);
+  font-size: 11px;
+  font-weight: 600;
+}
+.emu-platforms span.default {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.emu-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.emu-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+.emu-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--hairline, var(--border));
+  border-radius: 16px;
+  background: var(--glass, var(--panel));
+  transition:
+    border-color 200ms ease,
+    transform 300ms var(--ease-spring, ease);
+}
+.emu-offer:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  transform: translateY(-2px);
+}
+.emu-offer.base {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--accent) 12%, transparent),
+      transparent 60%
+    ),
+    var(--glass, var(--panel));
+}
+.emu-offer-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.emu-offer-top h3 {
+  font-size: 16px;
+}
+.emu-offer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.emu-offer-badges span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.emu-offer-badges .recommended {
+  color: var(--accent);
+}
+.emu-offer-badges .installed {
+  color: var(--success);
+}
+.emu-offer-description {
+  flex: 1;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.emu-offer-consoles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.emu-offer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline, var(--border));
+}
+.emu-offer-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.emu-offer-footer a:hover {
+  color: var(--accent);
+}
+.emu-offer-footer .button {
+  flex: none;
+}
+.emu-offer-progress {
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline, var(--border));
+  color: var(--muted);
+  font-size: 12px;
+}
+.emu-offer-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.emu-offer-progress strong {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.emu-offer-progress progress {
+  width: 100%;
+}
+@media (max-width: 1100px) {
+  .emu-row {
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+  }
+  .emu-platforms {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+}
+@media (max-width: 680px) {
+  .emu-row {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+  .emu-actions {
+    grid-column: 1 / -1;
+  }
+}

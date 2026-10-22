@@ -11,12 +11,29 @@ import {
   Settings2,
   Download,
   ExternalLink,
+  Wrench,
+  Star,
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
 import { bridge, isDesktop } from "../../services/bridge";
 import { listen } from "@tauri-apps/api/event";
-import type { Emulator } from "../../types";
+import type { Emulator, EmulatorInstall } from "../../types";
+
+/** Windows extended-length paths are an implementation detail; hide the prefix. */
+export function displayPath(path: string) {
+  return path.replace(/^\\\\\?\\(UNC\\)?/, (_, unc) => (unc ? "\\\\" : ""));
+}
+/** The managed runtime installs as openretro-<id>; other installs keep their name. */
+export function isInstalled(installer: EmulatorInstall, emulators: Emulator[]) {
+  return emulators.some(
+    (e) =>
+      e.id === `openretro-${installer.id}` ||
+      e.name.trim().toLowerCase() === installer.name.toLowerCase(),
+  );
+}
+const shortName = (id: string) =>
+  platforms.find((x) => x.id === id)?.shortName ?? id.toUpperCase();
 export function EmulatorsPage({
   emulators,
   refresh,
@@ -99,141 +116,91 @@ export function EmulatorsPage({
           </>
         }
       />
-      {installers.data?.length ? (
-        <section
-          className="emulator-installs"
-          aria-label="Official emulator installers"
-        >
-          <div className="section-heading">
-            <div>
-              <h2>Install an emulator</h2>
-              <p className="muted">
-                Installs use the official Windows package and are configured
-                automatically.
-              </p>
-            </div>
-          </div>
-          <div className="emulator-install-grid">
-            {installers.data.map((installer) => (
-              <article
-                className={`emulator-install ${installer.isBase ? "emulator-install-base" : ""}`}
-                key={installer.id}
-              >
-                <div className="emulator-icon">
-                  <Cpu size={25} />
+      {emulators.length ? (
+        <section className="emu-section" aria-labelledby="emu-installed">
+          <header className="emu-section-heading">
+            <h2 id="emu-installed">Seus emuladores</h2>
+            <p>
+              <Star size={12} fill="currentColor" /> marca o emulador padrão de
+              cada console.
+            </p>
+          </header>
+          <div className="emu-list">
+            {emulators.map((e) => (
+              <article className="emu-row" key={e.id}>
+                <div className="emu-icon">
+                  <Cpu size={24} />
                 </div>
-                <div>
-                  <h3>{installer.name}</h3>
-                  {installer.isBase && (
-                    <span className="emulator-base-label">
-                      Base recomendada
-                    </span>
-                  )}
-                  <p>{installer.description}</p>
-                  <a
-                    href={installer.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {installer.sourceName} <ExternalLink size={12} />
-                  </a>
+                <div className="emu-identity">
+                  <h3>{e.name}</h3>
+                  <p className="emu-path" title={displayPath(e.executablePath)}>
+                    {displayPath(e.executablePath)}
+                  </p>
                 </div>
-                <button
-                  className="button primary"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      setInstalling({
-                        id: installer.id,
-                        name: installer.name,
-                        progress: 4,
-                        stage: "Starting installation",
-                      });
-                      try {
-                        notify(await bridge.installEmulator(installer.id));
-                      } finally {
-                        setInstalling(null);
+                <div className="emu-platforms">
+                  {e.supportedPlatforms.map((p) => (
+                    <span
+                      key={p}
+                      className={
+                        e.defaultPlatforms.includes(p) ? "default" : ""
                       }
-                    })
-                  }
-                >
-                  <Download size={16} />{" "}
-                  {installing?.id === installer.id
-                    ? "Installing…"
-                    : "Install / repair"}
-                </button>
-                {installing?.id === installer.id && (
-                  <div className="emulator-install-progress" role="status">
-                    <div>
-                      <span>{installing.stage}</span>
-                      <strong>{installing.progress}%</strong>
-                    </div>
-                    <progress value={installing.progress} max={100} />
-                  </div>
-                )}
+                      title={
+                        e.defaultPlatforms.includes(p)
+                          ? `Padrão para ${shortName(p)}`
+                          : undefined
+                      }
+                    >
+                      {e.defaultPlatforms.includes(p) && (
+                        <Star size={10} fill="currentColor" />
+                      )}
+                      {shortName(p)}
+                    </span>
+                  ))}
+                </div>
+                <div className="emu-actions">
+                  <button
+                    disabled={busy}
+                    className="button secondary"
+                    onClick={() =>
+                      void run(async () =>
+                        notify(await bridge.testEmulator(e.id)),
+                      )
+                    }
+                  >
+                    <Check size={15} /> Testar
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label={`Configurar ${e.name}`}
+                    title="Configurar"
+                    onClick={() => setEditing(e)}
+                  >
+                    <Settings2 size={17} />
+                  </button>
+                  <button
+                    disabled={busy}
+                    className="icon-button"
+                    aria-label={`Remover ${e.name}`}
+                    title="Remover"
+                    onClick={() => void run(() => bridge.removeEmulator(e.id))}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         </section>
-      ) : null}
-      {emulators.length ? (
-        <div className="emulator-grid">
-          {emulators.map((e) => (
-            <article className="emulator-card" key={e.id}>
-              <div className="emulator-icon">
-                <Cpu size={28} />
-              </div>
-              <h2>{e.name}</h2>
-              <p className="path-text">{e.executablePath}</p>
-              <div className="platform-tags">
-                {e.supportedPlatforms.map((p) => (
-                  <span key={p}>
-                    {platforms.find((x) => x.id === p)?.shortName}
-                    {e.defaultPlatforms.includes(p) ? " · default" : ""}
-                  </span>
-                ))}
-              </div>
-              <div className="emulator-actions">
-                <button
-                  disabled={busy}
-                  className="text-button"
-                  onClick={() =>
-                    void run(async () =>
-                      notify(await bridge.testEmulator(e.id)),
-                    )
-                  }
-                >
-                  <Check size={15} /> Test path
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label={`Configure ${e.name}`}
-                  onClick={() => setEditing(e)}
-                >
-                  <Settings2 size={17} />
-                </button>
-                <button
-                  disabled={busy}
-                  className="icon-button"
-                  aria-label={`Remove ${e.name}`}
-                  onClick={() => void run(() => bridge.removeEmulator(e.id))}
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
       ) : (
         <div className="empty-state">
           <div className="large-icon">
             <Cpu size={32} />
           </div>
-          <h2>Add an emulator to play</h2>
+          <h2>Adicione um emulador para jogar</h2>
           <p>
-            Select an installed emulator and the consoles it supports.
-            <br />
-            OpenRetro uses it when you launch a compatible game.
+            Instale um emulador abaixo ou selecione um que já está no seu
+            computador.
+            <br />O OpenRetro usa ele ao abrir um jogo compatível.
           </p>
           <button
             className="button primary"
@@ -241,12 +208,112 @@ export function EmulatorsPage({
           >
             <Plus size={17} /> Adicionar emulador
           </button>
-          <small>Bring your own executable from its official project.</small>
         </div>
       )}
+      {installers.data?.length ? (
+        <section className="emu-section" aria-labelledby="emu-catalog">
+          <header className="emu-section-heading">
+            <h2 id="emu-catalog">Instalar emuladores</h2>
+            <p>
+              Usa o pacote oficial para Windows e configura tudo
+              automaticamente.
+            </p>
+          </header>
+          <div className="emu-catalog">
+            {installers.data.map((installer) => {
+              const installed = isInstalled(installer, emulators);
+              const active = installing?.id === installer.id;
+              return (
+                <article
+                  className={`emu-offer ${installer.isBase ? "base" : ""}`}
+                  key={installer.id}
+                >
+                  <div className="emu-offer-top">
+                    <div className="emu-icon">
+                      <Cpu size={22} />
+                    </div>
+                    <div>
+                      <h3>{installer.name}</h3>
+                      <div className="emu-offer-badges">
+                        {installer.isBase && (
+                          <span className="recommended">Recomendado</span>
+                        )}
+                        {installed && (
+                          <span className="installed">
+                            <Check size={11} /> Instalado
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="emu-offer-description">
+                    {installer.description}
+                  </p>
+                  <div className="emu-offer-consoles">
+                    {installer.supportedPlatforms.map((p) => (
+                      <span key={p}>{shortName(p)}</span>
+                    ))}
+                  </div>
+                  {active ? (
+                    <div className="emu-offer-progress" role="status">
+                      <div>
+                        <span>{installing.stage}</span>
+                        <strong>{installing.progress}%</strong>
+                      </div>
+                      <progress value={installing.progress} max={100} />
+                    </div>
+                  ) : (
+                    <div className="emu-offer-footer">
+                      <a
+                        href={installer.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={installer.sourceName}
+                      >
+                        Site oficial <ExternalLink size={11} />
+                      </a>
+                      <button
+                        className={`button ${installed ? "secondary" : "primary"}`}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            setInstalling({
+                              id: installer.id,
+                              name: installer.name,
+                              progress: 4,
+                              stage: "Iniciando instalação",
+                            });
+                            try {
+                              notify(
+                                await bridge.installEmulator(installer.id),
+                              );
+                            } finally {
+                              setInstalling(null);
+                            }
+                          })
+                        }
+                      >
+                        {installed ? (
+                          <>
+                            <Wrench size={15} /> Reparar
+                          </>
+                        ) : (
+                          <>
+                            <Download size={15} /> Instalar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
       {detected && (
         <div className="detected-panel">
-          <h3>Found on your system PATH</h3>
+          <h3>Encontrados no seu computador</h3>
           {detected.length ? (
             detected.map((e) => (
               <div className="detected-item" key={e.id}>
@@ -261,14 +328,14 @@ export function EmulatorsPage({
                     setDetected(undefined);
                   }}
                 >
-                  Review & add
+                  Revisar e adicionar
                 </button>
               </div>
             ))
           ) : (
             <p className="muted">
-              No supported emulator found on PATH. You can add an installed
-              executable manually.
+              Nenhum emulador compatível foi encontrado. Você pode adicionar um
+              executável manualmente.
             </p>
           )}
         </div>
@@ -277,35 +344,35 @@ export function EmulatorsPage({
         <Modal
           title={
             emulators.some((e) => e.id === editing.id)
-              ? "Configure emulator"
-              : "Add an emulator"
+              ? "Configurar emulador"
+              : "Adicionar emulador"
           }
           onClose={() => setEditing(undefined)}
         >
           <div className="form-stack">
             <label>
-              Name
+              Nome
               <input
                 value={editing.name}
                 onChange={(e) =>
                   setEditing({ ...editing, name: e.target.value })
                 }
-                placeholder="e.g. mGBA"
+                placeholder="ex.: mGBA"
               />
             </label>
             <label>
-              Executable
+              Executável
               <div className="input-action">
                 <input
                   value={editing.executablePath}
-                  placeholder="Select an installed emulator"
+                  placeholder="Selecione um emulador instalado"
                   onChange={(e) =>
                     setEditing({ ...editing, executablePath: e.target.value })
                   }
                 />
                 <button
                   className="icon-button"
-                  aria-label="Browse executable"
+                  aria-label="Procurar executável"
                   onClick={() =>
                     void run(async () => {
                       const p = await bridge.pickExecutable();
@@ -318,7 +385,7 @@ export function EmulatorsPage({
               </div>
             </label>
             <fieldset>
-              <legend>Supported platforms</legend>
+              <legend>Consoles compatíveis</legend>
               <div className="platform-checkboxes">
                 {platforms.map((p) => (
                   <label key={p.id}>
@@ -362,11 +429,11 @@ export function EmulatorsPage({
                   })
                 }
               />{" "}
-              Default for these platforms
+              Padrão para estes consoles
             </label>
             <p className="hint">
-              Adding an executable does not run it. The path test checks that
-              the file exists and has executable permissions.
+              Adicionar um executável não o executa. O teste confere se o
+              arquivo existe e pode ser executado.
             </p>
             {error && (
               <p className="error-message" role="alert">
@@ -385,11 +452,11 @@ export function EmulatorsPage({
                 void run(async () => {
                   await bridge.saveEmulator(editing);
                   setEditing(undefined);
-                  notify("Emulator saved. Ready for your next game.");
+                  notify("Emulador salvo. Pronto para o próximo jogo.");
                 })
               }
             >
-              Save emulator
+              Salvar emulador
             </button>
           </div>
         </Modal>
