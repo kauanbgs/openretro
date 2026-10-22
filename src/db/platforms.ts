@@ -93,6 +93,14 @@ export const platforms: Platform[] = [
     extensions: ["iso", "chd"],
     biosRequired: true,
   },
+  {
+    id: "ps3",
+    name: "PlayStation 3",
+    shortName: "PS3",
+    manufacturer: "Sony",
+    extensions: [],
+    catalogOnly: true,
+  },
   { id: "arcade", name: "Arcade", shortName: "ARC", extensions: ["zip"] },
   {
     id: "dos",

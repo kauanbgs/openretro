@@ -85,7 +85,7 @@ describe("LaunchBox catalog", () => {
       .mockResolvedValueOnce([{ id: 1, name: "Platform" }]);
     await expect(provider.getTaxonomy()).rejects.toThrow("building");
     const taxonomy = await provider.getTaxonomy();
-    expect(taxonomy.platforms).toHaveLength(15);
+    expect(taxonomy.platforms).toHaveLength(16);
     expect(taxonomy.genres).toEqual([{ id: 1, name: "Platform" }]);
   });
   it("rejects legacy or malformed IDs before game IPC", async () => {

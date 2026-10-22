@@ -433,28 +433,30 @@ export function EmulatorsPage({
             <fieldset>
               <legend>Consoles compatíveis</legend>
               <div className="platform-checkboxes">
-                {platforms.map((p) => (
-                  <label key={p.id}>
-                    <input
-                      type="checkbox"
-                      checked={editing.supportedPlatforms.includes(p.id)}
-                      onChange={(e) =>
-                        setEditing({
-                          ...editing,
-                          supportedPlatforms: e.target.checked
-                            ? [...editing.supportedPlatforms, p.id]
-                            : editing.supportedPlatforms.filter(
-                                (id) => id !== p.id,
-                              ),
-                          defaultPlatforms: editing.defaultPlatforms.filter(
-                            (id) => id !== p.id,
-                          ),
-                        })
-                      }
-                    />
-                    {p.shortName}
-                  </label>
-                ))}
+                {platforms
+                  .filter((p) => !p.catalogOnly)
+                  .map((p) => (
+                    <label key={p.id}>
+                      <input
+                        type="checkbox"
+                        checked={editing.supportedPlatforms.includes(p.id)}
+                        onChange={(e) =>
+                          setEditing({
+                            ...editing,
+                            supportedPlatforms: e.target.checked
+                              ? [...editing.supportedPlatforms, p.id]
+                              : editing.supportedPlatforms.filter(
+                                  (id) => id !== p.id,
+                                ),
+                            defaultPlatforms: editing.defaultPlatforms.filter(
+                              (id) => id !== p.id,
+                            ),
+                          })
+                        }
+                      />
+                      {p.shortName}
+                    </label>
+                  ))}
               </div>
             </fieldset>
             <label className="checkbox-line">

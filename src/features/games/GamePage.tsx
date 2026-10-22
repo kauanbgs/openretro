@@ -135,10 +135,7 @@ export function GamePage({
   const sourceMatches = useQuery({
     queryKey: ["game-download-options", game.id, downloadOptions],
     queryFn: async () =>
-      releasesFor(
-        await bridge.searchDownloadSources(game.title),
-        game,
-      ),
+      releasesFor(await bridge.searchDownloadSources(game.title), game),
     enabled: downloadOptions,
   });
   const visibleMatches = (sourceMatches.data ?? []).filter(
@@ -262,6 +259,11 @@ export function GamePage({
                   : "Na sua biblioteca"}
               </p>
             </>
+          ) : platform?.catalogOnly ? (
+            <p>
+              O OpenRetro ainda não roda jogos de {platform.name}. Eles aparecem
+              no catálogo só para você conhecer.
+            </p>
           ) : (
             <p>
               {isRemote
@@ -273,7 +275,7 @@ export function GamePage({
         <div className="hero-panel-actions">
           <button
             className={`button primary ${entry ? "play-button" : ""}`}
-            disabled={running || busy}
+            disabled={running || busy || (!entry && platform?.catalogOnly)}
             onClick={() =>
               entry
                 ? resolution?.state === "MISSING_EMULATOR"
@@ -311,7 +313,7 @@ export function GamePage({
                 <Users size={16} /> Jogar online
               </button>
             )}
-          {!entry && !isRemote && (
+          {!entry && !isRemote && !platform?.catalogOnly && (
             <button className="button outline" onClick={() => onImport(game)}>
               <FolderOpen size={16} /> Adicionar arquivo
             </button>
