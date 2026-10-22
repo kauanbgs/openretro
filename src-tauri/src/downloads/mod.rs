@@ -357,6 +357,32 @@ fn playable_extension(path: &Path) -> bool {
 }
 /// SHA-256 and size of each extracted file, by its canonical path.
 type ExtractedHashes = HashMap<PathBuf, (u64, String)>;
+#[derive(Debug)]
+enum ExtractError {
+    /// The archive's own data is damaged: downloading it again is the fix.
+    Corrupt(String),
+    Other(String),
+}
+impl From<String> for ExtractError {
+    fn from(message: String) -> Self {
+        Self::Other(message)
+    }
+}
+impl From<&str> for ExtractError {
+    fn from(message: &str) -> Self {
+        Self::Other(message.into())
+    }
+}
+/// The ZIP checks each file's CRC as it ends, so damaged data surfaces
+/// here as invalid data or an early end.
+fn read_error(e: std::io::Error) -> ExtractError {
+    match e.kind() {
+        std::io::ErrorKind::InvalidData | std::io::ErrorKind::UnexpectedEof => {
+            ExtractError::Corrupt(e.to_string())
+        }
+        _ => ExtractError::Other(e.to_string()),
+    }
+}
 /// Extracts the playable files and hashes them while writing, so the import
 /// does not read multi-gigabyte games a second time. Each file is written
 /// under a `.partial` name and renamed only once complete, so an extraction
@@ -365,7 +391,7 @@ fn extract_playable_zip(
     archive_path: &Path,
     directory: &Path,
     mut progress: impl FnMut(u64, u64),
-) -> Result<ExtractedHashes> {
+) -> std::result::Result<ExtractedHashes, ExtractError> {
     let mut hashes = ExtractedHashes::new();
     if archive_path
         .extension()
@@ -375,7 +401,7 @@ fn extract_playable_zip(
         return Ok(hashes);
     }
     let mut archive = zip::ZipArchive::new(File::open(archive_path).map_err(error)?)
-        .map_err(|_| "Downloaded ZIP is invalid.".to_string())?;
+        .map_err(|_| ExtractError::Corrupt("Downloaded ZIP is invalid.".into()))?;
     if archive.len() > 10_000 {
         return Err("Downloaded ZIP has too many entries.".into());
     }
@@ -399,7 +425,9 @@ fn extract_playable_zip(
     let mut done = 0u64;
     let mut buffer = vec![0u8; 1024 * 1024];
     for index in 0..archive.len() {
-        let mut entry = archive.by_index(index).map_err(error)?;
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|e| ExtractError::Corrupt(e.to_string()))?;
         let enclosed = entry
             .enclosed_name()
             .ok_or("Downloaded ZIP contains an unsafe path.")?;
@@ -418,7 +446,14 @@ fn extract_playable_zip(
         let mut hasher = Sha256::new();
         let mut size = 0u64;
         loop {
-            let read = entry.read(&mut buffer).map_err(error)?;
+            let read = match entry.read(&mut buffer) {
+                Ok(read) => read,
+                Err(e) => {
+                    drop(output);
+                    let _ = std::fs::remove_file(&partial);
+                    return Err(read_error(e));
+                }
+            };
             if read == 0 {
                 break;
             }
@@ -427,7 +462,9 @@ fn extract_playable_zip(
             size += read as u64;
             done += read as u64;
             if done > total {
-                return Err("Downloaded ZIP is larger than it declares.".into());
+                return Err(ExtractError::Corrupt(
+                    "Downloaded ZIP is larger than it declares.".into(),
+                ));
             }
             progress(done, total);
         }
@@ -435,10 +472,10 @@ fn extract_playable_zip(
         drop(output);
         if size != entry.size() {
             let _ = std::fs::remove_file(&partial);
-            return Err(format!(
+            return Err(ExtractError::Corrupt(format!(
                 "A extração parou em {size} de {} bytes.",
                 entry.size()
-            ));
+            )));
         }
         std::fs::rename(&partial, &destination).map_err(error)?;
         let path = destination.canonicalize().map_err(error)?;
@@ -519,8 +556,10 @@ pub fn finish_interrupted(app: &tauri::AppHandle) {
         });
     }
 }
-/// Extracts and adds a finished download, showing each step on the job and
-/// always ending in COMPLETED: a failed import keeps the downloaded files.
+/// Extracts and adds a finished download, showing each step on the job. It
+/// ends in COMPLETED, where a failed import keeps the downloaded files, or in
+/// FAILED for a damaged archive, which is deleted so retrying downloads it
+/// again.
 fn finish_download(app: &tauri::AppHandle, job: &mut DownloadJob, archive: Option<&Path>) {
     let mut reporter = StageReporter {
         app,
@@ -542,13 +581,33 @@ fn finish_download(app: &tauri::AppHandle, job: &mut DownloadJob, archive: Optio
         }
     }
     match extracted {
-        Err(message) => {
+        Err(ExtractError::Corrupt(message)) => {
+            log::warn!("Downloaded archive is damaged: {message}");
+            if let Some(archive) = archive {
+                let _ = std::fs::remove_file(archive);
+            }
+            job.state = "FAILED".into();
+            job.stage = None;
+            job.progress = 0.0;
+            job.downloaded_bytes = 0;
+            job.error = Some(
+                "O arquivo baixado veio corrompido e foi apagado. Tente de novo para baixá-lo outra vez."
+                    .into(),
+            );
+            let _ = save_job(app, job);
+            return;
+        }
+        Err(ExtractError::Other(message)) => {
             job.library_status = Some("manual".into());
             job.library_message = Some(format!(
                 "Não foi possível extrair o arquivo: {message} O download foi mantido."
             ));
         }
         Ok(hashes) => {
+            if let Some(archive) = archive.filter(|_| !hashes.is_empty() && delete_archives(app)) {
+                // The game is out of it; the archive only takes space now.
+                let _ = std::fs::remove_file(archive);
+            }
             if let Some((status, message)) =
                 auto_add_completed_game(app, job, &mut reporter, &hashes)
             {
@@ -563,6 +622,11 @@ fn finish_download(app: &tauri::AppHandle, job: &mut DownloadJob, archive: Optio
     job.bytes_per_second = 0.0;
     job.remaining_seconds = None;
     let _ = save_job(app, job);
+}
+fn delete_archives(app: &tauri::AppHandle) -> bool {
+    crate::commands::get_settings(app.state::<Database>())
+        .map(|settings| settings["deleteArchives"] != false)
+        .unwrap_or(true)
 }
 #[derive(Default)]
 struct RateMeter {
@@ -1083,6 +1147,30 @@ mod tests {
         assert!(!root.join("extracted/readme.txt").exists());
         assert!(reports.len() > 1);
         assert_eq!(*reports.last().unwrap(), (game.len() as u64, game.len() as u64));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn damaged_archives_leave_no_game_behind() {
+        let root = std::env::temp_dir().join(format!("openretro-damaged-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let archive = root.join("game.zip");
+        let game: Vec<u8> = (0..500_000u32).map(|i| (i * 7 % 251) as u8).collect();
+        {
+            let mut zip = zip::ZipWriter::new(File::create(&archive).unwrap());
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("Game (USA).sfc", options).unwrap();
+            zip.write_all(&game).unwrap();
+            zip.finish().unwrap();
+        }
+        // Flip one byte of the stored data: only the CRC can notice.
+        let mut bytes = std::fs::read(&archive).unwrap();
+        bytes[1000] ^= 0xff;
+        std::fs::write(&archive, bytes).unwrap();
+        let result = extract_playable_zip(&archive, &root, |_, _| {});
+        assert!(matches!(result, Err(ExtractError::Corrupt(_))), "{result:?}");
+        let extracted: Vec<_> = std::fs::read_dir(root.join("extracted")).unwrap().collect();
+        assert!(extracted.is_empty());
         std::fs::remove_dir_all(root).unwrap();
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
