@@ -169,7 +169,9 @@ fn pair_then(shared: &Shared, pairing: &Pairing, to: &str) -> Option<Response> {
     if !token_matches(&shared.token, given) {
         return Some(forbidden());
     }
-    let cookie = format!("{COOKIE}={given}; Path=/; HttpOnly; SameSite=Strict");
+    // QR scanners can open this as a cross-site navigation. Lax lets the
+    // cookie accompany the top-level GET redirect on a phone's first visit.
+    let cookie = format!("{COOKIE}={given}; Path=/; HttpOnly; SameSite=Lax");
     Some(([(header::SET_COOKIE, cookie)], Redirect::to(to)).into_response())
 }
 
