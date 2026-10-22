@@ -17,6 +17,19 @@ if (-not $destination.StartsWith($runtimeRoot + [System.IO.Path]::DirectorySepar
   throw "Runtime destination is outside the expected workspace directory."
 }
 
+# Get-FileHash disappears when Windows PowerShell inherits PowerShell 7's
+# module path, as on GitHub's Windows runners; .NET hashing has no such dependency.
+function Get-Sha256([string]$Path) {
+  $stream = [System.IO.File]::OpenRead($Path)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([System.BitConverter]::ToString($sha.ComputeHash($stream)) -replace "-", "").ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+    $stream.Dispose()
+  }
+}
+
 function Test-OpenRetroRuntime([string]$Path, [switch]$RequireCustom) {
   $executable = Join-Path $Path "retroarch.exe"
   $manifestPath = Join-Path $Path "runtime-manifest.json"
@@ -26,7 +39,7 @@ function Test-OpenRetroRuntime([string]$Path, [switch]$RequireCustom) {
   $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
   if ($RequireCustom -and $manifest.kind -ne "openretro-minimal") { return $false }
   if ($manifest.retroarchSha256) {
-    $actual = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
+    $actual = Get-Sha256 $executable
     if ($actual -ne [string]$manifest.retroarchSha256) {
       throw "OpenRetro Runtime integrity check failed. Rebuild the runtime."
     }
@@ -88,7 +101,7 @@ foreach ($extra in @("assets", "cores", "database", "thumbnails", "overlays", "s
   }
   if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
 }
-$hash = (Get-FileHash -LiteralPath (Join-Path $destination "retroarch.exe") -Algorithm SHA256).Hash.ToLowerInvariant()
+$hash = Get-Sha256 (Join-Path $destination "retroarch.exe")
 @{
   kind = "official-fallback"
   retroarchVersion = $version
