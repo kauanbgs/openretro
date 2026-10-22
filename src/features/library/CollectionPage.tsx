@@ -11,6 +11,8 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { GameCard } from "../../components/GameCard";
+import { Capsule } from "../../components/Capsule";
+import { isRemote } from "../../services/transport";
 import { platforms } from "../../db/platforms";
 import type { GameMetadata, LibraryGame } from "../../types";
 interface Props {
@@ -147,6 +149,20 @@ export function CollectionPage({
       </div>
       {isPending ? (
         <PageLoading embedded label="Abrindo sua coleção…" />
+      ) : visible.length && isRemote ? (
+        <div className="cover-grid">
+          {visible.map((x) => (
+            <Capsule
+              key={x.item.id}
+              game={x.game}
+              cover
+              detail={
+                platforms.find((p) => p.id === x.game.platformId)?.shortName
+              }
+              onClick={() => onSelect(x.game)}
+            />
+          ))}
+        </div>
       ) : visible.length ? (
         <div
           className={

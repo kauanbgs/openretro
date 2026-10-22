@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "../services/transport";
 import { isDesktop } from "../services/bridge";
 
 export function screenshotThumbnail(url: string) {

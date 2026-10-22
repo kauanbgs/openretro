@@ -14,6 +14,7 @@ mod audio;
 mod capture;
 #[cfg(windows)]
 mod frames;
+mod api;
 mod input;
 mod server;
 

@@ -19,7 +19,7 @@ import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
 import { bridge, isDesktop } from "../../services/bridge";
 import { MANAGED_RUNTIME_ID } from "../../services/GameResolver";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "../../services/transport";
 import type { Emulator, EmulatorInstall } from "../../types";
 
 /** Windows extended-length paths are an implementation detail; hide the prefix. */

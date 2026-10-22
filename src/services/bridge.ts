@@ -1,4 +1,4 @@
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc, hasBackend, isRemote } from "./transport";
 import { open } from "@tauri-apps/plugin-dialog";
 import { detectPlatforms } from "../db/platforms";
 import type {
@@ -38,13 +38,16 @@ export function registerFilePicker(
   };
 }
 function pickPath(request: FilePickerRequest): Promise<string | null> {
+  if (isRemote)
+    return Promise.reject("Escolher arquivos só é possível no computador.");
   return consoleFilePicker
     ? consoleFilePicker(request)
     : open({ ...request, multiple: false });
 }
 
-export const isDesktop =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** A backend answers: the desktop app, or a phone paired with it. */
+export const isDesktop = hasBackend;
+export { isRemote };
 const key = "openretro-preview-v1";
 export interface PlayerProfiles {
   activeId: string;

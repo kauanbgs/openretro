@@ -1312,3 +1312,603 @@ input[type="radio"] {
   color: var(--muted);
   font-weight: 600;
 }
+
+/* ---------- Phone (paired over the local network) ---------- */
+html.remote {
+  --header-height: 56px;
+  --tabs-height: calc(60px + env(safe-area-inset-bottom));
+  --page-gutter: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+html.remote,
+html.remote * {
+  /* Scrolling stays; double-tap zoom goes. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+html.remote .app main {
+  margin-left: 0;
+  padding-bottom: var(--tabs-height);
+}
+html.remote .bottom-panel,
+html.remote .sidebar-profile,
+html.remote .sidebar-library {
+  display: none;
+}
+html.remote .app .sidebar {
+  inset: auto 0 0 0;
+  width: auto;
+  height: var(--tabs-height);
+  flex-direction: row;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-right: 0;
+  border-top: 1px solid var(--border);
+}
+html.remote .sidebar-nav {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  padding: 0;
+}
+html.remote .sidebar-nav button {
+  position: relative;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 60px;
+  padding: 0;
+  border-radius: 0;
+  font-size: 11px;
+}
+html.remote .sidebar-nav button.active {
+  background: transparent;
+  color: var(--text);
+}
+html.remote .sidebar-nav button.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 30%;
+  right: 30%;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--text);
+}
+html.remote .sidebar-nav small {
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 6px);
+  min-width: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+html.remote .header {
+  gap: 8px;
+  padding: env(safe-area-inset-top) var(--page-gutter) 0;
+  height: calc(var(--header-height) + env(safe-area-inset-top));
+}
+html.remote .header h1 {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+}
+html.remote .header-actions {
+  margin-left: 0;
+}
+html.remote .header-search,
+html.remote .header-search:focus-within {
+  width: 132px;
+  height: 36px;
+}
+html.remote .header-search:focus-within {
+  width: 180px;
+}
+html.remote .header-actions .button.primary {
+  height: 36px;
+  padding: 0 10px;
+  text-decoration: none;
+}
+html.remote .header-player {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+html.remote .app .page-content {
+  padding: var(--page-gutter);
+}
+html.remote .page-heading {
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* Home */
+html.remote .home {
+  gap: 16px;
+}
+html.remote .hero {
+  height: 210px;
+}
+html.remote .hero-content {
+  padding: 16px;
+}
+html.remote .hero-content h2 {
+  font-size: 22px;
+}
+html.remote .home-categories,
+html.remote .home-categories > div {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+html.remote .home-categories .button {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 12px;
+}
+html.remote .cards-grid,
+html.remote .app .games-grid,
+html.remote .similar-row {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+html.remote .app .game-card {
+  height: 128px;
+}
+html.remote .app .game-card:hover {
+  transform: none;
+}
+html.remote .game-card-content {
+  padding: 22px 8px 8px;
+}
+html.remote .game-card-title p {
+  font-size: 13px;
+}
+html.remote .game-card-specifics {
+  gap: 8px;
+  font-size: 11px;
+}
+
+/* Catalogue: filters become scrolling rows of chips above the list. */
+html.remote .catalogue-layout {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+html.remote .catalogue-filters {
+  position: static;
+  order: -1;
+  max-height: none;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+html.remote .catalogue-filters h3 {
+  display: none;
+}
+html.remote .catalogue-filters select {
+  min-height: 36px;
+}
+html.remote .filter-list {
+  display: flex;
+  gap: 6px;
+  max-height: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+html.remote .filter-list li {
+  flex-shrink: 0;
+}
+html.remote .filter-list label {
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  white-space: nowrap;
+}
+html.remote .filter-list label:has(input:checked) {
+  border-color: transparent;
+  background: var(--muted);
+  color: var(--accentText);
+}
+html.remote .filter-list input {
+  display: none;
+}
+html.remote .catalogue-list button {
+  height: 76px;
+  gap: 12px;
+  padding-right: 10px;
+}
+html.remote .catalogue-list .artwork {
+  flex-basis: 112px;
+  max-width: 112px;
+}
+html.remote .catalogue-list strong {
+  font-size: 14px;
+}
+html.remote .catalogue-list em {
+  padding: 3px 6px;
+  font-size: 0;
+  gap: 0;
+}
+
+/* Game page */
+html.remote .game-hero {
+  height: 210px;
+}
+html.remote .game-hero-content {
+  padding: 16px;
+}
+html.remote .game-hero-content h2 {
+  font-size: 24px;
+}
+html.remote .hero-panel {
+  top: calc(var(--header-height) + env(safe-area-inset-top));
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px var(--page-gutter);
+}
+html.remote .hero-panel-actions {
+  flex-wrap: wrap;
+}
+html.remote .hero-panel-actions .button.primary {
+  flex: 1;
+  height: 44px;
+  font-size: 15px;
+}
+html.remote .app .detail-body {
+  padding: var(--page-gutter);
+}
+html.remote .app .detail-layout {
+  grid-template-columns: 1fr;
+}
+html.remote .app .tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+html.remote .app .tabs button {
+  flex-shrink: 0;
+}
+
+/* Library and downloads */
+html.remote .app .library-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+html.remote .app .filter-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+html.remote .app .filter-tabs button {
+  flex-shrink: 0;
+}
+html.remote .transfer-overview {
+  gap: 8px;
+}
+html.remote .transfer-overview > div {
+  padding: 10px;
+}
+html.remote .transfer-overview strong {
+  font-size: 18px;
+}
+html.remote .download-job {
+  min-height: 0;
+}
+html.remote .app .download-job > .artwork {
+  flex-basis: 96px;
+  max-width: 96px;
+  min-height: 0;
+}
+html.remote .download-job-body {
+  padding: 10px;
+}
+html.remote .transfer-actions {
+  flex-wrap: wrap;
+}
+
+/* Dialogs fill the phone. */
+html.remote .modal {
+  width: calc(100vw - 20px);
+  max-height: calc(100vh - 40px);
+}
+html.remote .toast {
+  right: 10px;
+  left: 10px;
+  bottom: calc(var(--tabs-height) + 10px);
+}
+html.remote .sidebar-nav span {
+  display: block;
+}
+html.remote .game-card-specifics {
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* Only the icon for "in library" or "download available". */
+html.remote .game-card-specifics span + span {
+  font-size: 0;
+}
+html.remote .home-categories > .button {
+  flex-shrink: 0;
+  width: 36px;
+  padding: 0;
+  font-size: 0;
+  gap: 0;
+}
+html.remote body {
+  overflow-x: hidden;
+}
+html.remote .app .library-toolbar > *,
+html.remote .app .filter-tabs {
+  min-width: 0;
+  max-width: 100%;
+}
+html.remote .app .toolbar-right {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+html.remote .app .toolbar-right select {
+  flex: 1;
+  min-width: 0;
+}
+/* Adding files and switching layouts are PC tasks. */
+html.remote .page-heading-actions,
+html.remote .app .view-toggle {
+  display: none;
+}
+
+/* ---------- Phone structure, after Steam's mobile app ---------- */
+html.remote .header-brand {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+html.remote .header-brand .brand-mark {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+html.remote .header-search.collapsed {
+  display: none;
+}
+html.remote .header:has(.header-search:not(.collapsed)) .header-actions {
+  flex: 1;
+}
+html.remote .header-search:not(.collapsed),
+html.remote .header-search:not(.collapsed):focus-within {
+  flex: 1;
+  width: auto;
+}
+html.remote .header:has(.header-search:not(.collapsed)) .header-player,
+html.remote .header:has(.header-search:not(.collapsed)) .header-actions > a {
+  display: none;
+}
+html.remote .header-search-open {
+  width: 38px;
+  height: 38px;
+  color: var(--muted);
+}
+
+/* Home: a swipeable featured carousel, then horizontal shelves. */
+html.remote .app .page-content:has(> .mobile-home),
+html.remote .mobile-home {
+  padding: 0;
+}
+html.remote .mobile-home {
+  display: grid;
+  gap: 26px;
+  padding: 14px 0 24px;
+}
+.featured-track {
+  display: flex;
+  gap: 10px;
+  padding: 0 var(--page-gutter);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--page-gutter);
+  scrollbar-width: none;
+}
+.featured-track::-webkit-scrollbar,
+.shelf-track::-webkit-scrollbar {
+  display: none;
+}
+.featured-card {
+  position: relative;
+  flex: 0 0 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--panel);
+  scroll-snap-align: start;
+  text-align: left;
+}
+.featured-card > .artwork {
+  position: absolute;
+  inset: 0;
+}
+.featured-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.featured-caption {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  gap: 2px;
+  padding: 40px 16px 14px;
+  background: linear-gradient(0deg, #000000d9 0%, #00000080 55%, #0000 100%);
+}
+.featured-caption small {
+  color: #c0c1c7;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.featured-caption strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.featured-caption span {
+  color: #c0c1c7;
+  font-size: 12px;
+}
+.featured-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.featured-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-strong);
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+.featured-dots i.on {
+  width: 18px;
+  background: var(--muted);
+}
+.shelf header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 var(--page-gutter);
+  margin-bottom: 10px;
+}
+.shelf h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+.shelf header button {
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+.shelf-track {
+  display: flex;
+  gap: 10px;
+  padding: 0 var(--page-gutter);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 var(--page-gutter);
+  scrollbar-width: none;
+}
+
+/* Capsules: the art, then the title and a detail line below it. */
+.capsule {
+  display: grid;
+  flex: 0 0 62%;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  scroll-snap-align: start;
+  text-align: left;
+}
+.capsule > .artwork {
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.capsule img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.capsule strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.capsule small {
+  color: var(--body);
+  font-size: 12px;
+}
+.capsule .missing-artwork span,
+.capsule .missing-artwork small {
+  display: none;
+}
+.capsule-cover > .artwork {
+  aspect-ratio: 3 / 4;
+}
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 10px;
+}
+.cover-grid .capsule strong {
+  font-size: 12px;
+}
+.cover-grid .capsule small {
+  font-size: 11px;
+}
+
+/* Game page: the art on top, the title and tags below it, then a big button. */
+html.remote .app .game-page {
+  padding-bottom: 8px;
+}
+html.remote .game-hero {
+  height: auto;
+  overflow: visible;
+  background: none;
+}
+html.remote .game-hero > .artwork {
+  position: relative;
+  inset: auto;
+  aspect-ratio: 16 / 9;
+}
+html.remote .game-hero-content {
+  position: static;
+  padding: 14px var(--page-gutter) 4px;
+  background: none;
+}
+html.remote .game-hero-content h2 {
+  color: var(--text);
+  font-size: 24px;
+}
+html.remote .game-hero-content > p {
+  color: var(--body);
+}
+html.remote .app .detail-badge {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--muted);
+}
+html.remote .hero-panel {
+  position: static;
+  border-bottom: 0;
+  background: none;
+}
+html.remote .hero-panel-content {
+  order: 2;
+}
+html.remote .hero-panel-actions .button.primary {
+  height: 50px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+html.remote .mobile-home {
+  grid-template-columns: minmax(0, 1fr);
+}
+.mobile-home > * {
+  min-width: 0;
+}

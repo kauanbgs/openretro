@@ -35,7 +35,7 @@ librqbit = { version = "=8.1.1", default-features = false, features = ["rust-tls
 tokio = { version = "1", features = ["sync", "time", "macros"] }
 tokio-util = "0.7"
 zip = { version = "2", default-features = false, features = ["deflate"] }
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws", "query"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws", "query", "json"] }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 
 [target.'cfg(windows)'.dependencies]

@@ -10,6 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Home,
+  Library,
+  Play,
   Compass,
   Download,
   Cpu,
@@ -29,10 +31,12 @@ import {
 import { Modal } from "./components/Modal";
 import { PlayerAvatar } from "./components/PlayerAvatar";
 import { PlayerPicker } from "./components/PlayerPicker";
+import { BrandMark } from "./components/Brand";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
-import { bridge, isDesktop } from "./services/bridge";
-import { listen } from "@tauri-apps/api/event";
+import { bridge, isDesktop, isRemote } from "./services/bridge";
+import { invoke, isTauri } from "./services/transport";
+import { listen } from "./services/transport";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import {
@@ -45,6 +49,11 @@ import {
 const HomePage = lazy(() =>
   import("./features/home/HomePage").then((module) => ({
     default: module.HomePage,
+  })),
+);
+const MobileHome = lazy(() =>
+  import("./features/home/MobileHome").then((module) => ({
+    default: module.MobileHome,
   })),
 );
 const DiscoverPage = lazy(() =>
@@ -97,13 +106,21 @@ const pageLabels: Record<Page, string> = {
   Emulators: "Emuladores",
   Settings: "Configurações",
 };
-const navItems = [
-  { page: "Home" as Page, icon: Home },
-  { page: "Discover" as Page, icon: Compass },
-  { page: "Downloads" as Page, icon: Download },
-  { page: "Emulators" as Page, icon: Cpu },
-  { page: "Settings" as Page, icon: Settings },
-];
+// A phone browses, downloads and plays; emulators and settings stay on the PC.
+const navItems = isRemote
+  ? [
+      { page: "Home" as Page, icon: Home },
+      { page: "Discover" as Page, icon: Compass },
+      { page: "Library" as Page, icon: Library },
+      { page: "Downloads" as Page, icon: Download },
+    ]
+  : [
+      { page: "Home" as Page, icon: Home },
+      { page: "Discover" as Page, icon: Compass },
+      { page: "Downloads" as Page, icon: Download },
+      { page: "Emulators" as Page, icon: Cpu },
+      { page: "Settings" as Page, icon: Settings },
+    ];
 export function App() {
   const [page, setPage] = useState<Page>("Home");
   const [selected, setSelected] = useState<GameMetadata>();
@@ -130,6 +147,7 @@ export function App() {
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState("");
   const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
   useEffect(() => {
@@ -177,6 +195,17 @@ export function App() {
     };
   }, [refresh]);
   useEffect(() => {
+    if (!isRemote) return;
+    void invoke<{ id: string } | null>("in_game_status")
+      .then((session) => {
+        if (session)
+          setPlaying(
+            libraryRef.current.find((entry) => entry.item.id === session.id),
+          );
+      })
+      .catch(() => undefined);
+  }, [library.length]);
+  useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(""), 6500);
     return () => clearTimeout(t);
@@ -186,7 +215,7 @@ export function App() {
     document.documentElement.dataset.animations = String(settings.animations);
   }, [settings]);
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!isTauri) return;
     let alive = true;
     const timer = window.setTimeout(() => {
       void check()
@@ -211,12 +240,17 @@ export function App() {
     return () => window.removeEventListener("keydown", fn);
   }, []);
   const navigate = (p: Page) => {
+    setSearchOpen(false);
     setPage(p);
     setSelected(undefined);
     setQuery("");
     setPlatform("all");
   };
   const openImport = (g?: GameMetadata) => {
+    if (isRemote)
+      return notify(
+        "Adicione arquivos pelo computador, ou baixe pelo catálogo daqui.",
+      );
     setImportCandidate(undefined);
     setImportGame(g);
     setImporting(true);
@@ -373,7 +407,15 @@ export function App() {
               <ArrowLeft size={18} />
             </button>
           )}
-          <h1>{selected ? selected.title : pageLabels[page]}</h1>
+          {isRemote && searchOpen ? null : isRemote &&
+            !selected &&
+            page === "Home" ? (
+            <span className="header-brand">
+              <BrandMark /> OpenRetro
+            </span>
+          ) : (
+            <h1>{selected ? selected.title : pageLabels[page]}</h1>
+          )}
           <div className="header-actions">
             {updateVersion && (
               <button
@@ -387,22 +429,53 @@ export function App() {
                   : `Atualizar para ${updateVersion}`}
               </button>
             )}
-            <button
-              className="button secondary"
-              onClick={() => setPhoneOpen(true)}
+            {isRemote ? (
+              <>
+                {playing && (
+                  <a className="button primary" href="/play">
+                    <Play size={15} fill="currentColor" /> Voltar ao jogo
+                  </a>
+                )}
+                <button
+                  className="header-player"
+                  aria-label="Trocar jogador"
+                  onClick={() => setPlayersOpen(true)}
+                >
+                  <PlayerAvatar player={activePlayer} size={32} />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="button secondary"
+                  onClick={() => setPhoneOpen(true)}
+                >
+                  <Smartphone size={16} /> Celular
+                </button>
+                <button
+                  className="button secondary"
+                  onClick={() => setBigPicture(true)}
+                >
+                  <Gamepad2 size={16} /> Big Picture
+                </button>
+              </>
+            )}
+            {isRemote && !searchOpen && (
+              <button
+                className="icon-button header-search-open"
+                aria-label="Buscar"
+                onClick={() => setSearchOpen(true)}
+              >
+                <Search size={20} />
+              </button>
+            )}
+            <label
+              className={`header-search ${isRemote && !searchOpen ? "collapsed" : ""}`}
             >
-              <Smartphone size={16} /> Celular
-            </button>
-            <button
-              className="button secondary"
-              onClick={() => setBigPicture(true)}
-            >
-              <Gamepad2 size={16} /> Big Picture
-            </button>
-            <label className="header-search">
               <Search size={16} />
               <input
                 id="global-search"
+                autoFocus={isRemote && searchOpen}
                 aria-label="Buscar jogos"
                 placeholder={
                   page === "Library" ? "Buscar na biblioteca" : "Buscar jogos"
@@ -424,6 +497,17 @@ export function App() {
                 </button>
               )}
             </label>
+            {isRemote && searchOpen && (
+              <button
+                className="text-button"
+                onClick={() => {
+                  setSearchOpen(false);
+                  setQuery("");
+                }}
+              >
+                Cancelar
+              </button>
+            )}
           </div>
         </header>
         {error && (
@@ -450,6 +534,13 @@ export function App() {
               }}
               refresh={refresh}
               notify={notify}
+            />
+          ) : page === "Home" && isRemote ? (
+            <MobileHome
+              library={library}
+              onSelect={setSelected}
+              onLibrary={() => navigate("Library")}
+              onDiscover={() => navigate("Discover")}
             />
           ) : page === "Home" ? (
             <HomePage

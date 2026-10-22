@@ -5,6 +5,9 @@ const App = lazy(() => import("./App").then(({ App }) => ({ default: App })));
 import "./fonts.css";
 import "./styles.css";
 import "./hydra.css";
+import { isRemote } from "./services/transport";
+// A paired phone gets the touch layout in hydra.css.
+document.documentElement.classList.toggle("remote", isRemote);
 const InGameOverlay = lazy(() =>
   import("./features/in-game/InGameOverlay").then(({ InGameOverlay }) => ({
     default: InGameOverlay,

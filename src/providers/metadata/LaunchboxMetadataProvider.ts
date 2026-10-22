@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { backendAvailable, invoke } from "../../services/transport";
 import { platforms } from "../../db/platforms";
 import type { GameMetadata } from "../../types";
 import type {
@@ -15,8 +15,7 @@ export interface CatalogStatus {
   games: number;
   message?: string | null;
 }
-const desktop = () =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const desktop = backendAvailable;
 export async function catalogStatus(): Promise<CatalogStatus> {
   if (!desktop())
     return { configured: false, state: "unavailable", progress: 0, games: 0 };

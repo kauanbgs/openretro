@@ -37,7 +37,7 @@ import {
 import { Modal } from "../../components/Modal";
 import { platformById } from "../../db/platforms";
 import { GameResolver, MANAGED_RUNTIME_ID } from "../../services/GameResolver";
-import { bridge, isDesktop } from "../../services/bridge";
+import { bridge, isDesktop, isRemote } from "../../services/bridge";
 import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
@@ -194,6 +194,8 @@ export function GamePage({
         return;
       }
       const seconds = await bridge.launch(entry.item.id, slot, session);
+      // On a phone the game runs on the PC; switch to its game screen.
+      if (isRemote) return void window.location.assign("/play");
       notify(
         `Session saved · ${Math.max(1, Math.round(seconds / 60))} min played`,
       );
@@ -254,12 +256,16 @@ export function GamePage({
               </p>
             </>
           ) : (
-            <p>Escolha uma versão nas suas fontes ou adicione um arquivo.</p>
+            <p>
+              {isRemote
+                ? "Escolha uma versão nas suas fontes para baixar no computador."
+                : "Escolha uma versão nas suas fontes ou adicione um arquivo."}
+            </p>
           )}
         </div>
         <div className="hero-panel-actions">
           <button
-            className="button primary"
+            className={`button primary ${entry ? "play-button" : ""}`}
             disabled={running || busy}
             onClick={() =>
               entry
@@ -287,6 +293,7 @@ export function GamePage({
                 : "Opções de download"}
           </button>
           {entry &&
+            !isRemote &&
             resolution?.state === "READY" &&
             resolution.emulator?.id === MANAGED_RUNTIME_ID &&
             NETPLAY_PLATFORMS.includes(game.platformId) && (
@@ -298,7 +305,7 @@ export function GamePage({
                 <Users size={16} /> Jogar online
               </button>
             )}
-          {!entry && (
+          {!entry && !isRemote && (
             <button className="button outline" onClick={() => onImport(game)}>
               <FolderOpen size={16} /> Adicionar arquivo
             </button>
@@ -338,14 +345,16 @@ export function GamePage({
                   fill={entry.item.favorite ? "currentColor" : "none"}
                 />
               </button>
-              <button
-                className="button outline"
-                aria-label="Configurar"
-                title="Configurar"
-                onClick={() => setConfig(true)}
-              >
-                <Settings2 size={16} />
-              </button>
+              {!isRemote && (
+                <button
+                  className="button outline"
+                  aria-label="Configurar"
+                  title="Configurar"
+                  onClick={() => setConfig(true)}
+                >
+                  <Settings2 size={16} />
+                </button>
+              )}
             </>
           )}
         </div>
@@ -396,7 +405,7 @@ export function GamePage({
         )}
         <div className="detail-layout">
           <div className="detail-main">
-            {entry && (
+            {entry && !isRemote && (
               <InGameMenuHelp
                 entry={entry}
                 emulators={emulators}
@@ -524,7 +533,7 @@ export function GamePage({
                   <br />
                   {entry?.item.sourcePath ?? "No local file associated"}
                 </p>
-                {entry && (
+                {entry && !isRemote && (
                   <>
                     <p>
                       <strong>SHA-256</strong>

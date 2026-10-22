@@ -11,15 +11,19 @@
     --muted: #c0c1c7; --body: #8e919b; --pad: #ffffff1f; --pad-on: #ffffff59;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; background: #000; color: var(--muted); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--muted); overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
   button { font: inherit; color: inherit; background: none; border: 0; }
-  #screen { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); background: linear-gradient(#000c, #0000); z-index: 5; }
+  /* The landscape stage. Held upright, the phone shows it turned sideways,
+     like any mobile game; --w and --h are its landscape size in pixels. */
+  #app { position: fixed; top: 0; left: 0; width: var(--w, 100vw); height: var(--h, 100vh); overflow: hidden; transform-origin: 0 0; }
+  #app.turned { transform: translateX(var(--h)) rotate(90deg); }
+  #screen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  #bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 8px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); background: linear-gradient(#000b, #0000); z-index: 5; }
   #title { flex: 1; overflow: hidden; color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
   .chip { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: #0008; font-size: 13px; font-weight: 600; }
   .chip.on { background: var(--muted); color: #1c1c1c; border-color: transparent; }
-  #menu { position: fixed; top: 52px; right: 12px; z-index: 6; display: none; min-width: 190px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  #menu { position: absolute; top: 52px; right: 12px; max-height: calc(var(--h, 100vh) - 64px); overflow-y: auto; z-index: 6; display: none; min-width: 190px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
   #menu.open { display: grid; }
   #menu button { padding: 10px 12px; border-radius: 6px; text-align: left; font-size: 14px; }
   #menu button:active { background: #ffffff14; }
@@ -27,30 +31,33 @@
   #menu .players button { flex: 1; padding: 8px 0; border: 1px solid var(--border); text-align: center; }
   #menu .players button.on { background: var(--muted); color: #1c1c1c; }
   #menu small { padding: 8px 12px 0; color: var(--body); font-size: 11px; }
-  /* Touch controls */
-  #controls { position: fixed; inset: 0; z-index: 4; }
+  /* Touch controls float over the game where thumbs rest: the d-pad on the
+     left, the face buttons on the right, both centred a little below the
+     middle. Sizes follow the stage height so every phone gets the same feel. */
+  #controls { position: absolute; inset: 0; z-index: 4; --u: calc(var(--h, 100vh) / 100); --side: max(calc(var(--u) * 6), env(safe-area-inset-left)); }
   #controls.hidden { display: none; }
-  .btn, #dpad { position: absolute; display: grid; place-items: center; border: 1px solid var(--border); background: var(--pad); color: #fffc; font-weight: 700; touch-action: none; }
-  .btn.on { background: var(--pad-on); }
-  #dpad { left: max(24px, env(safe-area-inset-left)); bottom: 28px; width: 150px; height: 150px; border-radius: 50%; }
-  #dpad i { position: absolute; width: 0; height: 0; border: 10px solid transparent; opacity: .7; }
-  #dpad .u { top: 14px; border-bottom-color: #fff; } #dpad .d { bottom: 14px; border-top-color: #fff; }
-  #dpad .l { left: 14px; border-right-color: #fff; } #dpad .r { right: 14px; border-left-color: #fff; }
-  #dpad.u .u, #dpad.d .d, #dpad.l .l, #dpad.r .r { opacity: 1; border-width: 12px; }
-  .face { width: 58px; height: 58px; border-radius: 50%; font-size: 18px; }
-  #a { right: max(24px, env(safe-area-inset-right)); bottom: 74px; }
-  #b { right: calc(max(24px, env(safe-area-inset-right)) + 62px); bottom: 20px; }
-  #x { right: calc(max(24px, env(safe-area-inset-right)) + 62px); bottom: 128px; }
-  #y { right: calc(max(24px, env(safe-area-inset-right)) + 124px); bottom: 74px; }
-  .shoulder { top: 58px; width: 84px; height: 40px; border-radius: 10px; font-size: 14px; }
-  .shoulder.small { top: 104px; width: 60px; height: 32px; font-size: 12px; }
-  #l { left: max(24px, env(safe-area-inset-left)); } #l2 { left: max(24px, env(safe-area-inset-left)); }
-  #r { right: max(24px, env(safe-area-inset-right)); } #r2 { right: max(24px, env(safe-area-inset-right)); }
-  .meta { bottom: 16px; width: 76px; height: 28px; border-radius: 14px; background: #000000a6; font-size: 11px; }
-  .meta.on { background: #000000d9; border-color: #ffffff80; }
-  #select { left: calc(50% - 84px); } #start { left: calc(50% + 8px); }
+  .btn, #dpad { position: absolute; display: grid; place-items: center; border: 2px solid #ffffff38; background: #ffffff1c; color: #ffffffd9; font-weight: 700; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+  .btn.on { background: #ffffff59; border-color: #ffffff8c; }
+  #dpad { left: var(--side); top: calc(var(--u) * 58); width: calc(var(--u) * 46); height: calc(var(--u) * 46); border-radius: 50%; transform: translateY(-50%); }
+  #dpad i { position: absolute; width: 0; height: 0; border: calc(var(--u) * 3) solid transparent; opacity: .75; }
+  #dpad .u { top: calc(var(--u) * 4); border-bottom-color: #fff; } #dpad .d { bottom: calc(var(--u) * 4); border-top-color: #fff; }
+  #dpad .l { left: calc(var(--u) * 4); border-right-color: #fff; } #dpad .r { right: calc(var(--u) * 4); border-left-color: #fff; }
+  #dpad.u .u, #dpad.d .d, #dpad.l .l, #dpad.r .r { opacity: 1; border-width: calc(var(--u) * 3.6); }
+  /* Face buttons in a diamond around (right edge - 25u, 58u). */
+  .face { width: calc(var(--u) * 17); height: calc(var(--u) * 17); border-radius: 50%; font-size: calc(var(--u) * 6.5); transform: translate(50%, -50%); }
+  #a { right: calc(var(--side) + var(--u) * 8); top: calc(var(--u) * 58); }
+  #b { right: calc(var(--side) + var(--u) * 25); top: calc(var(--u) * 75); }
+  #x { right: calc(var(--side) + var(--u) * 25); top: calc(var(--u) * 41); }
+  #y { right: calc(var(--side) + var(--u) * 42); top: calc(var(--u) * 58); }
+  .shoulder { top: calc(var(--u) * 15); width: calc(var(--u) * 26); height: calc(var(--u) * 12); border-radius: calc(var(--u) * 4); font-size: calc(var(--u) * 4.6); }
+  .shoulder.small { width: calc(var(--u) * 18); }
+  #l { left: var(--side); } #l2 { left: calc(var(--side) + var(--u) * 28); }
+  #r { right: var(--side); } #r2 { right: calc(var(--side) + var(--u) * 28); }
+  .meta { bottom: calc(var(--u) * 4); width: calc(var(--u) * 22); height: calc(var(--u) * 9); border-radius: calc(var(--u) * 4.5); background: #000000a6; font-size: calc(var(--u) * 3.4); }
+  .meta.on { background: #000000d9; border-color: #ffffff8c; }
+  #select { left: calc(50% - var(--u) * 24); } #start { left: calc(50% + var(--u) * 2); }
   /* Overlays */
-  .sheet { position: fixed; inset: 0; z-index: 8; display: none; overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) 20px 20px; background: var(--bg); }
+  .sheet { position: absolute; inset: 0; z-index: 8; display: none; overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) 20px 20px; background: var(--bg); }
   .sheet.open { display: block; }
   .sheet h1 { margin: 8px 0 4px; color: var(--text); font-size: 20px; }
   .sheet p { margin: 0 0 16px; color: var(--body); font-size: 14px; }
@@ -60,19 +67,16 @@
   #games img, #games .art { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #222; }
   #games span { display: block; padding: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
   #games small { display: block; padding: 0 8px 8px; color: var(--body); font-size: 11px; }
-  #start-overlay { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: #000d; text-align: center; }
+  .sheet, .sheet *, #menu, #menu * { touch-action: pan-y; }
+  #start-overlay { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: #000d; text-align: center; }
   #start-overlay strong { display: block; margin-bottom: 8px; color: var(--text); font-size: 20px; }
   #start-overlay span { color: var(--body); font-size: 14px; }
-  #notice { position: fixed; left: 50%; bottom: 60px; z-index: 7; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: #000c; color: var(--muted); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #notice { position: absolute; left: 50%; bottom: 60px; z-index: 7; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: #000c; color: var(--muted); font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #notice.show { opacity: 1; }
-  @media (orientation: portrait) {
-    #dpad { bottom: 120px; } #a, #b, #x, #y { transform: translateY(-96px); }
-    .shoulder { top: auto; bottom: 300px; } .shoulder.small { bottom: 346px; }
-    #screen { top: 56px; bottom: auto; height: auto; max-height: 50vh; }
-  }
 </style>
 </head>
 <body>
+<div id="app">
 <img id="screen" alt="">
 <div id="bar">
   <span id="title">OpenRetro</span>
@@ -83,6 +87,7 @@
   <div class="players" id="players"></div>
   <button data-action="save">Salvar estado</button>
   <button data-action="load">Carregar estado</button>
+  <button id="home-button">Voltar ao OpenRetro</button>
   <button id="library-button">Escolher outro jogo</button>
   <button id="fullscreen">Tela cheia</button>
   <button id="touch-toggle">Esconder controles</button>
@@ -109,6 +114,7 @@
 </section>
 <div id="start-overlay"><div><strong>Toque para começar</strong><span>O som e a tela cheia precisam de um toque.</span></div></div>
 <div id="notice"></div>
+</div>
 <script>
 (() => {
   const token = new URLSearchParams(location.search).get("t") || "";
@@ -117,6 +123,41 @@
   let ws, game = null, library = [], player = Number(localStorage.getItem("openretro-player") || 1);
   let touchButtons = 0, dpadBits = 0, padButtons = 0, axes = [0, 0, 0, 0], sent = "";
   let frames = 0, bytes = 0, objectUrl = null, decoding = false, pending = null;
+
+  // Always landscape: held upright, the stage is drawn turned a quarter.
+  const app = $("app");
+  let turned = false;
+  function layout() {
+    const width = window.innerWidth, height = window.innerHeight;
+    turned = height > width;
+    app.style.setProperty("--w", `${turned ? height : width}px`);
+    app.style.setProperty("--h", `${turned ? width : height}px`);
+    app.classList.toggle("turned", turned);
+  }
+  window.addEventListener("resize", layout);
+  window.addEventListener("orientationchange", () => setTimeout(layout, 250));
+  layout();
+
+  // Full screen and a locked landscape where the browser allows it (Android);
+  // elsewhere the turned stage keeps the game sideways.
+  async function goFullscreen() {
+    try {
+      if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      await window.screen.orientation?.lock?.("landscape");
+    } catch {}
+    layout();
+  }
+
+  // No zooming: double taps and pinches would leave the page stuck enlarged.
+  document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+  for (const type of ["gesturestart", "gesturechange"]) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("touchmove", (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+  let lastTap = 0;
+  document.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTap < 350 && e.target.closest && e.target.closest("#controls, #screen, #bar")) e.preventDefault();
+    lastTap = now;
+  }, { passive: false });
 
   function toast(text) {
     notice.textContent = text; notice.classList.add("show");
@@ -177,6 +218,8 @@
 
   function status(message) {
     if (message.type !== "status") return;
+    // When the game closes, return to OpenRetro's interface.
+    if (game && !message.game) return void location.assign("/");
     game = message.game; library = message.library || [];
     title.textContent = game || "Nenhum jogo aberto";
     renderLibrary();
@@ -208,7 +251,9 @@
   const controls = $("controls"), dpad = $("dpad"), held = new Map();
   function dpadFrom(x, y) {
     const box = dpad.getBoundingClientRect();
-    const dx = x - (box.left + box.width / 2), dy = y - (box.top + box.height / 2);
+    const sx = x - (box.left + box.width / 2), sy = y - (box.top + box.height / 2);
+    // On the turned stage, screen down is the game's right and screen left its down.
+    const dx = turned ? sy : sx, dy = turned ? -sx : sy;
     if (Math.hypot(dx, dy) < box.width * 0.14) return 0;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     let bits = 0;
@@ -236,7 +281,12 @@
     else held.delete(event.pointerId);
     refreshTouch();
   }
-  controls.addEventListener("pointerdown", (e) => { e.preventDefault(); controls.setPointerCapture(e.pointerId); track(e); if (navigator.vibrate) navigator.vibrate(8); });
+  controls.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    try { controls.setPointerCapture(e.pointerId); } catch {}
+    track(e);
+    if (navigator.vibrate) navigator.vibrate(8);
+  });
   controls.addEventListener("pointermove", (e) => { if (held.has(e.pointerId)) track(e); });
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) controls.addEventListener(type, (e) => { held.delete(e.pointerId); refreshTouch(); });
 
@@ -278,8 +328,9 @@
     toast({ save: "Estado salvo", load: "Estado carregado", quit: "Saindo do jogo…" }[action]);
     $("menu").classList.remove("open");
   });
+  $("home-button").onclick = () => location.assign("/");
   $("library-button").onclick = () => { $("library").classList.add("open"); $("menu").classList.remove("open"); };
-  $("fullscreen").onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); $("menu").classList.remove("open"); };
+  $("fullscreen").onclick = () => { void goFullscreen(); $("menu").classList.remove("open"); };
   $("touch-toggle").onclick = () => {
     const hidden = controls.classList.toggle("hidden");
     $("touch-toggle").textContent = hidden ? "Mostrar controles" : "Esconder controles";
@@ -288,8 +339,7 @@
   $("start-overlay").onclick = () => {
     $("start-overlay").remove();
     try { audio = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" }); audio.resume(); } catch {}
-    document.documentElement.requestFullscreen?.().catch(() => {});
-    window.screen.orientation?.lock?.("landscape").catch(() => {});
+    void goFullscreen();
   };
   setInterval(() => {
     $("stats").textContent = `${frames} quadros/s · ${(bytes * 8 / 1e6).toFixed(1)} Mbit/s`;
