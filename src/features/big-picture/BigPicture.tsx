@@ -22,6 +22,7 @@ import {
   Play,
   Search,
   Smartphone,
+  Users,
   Settings,
   Trash2,
   X,
@@ -56,6 +57,7 @@ import { ControllerInput } from "./controllerInput";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
 import { PhonePlayDialog } from "../../components/PhonePlayDialog";
+import { NETPLAY_PLATFORMS } from "../../types";
 import { PlayerAvatar, playerAccent } from "../../components/PlayerAvatar";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
 import { HeroArtwork } from "./HeroArtwork";
@@ -1005,6 +1007,20 @@ export function BigPicture({
                         <Play size={19} fill="currentColor" />
                         {launching ? "Iniciando…" : "Jogar"}
                       </button>
+                      {NETPLAY_PLATFORMS.includes(heroGame.game.platformId) && (
+                        <button
+                          className="tv-secondary"
+                          onClick={() =>
+                            setWorkspace({
+                              page: "game",
+                              game: heroGame.game,
+                              online: true,
+                            })
+                          }
+                        >
+                          <Users size={18} /> Jogar online
+                        </button>
+                      )}
                       <button
                         className="tv-secondary"
                         onClick={() =>

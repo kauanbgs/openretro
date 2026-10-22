@@ -58,6 +58,8 @@ export type WorkspacePage =
 export interface WorkspaceRoute {
   page: WorkspacePage;
   game?: GameMetadata;
+  /** Open the game page with its online-play dialog showing. */
+  online?: boolean;
 }
 const titles: Record<WorkspacePage, string> = {
   settings: "Configurações",
@@ -516,6 +518,7 @@ export function ConsoleWorkspace({
               onSelect={(game) => navigate({ page: "game", game })}
               refresh={refresh}
               notify={notify}
+              startOnline={route.online}
             />
           )}
           {route.page === "import" && (

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Globe2, LogIn } from "lucide-react";
 import { Modal } from "../../components/Modal";
-import { bridge } from "../../services/bridge";
+import { bridge, isRemote } from "../../services/bridge";
 import { NETPLAY_DEFAULT_PORT, type NetplaySession } from "../../types";
 
 /** Host or join a direct-IP netplay session for one library game. */
@@ -70,7 +70,9 @@ export function NetplayDialog({
               endereço. Todos precisam ter o mesmo arquivo do jogo.
             </p>
             <label>
-              Seu endereço na rede local
+              {isRemote
+                ? "Endereço do computador na rede local"
+                : "Seu endereço na rede local"}
               <div className="input-action">
                 <input
                   readOnly
@@ -81,9 +83,13 @@ export function NetplayDialog({
                   aria-label="Copiar endereço"
                   disabled={!shared}
                   onClick={() =>
-                    void navigator.clipboard
-                      .writeText(shared!)
+                    // Phones on a plain-HTTP page have no clipboard access.
+                    void (
+                      navigator.clipboard?.writeText(shared!) ??
+                      Promise.reject()
+                    )
                       .then(() => notify("Endereço copiado."))
+                      .catch(() => notify(`Passe este endereço: ${shared}`))
                   }
                 >
                   <Copy size={17} />

@@ -61,6 +61,7 @@ export function GamePage({
   onSelect,
   refresh,
   notify,
+  startOnline = false,
 }: {
   game: GameMetadata;
   entry?: LibraryGame;
@@ -71,6 +72,8 @@ export function GamePage({
   onEmulators: () => void;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
+  /** Open with the online-play dialog showing (Big Picture's "Jogar online"). */
+  startOnline?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("Overview");
@@ -100,7 +103,7 @@ export function GamePage({
   const [args, setArgs] = useState((entry?.item.runtimeArgs ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState(false);
-  const [netplay, setNetplay] = useState(false);
+  const [netplay, setNetplay] = useState(startOnline);
   const [downloadQuery, setDownloadQuery] = useState("");
   const [downloadSource, setDownloadSource] = useState("all");
   const [trailer, setTrailer] = useState<string>();
@@ -293,7 +296,6 @@ export function GamePage({
                 : "Opções de download"}
           </button>
           {entry &&
-            !isRemote &&
             resolution?.state === "READY" &&
             resolution.emulator?.id === MANAGED_RUNTIME_ID &&
             NETPLAY_PLATFORMS.includes(game.platformId) && (

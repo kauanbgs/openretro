@@ -112,13 +112,17 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
         // The game runs on the PC; the phone switches to the game screen
         // right away instead of waiting for the session to end.
         "launch_game" => {
-            let (id, slot, netplay): (String, Option<i32>, Option<crate::launcher::netplay::Netplay>) = (
-                take(&args, "id")?,
-                take(&args, "slot")?,
-                take(&args, "netplay")?,
-            );
+            let (id, slot): (String, Option<i32>) = (take(&args, "id")?, take(&args, "slot")?);
+            let netplay: Option<crate::launcher::netplay::Netplay> = take(&args, "netplay")?;
             if crate::in_game::in_game_status(app.clone())?.is_some() {
                 return Err("Um jogo já está aberto no computador.".into());
+            }
+            // Joining reports an unreachable host to the phone before the
+            // game opens; the launch itself runs in the background.
+            if let Some(check) = netplay.clone().filter(|netplay| !netplay.hosting()) {
+                tauri::async_runtime::spawn_blocking(move || check.check_host())
+                    .await
+                    .map_err(|e| e.to_string())??;
             }
             let launcher = app.clone();
             tauri::async_runtime::spawn(async move {
@@ -128,6 +132,7 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
             });
             Ok(json!(0))
         }
+        "netplay_local_address" => to_json(crate::launcher::netplay::netplay_local_address()),
         _ => Err("Esta ação só está disponível no computador.".into()),
     }
 }

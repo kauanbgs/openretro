@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 pub const DEFAULT_PORT: u16 = 55435;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Netplay {
     /// "host" or "join".
