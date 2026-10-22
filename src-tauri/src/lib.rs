@@ -53,6 +53,7 @@ pub fn run() {
                     }
                 });
             }
+            downloads::finish_interrupted(app.handle());
             log::info!(
                 "OpenRetro initialized; network downloads: {}",
                 downloads::NETWORK_DOWNLOADS_ENABLED

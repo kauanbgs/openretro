@@ -219,6 +219,7 @@ pub fn ensure_disc_key(app: &tauri::AppHandle, game: &Path) -> Result<()> {
     {
         return Ok(());
     }
+    complete_iso(game)?;
     let directory = directory(app)?;
     let stem = game.file_stem().unwrap_or_default().to_string_lossy();
     let known = |directory: &Path| keys_directory(directory).join(format!("{stem}.dkey")).is_file();
@@ -228,6 +229,27 @@ pub fn ensure_disc_key(app: &tauri::AppHandle, game: &Path) -> Result<()> {
     install_disc_keys(app, &directory)?;
     if !known(&directory) {
         log::warn!("No Redump disc key is named after {stem}; RPCS3 will try every key");
+    }
+    Ok(())
+}
+
+/// Rejects an ISO shorter than its own volume size, such as one whose
+/// extraction was cut short: RPCS3 would fail with an unexplained read error.
+fn complete_iso(game: &Path) -> Result<()> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(game).map_err(error)?;
+    let size = file.metadata().map_err(error)?.len();
+    // ISO 9660 volume space size, in 2048-byte sectors, little-endian.
+    let mut sectors = [0u8; 4];
+    file.seek(SeekFrom::Start(0x8050)).map_err(error)?;
+    file.read_exact(&mut sectors).map_err(error)?;
+    let declared = u64::from(u32::from_le_bytes(sectors)) * 2048;
+    if size < declared {
+        return Err(format!(
+            "O arquivo do jogo está incompleto ({:.1} de {:.1} GB). Remova o jogo e baixe de novo.",
+            size as f64 / 1e9,
+            declared as f64 / 1e9
+        ));
     }
     Ok(())
 }
@@ -325,6 +347,18 @@ pub fn launch_args(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn truncated_isos_are_refused() {
+        let iso = std::env::temp_dir().join(format!("openretro-{}.iso", uuid::Uuid::new_v4()));
+        let mut image = vec![0u8; 20 * 2048];
+        image[0x8050..0x8054].copy_from_slice(&20u32.to_le_bytes());
+        std::fs::write(&iso, &image).unwrap();
+        assert!(complete_iso(&iso).is_ok());
+        std::fs::write(&iso, &image[..19 * 2048]).unwrap();
+        assert!(complete_iso(&iso).unwrap_err().contains("incompleto"));
+        std::fs::remove_file(iso).unwrap();
+    }
 
     #[test]
     fn dialogs_are_turned_off_without_touching_other_settings() {

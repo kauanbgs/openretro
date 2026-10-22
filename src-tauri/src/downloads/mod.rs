@@ -358,7 +358,9 @@ fn playable_extension(path: &Path) -> bool {
 /// SHA-256 and size of each extracted file, by its canonical path.
 type ExtractedHashes = HashMap<PathBuf, (u64, String)>;
 /// Extracts the playable files and hashes them while writing, so the import
-/// does not read multi-gigabyte games a second time.
+/// does not read multi-gigabyte games a second time. Each file is written
+/// under a `.partial` name and renamed only once complete, so an extraction
+/// cut short by closing the app never leaves a half game to be added.
 fn extract_playable_zip(
     archive_path: &Path,
     directory: &Path,
@@ -406,9 +408,12 @@ fn extract_playable_zip(
         }
         let destination = output_root.join(enclosed);
         std::fs::create_dir_all(destination.parent().ok_or("Invalid ZIP path.")?).map_err(error)?;
+        let mut partial = destination.clone().into_os_string();
+        partial.push(".partial");
+        let partial = PathBuf::from(partial);
         let mut output = std::io::BufWriter::with_capacity(
             1024 * 1024,
-            File::create(&destination).map_err(error)?,
+            File::create(&partial).map_err(error)?,
         );
         let mut hasher = Sha256::new();
         let mut size = 0u64;
@@ -428,6 +433,14 @@ fn extract_playable_zip(
         }
         output.flush().map_err(error)?;
         drop(output);
+        if size != entry.size() {
+            let _ = std::fs::remove_file(&partial);
+            return Err(format!(
+                "A extração parou em {size} de {} bytes.",
+                entry.size()
+            ));
+        }
+        std::fs::rename(&partial, &destination).map_err(error)?;
         let path = destination.canonicalize().map_err(error)?;
         hashes.insert(path, (size, format!("{:x}", hasher.finalize())));
     }
@@ -480,6 +493,30 @@ impl StageReporter<'_> {
             let _ = save_job(self.app, job);
             self.saved_at = Instant::now();
         }
+    }
+}
+/// Finishes downloads that were extracting or being added when the app
+/// closed: the transfer is complete, so only that step runs again.
+pub fn finish_interrupted(app: &tauri::AppHandle) {
+    let Ok(jobs) = list_download_jobs(app.state::<Database>()) else {
+        return;
+    };
+    for mut job in jobs.into_iter().filter(|job| job.state == "INSTALLING") {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let archive = std::fs::read_dir(&job.directory)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|entry| entry.path())
+                .find(|path| {
+                    path.is_file()
+                        && path
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"))
+                });
+            finish_download(&app, &mut job, archive.as_deref());
+        });
     }
 }
 /// Extracts and adds a finished download, showing each step on the job and
