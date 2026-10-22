@@ -50,6 +50,14 @@ cpal = "0.18"
 # Upstream SHA-1 uses AWS-LC. Use its shipped assembly objects on Windows.
 aws-lc-sys = { version = "0.46", features = ["prebuilt-nasm"] }
 
+# Debug info for every dependency filled target/ with tens of gigabytes.
+# Our own code keeps line numbers for backtraces; dependencies keep none.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # Phone play encodes every frame as JPEG; keep that fast in debug builds too.
 [profile.dev.package.image]
 opt-level = 3
