@@ -9,6 +9,8 @@ import { LocalFileProvider } from "../providers/sources";
 import { EmulatorManager } from "./EmulatorManager";
 /** The managed runtime launches with its own arguments and keeps BIOS files itself. */
 export const MANAGED_RUNTIME_ID = "openretro-retroarch";
+/** PS3's emulator installs itself, with the console's system, on the first launch. */
+export const MANAGED_PS3_ID = "openretro-rpcs3";
 export class GameResolver {
   constructor(
     private exists: (path: string) => Promise<boolean>,
@@ -33,6 +35,14 @@ export class GameResolver {
       platform.id,
       item?.emulatorId ?? null,
     );
+    if (emulator?.id === MANAGED_PS3_ID)
+      return {
+        state: "READY",
+        message: "Everything is ready. Let’s play.",
+        emulator,
+        file: source.localPath,
+        args: [],
+      };
     if (!emulator || !(await this.exists(emulator.executablePath)))
       return {
         state: "MISSING_EMULATOR",

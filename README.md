@@ -10,6 +10,11 @@ updater, catalog, network services, achievements, recording or media tools.
 OpenRetro owns the complete interface and downloads only the compatible
 Libretro core required by the game on first play.
 
+OpenRetro installs the runtime into application data and registers it as the
+default for every console when it starts, and copies a newer one over it after
+an app update. It never appears in **Emuladores**, which lists only external
+emulators a player adds; nothing has to be installed or repaired by hand.
+
 On Windows, the runtime's video surface is attached directly to OpenRetro's
 main window. Starting a compatible game therefore keeps the player inside the
 same fullscreen application, without a separate RetroArch window or taskbar
@@ -22,6 +27,26 @@ corresponding source archive beside every release. The player never has to
 install or configure another application. See
 [docs/OPENRETRO_RUNTIME.md](docs/OPENRETRO_RUNTIME.md) for the feature boundary,
 local build and update process.
+
+## PlayStation 3
+
+PS3 games run on [RPCS3](https://rpcs3.net/) (GPL-2.0), which OpenRetro manages
+like the runtime: the first PS3 game downloads a pinned, hash-checked RPCS3
+build into application data, installs Sony's official system software from
+Sony's update server and fetches Redump's disc keys. Nothing is installed or
+configured by hand, and RPCS3's own interface never appears; games start full
+screen from the command line. Each connected controller becomes a player
+(DualShock 4, DualSense and Xbox controllers through RPCS3's own drivers, others
+through SDL), or the keyboard when none is connected. RPCS3's source is at
+<https://github.com/RPCS3/rpcs3>.
+
+Games are disc folders, imported through `PS3_GAME/USRDIR/EBOOT.BIN`, or
+Redump disc images, recognised by their disc header and decrypted with their
+Redump key. The first launch of each game compiles its code for the PC, which
+can take a few minutes; later launches are fast. PS3 emulation needs a recent
+multi-core CPU and a Vulkan GPU, and compatibility varies per game (see
+<https://rpcs3.net/compatibility>). Save states, online play and phone play are
+not available for PS3.
 
 ## Players, resume and local co-op
 
@@ -161,7 +186,7 @@ Windows MSVC prerequisite: **Desktop development with C++**, including the Windo
 
 ## LaunchBox catalog
 
-The desktop app downloads the public [LaunchBox Games Database](https://gamesdb.launchbox-app.com/) dump on first launch and builds a local SQLite index for the 15 supported consoles. No API key or account is needed. Open **Catálogo** to follow download/indexing progress; failed downloads can be retried there. An existing index stays usable during its weekly background refresh.
+The desktop app downloads the public [LaunchBox Games Database](https://gamesdb.launchbox-app.com/) dump on first launch and builds a local SQLite index for the 16 supported consoles. No API key or account is needed. Open **Catálogo** to follow download/indexing progress; failed downloads can be retried there. An existing index stays usable during its weekly background refresh.
 
 Catalog search, console/genre filters, ordering and pagination run against the local index. Covers and screenshots load from LaunchBox as needed. Gameplay thumbnails are resized and cached locally; the image viewer loads the original. Browser previews show that the catalog requires the desktop app.
 
@@ -201,7 +226,7 @@ Settings → Downloads lets you choose the destination. Each transfer gets its o
 1. Open the desktop app, click **Add Game**, and choose a legally obtained game file.
 2. Confirm the detected platform. `.bin` and `.pbp` are ambiguous and require a deliberate selection. ZIP archives are treated as Arcade files and are never extracted automatically.
 3. Choose matching LaunchBox metadata or keep your own title. Filename matching uses normalized names and aliases in the local LaunchBox index; a console-specific manual search is also available. You can still import when the metadata service is offline. No remote hash-match database is configured. SHA-256 fingerprints are streamed in Rust, then reused on import while the file size and modification time match.
-4. Go to **Emulators → Add emulator**. Select an official, already-installed executable, mark its supported systems, and optionally make it the default for those systems. Detection only searches PATH for known emulator names.
+4. Optional: the OpenRetro Runtime already plays every console. To use an external emulator instead, go to **Emulators → Add emulator**, select an official, already-installed executable, mark its supported systems, and optionally make it the default for those systems. Detection only searches PATH for known emulator names.
 5. Open the game and click **Play game**. The default launch is `executable` with a single game-path argument. For runtimes that need flags or a core (e.g. RetroArch), use **Configure**: one argument per line, with `{game}` and optional `{bios}` placeholders. Quote characters are unnecessary; paths with spaces are already passed as single arguments.
 6. Close the emulator. The session duration, last-played date, and total playtime are saved. Emulators must run in the foreground rather than hand the game off to another process. Runtime compatibility, firmware validity, and core availability depend on the emulator.
 7. Use **Details** to verify the checksum, relocate a moved file, or remove the library entry. Removing an entry never deletes the original file. Favorite games can be filtered in Library.

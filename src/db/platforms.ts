@@ -98,8 +98,8 @@ export const platforms: Platform[] = [
     name: "PlayStation 3",
     shortName: "PS3",
     manufacturer: "Sony",
+    // Games are found by content: a disc folder's EBOOT.BIN or a PS3 disc image.
     extensions: [],
-    catalogOnly: true,
   },
   { id: "arcade", name: "Arcade", shortName: "ARC", extensions: ["zip"] },
   {

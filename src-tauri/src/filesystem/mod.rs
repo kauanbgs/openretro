@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     fs::File,
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
     sync::{Mutex, OnceLock},
     time::SystemTime,
@@ -38,6 +38,55 @@ pub fn platform_ids_for_extension(extension: &str) -> Vec<String> {
         .get(extension)
         .cloned()
         .unwrap_or_default()
+}
+/// The child of `dir` called `name`, whatever its letter case.
+fn child(dir: &Path, name: &str) -> Option<PathBuf> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .find(|entry| entry.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        .map(|entry| entry.path())
+}
+/// What a PS3 disc folder boots: `PS3_GAME/USRDIR/EBOOT.BIN`, given `PS3_GAME`.
+pub fn ps3_boot_file(ps3_game: &Path) -> Option<PathBuf> {
+    child(&child(ps3_game, "USRDIR")?, "EBOOT.BIN").filter(|path| path.is_file())
+}
+/// A PS3 game is a disc folder, imported through the EBOOT.BIN it boots, or a
+/// disc image whose second sector starts with "PlayStation3".
+fn is_ps3_game(path: &Path) -> bool {
+    let name = |path: Option<&Path>| {
+        path.and_then(Path::file_name)
+            .map(|name| name.to_string_lossy().to_lowercase())
+    };
+    match name(Some(path)).as_deref() {
+        Some("eboot.bin") => {
+            let usrdir = path.parent();
+            name(usrdir).as_deref() == Some("usrdir")
+                && name(usrdir.and_then(Path::parent)).as_deref() == Some("ps3_game")
+        }
+        Some(file) if file.ends_with(".iso") => {
+            let mut header = [0u8; 12];
+            File::open(path)
+                .and_then(|mut file| {
+                    file.seek(SeekFrom::Start(0x800))?;
+                    file.read_exact(&mut header)
+                })
+                .is_ok()
+                && &header == b"PlayStation3"
+        }
+        _ => false,
+    }
+}
+pub fn platform_ids_for_file(path: &Path) -> Vec<String> {
+    if is_ps3_game(path) {
+        return vec!["ps3".into()];
+    }
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    platform_ids_for_extension(&extension)
 }
 #[derive(Clone)]
 struct InspectedFile {
@@ -119,19 +168,30 @@ pub fn inspect_with_progress(
     path: &str,
     progress: impl FnMut(u64, u64),
 ) -> Result<ImportCandidate> {
+    inspect_hashed(path, |path| hash_with_progress(path, progress))
+}
+/// Inspects a file whose hash was taken while it was written, such as a game
+/// just extracted from a download.
+pub fn inspect_with_hash(path: &str, sha256: String) -> Result<ImportCandidate> {
+    inspect_hashed(path, |_| Ok(sha256))
+}
+fn inspect_hashed(
+    path: &str,
+    digest: impl FnOnce(&Path) -> Result<String>,
+) -> Result<ImportCandidate> {
     let path = canonical_file(path)?;
     let extension = path
         .extension()
         .and_then(|s| s.to_str())
         .unwrap_or("")
         .to_lowercase();
-    let ids = platform_ids_for_extension(&extension);
+    let ids = platform_ids_for_file(&path);
     if ids.is_empty() {
         return Err(format!("The .{extension} format is not recognized. Choose a supported game file; archives are not automatically extracted."));
     }
     let before = std::fs::metadata(&path).map_err(error)?;
     let candidate = ImportCandidate {
-        sha256: hash_with_progress(&path, progress)?,
+        sha256: digest(&path)?,
         filename: path
             .file_name()
             .unwrap_or_default()
@@ -179,6 +239,14 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
                 continue;
             }
             let entry_path = entry.path();
+            // PS3 disc folders hold data files with console extensions; only
+            // the EBOOT.BIN they boot is a game.
+            if kind.is_dir() && entry.file_name().to_string_lossy().to_lowercase().starts_with("ps3_") {
+                if entry.file_name().eq_ignore_ascii_case("ps3_game") {
+                    found.extend(ps3_boot_file(&entry_path));
+                }
+                continue;
+            }
             if kind.is_dir() {
                 if depth < 8 {
                     pending.push((entry_path, depth + 1));

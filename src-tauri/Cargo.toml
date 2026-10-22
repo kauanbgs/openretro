@@ -35,8 +35,11 @@ librqbit = { version = "=8.1.1", default-features = false, features = ["rust-tls
 tokio = { version = "1", features = ["sync", "time", "macros", "fs", "io-util"] }
 tokio-util = "0.7"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+# zlib-rs replaces the default backend and inflates ZIPs about twice as fast.
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws", "query", "json"] }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["util"] }
 
 [target.'cfg(windows)'.dependencies]
 # Phone play: screen capture for OpenRetro's own screens, and the PC's sound.
@@ -49,4 +52,24 @@ aws-lc-sys = { version = "0.46", features = ["prebuilt-nasm"] }
 
 # Phone play encodes every frame as JPEG; keep that fast in debug builds too.
 [profile.dev.package.image]
+opt-level = 3
+
+# Extracting, hashing and downloading gigabytes is slow unoptimized; keep
+# the crates doing that work fast in debug builds too.
+[profile.dev.package.zlib-rs]
+opt-level = 3
+
+[profile.dev.package.flate2]
+opt-level = 3
+
+[profile.dev.package.zip]
+opt-level = 3
+
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.librqbit]
+opt-level = 3
+
+[profile.dev.package.sevenz-rust2]
 opt-level = 3

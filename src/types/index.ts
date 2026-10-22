@@ -5,8 +5,6 @@ export interface Platform {
   manufacturer?: string;
   extensions: string[];
   biosRequired?: boolean;
-  /** Listed in the catalog to browse its games; OpenRetro cannot run them yet. */
-  catalogOnly?: boolean;
 }
 export interface GameMetadata {
   id: string;

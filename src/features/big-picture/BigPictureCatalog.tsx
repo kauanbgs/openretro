@@ -779,8 +779,6 @@ export function BigPictureCatalog({
                 <p className="tv-catalog-detail-meta">
                   {platformById(game.platformId)?.name} ·{" "}
                   {game.year || "Ano não informado"}
-                  {platformById(game.platformId)?.catalogOnly &&
-                    " · ainda não roda no OpenRetro"}
                 </p>
                 <p>{game.description}</p>
                 <div className="tv-catalog-detail-actions">
@@ -797,7 +795,6 @@ export function BigPictureCatalog({
                   )}
                   <button
                     className={entry ? "" : "tv-catalog-primary"}
-                    disabled={platformById(game.platformId)?.catalogOnly}
                     onClick={() => setReleasesOpen((value) => !value)}
                   >
                     <Download size={18} />

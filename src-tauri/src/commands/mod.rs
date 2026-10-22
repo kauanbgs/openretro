@@ -83,8 +83,11 @@ pub fn list_emulators(db: State<Database>) -> Result<Vec<Emulator>> {
 }
 #[tauri::command]
 pub fn emulator_install_options() -> Vec<EmulatorInstall> {
+    // The runtime installs itself (see `ensure_runtime`); only optional
+    // emulators are offered.
     INSTALLERS
         .iter()
+        .filter(|installer| installer.id != "retroarch")
         .map(|installer| EmulatorInstall {
             id: installer.id.into(),
             name: installer.name.into(),
@@ -237,6 +240,9 @@ fn update_runtime(bundled: &std::path::Path, runtime: &std::path::Path) -> Resul
 }
 #[cfg(windows)]
 pub(crate) fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::path::PathBuf> {
+    // Startup and a game launch may both get here; one copy runs at a time.
+    static COPYING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _copying = COPYING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let runtime = app
         .path()
         .app_data_dir()
@@ -449,6 +455,42 @@ pub fn sync_runtime_platforms(db: &Database) -> Result<()> {
             .map_err(error)?;
     }
     transaction.commit().map_err(error)
+}
+/// Installs, updates and registers the bundled runtime when OpenRetro starts,
+/// so every console works without visiting Emulators. A registered runtime
+/// keeps the defaults its player chose.
+#[cfg(windows)]
+pub fn ensure_runtime(app: &tauri::AppHandle) -> Result<()> {
+    let executable = install_bundled_retroarch(app)?;
+    let registered = {
+        let database = app.state::<Database>();
+        let conn = database.0.lock().map_err(error)?;
+        database::emulators(&conn)?
+            .iter()
+            .any(|emulator| emulator.id == "openretro-retroarch")
+    };
+    if !registered {
+        register_retroarch(app, executable)?;
+        let _ = app.emit("emulators-changed", ());
+    }
+    Ok(())
+}
+/// PS3 games always have an emulator: RPCS3 installs itself on the first
+/// launch, so it is registered before its files exist.
+#[cfg(windows)]
+pub fn register_rpcs3(db: &Database, data: &std::path::Path) -> Result<()> {
+    let emulator = Emulator {
+        id: crate::launcher::rpcs3::EMULATOR_ID.into(),
+        name: "PlayStation 3 (RPCS3)".into(),
+        executable_path: crate::launcher::rpcs3::executable(&data.join("rpcs3"))
+            .to_string_lossy()
+            .into_owned(),
+        supported_platforms: vec!["ps3".into()],
+        version: None,
+        default_platforms: vec!["ps3".into()],
+    };
+    db.0.lock().map_err(error)?.execute("INSERT INTO emulators(id,data) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET data=excluded.data", params![emulator.id, serde_json::to_string(&emulator).map_err(error)?]).map_err(error)?;
+    Ok(())
 }
 #[cfg(windows)]
 fn register_pcsx2(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {

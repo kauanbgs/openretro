@@ -7,7 +7,7 @@ mod controller;
 #[cfg(target_os = "windows")]
 mod host;
 #[cfg(target_os = "windows")]
-mod sdl;
+pub(crate) mod sdl;
 
 #[derive(Default)]
 pub struct InGameService(Mutex<Option<Session>>);
@@ -54,8 +54,16 @@ impl SessionGuard {
         session.pid = pid;
         session.sdl_library = executable.parent().map(|path| path.join("SDL2.dll"));
         drop(guard);
+        self.host(pid)
+    }
+    /// Shows the process's game window inside OpenRetro's main window. RPCS3
+    /// takes no commands, so its session only gets this: no command channel
+    /// and no OpenRetro menu; its own PS button menu exits the game.
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
+    pub fn host(&self, pid: u32) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
+            let service = self.app.state::<InGameService>();
             let embedded = host::embed(&self.app, pid)?;
             let mut guard = service.0.lock().map_err(error)?;
             let Some(session) = guard

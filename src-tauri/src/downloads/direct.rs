@@ -7,7 +7,7 @@ use tokio::{fs::{File, OpenOptions}, io::{AsyncSeekExt, AsyncWriteExt, BufWriter
 use tokio_util::sync::CancellationToken;
 
 const BLOCK_BYTES: u64 = 8 * 1024 * 1024;
-const CONNECTIONS: usize = 6;
+const CONNECTIONS: usize = 16;
 const ATTEMPTS: u32 = 4;
 const REPORT_INTERVAL: Duration = Duration::from_millis(750);
 

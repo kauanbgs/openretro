@@ -22,6 +22,7 @@ import {
   X,
   Gamepad2,
   CheckCircle2,
+  LoaderCircle,
 } from "lucide-react";
 import { PageLoading } from "./components/PageLoading";
 import {
@@ -247,15 +248,43 @@ export function App() {
     setImportGame(g);
     setImporting(true);
   };
-  const updateOverlay = updates.phase === "installing" && (
-    <div className="update-overlay" role="status">
-      <Download size={28} />
-      <strong>
-        Atualizando o OpenRetro{updates.version && ` para ${updates.version}`}
-      </strong>
-      <span>O app reabre sozinho em alguns segundos.</span>
-    </div>
-  );
+  useEffect(() => {
+    if (!isDesktop) return;
+    // The runtime registers itself in the background on first start.
+    const unlisten = listen("emulators-changed", () => void refresh());
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [refresh]);
+  const [ps3Setup, setPs3Setup] = useState("");
+  useEffect(() => {
+    if (!isDesktop) return;
+    // The first PS3 game installs its emulator and the console's system.
+    const unlisten = listen<string>("ps3-setup", ({ payload }) =>
+      setPs3Setup(payload),
+    );
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, []);
+  const updateOverlay =
+    updates.phase === "installing" ? (
+      <div className="update-overlay" role="status">
+        <Download size={28} />
+        <strong>
+          Atualizando o OpenRetro{updates.version && ` para ${updates.version}`}
+        </strong>
+        <span>O app reabre sozinho em alguns segundos.</span>
+      </div>
+    ) : (
+      ps3Setup && (
+        <div className="update-overlay" role="status">
+          <LoaderCircle className="spin" size={28} />
+          <strong>{ps3Setup}</strong>
+          <span>Isso só acontece no primeiro jogo de PS3.</span>
+        </div>
+      )
+    );
   // Unmount desktop pages while the console owns the screen: no hidden catalog,
   // images, observers or page queries behind Big Picture.
   if (bigPicture)

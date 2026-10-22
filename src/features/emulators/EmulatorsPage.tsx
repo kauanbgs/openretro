@@ -18,7 +18,10 @@ import {
 import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
 import { bridge, isDesktop } from "../../services/bridge";
-import { MANAGED_RUNTIME_ID } from "../../services/GameResolver";
+import {
+  MANAGED_PS3_ID,
+  MANAGED_RUNTIME_ID,
+} from "../../services/GameResolver";
 import { listen } from "../../services/transport";
 import type { Emulator, EmulatorInstall } from "../../types";
 
@@ -60,6 +63,11 @@ export function EmulatorsPage({
     queryFn: bridge.emulatorInstallOptions,
   });
   const runtimeInstalled = emulators.some((e) => e.id === MANAGED_RUNTIME_ID);
+  // The runtime and RPCS3 install and update themselves; only emulators the
+  // player added are listed.
+  const own = emulators.filter(
+    (e) => e.id !== MANAGED_RUNTIME_ID && e.id !== MANAGED_PS3_ID,
+  );
   const ps2Bios = useQuery({
     queryKey: ["runtime-bios", "ps2"],
     queryFn: () => bridge.runtimeBiosStatus("ps2"),
@@ -101,7 +109,11 @@ export function EmulatorsPage({
     <div className="page-content">
       <PageHeader
         title="Emuladores"
-        description="Instale, configure e escolha o emulador de cada console."
+        description={
+          runtimeInstalled
+            ? "Todos os consoles já rodam no OpenRetro, que instala e atualiza o que precisa sozinho. Emuladores externos são opcionais."
+            : "Instale, configure e escolha o emulador de cada console."
+        }
         actions={
           <>
             <button
@@ -124,17 +136,19 @@ export function EmulatorsPage({
           </>
         }
       />
-      {emulators.length ? (
+      {own.length || runtimeInstalled ? (
         <section className="emu-section" aria-labelledby="emu-installed">
-          <header className="emu-section-heading">
-            <h2 id="emu-installed">Seus emuladores</h2>
-            <p>
-              <Star size={12} fill="currentColor" /> marca o emulador padrão de
-              cada console.
-            </p>
-          </header>
+          {own.length > 0 && (
+            <header className="emu-section-heading">
+              <h2 id="emu-installed">Seus emuladores</h2>
+              <p>
+                <Star size={12} fill="currentColor" /> marca o emulador padrão
+                de cada console.
+              </p>
+            </header>
+          )}
           <div className="emu-list">
-            {emulators.map((e) => (
+            {own.map((e) => (
               <article className="emu-row" key={e.id}>
                 <div className="emu-icon">
                   <Cpu size={24} />
@@ -433,30 +447,28 @@ export function EmulatorsPage({
             <fieldset>
               <legend>Consoles compatíveis</legend>
               <div className="platform-checkboxes">
-                {platforms
-                  .filter((p) => !p.catalogOnly)
-                  .map((p) => (
-                    <label key={p.id}>
-                      <input
-                        type="checkbox"
-                        checked={editing.supportedPlatforms.includes(p.id)}
-                        onChange={(e) =>
-                          setEditing({
-                            ...editing,
-                            supportedPlatforms: e.target.checked
-                              ? [...editing.supportedPlatforms, p.id]
-                              : editing.supportedPlatforms.filter(
-                                  (id) => id !== p.id,
-                                ),
-                            defaultPlatforms: editing.defaultPlatforms.filter(
-                              (id) => id !== p.id,
-                            ),
-                          })
-                        }
-                      />
-                      {p.shortName}
-                    </label>
-                  ))}
+                {platforms.map((p) => (
+                  <label key={p.id}>
+                    <input
+                      type="checkbox"
+                      checked={editing.supportedPlatforms.includes(p.id)}
+                      onChange={(e) =>
+                        setEditing({
+                          ...editing,
+                          supportedPlatforms: e.target.checked
+                            ? [...editing.supportedPlatforms, p.id]
+                            : editing.supportedPlatforms.filter(
+                                (id) => id !== p.id,
+                              ),
+                          defaultPlatforms: editing.defaultPlatforms.filter(
+                            (id) => id !== p.id,
+                          ),
+                        })
+                      }
+                    />
+                    {p.shortName}
+                  </label>
+                ))}
               </div>
             </fieldset>
             <label className="checkbox-line">

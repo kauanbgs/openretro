@@ -259,11 +259,6 @@ export function GamePage({
                   : "Na sua biblioteca"}
               </p>
             </>
-          ) : platform?.catalogOnly ? (
-            <p>
-              O OpenRetro ainda não roda jogos de {platform.name}. Eles aparecem
-              no catálogo só para você conhecer.
-            </p>
           ) : (
             <p>
               {isRemote
@@ -275,7 +270,7 @@ export function GamePage({
         <div className="hero-panel-actions">
           <button
             className={`button primary ${entry ? "play-button" : ""}`}
-            disabled={running || busy || (!entry && platform?.catalogOnly)}
+            disabled={running || busy}
             onClick={() =>
               entry
                 ? resolution?.state === "MISSING_EMULATOR"
@@ -313,7 +308,7 @@ export function GamePage({
                 <Users size={16} /> Jogar online
               </button>
             )}
-          {!entry && !isRemote && !platform?.catalogOnly && (
+          {!entry && !isRemote && (
             <button className="button outline" onClick={() => onImport(game)}>
               <FolderOpen size={16} /> Adicionar arquivo
             </button>

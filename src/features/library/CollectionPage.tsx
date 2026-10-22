@@ -113,13 +113,11 @@ export function CollectionPage({
             onChange={(e) => setPlatform(e.target.value)}
           >
             <option value="all">Todos os consoles</option>
-            {platforms
-              .filter((p) => !p.catalogOnly)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
+            {platforms.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </select>
           <select
             aria-label="Sort games"

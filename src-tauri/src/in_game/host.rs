@@ -168,7 +168,8 @@ pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<Embedded> {
     main.set_fullscreen(true).map_err(error)?;
     main.show().map_err(error)?;
     let parent = main.hwnd().map_err(error)?.0;
-    let deadline = Instant::now() + Duration::from_secs(12);
+    // RPCS3 opens its window after loading the system software.
+    let deadline = Instant::now() + Duration::from_secs(30);
     let child = loop {
         if let Some(window) = process_window(pid) {
             break window;

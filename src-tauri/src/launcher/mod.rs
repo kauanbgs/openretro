@@ -11,6 +11,8 @@ use std::{
 use tauri::{Emitter, Manager};
 pub mod bios;
 pub mod netplay;
+#[cfg(windows)]
+pub mod rpcs3;
 pub mod runtime_menu;
 pub mod save_states;
 
@@ -152,7 +154,7 @@ pub async fn launch_game(
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,player,auto_resume,ps2_resolution) = {
+ let (entry,emulator,player,auto_resume,ps2_resolution,sdl_library) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
@@ -161,9 +163,22 @@ pub async fn launch_game(
   let settings=serde_json::from_str::<serde_json::Value>(&settings).ok();
   let auto_resume=settings.as_ref().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
   let ps2_resolution=settings.as_ref().and_then(|v|v["ps2Resolution"].as_str().map(String::from));
-  (entry,emulator,player,auto_resume,ps2_resolution)
+  // The runtime's SDL2 tells which controllers are connected.
+  let sdl_library=database::emulators(&conn)?.into_iter().find(|e|e.id=="openretro-retroarch").and_then(|e|std::path::Path::new(&e.executable_path).parent().map(|dir|dir.join("SDL2.dll")));
+  (entry,emulator,player,auto_resume,ps2_resolution,sdl_library)
  };
  let game_path=filesystem::canonical_file(&entry.item.source_path)?;
+ // PS3 games install their emulator, system software and disc keys on first use.
+ let ps3=emulator.id=="openretro-rpcs3";
+ #[cfg(windows)]
+ if ps3 {
+    let ready=rpcs3::prepare(&app).and_then(|_|rpcs3::ensure_disc_key(&app,&game_path));
+    // An empty message closes the setup screen, whatever happened.
+    let _=app.emit("ps3-setup","");
+    ready?;
+ }
+ #[cfg(not(windows))]
+ if ps3 { return Err("Jogos de PS3 só rodam no Windows por enquanto.".into()); }
  let executable=filesystem::executable(&emulator.executable_path)?;
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
  let managed_retroarch=is_managed_runtime(&emulator,&entry);
@@ -181,7 +196,7 @@ pub async fn launch_game(
  let boot_states=!boots_without_states(&entry.item.platform_id);
  if slot.is_some() && !boot_states { return Err("No PS2, carregue o estado pelo menu do jogo depois que ele abrir.".into()); }
  if managed_retroarch && bios::required(&entry.item.platform_id) && !bios::installed(&bios::system_dir(&app.path().app_data_dir().map_err(error)?), &entry.item.platform_id) { return Err("Este console precisa da BIOS. Selecione o arquivo da BIOS na página do jogo ou em Emuladores.".into()); }
- let runtime_session=if managed_retroarch { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
+ let runtime_session=if managed_retroarch || ps3 { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
  // An app update can ship a newer runtime; copy it before launching so the in-game menu matches it.
  #[cfg(windows)]
  if emulator.id=="openretro-retroarch" { if let Err(message)=crate::commands::install_bundled_retroarch(&app) { log::warn!("Keeping the installed runtime: {message}"); } }
@@ -201,8 +216,13 @@ pub async fn launch_game(
     if let Some(slot)=slot.filter(|slot| *slot>=0) { args.extend(["--entryslot".into(),slot.to_string()]); }
     args.extend(["-L".into(),retroarch_core(&app,&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()]);
     args
+ } else if ps3 {
+    #[cfg(windows)]
+    { rpcs3::launch_args(executable.parent().ok_or("Invalid RPCS3 directory.")?, sdl_library.as_deref(), &game_path)? }
+    #[cfg(not(windows))]
+    { let _=&sdl_library; unreachable!() }
  } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
- if !managed_retroarch && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
+ if !managed_retroarch && !ps3 && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
  let session=uuid::Uuid::new_v4().to_string(); let started=chrono::Utc::now().to_rfc3339();
  {
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;
@@ -214,13 +234,13 @@ pub async fn launch_game(
  let child=Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?).spawn();
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {
-    if let Some(stdin)=child.stdin.take() {
-      if let Err(message)=runtime_session.attach(stdin,child.id(),&executable) {
-        let _=child.kill();
-        let _=child.wait();
-        db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?;
-        return Err(message);
-      }
+    // Both play inside OpenRetro's window; only the runtime takes commands.
+    let hosted=if ps3 { runtime_session.host(child.id()) } else if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable) } else { Ok(()) };
+    if let Err(message)=hosted {
+      let _=child.kill();
+      let _=child.wait();
+      db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?;
+      return Err(message);
     }
  }
  {
@@ -236,7 +256,8 @@ pub async fn launch_game(
  else { tx.execute("UPDATE player_progress SET playtime=playtime+?1 WHERE profile_id=?2 AND library_item_id=?3",params![elapsed,player,id]).map_err(error)?; }
  tx.commit().map_err(error)?; let _=app.emit("game-finished",&id);
  let status=status.map_err(error)?;
- if !status.success() { return Err(format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()))); }
+ // RPCS3 can report an error code while shutting down after a normal exit.
+ if !status.success() && !ps3 { return Err(format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()))); }
  Ok(elapsed)
  }).await.map_err(error)?
 }

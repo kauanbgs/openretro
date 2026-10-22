@@ -8,6 +8,7 @@ use crate::{
 use librqbit::{AddTorrent, AddTorrentOptions, Session, SessionOptions};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     fs::File,
@@ -65,7 +66,7 @@ pub struct DownloadService {
 }
 impl Default for DownloadService {
     fn default() -> Self {
-        Self { session: OnceCell::new(), http: OnceCell::new(), http_slots: Arc::new(tokio::sync::Semaphore::new(12)), active: Mutex::default(), operations: tokio::sync::Mutex::new(()) }
+        Self { session: OnceCell::new(), http: OnceCell::new(), http_slots: Arc::new(tokio::sync::Semaphore::new(32)), active: Mutex::default(), operations: tokio::sync::Mutex::new(()) }
     }
 }
 fn save_job(app: &tauri::AppHandle, job: &DownloadJob) -> Result<()> {
@@ -354,17 +355,22 @@ fn playable_extension(path: &Path) -> bool {
             | "bin"
     )
 }
+/// SHA-256 and size of each extracted file, by its canonical path.
+type ExtractedHashes = HashMap<PathBuf, (u64, String)>;
+/// Extracts the playable files and hashes them while writing, so the import
+/// does not read multi-gigabyte games a second time.
 fn extract_playable_zip(
     archive_path: &Path,
     directory: &Path,
     mut progress: impl FnMut(u64, u64),
-) -> Result<()> {
+) -> Result<ExtractedHashes> {
+    let mut hashes = ExtractedHashes::new();
     if archive_path
         .extension()
         .and_then(|ext| ext.to_str())
         .is_none_or(|ext| !ext.eq_ignore_ascii_case("zip"))
     {
-        return Ok(());
+        return Ok(hashes);
     }
     let mut archive = zip::ZipArchive::new(File::open(archive_path).map_err(error)?)
         .map_err(|_| "Downloaded ZIP is invalid.".to_string())?;
@@ -402,14 +408,18 @@ fn extract_playable_zip(
         std::fs::create_dir_all(destination.parent().ok_or("Invalid ZIP path.")?).map_err(error)?;
         let mut output = std::io::BufWriter::with_capacity(
             1024 * 1024,
-            File::create(destination).map_err(error)?,
+            File::create(&destination).map_err(error)?,
         );
+        let mut hasher = Sha256::new();
+        let mut size = 0u64;
         loop {
             let read = entry.read(&mut buffer).map_err(error)?;
             if read == 0 {
                 break;
             }
             output.write_all(&buffer[..read]).map_err(error)?;
+            hasher.update(&buffer[..read]);
+            size += read as u64;
             done += read as u64;
             if done > total {
                 return Err("Downloaded ZIP is larger than it declares.".into());
@@ -417,8 +427,11 @@ fn extract_playable_zip(
             progress(done, total);
         }
         output.flush().map_err(error)?;
+        drop(output);
+        let path = destination.canonicalize().map_err(error)?;
+        hashes.insert(path, (size, format!("{:x}", hasher.finalize())));
     }
-    Ok(())
+    Ok(hashes)
 }
 async fn direct_transfer(app: &tauri::AppHandle, job: &mut DownloadJob, cancel: &CancellationToken) -> Result<()> {
     let url = sources::direct_url(&job.magnet)?;
@@ -478,7 +491,7 @@ fn finish_download(app: &tauri::AppHandle, job: &mut DownloadJob, archive: Optio
     };
     job.library_status = None;
     job.library_message = None;
-    let mut extracted = Ok(());
+    let mut extracted = Ok(ExtractedHashes::new());
     if let Some(archive) = archive.filter(|_| job.auto_extract) {
         if archive
             .extension()
@@ -498,8 +511,10 @@ fn finish_download(app: &tauri::AppHandle, job: &mut DownloadJob, archive: Optio
                 "Não foi possível extrair o arquivo: {message} O download foi mantido."
             ));
         }
-        Ok(()) => {
-            if let Some((status, message)) = auto_add_completed_game(app, job, &mut reporter) {
+        Ok(hashes) => {
+            if let Some((status, message)) =
+                auto_add_completed_game(app, job, &mut reporter, &hashes)
+            {
                 job.library_status = Some(status.into());
                 job.library_message = message;
             }
@@ -533,11 +548,12 @@ fn auto_add_completed_game(
     app: &tauri::AppHandle,
     job: &mut DownloadJob,
     reporter: &mut StageReporter,
+    hashes: &ExtractedHashes,
 ) -> Option<(&'static str, Option<String>)> {
     if !job.auto_add_to_library {
         return None;
     }
-    add_to_library(app, job, reporter, None)
+    add_to_library(app, job, reporter, None, hashes)
 }
 /// Adds `chosen`, or the download's only playable file, under the job's game.
 fn add_to_library(
@@ -545,6 +561,7 @@ fn add_to_library(
     job: &mut DownloadJob,
     reporter: &mut StageReporter,
     chosen: Option<&Path>,
+    hashes: &ExtractedHashes,
 ) -> Option<(&'static str, Option<String>)> {
     let game = job.game.clone()?;
     let manual = |message: String| Some(("manual", Some(message)));
@@ -576,11 +593,23 @@ fn add_to_library(
             ))
         }
     };
-    reporter.begin(job, "Verificando o jogo");
-    // The file is hashed once here; the import trusts this fresh hash.
-    let candidate = match crate::filesystem::inspect_with_progress(&file.path, |done, total| {
-        reporter.report(job, done, total)
-    }) {
+    // A file hashed during extraction keeps that hash while its size holds;
+    // anything else is hashed once here, and the import trusts this hash.
+    let known = std::fs::canonicalize(&file.path)
+        .ok()
+        .and_then(|path| Some((hashes.get(&path)?, std::fs::metadata(&path).ok()?.len())))
+        .filter(|((size, _), current)| size == current)
+        .map(|((_, sha256), _)| sha256.clone());
+    let inspected = match known {
+        Some(sha256) => crate::filesystem::inspect_with_hash(&file.path, sha256),
+        None => {
+            reporter.begin(job, "Verificando o jogo");
+            crate::filesystem::inspect_with_progress(&file.path, |done, total| {
+                reporter.report(job, done, total)
+            })
+        }
+    };
+    let candidate = match inspected {
         Ok(candidate) => candidate,
         Err(message) => return manual(message),
     };
@@ -636,7 +665,7 @@ pub fn add_download_to_library(
             app: &app,
             saved_at: Instant::now(),
         };
-        let outcome = add_to_library(&app, &mut job, &mut reporter, chosen.as_deref());
+        let outcome = add_to_library(&app, &mut job, &mut reporter, chosen.as_deref(), &HashMap::new());
         let (status, message) = outcome.unwrap_or(("manual", None));
         job.library_status = Some(status.into());
         job.library_message = message;
@@ -859,9 +888,7 @@ fn unsupported_console(root: &Path) -> Option<&'static str> {
         .find_map(|names| {
             let names: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
             let has = |name: &str| names.iter().any(|n| n == name);
-            if has("ps3_disc.sfb") || has("ps3_game") {
-                Some("PlayStation 3")
-            } else if has("default.xex") {
+            if has("default.xex") {
                 Some("Xbox 360")
             } else if names.iter().any(|n| {
                 [".wbfs", ".rvz", ".wia", ".gcz"].iter().any(|ext| n.ends_with(ext))
@@ -915,11 +942,20 @@ fn collect_files(
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_lowercase();
-        if kind.is_dir() {
-            // PS3 game folders hold executables and data, never playable images.
-            if !name.starts_with("ps3_") {
-                collect_files(root, &path, files, visited)?;
+        if kind.is_dir() && name.starts_with("ps3_") {
+            // PS3 disc folders hold data files with console extensions; only
+            // the EBOOT.BIN they boot is a game.
+            if name == "ps3_game" {
+                if let Some(eboot) = crate::filesystem::ps3_boot_file(&path) {
+                    files.push(DownloadedFile {
+                        path: eboot.to_string_lossy().into_owned(),
+                        filename: "EBOOT.BIN".into(),
+                        platform_ids: vec!["ps3".into()],
+                    });
+                }
             }
+        } else if kind.is_dir() {
+            collect_files(root, &path, files, visited)?;
         } else if kind.is_file() && name != "eboot.bin" {
             let extension = path
                 .extension()
@@ -932,7 +968,7 @@ fn collect_files(
             ]
             .contains(&extension.as_str())
             {
-                let ids = crate::filesystem::platform_ids_for_extension(&extension);
+                let ids = crate::filesystem::platform_ids_for_file(&path);
                 files.push(DownloadedFile {
                     path: path.to_string_lossy().into_owned(),
                     filename: entry.file_name().to_string_lossy().into_owned(),
@@ -948,19 +984,36 @@ fn collect_files(
 mod tests {
     use super::*;
     #[test]
-    fn ps3_dumps_are_recognised_and_offer_no_files() {
+    fn ps3_games_are_found_by_what_they_boot() {
         let root = std::env::temp_dir().join(format!("openretro-ps3-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(root.join("Game/PS3_GAME/USRDIR")).unwrap();
+        std::fs::create_dir_all(root.join("Game/PS3_GAME/USRDIR/DATA")).unwrap();
         std::fs::write(root.join("Game/PS3_DISC.SFB"), b"").unwrap();
         std::fs::write(root.join("Game/PS3_GAME/USRDIR/EBOOT.BIN"), b"").unwrap();
+        // Data files with console extensions are not games.
+        std::fs::write(root.join("Game/PS3_GAME/USRDIR/DATA/music.bin"), b"").unwrap();
+        let mut disc = vec![0u8; 0x900];
+        disc[0x800..0x80c].copy_from_slice(b"PlayStation3");
+        std::fs::write(root.join("Other (USA).iso"), &disc).unwrap();
+        std::fs::write(root.join("PS2 Game (USA).iso"), vec![0u8; 0x900]).unwrap();
         let root = root.canonicalize().unwrap();
         let mut files = Vec::new();
         collect_files(&root, &root, &mut files, &mut 0).unwrap();
-        assert!(files.is_empty());
-        assert_eq!(unsupported_console(&root), Some("PlayStation 3"));
-        std::fs::write(root.join("Game (USA).iso"), b"").unwrap();
-        std::fs::remove_dir_all(root.join("Game")).unwrap();
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+        let found: Vec<_> = files
+            .iter()
+            .map(|file| (file.filename.as_str(), file.platform_ids.clone()))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("EBOOT.BIN", vec!["ps3".to_string()]),
+                ("Other (USA).iso", vec!["ps3".to_string()]),
+                ("PS2 Game (USA).iso", vec!["psp".to_string(), "ps2".to_string()]),
+            ]
+        );
         assert_eq!(unsupported_console(&root), None);
+        std::fs::write(root.join("default.xex"), b"").unwrap();
+        assert_eq!(unsupported_console(&root), Some("Xbox 360"));
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -980,8 +1033,16 @@ mod tests {
             zip.finish().unwrap();
         }
         let mut reports = Vec::new();
-        extract_playable_zip(&archive, &root, |done, total| reports.push((done, total))).unwrap();
-        assert_eq!(std::fs::read(root.join("extracted/Game (USA).sfc")).unwrap(), game);
+        let hashes =
+            extract_playable_zip(&archive, &root, |done, total| reports.push((done, total))).unwrap();
+        let extracted = root.join("extracted/Game (USA).sfc");
+        assert_eq!(std::fs::read(&extracted).unwrap(), game);
+        let path = extracted.canonicalize().unwrap();
+        assert_eq!(
+            hashes[&path],
+            (game.len() as u64, crate::filesystem::hash(&path).unwrap())
+        );
+        assert_eq!(hashes.len(), 1);
         assert!(!root.join("extracted/readme.txt").exists());
         assert!(reports.len() > 1);
         assert_eq!(*reports.last().unwrap(), (game.len() as u64, game.len() as u64));

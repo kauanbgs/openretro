@@ -33,6 +33,8 @@ pub fn run() {
             let db = database::initialize(&dir.join("openretro.sqlite"))
                 .map_err(std::io::Error::other)?;
             commands::sync_runtime_platforms(&db).map_err(std::io::Error::other)?;
+            #[cfg(windows)]
+            commands::register_rpcs3(&db, &dir).map_err(std::io::Error::other)?;
             app.manage(db);
             app.manage(metadata::LaunchboxCatalog::default());
             metadata::start(app.handle());
@@ -41,6 +43,16 @@ pub fn run() {
             app.manage(in_game::InGameService::default());
             app.manage(remote_play::RemotePlay::default());
             in_game::setup(app.handle())?;
+            #[cfg(windows)]
+            {
+                // Copying the runtime takes a moment; the window opens meanwhile.
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    if let Err(message) = commands::ensure_runtime(&handle) {
+                        log::error!("OpenRetro Runtime could not be prepared: {message}");
+                    }
+                });
+            }
             log::info!(
                 "OpenRetro initialized; network downloads: {}",
                 downloads::NETWORK_DOWNLOADS_ENABLED

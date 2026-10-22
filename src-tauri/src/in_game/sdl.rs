@@ -120,6 +120,32 @@ impl Sdl {
             self.controllers.len()
         );
     }
+    /// The type (`SDL_GameControllerType`) and name of each connected
+    /// controller, in SDL's order.
+    pub fn controller_types(&self) -> Vec<(i32, String)> {
+        unsafe {
+            let kind = GetProcAddress(self._library.0, c"SDL_GameControllerTypeForIndex".as_ptr().cast());
+            let name = GetProcAddress(self._library.0, c"SDL_GameControllerNameForIndex".as_ptr().cast());
+            if kind.is_null() || name.is_null() {
+                return Vec::new();
+            }
+            let kind = std::mem::transmute::<*mut c_void, unsafe extern "C" fn(i32) -> i32>(kind);
+            let name = std::mem::transmute::<*mut c_void, unsafe extern "C" fn(i32) -> *const std::ffi::c_char>(name);
+            (self.update)();
+            (0..(self.count)().clamp(0, 16))
+                .filter(|&index| (self.is_controller)(index) != 0)
+                .map(|index| {
+                    let label = name(index);
+                    let label = if label.is_null() {
+                        String::new()
+                    } else {
+                        std::ffi::CStr::from_ptr(label).to_string_lossy().into_owned()
+                    };
+                    (kind(index), label)
+                })
+                .collect()
+        }
+    }
     pub fn sample(&self) -> (bool, u32) {
         let mut guide = false;
         let mut menu = 0;
