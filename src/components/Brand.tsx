@@ -2,20 +2,18 @@ export function BrandMark({ className = "" }: { className?: string }) {
   return (
     <svg
       className={`brand-mark ${className}`}
-      viewBox="0 0 40 40"
-      fill="none"
+      viewBox="0 0 17 17"
+      shapeRendering="crispEdges"
       aria-hidden="true"
     >
-      <rect x="2" y="2" width="36" height="36" rx="11" fill="currentColor" />
-      <circle
-        cx="20"
-        cy="20"
-        r="10"
-        stroke="var(--brand-cutout)"
-        strokeWidth="3"
+      <path
+        fill="#2e2866"
+        d="M8 1h1v1h-1zM7 2h1v1h-1zM9 2h1v1h-1zM6 3h1v2h-1zM10 3h1v2h-1zM2 5h4v1h-4zM11 5h4v1h-4zM1 6h1v1h-1zM15 6h1v1h-1zM2 7h1v1h-1zM14 7h1v1h-1zM3 8h1v1h-1zM13 8h1v1h-1zM4 9h1v2h-1zM12 9h1v2h-1zM8 11h1v1h-1zM7 12h1v1h-1zM9 12h1v1h-1zM6 13h1v1h-1zM10 13h1v1h-1zM3 11h1v4h-1zM13 11h1v4h-1zM5 14h1v1h-1zM11 14h1v1h-1zM4 15h1v1h-1zM12 15h1v1h-1z"
       />
-      <circle cx="20" cy="20" r="2.7" fill="var(--brand-cutout)" />
-      <path d="M28 12L34 6" stroke="var(--brand-cutout)" strokeWidth="3" />
+      <path
+        fill="#12ace2"
+        d="M8 2h1v1h-1zM7 3h3v2h-3zM6 5h5v1h-5zM2 6h13v1h-13zM3 7h11v1h-11zM4 8h9v1h-9zM5 9h7v2h-7zM4 11h4v1h-4zM9 11h4v1h-4zM4 12h3v1h-3zM10 12h3v1h-3zM4 13h2v1h-2zM11 13h2v1h-2zM4 14h1v1h-1zM12 14h1v1h-1z"
+      />
     </svg>
   );
 }
