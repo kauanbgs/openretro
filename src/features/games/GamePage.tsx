@@ -26,7 +26,6 @@ import type {
   GameResolution,
   LibraryGame,
   NetplaySession,
-  SourceMatch,
 } from "../../types";
 import { NETPLAY_PLATFORMS } from "../../types";
 import { GameArtwork } from "../../components/GameArtwork";
@@ -38,6 +37,7 @@ import { Modal } from "../../components/Modal";
 import { platformById } from "../../db/platforms";
 import { GameResolver, MANAGED_RUNTIME_ID } from "../../services/GameResolver";
 import { bridge, isDesktop, isRemote } from "../../services/bridge";
+import { releasesFor } from "../../services/downloadPlatform";
 import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
@@ -134,7 +134,11 @@ export function GamePage({
     );
   const sourceMatches = useQuery({
     queryKey: ["game-download-options", game.id, downloadOptions],
-    queryFn: () => bridge.searchDownloadSources(game.title),
+    queryFn: async () =>
+      releasesFor(
+        await bridge.searchDownloadSources(game.title),
+        game,
+      ),
     enabled: downloadOptions,
   });
   const visibleMatches = (sourceMatches.data ?? []).filter(
@@ -806,7 +810,7 @@ export function GamePage({
               <p className="error-message">{String(sourceMatches.error)}</p>
             ) : visibleMatches.length ? (
               <div className="download-option-list">
-                {visibleMatches.map((match: SourceMatch) => (
+                {visibleMatches.map((match) => (
                   <button
                     className="download-option"
                     disabled={busy}
@@ -827,7 +831,10 @@ export function GamePage({
                     <span>
                       <strong>{match.title}</strong>
                       <small>
-                        {match.fileSize || "Tamanho não informado"} ·{" "}
+                        {match.confirmed
+                          ? platform?.shortName
+                          : "Console não informado"}{" "}
+                        · {match.fileSize || "Tamanho não informado"} ·{" "}
                         {match.sourceName}
                       </small>
                     </span>

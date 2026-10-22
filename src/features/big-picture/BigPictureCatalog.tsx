@@ -31,6 +31,7 @@ import {
 import type { CatalogRequest } from "../../providers/metadata/types";
 import type { GameMetadata, LibraryGame } from "../../types";
 import { bridge } from "../../services/bridge";
+import { releasesFor } from "../../services/downloadPlatform";
 import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import { useCatalogPagination } from "../../hooks/useCatalogPagination";
@@ -212,7 +213,11 @@ export function BigPictureCatalog({
   );
   const releases = useQuery({
     queryKey: ["game-download-options", game?.id, releasesOpen],
-    queryFn: () => bridge.searchDownloadSources(game!.title),
+    queryFn: async () =>
+      releasesFor(
+        await bridge.searchDownloadSources(game!.title),
+        game!,
+      ),
     enabled: Boolean(game && releasesOpen),
     retry: false,
   });
@@ -833,7 +838,10 @@ export function BigPictureCatalog({
                           <span>
                             <strong>{match.title}</strong>
                             <small>
-                              {match.sourceName} ·{" "}
+                              {match.confirmed
+                                ? platformById(game.platformId)?.shortName
+                                : "Console não informado"}{" "}
+                              · {match.sourceName} ·{" "}
                               {match.fileSize || "Tamanho não informado"}
                             </small>
                           </span>

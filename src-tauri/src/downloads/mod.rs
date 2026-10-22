@@ -564,10 +564,10 @@ fn add_to_library(
     let file = match matches.as_slice() {
         [file] => file,
         [] => {
-            return manual(
-                "Nenhum arquivo deste console foi encontrado no download. Use Adicionar à biblioteca para escolher o arquivo."
-                    .into(),
-            )
+            return manual(unsupported_console(&root).map_or_else(
+                || "Nenhum arquivo deste console foi encontrado no download. Use Adicionar à biblioteca para escolher o arquivo.".into(),
+                unsupported_message,
+            ))
         }
         several => {
             return manual(format!(
@@ -839,6 +839,46 @@ pub async fn remove_download(app: tauri::AppHandle, id: String) -> Result<()> {
         .map_err(error)?;
     Ok(())
 }
+/// Consoles OpenRetro cannot run, recognised by the layout of their dumps in
+/// the download or in the folder a torrent wraps it in.
+fn unsupported_console(root: &Path) -> Option<&'static str> {
+    let names = |dir: &Path| -> Vec<String> {
+        std::fs::read_dir(dir)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let top = names(root);
+    let folders = top.iter().map(|name| root.join(name)).filter(|path| path.is_dir());
+    std::iter::once(top.clone())
+        .chain(folders.map(|folder| names(&folder)))
+        .find_map(|names| {
+            let names: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
+            let has = |name: &str| names.iter().any(|n| n == name);
+            if has("ps3_disc.sfb") || has("ps3_game") {
+                Some("PlayStation 3")
+            } else if has("default.xex") {
+                Some("Xbox 360")
+            } else if names.iter().any(|n| {
+                [".wbfs", ".rvz", ".wia", ".gcz"].iter().any(|ext| n.ends_with(ext))
+            }) {
+                Some("Wii ou GameCube")
+            } else {
+                None
+            }
+        })
+}
+
+fn unsupported_message(console: &str) -> String {
+    format!(
+        "Este download é de {console}, que o OpenRetro não roda. Remova-o e escolha outra versão nas opções de download, de preferência uma marcada com o console do jogo."
+    )
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadedFile {
@@ -874,9 +914,13 @@ fn collect_files(
         if !path.starts_with(root) {
             continue;
         }
+        let name = entry.file_name().to_string_lossy().to_lowercase();
         if kind.is_dir() {
-            collect_files(root, &path, files, visited)?;
-        } else if kind.is_file() {
+            // PS3 game folders hold executables and data, never playable images.
+            if !name.starts_with("ps3_") {
+                collect_files(root, &path, files, visited)?;
+            }
+        } else if kind.is_file() && name != "eboot.bin" {
             let extension = path
                 .extension()
                 .and_then(|s| s.to_str())
@@ -903,6 +947,23 @@ fn collect_files(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ps3_dumps_are_recognised_and_offer_no_files() {
+        let root = std::env::temp_dir().join(format!("openretro-ps3-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("Game/PS3_GAME/USRDIR")).unwrap();
+        std::fs::write(root.join("Game/PS3_DISC.SFB"), b"").unwrap();
+        std::fs::write(root.join("Game/PS3_GAME/USRDIR/EBOOT.BIN"), b"").unwrap();
+        let root = root.canonicalize().unwrap();
+        let mut files = Vec::new();
+        collect_files(&root, &root, &mut files, &mut 0).unwrap();
+        assert!(files.is_empty());
+        assert_eq!(unsupported_console(&root), Some("PlayStation 3"));
+        std::fs::write(root.join("Game (USA).iso"), b"").unwrap();
+        std::fs::remove_dir_all(root.join("Game")).unwrap();
+        assert_eq!(unsupported_console(&root), None);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     #[test]
     fn extraction_reports_progress_and_keeps_only_playable_files() {
         let root = std::env::temp_dir().join(format!("openretro-extract-{}", uuid::Uuid::new_v4()));
@@ -1062,6 +1123,11 @@ pub async fn download_files(app: tauri::AppHandle, id: String) -> Result<Vec<Dow
         let root = PathBuf::from(job.directory).canonicalize().map_err(error)?;
         let mut files = Vec::new();
         collect_files(&root, &root, &mut files, &mut 0)?;
+        if files.is_empty() {
+            if let Some(console) = unsupported_console(&root) {
+                return Err(unsupported_message(console));
+            }
+        }
         Ok(files)
     })
     .await
