@@ -207,6 +207,28 @@ fn copy_directory(source: &std::path::Path, destination: &std::path::Path) -> Re
     }
     Ok(())
 }
+/// Copies a newer runtime over the installed one. The installed folder also
+/// holds the first player's saves, states, screenshots and BIOS, so nothing
+/// is deleted. The manifest goes last: an interrupted copy is retried on the
+/// next launch instead of being taken for an up-to-date runtime.
+fn update_runtime(bundled: &std::path::Path, runtime: &std::path::Path) -> Result<()> {
+    let manifest = runtime.join("runtime-manifest.json");
+    if manifest.is_file() {
+        std::fs::remove_file(&manifest).map_err(error)?;
+    }
+    std::fs::create_dir_all(runtime).map_err(error)?;
+    for entry in std::fs::read_dir(bundled).map_err(error)? {
+        let entry = entry.map_err(error)?;
+        let (source, destination) = (entry.path(), runtime.join(entry.file_name()));
+        if source.is_dir() {
+            copy_directory(&source, &destination)?;
+        } else if entry.file_name() != "runtime-manifest.json" {
+            std::fs::copy(&source, &destination).map_err(error)?;
+        }
+    }
+    std::fs::copy(bundled.join("runtime-manifest.json"), &manifest).map_err(error)?;
+    Ok(())
+}
 #[cfg(windows)]
 pub(crate) fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::path::PathBuf> {
     let runtime = app
@@ -237,10 +259,7 @@ pub(crate) fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::p
     {
         return Ok(executable);
     }
-    if runtime.exists() {
-        std::fs::remove_dir_all(&runtime).map_err(error)?;
-    }
-    copy_directory(&bundled, &runtime)?;
+    update_runtime(&bundled, &runtime)?;
     if executable.is_file() {
         Ok(executable)
     } else {
@@ -785,6 +804,33 @@ pub fn app_paths(app: tauri::AppHandle) -> Result<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_updates_keep_player_saves() {
+        let root = std::env::temp_dir().join(format!("openretro-runtime-{}", uuid::Uuid::new_v4()));
+        let (bundled, runtime) = (root.join("bundled"), root.join("installed"));
+        std::fs::create_dir_all(bundled.join("autoconfig")).unwrap();
+        std::fs::write(bundled.join("retroarch.exe"), "new").unwrap();
+        std::fs::write(bundled.join("autoconfig").join("pad.cfg"), "pad").unwrap();
+        std::fs::write(bundled.join("runtime-manifest.json"), "r5").unwrap();
+        std::fs::create_dir_all(runtime.join("saves").join("Snes9x")).unwrap();
+        std::fs::write(runtime.join("retroarch.exe"), "old").unwrap();
+        std::fs::write(runtime.join("runtime-manifest.json"), "r2").unwrap();
+        std::fs::write(runtime.join("saves").join("Snes9x").join("Kart.srm"), "save").unwrap();
+
+        update_runtime(&bundled, &runtime).unwrap();
+        let read = |path: std::path::PathBuf| std::fs::read_to_string(path).unwrap();
+        assert_eq!(read(runtime.join("retroarch.exe")), "new");
+        assert_eq!(read(runtime.join("autoconfig").join("pad.cfg")), "pad");
+        assert_eq!(read(runtime.join("runtime-manifest.json")), "r5");
+        assert_eq!(read(runtime.join("saves").join("Snes9x").join("Kart.srm")), "save");
+
+        // A copy that fails leaves no manifest, so the next launch retries.
+        std::fs::remove_file(bundled.join("runtime-manifest.json")).unwrap();
+        assert!(update_runtime(&bundled, &runtime).is_err());
+        assert!(!runtime.join("runtime-manifest.json").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
 
     #[test]
     fn existing_runtime_gains_new_consoles_without_stealing_defaults() {
