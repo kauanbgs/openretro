@@ -25,6 +25,7 @@
   --sidebar-width: 250px;
   --header-height: 68px;
   --bottom-height: 30px;
+  --titlebar-height: 0px;
   --page-gutter: 24px;
   --radius: 8px;
   --radius-small: 4px;
@@ -169,13 +170,70 @@ input[type="radio"] {
   color: var(--text);
 }
 
+/* ---------- Title bar ---------- */
+html.custom-titlebar {
+  --titlebar-height: 32px;
+}
+.titlebar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--titlebar-height);
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.titlebar-brand .brand-mark {
+  width: 16px;
+  height: 16px;
+}
+.titlebar-controls {
+  display: flex;
+  align-self: stretch;
+}
+.titlebar-controls button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+}
+.titlebar-controls button:hover {
+  background: #ffffff14;
+  color: var(--text);
+}
+.titlebar-controls .titlebar-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+html[data-theme="light"] .titlebar-controls button:hover {
+  background: #0000000f;
+}
+
 /* ---------- Shell ---------- */
 .app {
   min-height: 100vh;
+  padding-top: var(--titlebar-height);
 }
 .app .sidebar {
   position: fixed;
-  inset: 0 auto var(--bottom-height) 0;
+  inset: var(--titlebar-height) auto var(--bottom-height) 0;
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -314,13 +372,13 @@ input[type="radio"] {
 }
 
 .app main {
-  min-height: 100vh;
+  min-height: calc(100vh - var(--titlebar-height));
   margin-left: var(--sidebar-width);
   padding-bottom: var(--bottom-height);
 }
 .header {
   position: sticky;
-  top: 0;
+  top: var(--titlebar-height);
   z-index: 30;
   display: flex;
   align-items: center;
@@ -703,10 +761,10 @@ input[type="radio"] {
 }
 .catalogue-filters {
   position: sticky;
-  top: calc(var(--header-height) + var(--page-gutter));
+  top: calc(var(--titlebar-height) + var(--header-height) + var(--page-gutter));
   display: grid;
   gap: 16px;
-  max-height: calc(100vh - var(--header-height) - var(--bottom-height) - 48px);
+  max-height: calc(100vh - var(--titlebar-height) - var(--header-height) - var(--bottom-height) - 48px);
   overflow-y: auto;
   padding: 16px;
   border: 1px solid var(--border);
@@ -819,7 +877,7 @@ input[type="radio"] {
 }
 .hero-panel {
   position: sticky;
-  top: var(--header-height);
+  top: calc(var(--titlebar-height) + var(--header-height));
   z-index: 20;
   display: flex;
   align-items: center;

@@ -33,6 +33,7 @@ import { Modal } from "./components/Modal";
 import { PlayerAvatar } from "./components/PlayerAvatar";
 import { PlayerPicker } from "./components/PlayerPicker";
 import { BrandMark } from "./components/Brand";
+import { TitleBar } from "./components/TitleBar";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop, isRemote } from "./services/bridge";
@@ -142,6 +143,11 @@ export function App() {
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
   const [bigPicture, setBigPicture] = useState(false);
+  // The desktop window has no system title bar; Big Picture covers the screen.
+  const titleBar = isDesktop && !bigPicture;
+  useEffect(() => {
+    document.documentElement.classList.toggle("custom-titlebar", titleBar);
+  }, [titleBar]);
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
@@ -323,6 +329,7 @@ export function App() {
   const downloading = activeDownloads[0];
   return (
     <div className={`app density-${settings.density}`}>
+      {titleBar && <TitleBar />}
       {updateOverlay}
       <aside className="sidebar">
         <button
