@@ -2,7 +2,7 @@ export function BrandMark({ className = "" }: { className?: string }) {
   return (
     <svg
       className={`brand-mark ${className}`}
-      viewBox="0 0 17 17"
+      viewBox="1 1 15 15"
       shapeRendering="crispEdges"
       aria-hidden="true"
     >
