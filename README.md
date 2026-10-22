@@ -63,7 +63,15 @@ are supported.
 opens it in the browser, no app needed, and gets the game's picture and sound,
 touch controls, and the library to start a game. Each phone picks a player
 (J1 to J4); a controller paired with the phone also works where the browser
-allows it. The game keeps running on the PC.
+allows it. Up to four phones can therefore play the same local multiplayer
+game from one PC. The game keeps running on the PC.
+
+To play this one-PC mode over the internet, connect the PC and phones through
+a gaming VPN or forward TCP port 47820 to the PC and share its reachable
+address. The pairing URL is the authorization: do not share it publicly.
+The phone's **Jogar online** option also starts or joins the usual direct-IP
+netplay session on the PC; that mode still requires every remote emulator to
+have the same game file and core.
 
 The page only opens with the random token in the QR code, which changes each
 time phone play starts. The runtime publishes each frame in shared memory, so

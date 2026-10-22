@@ -112,13 +112,17 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
         // The game runs on the PC; the phone switches to the game screen
         // right away instead of waiting for the session to end.
         "launch_game" => {
-            let (id, slot): (String, Option<i32>) = (take(&args, "id")?, take(&args, "slot")?);
+            let (id, slot, netplay): (String, Option<i32>, Option<crate::launcher::netplay::Netplay>) = (
+                take(&args, "id")?,
+                take(&args, "slot")?,
+                take(&args, "netplay")?,
+            );
             if crate::in_game::in_game_status(app.clone())?.is_some() {
                 return Err("Um jogo já está aberto no computador.".into());
             }
             let launcher = app.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = crate::launcher::launch_game(launcher, id, slot, None).await {
+                if let Err(e) = crate::launcher::launch_game(launcher, id, slot, netplay).await {
                     log::warn!("Phone launch: {e}");
                 }
             });
@@ -138,5 +142,21 @@ mod tests {
         assert_eq!(take::<String>(&args, "id").unwrap(), "abc");
         assert_eq!(take::<Option<i64>>(&args, "genreId").unwrap(), None);
         assert!(take::<String>(&args, "missing").is_err());
+    }
+
+    #[test]
+    fn netplay_argument_keeps_the_mobile_players_choice() {
+        let args = json!({
+            "netplay": {
+                "role": "host",
+                "port": 55435,
+                "nickname": "Jogador 1"
+            }
+        });
+        let session = take::<Option<crate::launcher::netplay::Netplay>>(&args, "netplay")
+            .unwrap()
+            .unwrap();
+        assert!(session.hosting());
+        assert_eq!(session.args().unwrap(), ["--host", "--port", "55435", "--nick", "Jogador 1"]);
     }
 }

@@ -410,7 +410,16 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
     connected(&shared, true);
     let mut video = shared.video.subscribe();
     let mut audio = shared.audio.subscribe();
-    let mut relay = input::Relay::new().ok();
+    let mut relay = match input::Relay::new() {
+        Ok(relay) => Some(relay),
+        Err(error) => {
+            // Input must be local-only. Keep video and the rest of the phone
+            // interface available, but leave evidence when the loopback relay
+            // cannot be created instead of making the controls fail silently.
+            log::warn!("Phone play input relay unavailable: {error}");
+            None
+        }
+    };
     let mut last_status = Value::Null;
     let mut tick = tokio::time::interval(std::time::Duration::from_millis(1000));
     loop {

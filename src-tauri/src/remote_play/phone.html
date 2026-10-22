@@ -121,6 +121,7 @@
   const $ = (id) => document.getElementById(id);
   const screen = $("screen"), title = $("title"), notice = $("notice");
   let ws, game = null, library = [], player = Number(localStorage.getItem("openretro-player") || 1);
+  player = Number.isInteger(player) && player >= 1 && player <= 4 ? player : 1;
   let touchButtons = 0, dpadBits = 0, padButtons = 0, axes = [0, 0, 0, 0], sent = "";
   let frames = 0, bytes = 0, objectUrl = null, decoding = false, pending = null;
 
@@ -163,11 +164,22 @@
     notice.textContent = text; notice.classList.add("show");
     clearTimeout(toast.timer); toast.timer = setTimeout(() => notice.classList.remove("show"), 2200);
   }
-  function send(message) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(message)); }
+  function send(message) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+      return true;
+    }
+    return false;
+  }
   function sendPad(force) {
     const state = { type: "pad", player, buttons: touchButtons | dpadBits | padButtons, axes };
     const key = JSON.stringify(state);
-    if (force || key !== sent) { sent = key; send(state); }
+    if (force || key !== sent) {
+      send(state);
+      // `onopen` always forces the current state. Remembering the state here
+      // avoids retrying a closed socket on every animation frame.
+      sent = key;
+    }
   }
 
   // Video: show the newest frame; skip frames that arrive while one decodes.
@@ -213,7 +225,11 @@
       if (view.getUint8(0) === 1) { frames++; showFrame(new Uint8Array(event.data, 1)); }
       else if (view.getUint8(0) === 2) playSound(view);
     };
-    ws.onclose = () => { title.textContent = "Reconectando…"; setTimeout(connect, 1000); };
+    ws.onclose = () => {
+      title.textContent = "Reconectando…";
+      sent = "";
+      setTimeout(connect, 1000);
+    };
   }
 
   function status(message) {

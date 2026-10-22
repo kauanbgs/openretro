@@ -83,7 +83,14 @@ export function PhonePlayDialog({
             </p>
             <p className="hint">
               Cada celular escolhe o jogador (J1 a J4) no menu da página. O jogo
-              continua aparecendo neste computador.
+              continua aparecendo neste computador. Assim, até quatro amigos
+              podem jogar pelo próprio celular usando um único PC.
+            </p>
+            <p className="hint">
+              Para amigos fora do Wi-Fi, conectem o PC e os celulares na mesma
+              VPN de jogos ou encaminhem a porta 47820 do roteador para este
+              computador; depois compartilhe o endereço copiado. Para netplay
+              entre PCs, abra o jogo no celular e use Jogar online.
             </p>
             <button
               className="button outline full"
@@ -104,6 +111,10 @@ export function PhonePlayDialog({
             <p className="hint">
               Na primeira vez, o Windows pergunta se o OpenRetro pode usar a
               rede. Permita em redes privadas.
+            </p>
+            <p className="hint">
+              Amigos podem entrar com seus próprios celulares e escolher J1 a
+              J4. Todos assistem e controlam a mesma partida que roda neste PC.
             </p>
             <button
               className="button primary full"
