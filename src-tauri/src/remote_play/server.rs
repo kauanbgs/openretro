@@ -18,9 +18,11 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+#[cfg(windows)]
+use std::sync::Mutex;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+    Arc,
 };
 use tauri::{Listener, Manager};
 use tokio::sync::{broadcast, oneshot};
@@ -319,6 +321,7 @@ async fn socket(
 }
 
 /// Starts capture for the first phone and stops it after the last one leaves.
+#[cfg_attr(not(windows), allow(unused_variables))]
 fn connected(shared: &Shared, joined: bool) {
     let before = if joined {
         shared.devices.fetch_add(1, Ordering::AcqRel)

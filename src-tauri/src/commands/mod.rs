@@ -192,7 +192,8 @@ fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String>
         ))
     }
 }
-#[cfg(windows)]
+// Only the Windows runtime install uses these; tests run them everywhere.
+#[cfg_attr(not(windows), allow(dead_code))]
 fn copy_directory(source: &std::path::Path, destination: &std::path::Path) -> Result<()> {
     std::fs::create_dir_all(destination).map_err(error)?;
     for entry in std::fs::read_dir(source).map_err(error)? {
@@ -211,6 +212,7 @@ fn copy_directory(source: &std::path::Path, destination: &std::path::Path) -> Re
 /// holds the first player's saves, states, screenshots and BIOS, so nothing
 /// is deleted. The manifest goes last: an interrupted copy is retried on the
 /// next launch instead of being taken for an up-to-date runtime.
+#[cfg_attr(not(windows), allow(dead_code))]
 fn update_runtime(bundled: &std::path::Path, runtime: &std::path::Path) -> Result<()> {
     let manifest = runtime.join("runtime-manifest.json");
     if manifest.is_file() {
