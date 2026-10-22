@@ -208,7 +208,7 @@ fn copy_directory(source: &std::path::Path, destination: &std::path::Path) -> Re
     Ok(())
 }
 #[cfg(windows)]
-fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::path::PathBuf> {
+pub(crate) fn install_bundled_retroarch(app: &tauri::AppHandle) -> Result<std::path::PathBuf> {
     let runtime = app
         .path()
         .app_data_dir()

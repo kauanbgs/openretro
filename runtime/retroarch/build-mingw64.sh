@@ -11,6 +11,9 @@ AUTOCONFIG_DIR="$CACHE_ROOT/retroarch-joypad-autoconfig"
 OUTPUT_ROOT="${OPENRETRO_RUNTIME_OUTPUT:-$PROJECT_ROOT/src-tauri/resources/runtime/retroarch}"
 DIST_ROOT="${OPENRETRO_RUNTIME_DIST:-$PROJECT_ROOT/dist-runtime}"
 SOURCE_STAGE="$CACHE_ROOT/source-package"
+# Incremental builds reuse the previous objects and configure run. Releases
+# leave it unset so every package is built from a clean tree.
+INCREMENTAL="${OPENRETRO_RUNTIME_INCREMENTAL:-0}"
 
 for command in git make gcc strip ntldd sha256sum tar; do
   command -v "$command" >/dev/null 2>&1 || {
@@ -27,8 +30,14 @@ checkout_pinned() {
     rm -rf "$destination"
     git clone --filter=blob:none --no-checkout "$repository" "$destination"
   fi
-  git -C "$destination" fetch --depth 1 origin "$commit"
-  git -C "$destination" checkout --detach --force "$commit"
+  # The pinned commit never changes, so only fetch it once.
+  git -C "$destination" cat-file -e "$commit^{commit}" 2>/dev/null ||
+    git -C "$destination" fetch --depth 1 origin "$commit"
+  # A forced checkout rewrites the patched files, which makes make rebuild
+  # them; incremental builds keep the tree when it is already on the commit.
+  if [[ "$INCREMENTAL" != 1 || "$(git -C "$destination" rev-parse HEAD)" != "$commit" ]]; then
+    git -C "$destination" checkout --detach --force "$commit"
+  fi
   local actual
   actual="$(git -C "$destination" rev-parse HEAD)"
   [[ "$actual" == "$commit" ]] || {
@@ -43,18 +52,49 @@ checkout_pinned "$AUTOCONFIG_REPOSITORY" "$AUTOCONFIG_COMMIT" "$AUTOCONFIG_DIR"
 # The pinned release does not compile with both the menu and networking
 # disabled. These patches backport the equivalent upstream fixes.
 for patch in "$SCRIPT_DIR"/patches/*.patch; do
+  if [[ "$INCREMENTAL" == 1 ]] && git -C "$SOURCE_DIR" apply --reverse --check --whitespace=nowarn "$patch" 2>/dev/null; then
+    continue
+  fi
   git -C "$SOURCE_DIR" apply --whitespace=nowarn "$patch"
 done
 
 mapfile -t CONFIGURE_FLAGS < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$SCRIPT_DIR/configure-flags.txt")
 
+# ccache returns unchanged objects instantly, even after make clean or a new
+# config.h. It is optional and only changes build speed, never the output.
+COMPILERS=()
+if command -v ccache >/dev/null 2>&1; then
+  COMPILERS=(CC="ccache gcc" CXX="ccache g++")
+  echo "Using ccache for the runtime build."
+fi
+CONFIGURE_STAMP="$(printf '%s\n' "${CONFIGURE_FLAGS[@]}" "${COMPILERS[@]}" | sha256sum | cut -d' ' -f1)"
+
 pushd "$SOURCE_DIR" >/dev/null
-make clean >/dev/null 2>&1 || true
-rm -f config.mk config.log
-CFLAGS="-Os -DNDEBUG -ffunction-sections -fdata-sections" \
-CXXFLAGS="-Os -DNDEBUG -ffunction-sections -fdata-sections" \
-LDFLAGS="-Wl,--gc-sections -s" \
-  ./configure "${CONFIGURE_FLAGS[@]}"
+if [[ "$INCREMENTAL" != 1 ]]; then
+  make clean >/dev/null 2>&1 || true
+fi
+# Rerunning configure regenerates config.h, which every file includes, so an
+# incremental build only reconfigures when the flags or compilers changed.
+if [[ "$INCREMENTAL" != 1 || ! -f config.mk || "$(cat .openretro-configure 2>/dev/null)" != "$CONFIGURE_STAMP" ]]; then
+  rm -f config.mk config.log .openretro-configure
+  env "${COMPILERS[@]}" \
+  CFLAGS="-Os -DNDEBUG -ffunction-sections -fdata-sections" \
+  CXXFLAGS="-Os -DNDEBUG -ffunction-sections -fdata-sections" \
+  LDFLAGS="-Wl,--gc-sections -s" \
+    ./configure "${CONFIGURE_FLAGS[@]}"
+  # configure only enables the stdin command interface when it finds fcntl(),
+  # which MinGW lacks, so it silently drops it. The Windows implementation reads
+  # the pipe with PeekNamedPipe and needs no fcntl. OpenRetro's in-game menu
+  # (pause, states, screenshots, quit) depends on it, so force it on and fail
+  # loudly if that ever stops working.
+  sed -i 's/^HAVE_STDIN_CMD = 0$/HAVE_STDIN_CMD = 1/' config.mk
+  sed -i 's|^/\* #undef HAVE_STDIN_CMD \*/$|#define HAVE_STDIN_CMD 1|' config.h
+  echo "$CONFIGURE_STAMP" > .openretro-configure
+fi
+grep -q '^HAVE_STDIN_CMD = 1$' config.mk && grep -q '^#define HAVE_STDIN_CMD 1$' config.h || {
+  echo "The runtime must be built with stdin commands enabled." >&2
+  exit 1
+}
 make -j"${NUMBER_OF_PROCESSORS:-$(nproc)}"
 strip -s retroarch.exe
 popd >/dev/null
@@ -99,7 +139,8 @@ while IFS= read -r dependency; do
       fi
     fi
   fi
-done < <(ntldd -R "$SOURCE_DIR/retroarch.exe" | awk '/=>/ { print $3 }' | sort -u)
+# The C locale keeps sort from failing on non-ASCII project paths.
+done < <(ntldd -R "$SOURCE_DIR/retroarch.exe" | awk '/=>/ { print $3 }' | LC_ALL=C sort -u)
 
 # SDL2 is required both by RetroArch and by OpenRetro's Guide-button listener.
 if [[ -f /mingw64/bin/SDL2.dll ]]; then

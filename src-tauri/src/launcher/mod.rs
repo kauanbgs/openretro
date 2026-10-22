@@ -154,6 +154,9 @@ pub async fn launch_game(app: tauri::AppHandle, id: String, slot: Option<i32>) -
  let managed_retroarch=is_managed_runtime(&emulator,&entry);
  if slot.is_some() && !managed_retroarch { return Err("Estados salvos só podem ser abertos pelo OpenRetro Runtime.".into()); }
  let runtime_session=if managed_retroarch { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
+ // An app update can ship a newer runtime; copy it before launching so the in-game menu matches it.
+ #[cfg(windows)]
+ if emulator.id=="openretro-retroarch" { if let Err(message)=crate::commands::install_bundled_retroarch(&app) { log::warn!("Keeping the installed runtime: {message}"); } }
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
  let mut args:Vec<String>=if managed_retroarch {
     let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume, auto_resume || slot==Some(-1))?;

@@ -236,7 +236,7 @@ quick_menu_show_save_game_overrides = "false"
 quick_menu_show_information = "false"
 quick_menu_show_download_thumbnails = "false"
 quit_on_close_content = "1"
-quit_press_twice = "true"
+quit_press_twice = "false"
 user_language = "7"
 autosave_interval = "10"
 savestate_thumbnail_enable = "true"
@@ -343,6 +343,8 @@ mod tests {
         assert!(text.contains("stdin_cmd_enable = \"true\""));
         assert!(text.contains("network_cmd_enable = \"false\""));
         assert!(text.contains("menu_pause_libretro = \"true\""));
+        // OpenRetro confirms quit and reset itself; one command must be enough.
+        assert!(text.contains("quit_press_twice = \"false\""));
         assert!(text.contains("menu_driver = \"rgui\""));
         assert!(!text.contains("savefile_directory"));
         assert!(!text.contains("savestate_directory"));
