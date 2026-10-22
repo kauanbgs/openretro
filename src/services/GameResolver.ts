@@ -7,8 +7,14 @@ import type {
 } from "../types";
 import { LocalFileProvider } from "../providers/sources";
 import { EmulatorManager } from "./EmulatorManager";
+/** The managed runtime launches with its own arguments and keeps BIOS files itself. */
+export const MANAGED_RUNTIME_ID = "openretro-retroarch";
 export class GameResolver {
-  constructor(private exists: (path: string) => Promise<boolean>) {}
+  constructor(
+    private exists: (path: string) => Promise<boolean>,
+    private runtimeBios: (platformId: string) => Promise<boolean> = async () =>
+      true,
+  ) {}
   async resolve(
     game: GameMetadata,
     item: LibraryItem | undefined,
@@ -32,6 +38,21 @@ export class GameResolver {
         state: "MISSING_EMULATOR",
         message: `An emulator is required to play this game. Configure a compatible emulator for ${platform.name}.`,
       };
+    if (emulator.id === MANAGED_RUNTIME_ID) {
+      if (!(await this.runtimeBios(platform.id)))
+        return {
+          state: "MISSING_BIOS",
+          message: `O ${platform.name} precisa da BIOS do console. Selecione o arquivo .bin da BIOS (ou um .zip com ela); o OpenRetro guarda uma cópia para todos os jogadores.`,
+          emulator,
+        };
+      return {
+        state: "READY",
+        message: "Everything is ready. Let’s play.",
+        emulator,
+        file: source.localPath,
+        args: [],
+      };
+    }
     if (
       platform.biosRequired &&
       (!item?.biosPath || !(await this.exists(item.biosPath)))

@@ -231,17 +231,46 @@ export function SettingsPage({
               </div>
             </>
           ) : section === "Emulators" ? (
-            <div className="setting-row">
-              <div>
-                <strong>Emuladores e consoles</strong>
-                <p>
-                  Instale, teste e escolha o emulador padrão para cada console.
-                </p>
+            <>
+              <div className="setting-row">
+                <div>
+                  <strong>Emuladores e consoles</strong>
+                  <p>
+                    Instale, teste e escolha o emulador padrão para cada
+                    console.
+                  </p>
+                </div>
+                <button className="button secondary" onClick={onEmulators}>
+                  Gerenciar <ExternalLink size={15} />
+                </button>
               </div>
-              <button className="button secondary" onClick={onEmulators}>
-                Gerenciar <ExternalLink size={15} />
-              </button>
-            </div>
+              <div className="setting-row">
+                <div>
+                  <strong>Resolução do PlayStation 2</strong>
+                  <p>
+                    Desenha os jogos de PS2 em uma resolução maior que a do
+                    console, deixando a imagem mais nítida. Valores altos exigem
+                    mais da placa de vídeo. Vale a partir do próximo jogo
+                    aberto.
+                  </p>
+                </div>
+                <select
+                  aria-label="Resolução do PlayStation 2"
+                  value={settings.ps2Resolution ?? "2x"}
+                  onChange={(e) =>
+                    void save({
+                      ps2Resolution: e.target
+                        .value as AppSettings["ps2Resolution"],
+                    })
+                  }
+                >
+                  <option value="1x">Nativa (640×448)</option>
+                  <option value="2x">2x · recomendado (~1280×896)</option>
+                  <option value="4x">4x · mais nítido (~2560×1792)</option>
+                  <option value="8x">8x · muito pesado</option>
+                </select>
+              </div>
+            </>
           ) : section === "Downloads" ? (
             <>
               <SourceManager />

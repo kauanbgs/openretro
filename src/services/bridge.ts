@@ -493,6 +493,23 @@ export const bridge = {
       throw new Error("Abra o aplicativo desktop para gerenciar seus saves.");
     return invoke("delete_save_state", { id, slot });
   },
+  async runtimeBiosStatus(platformId: string): Promise<boolean> {
+    return isDesktop
+      ? invoke("runtime_bios_status", { platform: platformId })
+      : true;
+  },
+  /** Asks for a BIOS file or ZIP and copies it; resolves null when cancelled. */
+  async installRuntimeBios(platformId: string): Promise<number | null> {
+    if (!isDesktop)
+      throw new Error("Abra o aplicativo desktop para adicionar a BIOS.");
+    const path = await pickPath({
+      directory: false,
+      title: "Selecione a BIOS (.bin) ou um .zip com ela",
+    });
+    return path
+      ? invoke("install_runtime_bios", { platform: platformId, path })
+      : null;
+  },
   async gameCaptures(id: string): Promise<GameCapture[]> {
     return isDesktop ? invoke("list_game_screenshots", { id }) : [];
   },

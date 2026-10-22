@@ -338,11 +338,10 @@ export function BigPicture({
     setLaunchTarget(details[entry.game.id] ?? entry.game);
     setPreparing(true);
     try {
-      const resolution = await new GameResolver(bridge.exists).resolve(
-        entry.game,
-        entry.item,
-        emulators,
-      );
+      const resolution = await new GameResolver(
+        bridge.exists,
+        bridge.runtimeBiosStatus,
+      ).resolve(entry.game, entry.item, emulators);
       if (resolution.state !== "READY") throw new Error(resolution.message);
       await bridge.launch(entry.item.id);
     } catch (error) {

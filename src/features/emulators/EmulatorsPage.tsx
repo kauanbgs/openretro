@@ -12,11 +12,13 @@ import {
   Download,
   ExternalLink,
   Wrench,
+  KeyRound,
   Star,
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { platforms } from "../../db/platforms";
 import { bridge, isDesktop } from "../../services/bridge";
+import { MANAGED_RUNTIME_ID } from "../../services/GameResolver";
 import { listen } from "@tauri-apps/api/event";
 import type { Emulator, EmulatorInstall } from "../../types";
 
@@ -56,6 +58,12 @@ export function EmulatorsPage({
   const installers = useQuery({
     queryKey: ["emulator-installers"],
     queryFn: bridge.emulatorInstallOptions,
+  });
+  const runtimeInstalled = emulators.some((e) => e.id === MANAGED_RUNTIME_ID);
+  const ps2Bios = useQuery({
+    queryKey: ["runtime-bios", "ps2"],
+    queryFn: () => bridge.runtimeBiosStatus("ps2"),
+    enabled: isDesktop && runtimeInstalled,
   });
   useEffect(() => {
     if (!isDesktop) return;
@@ -190,6 +198,44 @@ export function EmulatorsPage({
               </article>
             ))}
           </div>
+          {runtimeInstalled && isDesktop && (
+            <div className="emu-bios">
+              <div className="emu-icon">
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3>BIOS do PlayStation 2</h3>
+                <p>
+                  {ps2Bios.data
+                    ? "Instalada. Os jogos de PS2 rodam no OpenRetro Runtime."
+                    : "Necessária para jogos de PS2. Use o .bin do seu console ou um .zip com ele."}
+                </p>
+              </div>
+              {ps2Bios.data && (
+                <span className="emu-bios-ok">
+                  <Check size={14} /> Pronta
+                </span>
+              )}
+              <button
+                className={`button ${ps2Bios.data ? "secondary" : "primary"}`}
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    const images = await bridge.installRuntimeBios("ps2");
+                    if (images === null) return;
+                    await ps2Bios.refetch();
+                    notify(
+                      images === 1
+                        ? "BIOS do PS2 adicionada."
+                        : `${images} BIOS do PS2 disponíveis.`,
+                    );
+                  })
+                }
+              >
+                {ps2Bios.data ? "Adicionar outra" : "Selecionar BIOS"}
+              </button>
+            </div>
+          )}
         </section>
       ) : (
         <div className="empty-state">

@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager};
+pub mod bios;
 pub mod runtime_menu;
 pub mod save_states;
 
@@ -23,6 +24,7 @@ fn core_name(platform: &str) -> Option<&'static str> {
         "sms" | "genesis" | "gg" => "genesis_plus_gx_libretro.dll",
         "psx" => "pcsx_rearmed_libretro.dll",
         "psp" => "ppsspp_libretro.dll",
+        "ps2" => "pcsx2_libretro.dll",
         "arcade" => "fbneo_libretro.dll",
         "dos" => "dosbox_pure_libretro.dll",
         _ => return None,
@@ -121,6 +123,10 @@ pub fn select_emulator(
     .cloned()
     .ok_or_else(|| "Configure a compatible emulator before playing this game.".into())
 }
+/// Consoles whose core cannot load a save state while booting.
+pub fn boots_without_states(platform: &str) -> bool {
+    platform == "ps2"
+}
 pub fn is_managed_runtime(
     emulator: &crate::models::Emulator,
     entry: &crate::models::LibraryGame,
@@ -139,27 +145,37 @@ pub async fn launch_game(app: tauri::AppHandle, id: String, slot: Option<i32>) -
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,player,auto_resume) = {
+ let (entry,emulator,player,auto_resume,ps2_resolution) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
   let player=crate::profiles::active(&conn)?;
   let settings: String=conn.query_row("SELECT value FROM settings WHERE key='app'",[],|r|r.get(0)).unwrap_or_default();
-  let auto_resume=serde_json::from_str::<serde_json::Value>(&settings).ok().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
-  (entry,emulator,player,auto_resume)
+  let settings=serde_json::from_str::<serde_json::Value>(&settings).ok();
+  let auto_resume=settings.as_ref().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
+  let ps2_resolution=settings.as_ref().and_then(|v|v["ps2Resolution"].as_str().map(String::from));
+  (entry,emulator,player,auto_resume,ps2_resolution)
  };
  let game_path=filesystem::canonical_file(&entry.item.source_path)?;
  let executable=filesystem::executable(&emulator.executable_path)?;
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
  let managed_retroarch=is_managed_runtime(&emulator,&entry);
  if slot.is_some() && !managed_retroarch { return Err("Estados salvos só podem ser abertos pelo OpenRetro Runtime.".into()); }
+ // The PS2 core renders black when a state loads during boot, and saving on
+ // exit would then store that black state; its states load from the game menu.
+ let boot_states=!boots_without_states(&entry.item.platform_id);
+ if slot.is_some() && !boot_states { return Err("No PS2, carregue o estado pelo menu do jogo depois que ele abrir.".into()); }
+ if managed_retroarch && bios::required(&entry.item.platform_id) && !bios::installed(&bios::system_dir(&app.path().app_data_dir().map_err(error)?), &entry.item.platform_id) { return Err("Este console precisa da BIOS. Selecione o arquivo da BIOS na página do jogo ou em Emuladores.".into()); }
  let runtime_session=if managed_retroarch { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
  // An app update can ship a newer runtime; copy it before launching so the in-game menu matches it.
  #[cfg(windows)]
  if emulator.id=="openretro-retroarch" { if let Err(message)=crate::commands::install_bundled_retroarch(&app) { log::warn!("Keeping the installed runtime: {message}"); } }
  if entry.item.platform_id == "psx" && !managed_retroarch && (bios.is_none() || !entry.item.runtime_args.iter().any(|a|a.contains("{bios}"))) { return Err("Configure your BIOS path and the emulator's BIOS argument before playing.".into()); }
+ if managed_retroarch && entry.item.platform_id=="ps2" {
+    runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "LRPS2", &[("pcsx2_upscale_multiplier", runtime_menu::ps2_upscale(ps2_resolution.as_deref()))])?;
+ }
  let mut args:Vec<String>=if managed_retroarch {
-    let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume, auto_resume || slot==Some(-1))?;
+    let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume && boot_states, (auto_resume || slot==Some(-1)) && boot_states)?;
     let mut args:Vec<String>=vec!["--appendconfig".into(),config.to_string_lossy().into_owned()];
     // An entry slot makes the runtime skip its automatic state and adopt that slot.
     if let Some(slot)=slot.filter(|slot| *slot>=0) { args.extend(["--entryslot".into(),slot.to_string()]); }

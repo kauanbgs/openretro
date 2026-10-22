@@ -6,6 +6,8 @@ import { bridge, isDesktop } from "../../services/bridge";
 import { formatBytes, formatRelative } from "../../utils/format";
 
 export const saveStatesKey = (id: string) => ["save-states", id];
+/** Mirrors boots_without_states in src-tauri/src/launcher/mod.rs. */
+export const loadsStateAtBoot = (platformId: string) => platformId !== "ps2";
 
 function dayLabel(date: Date, now = new Date()) {
   const day = (d: Date) =>
@@ -54,6 +56,7 @@ export function SaveTimeline({
     enabled: isDesktop,
   });
   const [confirmDelete, setConfirmDelete] = useState<number>();
+  const loadsAtBoot = loadsStateAtBoot(entry.item.platformId);
   const [deleting, setDeleting] = useState(false);
   async function remove(slot: number) {
     setDeleting(true);
@@ -104,6 +107,12 @@ export function SaveTimeline({
   const newest = states.data[0];
   return (
     <div className="save-timeline">
+      {!loadsAtBoot && (
+        <p className="library-status manual">
+          No PS2, os estados não abrem junto com o jogo. Abra o jogo, escolha o
+          slot no menu (botão PS) e use “Carregar estado”.
+        </p>
+      )}
       {groupByDay(states.data).map((group) => (
         <section key={group.label}>
           <h3>{group.label}</h3>
@@ -150,13 +159,15 @@ export function SaveTimeline({
                     </div>
                   ) : (
                     <div className="save-state-actions">
-                      <button
-                        className="button primary"
-                        disabled={running}
-                        onClick={() => onPlay(state.slot)}
-                      >
-                        <Play size={16} fill="currentColor" /> Jogar daqui
-                      </button>
+                      {loadsAtBoot && (
+                        <button
+                          className="button primary"
+                          disabled={running}
+                          onClick={() => onPlay(state.slot)}
+                        >
+                          <Play size={16} fill="currentColor" /> Jogar daqui
+                        </button>
+                      )}
                       <button
                         className="icon-button"
                         aria-label={`Apagar ${slotLabel(state.slot)}`}

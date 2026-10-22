@@ -31,6 +31,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir)?;
             let db = database::initialize(&dir.join("openretro.sqlite"))
                 .map_err(std::io::Error::other)?;
+            commands::sync_runtime_platforms(&db).map_err(std::io::Error::other)?;
             app.manage(db);
             app.manage(metadata::CatalogService::default());
             app.manage(downloads::DownloadService::default());
@@ -88,6 +89,8 @@ pub fn run() {
             launcher::runtime_menu::open_game_screenshots,
             launcher::runtime_menu::list_game_screenshots,
             launcher::save_states::list_save_states,
+            launcher::bios::runtime_bios_status,
+            launcher::bios::install_runtime_bios,
             launcher::save_states::delete_save_state,
             in_game::in_game_status,
             in_game::in_game_action,

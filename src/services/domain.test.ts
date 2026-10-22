@@ -37,6 +37,44 @@ describe("platform detection", () => {
   it("does not infer support from a name with an executable suffix", () =>
     expect(detectPlatforms("game.gba.bat")).toEqual([]));
 });
+describe("GameResolver with the managed runtime", () => {
+  const runtime: Emulator = {
+    id: "openretro-retroarch",
+    name: "OpenRetro Runtime",
+    executablePath: "C:\\runtime\\retroarch.exe",
+    supportedPlatforms: ["psx", "ps2"],
+    defaultPlatforms: ["psx", "ps2"],
+  };
+  const disc = {
+    ...item,
+    platformId: "ps2",
+    sourcePath: "C:\\games\\disc.iso",
+  };
+  const ps2 = { ...catalog[0], platformId: "ps2" };
+  it("asks for the runtime BIOS instead of a per-game path", async () => {
+    const missing = await new GameResolver(
+      async () => true,
+      async () => false,
+    ).resolve(ps2, disc, [runtime]);
+    expect(missing.state).toBe("MISSING_BIOS");
+    expect(missing.emulator?.id).toBe("openretro-retroarch");
+    const ready = await new GameResolver(
+      async () => true,
+      async () => true,
+    ).resolve(ps2, disc, [runtime]);
+    expect(ready.state).toBe("READY");
+  });
+  it("does not require launch arguments for the runtime's own BIOS handling", async () =>
+    expect(
+      (
+        await new GameResolver(async () => true).resolve(
+          { ...catalog[0], platformId: "psx" },
+          { ...item, platformId: "psx", sourcePath: "C:\\games\\disc.cue" },
+          [runtime],
+        )
+      ).state,
+    ).toBe("READY"));
+});
 describe("GameResolver", () => {
   const resolver = new GameResolver(async () => true);
   it("explains unsupported platforms", async () =>

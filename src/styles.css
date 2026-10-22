@@ -3894,6 +3894,41 @@ html[data-animations="false"] *:after {
     grid-column: 1 / -1;
   }
 }
+.emu-bios {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  margin-top: 10px;
+  padding: 14px 18px;
+  border: 1px dashed var(--hairline, var(--border));
+  border-radius: 14px;
+}
+.emu-bios h3 {
+  font-size: 15px;
+}
+.emu-bios p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.emu-bios-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 700;
+}
+@media (max-width: 680px) {
+  .emu-bios {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+  .emu-bios .button,
+  .emu-bios-ok {
+    grid-column: 1 / -1;
+  }
+}
 
 /* Download jobs: post-transfer status. */
 .transfer-state .spin {

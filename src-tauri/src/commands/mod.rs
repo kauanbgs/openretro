@@ -24,7 +24,7 @@ const INSTALLERS: &[InstallerSpec] = &[
             "Runtime mínimo integrado para consoles clássicos. Instala somente o core necessário ao jogar.",
         platforms: &[
             "nes", "snes", "n64", "gb", "gbc", "gba", "nds", "sms", "genesis", "gg", "psx", "psp",
-            "arcade", "dos",
+            "ps2", "arcade", "dos",
         ],
         is_base: true,
         winget_id: "Libretro.RetroArch",
@@ -395,6 +395,36 @@ fn register_retroarch(app: &tauri::AppHandle, executable: std::path::PathBuf) ->
     transaction.execute("INSERT INTO emulators(id,data) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET data=excluded.data", params![emulator.id, serde_json::to_string(&emulator).map_err(error)?]).map_err(error)?;
     transaction.commit().map_err(error)
 }
+/// Runtimes registered before a console was added to the runtime gain it at
+/// startup. It only becomes their default when no other emulator claims it.
+pub fn sync_runtime_platforms(db: &Database) -> Result<()> {
+    let mut conn = db.0.lock().map_err(error)?;
+    let transaction = conn.transaction().map_err(error)?;
+    let emulators = database::emulators(&transaction)?;
+    let Some(mut runtime) = emulators.iter().find(|e| e.id == "openretro-retroarch").cloned() else {
+        return Ok(());
+    };
+    let mut changed = false;
+    for platform in INSTALLERS[0].platforms {
+        let platform = (*platform).to_string();
+        if !runtime.supported_platforms.contains(&platform) {
+            runtime.supported_platforms.push(platform.clone());
+            changed = true;
+            if !emulators.iter().any(|e| e.default_platforms.contains(&platform)) {
+                runtime.default_platforms.push(platform);
+            }
+        }
+    }
+    if changed {
+        transaction
+            .execute(
+                "UPDATE emulators SET data=?1 WHERE id=?2",
+                params![serde_json::to_string(&runtime).map_err(error)?, runtime.id],
+            )
+            .map_err(error)?;
+    }
+    transaction.commit().map_err(error)
+}
 #[cfg(windows)]
 fn register_pcsx2(app: &tauri::AppHandle, executable: std::path::PathBuf) -> Result<()> {
     let emulator = Emulator {
@@ -760,4 +790,49 @@ pub fn app_paths(app: tauri::AppHandle) -> Result<serde_json::Value> {
     Ok(
         serde_json::json!({"database":app.path().app_data_dir().map_err(error)?.join("openretro.sqlite"),"cache":app.path().app_cache_dir().map_err(error)?,"logs":app.path().app_log_dir().map_err(error)?}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn existing_runtime_gains_new_consoles_without_stealing_defaults() {
+        let path = std::env::temp_dir().join(format!("openretro-sync-{}.sqlite", uuid::Uuid::new_v4()));
+        let db = database::initialize(&path).unwrap();
+        let emulator = |id: &str, supported: &[&str], defaults: &[&str]| Emulator {
+            id: id.into(),
+            name: id.into(),
+            executable_path: String::new(),
+            supported_platforms: supported.iter().map(|p| p.to_string()).collect(),
+            version: None,
+            default_platforms: defaults.iter().map(|p| p.to_string()).collect(),
+        };
+        {
+            let conn = db.0.lock().unwrap();
+            for e in [
+                emulator("openretro-retroarch", &["nes"], &["nes"]),
+                emulator("detected-pcsx2", &["ps2"], &["ps2"]),
+            ] {
+                conn.execute(
+                    "INSERT INTO emulators(id,data) VALUES(?1,?2)",
+                    params![e.id, serde_json::to_string(&e).unwrap()],
+                )
+                .unwrap();
+            }
+        }
+        sync_runtime_platforms(&db).unwrap();
+        let runtime = database::emulators(&db.0.lock().unwrap())
+            .unwrap()
+            .into_iter()
+            .find(|e| e.id == "openretro-retroarch")
+            .unwrap();
+        assert!(runtime.supported_platforms.contains(&"ps2".to_string()));
+        assert!(!runtime.default_platforms.contains(&"ps2".to_string()));
+        assert!(runtime.default_platforms.contains(&"snes".to_string()));
+        drop(db);
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+        }
+    }
 }

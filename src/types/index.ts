@@ -121,6 +121,8 @@ export interface AppSettings {
   concurrentDownloads: number;
   bandwidthLimit: number;
   developerMode: boolean;
+  /** Internal resolution of PS2 games in the managed runtime. */
+  ps2Resolution?: "1x" | "2x" | "4x" | "8x";
 }
 export const defaultSettings: AppSettings = {
   autoResume: true,
@@ -132,6 +134,7 @@ export const defaultSettings: AppSettings = {
   concurrentDownloads: 2,
   bandwidthLimit: 0,
   developerMode: false,
+  ps2Resolution: "2x",
 };
 export type DownloadState =
   | "RESOLVING"

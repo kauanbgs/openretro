@@ -33,7 +33,7 @@ import { GameArtwork } from "../../components/GameArtwork";
 import { metadataProvider } from "../../providers/metadata/IgdbMetadataProvider";
 import { Modal } from "../../components/Modal";
 import { platformById } from "../../db/platforms";
-import { GameResolver } from "../../services/GameResolver";
+import { GameResolver, MANAGED_RUNTIME_ID } from "../../services/GameResolver";
 import { bridge, isDesktop } from "../../services/bridge";
 import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
@@ -135,9 +135,11 @@ export function GamePage({
       match.title.toLowerCase().includes(downloadQuery.trim().toLowerCase()) &&
       (downloadSource === "all" || match.sourceId === downloadSource),
   );
+  // Bumped after a BIOS is added so the resolver runs again.
+  const [biosVersion, setBiosVersion] = useState(0);
   useEffect(() => {
     let active = true;
-    new GameResolver(bridge.exists)
+    new GameResolver(bridge.exists, bridge.runtimeBiosStatus)
       .resolve(game, entry?.item, emulators)
       .then((r) => {
         if (active) setResolution(r);
@@ -146,8 +148,23 @@ export function GamePage({
     return () => {
       active = false;
     };
-  }, [game, entry, emulators, notify]);
+  }, [game, entry, emulators, notify, biosVersion]);
   const platform = platformById(game.platformId);
+  const needsRuntimeBios =
+    resolution?.state === "MISSING_BIOS" &&
+    resolution.emulator?.id === MANAGED_RUNTIME_ID;
+  async function addRuntimeBios() {
+    await action(async () => {
+      const images = await bridge.installRuntimeBios(game.platformId);
+      if (images === null) return;
+      notify(
+        images === 1
+          ? "BIOS adicionada. Pronto para jogar."
+          : `${images} BIOS adicionadas. Pronto para jogar.`,
+      );
+      setBiosVersion((value) => value + 1);
+    });
+  }
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
     try {
@@ -163,11 +180,10 @@ export function GamePage({
     if (!entry) return;
     setRunning(true);
     try {
-      const r = await new GameResolver(bridge.exists).resolve(
-        game,
-        entry.item,
-        emulators,
-      );
+      const r = await new GameResolver(
+        bridge.exists,
+        bridge.runtimeBiosStatus,
+      ).resolve(game, entry.item, emulators);
       setResolution(r);
       if (r.state !== "READY") {
         notify(r.message);
@@ -327,7 +343,9 @@ export function GamePage({
                   ? "Emulator required"
                   : resolution.state === "MISSING_GAME"
                     ? "Game file not found"
-                    : "Configuration required"}
+                    : needsRuntimeBios
+                      ? "BIOS necessária"
+                      : "Configuration required"}
               </strong>
               <p>
                 {!isDesktop
@@ -345,14 +363,18 @@ export function GamePage({
                         const c = await bridge.pickGame();
                         if (c) await bridge.relocate(entry.item.id, c);
                       })
-                    : setConfig(true)
+                    : needsRuntimeBios
+                      ? void addRuntimeBios()
+                      : setConfig(true)
               }
             >
               {resolution.state === "MISSING_EMULATOR"
                 ? "Configurar emulador"
                 : resolution.state === "MISSING_GAME"
                   ? "Locate file"
-                  : "Configurar"}
+                  : needsRuntimeBios
+                    ? "Selecionar BIOS"
+                    : "Configurar"}
             </button>
           </div>
         )}

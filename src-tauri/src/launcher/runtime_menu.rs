@@ -100,6 +100,8 @@ fn screenshots_directory(data: &Path, hash: &str) -> Result<PathBuf> {
 /// and existing cartridge saves remain untouched.
 pub fn prepare(data: &Path, executable: &Path, hash: &str) -> Result<PathBuf> {
     let screenshots = screenshots_directory(data, hash)?;
+    let system = super::bios::system_dir(data);
+    std::fs::create_dir_all(&system).map_err(error)?;
     let runtime = executable.parent().ok_or("Invalid RetroArch directory.")?;
     let directory = data.join("runtime-config");
     std::fs::create_dir_all(&directory).map_err(error)?;
@@ -126,6 +128,7 @@ pub fn prepare(data: &Path, executable: &Path, hash: &str) -> Result<PathBuf> {
         render(
             runtime,
             &screenshots,
+            &system,
             profiles.parent().ok_or("Invalid controller directory.")?,
         ),
     )
@@ -165,12 +168,57 @@ pub fn prepare_player(
             std::fs::create_dir_all(&path).map_err(error)?;
             config.push_str(&format!("{key} = \"{}\"\n", quoted_path(&path)));
         }
+        // PS2 memory cards live in the system folder, so each player gets one
+        // with a mirrored copy of the shared BIOS files.
+        let shared = super::bios::system_dir(data);
+        let system = data.join("players").join(player).join("system");
+        super::bios::mirror(&shared, &system)?;
+        config = config.replace(
+            &format!("system_directory = \"{}\"", quoted_path(&shared)),
+            &format!("system_directory = \"{}\"", quoted_path(&system)),
+        );
     }
     let path = data
         .join("runtime-config")
         .join(format!("{player}-{hash}.cfg"));
     std::fs::write(&path, config).map_err(error)?;
     Ok(path)
+}
+
+/// The PS2 core's internal resolution values, keyed by OpenRetro's setting.
+/// Unknown or missing settings use 2x, which stays sharp on any GPU.
+pub fn ps2_upscale(setting: Option<&str>) -> &'static str {
+    match setting {
+        Some("1x") => "1x (Native)",
+        Some("4x") => "4x",
+        Some("8x") => "8x",
+        _ => "2x",
+    }
+}
+
+/// Sets OpenRetro-owned keys in a core's options file before launch and
+/// leaves every other option the player may have changed untouched. The file
+/// is rewritten on each launch, so a runtime update that resets it is harmless.
+pub fn set_core_options(runtime: &Path, core: &str, options: &[(&str, &str)]) -> Result<()> {
+    let directory = runtime.join(core);
+    std::fs::create_dir_all(&directory).map_err(error)?;
+    let path = directory.join(format!("{core}.opt"));
+    let mut lines: Vec<String> = std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .lines()
+        .map(String::from)
+        .collect();
+    for (key, value) in options {
+        let line = format!("{key} = \"{value}\"");
+        match lines
+            .iter_mut()
+            .find(|existing| existing.split('=').next().is_some_and(|k| k.trim() == *key))
+        {
+            Some(existing) => *existing = line,
+            None => lines.push(line),
+        }
+    }
+    std::fs::write(&path, lines.join("\n") + "\n").map_err(error)
 }
 
 fn quoted_path(path: &Path) -> String {
@@ -183,7 +231,7 @@ fn controller_bindings() -> &'static str {
     "input_b_btn = \"0\"\ninput_a_btn = \"1\"\ninput_y_btn = \"2\"\ninput_x_btn = \"3\"\ninput_select_btn = \"4\"\ninput_start_btn = \"6\"\ninput_l3_btn = \"7\"\ninput_r3_btn = \"8\"\ninput_l_btn = \"9\"\ninput_r_btn = \"10\"\ninput_up_btn = \"11\"\ninput_down_btn = \"12\"\ninput_left_btn = \"13\"\ninput_right_btn = \"14\"\ninput_l_x_plus_axis = \"+0\"\ninput_l_x_minus_axis = \"-0\"\ninput_l_y_plus_axis = \"+1\"\ninput_l_y_minus_axis = \"-1\"\ninput_r_x_plus_axis = \"+2\"\ninput_r_x_minus_axis = \"-2\"\ninput_r_y_plus_axis = \"+3\"\ninput_r_y_minus_axis = \"-3\"\ninput_l2_axis = \"+4\"\ninput_r2_axis = \"+5\"\ninput_menu_toggle_btn = \"5\"\ninput_menu_toggle_btn_label = \"PS\"\n"
 }
 
-fn render(runtime: &Path, screenshots: &Path, profiles: &Path) -> String {
+fn render(runtime: &Path, screenshots: &Path, system: &Path, profiles: &Path) -> String {
     let mut config = String::from(
         r#"# OpenRetro in-game controls. Regenerated on launch.
 config_save_on_exit = "false"
@@ -260,9 +308,10 @@ input_state_slot_decrease = "f6"
         profiles.to_path_buf()
     };
     config.push_str(&format!(
-        "joypad_autoconfig_dir = \"{}\"\nscreenshot_directory = \"{}\"\n",
+        "joypad_autoconfig_dir = \"{}\"\nscreenshot_directory = \"{}\"\nsystem_directory = \"{}\"\n",
         quoted_path(&autoconfig),
-        quoted_path(screenshots)
+        quoted_path(screenshots),
+        quoted_path(system)
     ));
     let assets = runtime.join("assets");
     if assets.join("ozone").join("regular.ttf").is_file() {
@@ -280,6 +329,28 @@ input_state_slot_decrease = "f6"
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn core_options_update_owned_keys_and_keep_the_rest() {
+        let root = std::env::temp_dir().join(format!("openretro-opt-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("LRPS2")).unwrap();
+        std::fs::write(
+            root.join("LRPS2/LRPS2.opt"),
+            "pcsx2_bios = \"scph.bin\"\npcsx2_upscale_multiplier = \"1x (Native)\"\n",
+        )
+        .unwrap();
+        set_core_options(&root, "LRPS2", &[("pcsx2_upscale_multiplier", ps2_upscale(Some("4x")))]).unwrap();
+        let text = std::fs::read_to_string(root.join("LRPS2/LRPS2.opt")).unwrap();
+        assert_eq!(text, "pcsx2_bios = \"scph.bin\"\npcsx2_upscale_multiplier = \"4x\"\n");
+        std::fs::remove_dir_all(root.join("LRPS2")).unwrap();
+        set_core_options(&root, "LRPS2", &[("pcsx2_upscale_multiplier", ps2_upscale(None))]).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(root.join("LRPS2/LRPS2.opt")).unwrap(),
+            "pcsx2_upscale_multiplier = \"2x\"\n"
+        );
+        assert_eq!(ps2_upscale(Some("1x")), "1x (Native)");
+        assert_eq!(ps2_upscale(Some("bogus")), "2x");
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn player_saves_are_isolated_and_resume_can_be_disabled() {
         let root = std::env::temp_dir().join(format!("openretro-player-{}", uuid::Uuid::new_v4()));
@@ -299,6 +370,7 @@ mod tests {
         assert!(text.contains("savestate_auto_load = \"true\""));
         assert!(text.contains(&format!("players/{player}/{hash}/saves")));
         assert!(text.contains(&format!("players/{player}/{hash}/states")));
+        assert!(text.contains(&format!("system_directory = \"{}\"", quoted_path(&root.join("players").join(&player).join("system")))));
         assert!(text.contains("input_player4_joypad_index = \"3\""));
         let default = prepare_player(
             &root,
@@ -313,6 +385,7 @@ mod tests {
         assert!(text.contains("savestate_auto_load = \"false\""));
         assert!(!text.contains("savefile_directory"));
         assert!(!text.contains("savestate_directory"));
+        assert!(text.contains(&format!("system_directory = \"{}\"", quoted_path(&root.join("system")))));
         assert!(prepare_player(
             &root,
             &root.join("retroarch.exe"),
