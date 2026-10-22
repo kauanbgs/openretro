@@ -34,8 +34,8 @@ PS3 games run on [RPCS3](https://rpcs3.net/) (GPL-2.0), which OpenRetro manages
 like the runtime: the first PS3 game downloads a pinned, hash-checked RPCS3
 build into application data, installs Sony's official system software from
 Sony's update server and fetches Redump's disc keys. Nothing is installed or
-configured by hand, and RPCS3's own interface never appears; games start full
-screen from the command line. Each connected controller becomes a player
+configured by hand, and RPCS3's own interface never appears; games start inside
+the OpenRetro window from the command line. Each connected controller becomes a player
 (DualShock 4, DualSense and Xbox controllers through RPCS3's own drivers, others
 through SDL), or the keyboard when none is connected. RPCS3's source is at
 <https://github.com/RPCS3/rpcs3>.
@@ -47,6 +47,12 @@ can take a few minutes; later launches are fast. PS3 emulation needs a recent
 multi-core CPU and a Vulkan GPU, and compatibility varies per game (see
 <https://rpcs3.net/compatibility>). Save states, online play and phone play are
 not available for PS3.
+
+Before a PS3 game starts, OpenRetro installs its official updates from Sony's
+update server (checked at most once a day per game, SHA-1 verified, and
+skippable in **Settings → Emuladores**) and keeps RPCS3's recommended settings
+database (<https://api.rpcs3.net/config/?api=v1>) on disk, so RPCS3 applies the
+community's settings for each game as its own interface would.
 
 ## Players, resume and local co-op
 

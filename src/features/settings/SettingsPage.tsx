@@ -270,6 +270,27 @@ export function SettingsPage({
                   <option value="8x">8x · muito pesado</option>
                 </select>
               </div>
+              <div className="setting-row">
+                <div>
+                  <strong>Atualizar jogos de PlayStation 3</strong>
+                  <p>
+                    Antes de abrir um jogo de PS3, baixa e instala a última
+                    atualização oficial dele. Muitos jogos rodam melhor
+                    atualizados.
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={settings.ps3Updates !== false}
+                  aria-label="Atualizar jogos de PlayStation 3"
+                  className={`switch ${settings.ps3Updates !== false ? "on" : ""}`}
+                  onClick={() =>
+                    void save({ ps3Updates: settings.ps3Updates === false })
+                  }
+                >
+                  <span />
+                </button>
+              </div>
             </>
           ) : section === "Downloads" ? (
             <>
@@ -296,6 +317,26 @@ export function SettingsPage({
               >
                 <Folder size={16} /> Escolher pasta de downloads
               </button>
+              <div className="setting-row">
+                <div>
+                  <strong>Apagar o arquivo compactado após instalar</strong>
+                  <p>
+                    Depois de extrair o jogo, remove o .zip baixado e libera o
+                    espaço que ele ocupa.
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={settings.deleteArchives !== false}
+                  aria-label="Apagar o arquivo compactado após instalar"
+                  className={`switch ${settings.deleteArchives !== false ? "on" : ""}`}
+                  onClick={() =>
+                    void save({ deleteArchives: settings.deleteArchives === false })
+                  }
+                >
+                  <span />
+                </button>
+              </div>
               <div className="setting-row">
                 <div>
                   <strong>Downloads simultâneos</strong>

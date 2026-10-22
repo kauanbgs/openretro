@@ -173,6 +173,11 @@ pub async fn launch_game(
  #[cfg(windows)]
  if ps3 {
     let ready=rpcs3::prepare(&app).and_then(|_|rpcs3::ensure_disc_key(&app,&game_path));
+    // Updates are best effort: without Sony's servers the game still starts.
+    let updates=crate::commands::get_settings(app.state::<Database>()).map_or(true,|s|s["ps3Updates"]!=false);
+    if ready.is_ok() && updates {
+       if let Err(message)=rpcs3::install_updates(&app,&game_path) { log::warn!("PS3 game update skipped: {message}"); }
+    }
     // An empty message closes the setup screen, whatever happened.
     let _=app.emit("ps3-setup","");
     ready?;

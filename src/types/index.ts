@@ -157,6 +157,10 @@ export interface AppSettings {
   navigationSounds?: boolean;
   /** Download updates in the background and install them on the next start. */
   autoUpdate?: boolean;
+  /** Delete a downloaded archive once its game is extracted. */
+  deleteArchives?: boolean;
+  /** Install the latest official update before a PS3 game starts. */
+  ps3Updates?: boolean;
   /** Internal resolution of PS2 games in the managed runtime. */
   ps2Resolution?: "1x" | "2x" | "4x" | "8x";
 }
@@ -173,6 +177,8 @@ export const defaultSettings: AppSettings = {
   ps2Resolution: "2x",
   navigationSounds: true,
   autoUpdate: true,
+  deleteArchives: true,
+  ps3Updates: true,
 };
 export type DownloadState =
   | "RESOLVING"
