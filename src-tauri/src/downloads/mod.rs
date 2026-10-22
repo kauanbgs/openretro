@@ -1,3 +1,4 @@
+pub mod region;
 pub mod sources;
 use crate::{
     database::{error, Database, Result},

@@ -10,6 +10,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 pub mod bios;
+pub mod netplay;
 pub mod runtime_menu;
 pub mod save_states;
 
@@ -138,8 +139,14 @@ pub fn is_managed_runtime(
 }
 
 /// `slot` starts from a saved state: -1 is the automatic resume state, 0-99 a manual slot.
+/// `netplay` hosts or joins an online session instead of playing locally.
 #[tauri::command]
-pub async fn launch_game(app: tauri::AppHandle, id: String, slot: Option<i32>) -> Result<i64> {
+pub async fn launch_game(
+    app: tauri::AppHandle,
+    id: String,
+    slot: Option<i32>,
+    netplay: Option<netplay::Netplay>,
+) -> Result<i64> {
     if slot.is_some_and(|slot| !(-1..=99).contains(&slot)) {
         return Err("Slot de estado inválido.".into());
     }
@@ -161,6 +168,13 @@ pub async fn launch_game(app: tauri::AppHandle, id: String, slot: Option<i32>) -
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
  let managed_retroarch=is_managed_runtime(&emulator,&entry);
  if slot.is_some() && !managed_retroarch { return Err("Estados salvos só podem ser abertos pelo OpenRetro Runtime.".into()); }
+ if let Some(netplay)=&netplay {
+    if !managed_retroarch { return Err("O jogo online só funciona no OpenRetro Runtime.".into()); }
+    netplay.validate(&entry.item.platform_id)?;
+    // Players who join receive the host's state, so they never load or save their own.
+    if !netplay.hosting() && slot.is_some() { return Err("Quem entra na partida joga a partir do estado de quem hospeda.".into()); }
+ }
+ let joining=netplay.as_ref().is_some_and(|n| !n.hosting());
  // The PS2 core renders black when a state loads during boot, and saving on
  // exit would then store that black state; its states load from the game menu.
  let boot_states=!boots_without_states(&entry.item.platform_id);
@@ -175,8 +189,13 @@ pub async fn launch_game(app: tauri::AppHandle, id: String, slot: Option<i32>) -
     runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "LRPS2", &runtime_menu::ps2_options(ps2_resolution.as_deref(), num_cpus::get_physical()))?;
  }
  let mut args:Vec<String>=if managed_retroarch {
-    let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume && boot_states, (auto_resume || slot==Some(-1)) && boot_states)?;
+    let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining)?;
     let mut args:Vec<String>=vec!["--appendconfig".into(),config.to_string_lossy().into_owned()];
+    if let Some(netplay)=&netplay {
+      let mut file=std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?;
+      file.write_all(netplay.config().as_bytes()).map_err(error)?;
+      args.extend(netplay.args()?);
+    }
     // An entry slot makes the runtime skip its automatic state and adopt that slot.
     if let Some(slot)=slot.filter(|slot| *slot>=0) { args.extend(["--entryslot".into(),slot.to_string()]); }
     args.extend(["-L".into(),retroarch_core(&app,&executable,&entry.item.platform_id)?.to_string_lossy().into_owned(),game_path.to_string_lossy().into_owned()]);

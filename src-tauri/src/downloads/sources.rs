@@ -92,7 +92,8 @@ fn index(app: &tauri::AppHandle) -> Result<Arc<Index>> {
     let mut titles = String::new();
     for (source_id, source_name, document) in rows {
         let doc: SourceDocument = serde_json::from_str(&document).map_err(error)?;
-        for entry in doc.downloads {
+        // Japanese-only, other-language and bad-dump releases are never offered.
+        for entry in doc.downloads.into_iter().filter(|e| super::region::accepted(&e.title)) {
             titles.push_str(&entry.title.to_lowercase().replace('\n', " "));
             titles.push('\n');
             entries.push(SourceMatch {
@@ -380,7 +381,11 @@ pub async fn search_download_sources(
             return Err("Search is too long.".into());
         }
         let query = query.trim().to_lowercase();
-        Ok(index(&app)?.matching(&query).take(60).cloned().collect())
+        let mut found: Vec<SourceMatch> = index(&app)?.matching(&query).cloned().collect();
+        // Portuguese first, then English, Europe and untagged releases.
+        found.sort_by_key(|m| super::region::fit(&m.entry.title));
+        found.truncate(60);
+        Ok(found)
     })
     .await
     .map_err(error)?

@@ -28,8 +28,10 @@ import type {
   GameMetadata,
   GameResolution,
   LibraryGame,
+  NetplaySession,
   SourceMatch,
 } from "../../types";
+import { NETPLAY_PLATFORMS } from "../../types";
 import { GameArtwork } from "../../components/GameArtwork";
 import {
   catalogGameDetails,
@@ -42,6 +44,7 @@ import { bridge, isDesktop } from "../../services/bridge";
 import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
+import { NetplayDialog } from "./NetplayDialog";
 import { formatRelative } from "../../utils/format";
 
 const tabLabels: Record<string, string> = {
@@ -100,6 +103,7 @@ export function GamePage({
   const [args, setArgs] = useState((entry?.item.runtimeArgs ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState(false);
+  const [netplay, setNetplay] = useState(false);
   const [downloadQuery, setDownloadQuery] = useState("");
   const [downloadSource, setDownloadSource] = useState("all");
   const [trailer, setTrailer] = useState<string>();
@@ -179,7 +183,7 @@ export function GamePage({
       setBusy(false);
     }
   }
-  async function play(slot?: number) {
+  async function play(slot?: number, session?: NetplaySession) {
     if (!entry) return;
     setRunning(true);
     try {
@@ -192,7 +196,7 @@ export function GamePage({
         notify(r.message);
         return;
       }
-      const seconds = await bridge.launch(entry.item.id, slot);
+      const seconds = await bridge.launch(entry.item.id, slot, session);
       notify(
         `Session saved · ${Math.max(1, Math.round(seconds / 60))} min played`,
       );
@@ -291,6 +295,20 @@ export function GamePage({
                     : "Jogar"
                   : "Opções de download"}
             </button>
+            {entry &&
+              resolution?.state === "READY" &&
+              resolution.emulator?.id === MANAGED_RUNTIME_ID &&
+              NETPLAY_PLATFORMS.includes(game.platformId) && (
+                <button
+                  className="button glass"
+                  disabled={running || busy}
+                  aria-label="Jogar online"
+                  title="Jogar online"
+                  onClick={() => setNetplay(true)}
+                >
+                  <Users size={18} />
+                </button>
+              )}
             {game.trailers?.length ? (
               <button
                 className="button glass"
@@ -944,6 +962,17 @@ export function GamePage({
             </button>
           </div>
         </Modal>
+      )}
+      {netplay && entry && (
+        <NetplayDialog
+          title={game.title}
+          notify={notify}
+          onClose={() => setNetplay(false)}
+          onStart={(session) => {
+            setNetplay(false);
+            void play(undefined, session);
+          }}
+        />
       )}
       {remove && entry && (
         <Modal title="Remover este jogo?" onClose={() => setRemove(false)}>

@@ -45,6 +45,18 @@ uses automatic SDL mappings. Connect controllers before launching; supported
 player counts and multitap requirements depend on the game and core. Multitap is
 not forced. Physical controller order and automatic resume need device testing.
 
+## Online play
+
+On a library game that runs in the OpenRetro Runtime, the **Jogar online**
+button hosts a direct-IP netplay session or joins one. Everyone needs the same
+game file; the host shares the address shown in the dialog, an optional room
+password, and the port (55435 by default, opened through UPnP when the router
+allows it). Over the internet without UPnP, forward the port or use a gaming VPN
+such as Tailscale, ZeroTier or Radmin VPN. Players who join start from the
+host's state and never load or overwrite their own resume state. NES, SNES,
+Game Boy, GBA, Master System, Genesis, Game Gear, PlayStation and Arcade games
+are supported.
+
 ## Big Picture tools
 
 Big Picture includes the same game details/configuration, file and folder import,

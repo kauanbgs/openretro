@@ -8,6 +8,7 @@ import type {
   GameMetadata,
   ImportCandidate,
   LibraryGame,
+  NetplaySession,
   PlayerProfile,
   SaveState,
 } from "../types";
@@ -479,11 +480,24 @@ export const bridge = {
     throw new Error("Testing executables requires the desktop app.");
   },
   /** `slot` starts from a saved state: -1 is the automatic resume state. */
-  async launch(id: string, slot?: number): Promise<number> {
-    if (isDesktop) return invoke("launch_game", { id, slot: slot ?? null });
+  async launch(
+    id: string,
+    slot?: number,
+    netplay?: NetplaySession,
+  ): Promise<number> {
+    if (isDesktop)
+      return invoke("launch_game", {
+        id,
+        slot: slot ?? null,
+        netplay: netplay ?? null,
+      });
     throw new Error(
       "Open the desktop app to launch a game with your configured emulator.",
     );
+  },
+  /** This computer's local network address, shared by the netplay host. */
+  async netplayLocalAddress(): Promise<string | null> {
+    return isDesktop ? invoke("netplay_local_address") : null;
   },
   async saveStates(id: string): Promise<SaveState[]> {
     return isDesktop ? invoke("list_save_states", { id }) : [];

@@ -12,10 +12,13 @@ a child process preserves crash isolation without exposing a second app window.
 The runtime keeps dynamic Libretro core loading, configuration files, D3D11,
 OpenGL and Vulkan hardware contexts, SDL2 and Windows controller input, WASAPI
 and XAudio, threading, ZIP/7z/CHD support, save data, save states, screenshots
-and the command channel used by OpenRetro's in-game menu.
+and the command channel used by OpenRetro's in-game menu. Networking is built
+only for direct-IP netplay: OpenRetro starts it with `--host` or `--connect`,
+turns off lobby announcements and relay servers, and lets the host open its
+port through UPnP. The build has no SSL, LAN discovery or network gamepad.
 
 It excludes the RetroArch menu drivers, widgets, database, playlists, online
-updater, networking and netplay, achievements, Discord, recording, streaming,
+updater, netplay lobby and discovery, achievements, Discord, recording, streaming,
 media viewers, overlays, cheats, rewind, runahead, filters, translation,
 accessibility, microphone, CD handling and unused legacy Windows drivers. The
 authoritative list is `runtime/retroarch/configure-flags.txt`.

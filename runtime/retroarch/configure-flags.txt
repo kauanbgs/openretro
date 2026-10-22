@@ -8,7 +8,9 @@
 --disable-update_cores
 --disable-update_core_info
 --disable-update_assets
---disable-networking
+# Networking stays on only for direct-IP netplay, started by OpenRetro.
+--enable-networking
+--disable-ssl
 --disable-networkgamepad
 --disable-netplaydiscovery
 --enable-command

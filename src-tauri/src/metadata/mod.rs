@@ -776,6 +776,10 @@ pub async fn catalog_browse(
             values.push(genre.into());
         }
         let order = if query.is_empty() {
+            // Browsing shows only games with box art; a search still finds the rest.
+            conditions.push(
+                "EXISTS (SELECT 1 FROM images i WHERE i.id=g.id AND i.type='Box - Front')".into(),
+            );
             match sort.as_deref().unwrap_or("popular") {
                 "rating" => {
                     conditions.push("g.rating_count >= 5".into());

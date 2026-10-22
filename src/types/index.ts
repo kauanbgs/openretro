@@ -43,6 +43,29 @@ export interface SaveState {
   size: number;
   thumbnail: string | null;
 }
+/** Hosts or joins a direct-IP netplay session in the OpenRetro Runtime. */
+export interface NetplaySession {
+  role: "host" | "join";
+  /** The host's address, optionally with ":port". Joining only. */
+  address?: string;
+  port?: number;
+  nickname?: string;
+  password?: string;
+}
+/** Consoles whose Runtime cores stay in sync over netplay. */
+export const NETPLAY_PLATFORMS = [
+  "nes",
+  "snes",
+  "gb",
+  "gbc",
+  "gba",
+  "sms",
+  "genesis",
+  "gg",
+  "psx",
+  "arcade",
+];
+export const NETPLAY_DEFAULT_PORT = 55435;
 export interface PlayerProfile {
   id: string;
   name: string;

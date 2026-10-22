@@ -92,6 +92,7 @@ pub fn run() {
             commands::save_settings,
             commands::app_paths,
             launcher::launch_game,
+            launcher::netplay::netplay_local_address,
             launcher::runtime_menu::open_game_screenshots,
             launcher::runtime_menu::list_game_screenshots,
             launcher::save_states::list_save_states,
