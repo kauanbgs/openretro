@@ -8,8 +8,8 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   Home,
-  Library,
   Compass,
   Download,
   Cpu,
@@ -18,7 +18,6 @@ import {
   Plus,
   X,
   Gamepad2,
-  CircleHelp,
   CheckCircle2,
 } from "lucide-react";
 import { PageLoading } from "./components/PageLoading";
@@ -27,7 +26,8 @@ import {
   downloadPollInterval,
 } from "./services/activity";
 import { Modal } from "./components/Modal";
-import { BrandMark } from "./components/Brand";
+import { PlayerAvatar } from "./components/PlayerAvatar";
+import { PlayerPicker } from "./components/PlayerPicker";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop } from "./services/bridge";
 import { listen } from "@tauri-apps/api/event";
@@ -40,7 +40,6 @@ import {
   type LibraryGame,
   type DownloadImported,
 } from "./types";
-import { platformById } from "./db/platforms";
 const HomePage = lazy(() =>
   import("./features/home/HomePage").then((module) => ({
     default: module.HomePage,
@@ -98,7 +97,6 @@ const pageLabels: Record<Page, string> = {
 };
 const navItems = [
   { page: "Home" as Page, icon: Home },
-  { page: "Library" as Page, icon: Library },
   { page: "Discover" as Page, icon: Compass },
   { page: "Downloads" as Page, icon: Download },
   { page: "Emulators" as Page, icon: Cpu },
@@ -128,6 +126,9 @@ export function App() {
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [updateVersion, setUpdateVersion] = useState<string>();
   const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [libraryFilter, setLibraryFilter] = useState("");
+  const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [page, selected?.id]);
@@ -260,107 +261,137 @@ export function App() {
       </Suspense>
     );
   const activeEntry = library.find((x) => x.game.id === selected?.id);
+  const activePlayer = players.data?.players.find(
+    (p) => p.id === players.data?.activeId,
+  );
+  const shownLibrary = library.filter((x) =>
+    x.game.title.toLowerCase().includes(libraryFilter.trim().toLowerCase()),
+  );
+  const downloading = activeDownloads[0];
   return (
     <div className={`app density-${settings.density}`}>
       <aside className="sidebar">
         <button
-          className="brand"
-          onClick={() => navigate("Home")}
-          aria-label="OpenRetro home"
+          className="sidebar-profile"
+          onClick={() => setPlayersOpen(true)}
+          title="Trocar jogador"
         >
-          <BrandMark />
-          <span>OpenRetro</span>
+          <PlayerAvatar player={activePlayer} size={36} />
+          <span>
+            <strong>{activePlayer?.name ?? "Jogador 1"}</strong>
+            <small>
+              {playing ? `Jogando ${playing.game.title}` : "Trocar jogador"}
+            </small>
+          </span>
         </button>
-        <div className="sidebar-label">Sua coleção</div>
-        <nav className="main-nav">
-          {navItems.map((n, i) => (
-            <div key={n.page} className={i === 3 || i === 5 ? "nav-group" : ""}>
-              <button
-                aria-label={pageLabels[n.page]}
-                title={pageLabels[n.page]}
-                aria-current={page === n.page ? "page" : undefined}
-                className={page === n.page ? "active" : ""}
-                onClick={() => navigate(n.page)}
-              >
-                <n.icon size={19} strokeWidth={1.65} />
-                <span>{pageLabels[n.page]}</span>
-                {n.page === "Library" && library.length > 0 && (
-                  <small>{library.length}</small>
-                )}
-              </button>
-            </div>
+        <nav className="sidebar-nav" aria-label="Navegação">
+          {navItems.map((n) => (
+            <button
+              key={n.page}
+              aria-current={page === n.page && !selected ? "page" : undefined}
+              className={page === n.page && !selected ? "active" : ""}
+              onClick={() => navigate(n.page)}
+            >
+              <n.icon size={17} strokeWidth={1.8} />
+              <span>{pageLabels[n.page]}</span>
+              {n.page === "Downloads" && activeDownloads.length > 0 && (
+                <small>{activeDownloads.length}</small>
+              )}
+            </button>
           ))}
         </nav>
-        <div className="sidebar-collection">
-          {library.length > 0 && (
-            <span className="sidebar-label">Seus consoles</span>
-          )}
-          {[...new Set(library.map((x) => x.game.platformId))]
-            .slice(0, 4)
-            .map((id) => (
-              <button
-                key={id}
-                onClick={() => {
-                  navigate("Library");
-                  setPlatform(id);
-                }}
-              >
-                <Gamepad2 size={15} />
-                {platformById(id)?.shortName}
-                <span>
-                  {library.filter((x) => x.game.platformId === id).length}
-                </span>
-              </button>
-            ))}
-        </div>
-        <div className="sidebar-bottom">
-          <div className="download-status">
-            <Download size={16} />
-            <span>
-              {activeDownloads.length
-                ? `${activeDownloads.length} active download${activeDownloads.length === 1 ? "" : "s"}`
-                : "No active downloads"}
-            </span>
-          </div>
-          <div className="sidebar-version">
-            <span>
-              {isDesktop ? "Desktop" : "Browser preview"} <b>v0.3.0</b>
-            </span>
+        <section className="sidebar-library" aria-label="Minha biblioteca">
+          <div className="sidebar-library-heading">
+            <button
+              className={page === "Library" && !selected ? "active" : ""}
+              onClick={() => navigate("Library")}
+            >
+              Minha biblioteca
+            </button>
             <button
               className="icon-button"
-              aria-label="About OpenRetro"
-              onClick={() => setHelp(true)}
+              aria-label="Adicionar jogo"
+              title="Adicionar jogo"
+              onClick={() => openImport()}
             >
-              <CircleHelp size={15} />
+              <Plus size={16} />
             </button>
           </div>
-          {settings.developerMode && (
-            <small className="runtime-label">
-              {isDesktop ? "Tauri · SQLite" : "Browser · localStorage"}
-            </small>
+          {library.length > 0 && (
+            <input
+              className="sidebar-filter"
+              aria-label="Filtrar biblioteca"
+              placeholder="Filtrar biblioteca"
+              value={libraryFilter}
+              onChange={(e) => setLibraryFilter(e.target.value)}
+            />
           )}
-        </div>
+          <ul>
+            {shownLibrary.map(({ game, item }) => (
+              <li key={item.id}>
+                <button
+                  className={selected?.id === game.id ? "active" : ""}
+                  onClick={() => setSelected(game)}
+                  title={game.title}
+                >
+                  {game.coverUrl ? (
+                    <img
+                      src={game.coverUrl}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Gamepad2 size={16} />
+                  )}
+                  <span>{game.title}</span>
+                  {playing?.item.id === item.id && (
+                    <small className="sidebar-playing">jogando</small>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {library.length === 0 && (
+            <p className="sidebar-empty">
+              Os jogos que você adicionar aparecem aqui.
+            </p>
+          )}
+        </section>
       </aside>
       <main>
-        <header className="topbar">
-          <div className="topbar-actions">
-            {playing && (
+        <header className="header">
+          {selected && (
+            <button
+              className="icon-button header-back"
+              aria-label="Voltar"
+              onClick={() => setSelected(undefined)}
+            >
+              <ArrowLeft size={18} />
+            </button>
+          )}
+          <h1>{selected ? selected.title : pageLabels[page]}</h1>
+          <div className="header-actions">
+            {updateVersion && (
               <button
-                className="now-playing"
-                onClick={() => {
-                  setSelected(playing.game);
-                  setPage("Library");
-                }}
+                className="button primary"
+                disabled={installingUpdate}
+                onClick={() => void installUpdate()}
               >
-                <span className="playing-indicator" />
-                <span>
-                  Jogando agora
-                  <strong>{playing.game.title}</strong>
-                </span>
+                <Download size={16} />
+                {installingUpdate
+                  ? "Atualizando…"
+                  : `Atualizar para ${updateVersion}`}
               </button>
             )}
-            <div className="global-search">
-              <Search size={17} />
+            <button
+              className="button secondary"
+              onClick={() => setBigPicture(true)}
+            >
+              <Gamepad2 size={16} /> Big Picture
+            </button>
+            <label className="header-search">
+              <Search size={16} />
               <input
                 id="global-search"
                 aria-label="Buscar jogos"
@@ -374,46 +405,16 @@ export function App() {
                   setSelected(undefined);
                 }}
               />
-              <kbd>Ctrl K</kbd>
               {query && (
                 <button
                   className="icon-button"
                   aria-label="Limpar busca"
                   onClick={() => setQuery("")}
                 >
-                  <X size={13} />
+                  <X size={14} />
                 </button>
               )}
-            </div>
-            <button
-              className="button secondary big-picture-toggle"
-              onClick={() => setBigPicture(true)}
-            >
-              <Gamepad2 size={18} /> Big Picture
-            </button>
-            {updateVersion && (
-              <button
-                className="button primary update-button"
-                disabled={installingUpdate}
-                onClick={() => void installUpdate()}
-              >
-                <Download size={18} />
-                {installingUpdate ? "Updating…" : `Update ${updateVersion}`}
-              </button>
-            )}
-            <button
-              className="button primary add-game"
-              onClick={() => openImport()}
-            >
-              <Plus size={18} /> Adicionar jogo
-            </button>
-            <button
-              className="icon-button topbar-settings"
-              aria-label="Abrir configurações"
-              onClick={() => navigate("Settings")}
-            >
-              <Settings size={19} />
-            </button>
+            </label>
           </div>
         </header>
         {error && (
@@ -497,6 +498,19 @@ export function App() {
           )}
         </Suspense>
       </main>
+      <footer className="bottom-panel">
+        <button onClick={() => navigate("Downloads")}>
+          {playing
+            ? `Jogando ${playing.game.title}`
+            : downloading
+              ? `Baixando ${downloading.game?.title ?? downloading.name} (${downloading.progress.toFixed(0)}%)`
+              : "Nenhum download em andamento"}
+        </button>
+        <button onClick={() => setHelp(true)}>
+          OpenRetro v0.3.0{isDesktop ? "" : " · prévia no navegador"}
+        </button>
+      </footer>
+      {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
       {importing && (
         <Suspense
           fallback={

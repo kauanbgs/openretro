@@ -236,6 +236,70 @@ fn controller_bindings() -> &'static str {
     "input_b_btn = \"0\"\ninput_a_btn = \"1\"\ninput_y_btn = \"2\"\ninput_x_btn = \"3\"\ninput_select_btn = \"4\"\ninput_start_btn = \"6\"\ninput_l3_btn = \"7\"\ninput_r3_btn = \"8\"\ninput_l_btn = \"9\"\ninput_r_btn = \"10\"\ninput_up_btn = \"11\"\ninput_down_btn = \"12\"\ninput_left_btn = \"13\"\ninput_right_btn = \"14\"\ninput_l_x_plus_axis = \"+0\"\ninput_l_x_minus_axis = \"-0\"\ninput_l_y_plus_axis = \"+1\"\ninput_l_y_minus_axis = \"-1\"\ninput_r_x_plus_axis = \"+2\"\ninput_r_x_minus_axis = \"-2\"\ninput_r_y_plus_axis = \"+3\"\ninput_r_y_minus_axis = \"-3\"\ninput_l2_axis = \"+4\"\ninput_r2_axis = \"+5\"\ninput_menu_toggle_btn = \"5\"\ninput_menu_toggle_btn_label = \"PS\"\n"
 }
 
+/// Player 1's keyboard: every SNES and PlayStation button plus both analog
+/// sticks. The face buttons, d-pad, L/R, Start and Select keep RetroArch's
+/// defaults; the page and in-game menu show the same map to the player.
+const KEYBOARD_BINDINGS: &[(&str, &str)] = &[
+    ("input_player1_up", "up"),
+    ("input_player1_down", "down"),
+    ("input_player1_left", "left"),
+    ("input_player1_right", "right"),
+    ("input_player1_b", "z"),
+    ("input_player1_a", "x"),
+    ("input_player1_y", "a"),
+    ("input_player1_x", "s"),
+    ("input_player1_l", "q"),
+    ("input_player1_r", "w"),
+    ("input_player1_l2", "e"),
+    ("input_player1_r2", "r"),
+    ("input_player1_l3", "c"),
+    ("input_player1_r3", "v"),
+    ("input_player1_start", "enter"),
+    ("input_player1_select", "rshift"),
+    ("input_player1_l_y_minus", "i"),
+    ("input_player1_l_y_plus", "k"),
+    ("input_player1_l_x_minus", "j"),
+    ("input_player1_l_x_plus", "l"),
+    ("input_player1_r_y_minus", "t"),
+    ("input_player1_r_y_plus", "g"),
+    ("input_player1_r_x_minus", "f"),
+    ("input_player1_r_x_plus", "h"),
+];
+
+/// RetroArch hotkeys that share a key with the bindings above, or quit,
+/// reset or speed up the game on a stray key press. OpenRetro's in-game menu
+/// (F1) offers the useful ones instead.
+const DISABLED_HOTKEYS: &[&str] = &[
+    "input_exit_emulator",
+    "input_reset",
+    "input_toggle_fast_forward",
+    "input_hold_fast_forward",
+    "input_hold_slowmotion",
+    "input_frame_advance",
+    "input_rewind",
+    "input_toggle_fullscreen",
+    "input_netplay_game_watch",
+    "input_cheat_toggle",
+    "input_cheat_index_plus",
+    "input_cheat_index_minus",
+    "input_shader_toggle",
+    "input_shader_next",
+    "input_shader_prev",
+];
+
+fn keyboard_bindings() -> String {
+    let mut config = String::new();
+    for (key, value) in KEYBOARD_BINDINGS {
+        config.push_str(&format!("{key} = \"{value}\"
+"));
+    }
+    for key in DISABLED_HOTKEYS {
+        config.push_str(&format!("{key} = \"nul\"
+"));
+    }
+    config
+}
+
 fn render(runtime: &Path, screenshots: &Path, system: &Path, profiles: &Path) -> String {
     let mut config = String::from(
         r#"# OpenRetro in-game controls. Regenerated on launch.
@@ -300,6 +364,7 @@ input_state_slot_increase = "f7"
 input_state_slot_decrease = "f6"
 "#,
     );
+    config.push_str(&keyboard_bindings());
     // Preserve the runtime's normal autoconfig library (Xbox, 8BitDo, etc.)
     // when supplied. The bundled SDL profiles are a fallback for small runtimes.
     let supplied = runtime.join("autoconfig");
@@ -334,6 +399,20 @@ input_state_slot_decrease = "f6"
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn keyboard_keys_are_unique_and_clear_of_active_hotkeys() {
+        let keys: Vec<&str> = KEYBOARD_BINDINGS.iter().map(|(_, key)| *key).collect();
+        let unique: std::collections::HashSet<_> = keys.iter().collect();
+        assert_eq!(unique.len(), keys.len(), "a key is bound twice");
+        // RetroArch's hotkeys that stay enabled, and OpenRetro's own F keys.
+        for hotkey in [
+            "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f11", "scroll_lock",
+            "backquote", "add", "subtract",
+        ] {
+            assert!(!keys.contains(&hotkey), "{hotkey} is a hotkey");
+        }
+    }
+
     #[test]
     fn ps2_mtvu_follows_the_cpu_threshold_and_is_written_with_resolution() {
         let root = std::env::temp_dir().join(format!("openretro-mtvu-{}", uuid::Uuid::new_v4()));
@@ -456,6 +535,9 @@ mod tests {
         assert!(text.contains("menu_pause_libretro = \"true\""));
         // OpenRetro confirms quit and reset itself; one command must be enough.
         assert!(text.contains("quit_press_twice = \"false\""));
+        assert!(text.contains("input_player1_l2 = \"e\""));
+        assert!(text.contains("input_player1_l_x_plus = \"l\""));
+        assert!(text.contains("input_exit_emulator = \"nul\""));
         assert!(text.contains("menu_driver = \"rgui\""));
         assert!(!text.contains("savefile_directory"));
         assert!(!text.contains("savestate_directory"));

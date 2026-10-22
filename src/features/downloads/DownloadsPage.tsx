@@ -10,6 +10,7 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
+import { GameArtwork } from "../../components/GameArtwork";
 import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
 import { activeTransferStates } from "../../services/activity";
@@ -154,9 +155,16 @@ export function DownloadsPage({
                 key={j.id}
                 aria-busy={activeTransferStates.has(j.state)}
               >
-                <Download size={24} />
-                <div>
-                  <h3>{j.name}</h3>
+                {j.game ? (
+                  <GameArtwork game={j.game} hero loading="lazy" />
+                ) : (
+                  <div className="artwork download-job-icon">
+                    <Download size={28} />
+                  </div>
+                )}
+                <div className="download-job-body">
+                  <h3>{j.game?.title ?? j.name}</h3>
+                  {j.game && <small className="download-job-file">{j.name}</small>}
                   <p>{j.sourceName}</p>
                   <span className="transfer-state" data-state={j.state}>
                     {j.state === "INSTALLING" && (

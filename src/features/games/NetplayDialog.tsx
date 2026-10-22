@@ -22,7 +22,7 @@ export function NetplayDialog({
   const [port, setPort] = useState(String(NETPLAY_DEFAULT_PORT));
   const [password, setPassword] = useState("");
   const profiles = useQuery({
-    queryKey: ["player-profiles"],
+    queryKey: ["players"],
     queryFn: () => bridge.profiles(),
   });
   const localAddress = useQuery({

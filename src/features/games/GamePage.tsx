@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { enrichGameMetadata } from "../../utils/metadata";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Download,
   Play,
   Heart,
@@ -11,8 +10,6 @@ import {
   FolderOpen,
   ShieldCheck,
   Trash2,
-  Clock3,
-  CalendarDays,
   LoaderCircle,
   ExternalLink,
   Search,
@@ -215,144 +212,142 @@ export function GamePage({
   }
   return (
     <div className="game-page">
-      <div className="detail-hero">
+      <div className="game-hero">
         <GameArtwork game={game} hero />
-        <div className="detail-shade" />
-        <button className="back-button" onClick={onBack}>
-          <ArrowLeft size={17} /> Back
-        </button>
-        <div className="detail-heading">
-          <div className="detail-cover">
-            <GameArtwork game={game} />
-          </div>
-          <div className="detail-titleblock">
-            <span className="detail-console">{platform?.name}</span>
-            <h1>{game.title}</h1>
-            <div className="game-facts">
-              <span>{game.year || "Year unknown"}</span>
-              <span>{game.developer}</span>
-            </div>
-            <div className="detail-badges">
-              {game.rating !== undefined && (
-                <span
-                  className="detail-rating"
-                  title={`${game.ratingCount ?? 0} avaliações no LaunchBox`}
-                >
-                  <Star size={14} fill="currentColor" /> {game.rating}
-                </span>
-              )}
-              {game.gameModes?.map((mode) =>
-                multiplayer.test(mode) ? (
-                  <span className="detail-badge accent" key={mode}>
-                    <Users size={14} /> {mode}
-                  </span>
-                ) : (
-                  <span className="detail-badge" key={mode}>
-                    {mode}
-                  </span>
-                ),
-              )}
-            </div>
+        <div className="game-hero-content">
+          <h2>{game.title}</h2>
+          <p>
+            {[platform?.name, game.year || null, game.developer]
+              .filter(Boolean)
+              .join(", ")}
+          </p>
+          <div className="detail-badges">
+            {game.rating !== undefined && (
+              <span
+                className="detail-badge"
+                title={`${game.ratingCount ?? 0} avaliações no LaunchBox`}
+              >
+                <Star size={13} fill="currentColor" /> {game.rating}
+              </span>
+            )}
+            {game.gameModes?.map((mode) => (
+              <span className="detail-badge" key={mode}>
+                {multiplayer.test(mode) && <Users size={13} />} {mode}
+              </span>
+            ))}
           </div>
         </div>
-        <div className="detail-download-ribbon">
-          <div className="download-ribbon-copy">
-            <span>
-              {entry ? "Disponível na biblioteca" : "Adicionar à coleção"}
-            </span>
-            <strong>
-              {entry
-                ? "Seu jogo está pronto para iniciar"
-                : "Escolha uma versão para baixar"}
-            </strong>
-          </div>
-          <div className="hero-actions">
-            <button
-              className="button primary"
-              disabled={running || busy}
-              onClick={() =>
-                entry
-                  ? resolution?.state === "MISSING_EMULATOR"
-                    ? onEmulators()
-                    : void play()
-                  : (setDownloadQuery(""),
-                    setDownloadSource("all"),
-                    setDownloadOptions(true))
-              }
-            >
-              {running ? (
-                <LoaderCircle className="spin" size={19} />
-              ) : entry ? (
-                <Play size={18} fill="currentColor" />
-              ) : (
-                <Download size={18} />
-              )}{" "}
-              {running
-                ? "Jogo em execução"
-                : entry
-                  ? resolution?.state === "MISSING_EMULATOR"
-                    ? "Configurar emulador"
-                    : "Jogar"
-                  : "Opções de download"}
-            </button>
-            {entry &&
-              resolution?.state === "READY" &&
-              resolution.emulator?.id === MANAGED_RUNTIME_ID &&
-              NETPLAY_PLATFORMS.includes(game.platformId) && (
-                <button
-                  className="button glass"
-                  disabled={running || busy}
-                  aria-label="Jogar online"
-                  title="Jogar online"
-                  onClick={() => setNetplay(true)}
-                >
-                  <Users size={18} />
-                </button>
-              )}
-            {game.trailers?.length ? (
+      </div>
+      <div className="hero-panel">
+        <div className="hero-panel-content">
+          {entry ? (
+            <>
+              <p>
+                {entry.item.lastPlayedAt
+                  ? `Jogou pela última vez ${formatRelative(new Date(entry.item.lastPlayedAt))}`
+                  : "Você ainda não jogou"}
+              </p>
+              <p>
+                {entry.item.playtime
+                  ? `${Math.floor(entry.item.playtime / 3600)}h ${Math.floor((entry.item.playtime % 3600) / 60)}min de jogo`
+                  : "Na sua biblioteca"}
+              </p>
+            </>
+          ) : (
+            <p>Escolha uma versão nas suas fontes ou adicione um arquivo.</p>
+          )}
+        </div>
+        <div className="hero-panel-actions">
+          <button
+            className="button primary"
+            disabled={running || busy}
+            onClick={() =>
+              entry
+                ? resolution?.state === "MISSING_EMULATOR"
+                  ? onEmulators()
+                  : void play()
+                : (setDownloadQuery(""),
+                  setDownloadSource("all"),
+                  setDownloadOptions(true))
+            }
+          >
+            {running ? (
+              <LoaderCircle className="spin" size={16} />
+            ) : entry ? (
+              <Play size={16} fill="currentColor" />
+            ) : (
+              <Download size={16} />
+            )}
+            {running
+              ? "Jogo em execução"
+              : entry
+                ? resolution?.state === "MISSING_EMULATOR"
+                  ? "Configurar emulador"
+                  : "Jogar"
+                : "Opções de download"}
+          </button>
+          {entry &&
+            resolution?.state === "READY" &&
+            resolution.emulator?.id === MANAGED_RUNTIME_ID &&
+            NETPLAY_PLATFORMS.includes(game.platformId) && (
               <button
-                className="button glass"
-                aria-label="Assistir trailer"
-                title="Assistir trailer"
-                onClick={() => setTrailer(game.trailers![0].id)}
+                className="button outline"
+                disabled={running || busy}
+                onClick={() => setNetplay(true)}
               >
-                <Clapperboard size={18} />
-              </button>
-            ) : null}
-            {!entry && (
-              <button className="button glass" onClick={() => onImport(game)}>
-                <FolderOpen size={17} /> Adicionar arquivo local
+                <Users size={16} /> Jogar online
               </button>
             )}
-            {entry && (
-              <>
-                <button
-                  className={`button glass ${entry.item.favorite ? "favorited" : ""}`}
-                  aria-label={
-                    entry.item.favorite
-                      ? "Remover dos favoritos"
-                      : "Favoritar jogo"
-                  }
-                  onClick={() =>
-                    void action(() =>
-                      bridge.favorite(entry.item.id, !entry.item.favorite),
-                    )
-                  }
-                >
-                  <Heart
-                    size={19}
-                    fill={entry.item.favorite ? "currentColor" : "none"}
-                  />
-                </button>
-                <button
-                  className="button glass"
-                  onClick={() => setConfig(true)}
-                >
-                  <Settings2 size={18} /> Configurar
-                </button>
-              </>
-            )}
-          </div>
+          {!entry && (
+            <button className="button outline" onClick={() => onImport(game)}>
+              <FolderOpen size={16} /> Adicionar arquivo
+            </button>
+          )}
+          {game.trailers?.length ? (
+            <button
+              className="button outline"
+              aria-label="Assistir trailer"
+              title="Assistir trailer"
+              onClick={() => setTrailer(game.trailers![0].id)}
+            >
+              <Clapperboard size={16} />
+            </button>
+          ) : null}
+          {entry && (
+            <>
+              <button
+                className={`button outline ${entry.item.favorite ? "favorited" : ""}`}
+                aria-label={
+                  entry.item.favorite
+                    ? "Remover dos favoritos"
+                    : "Favoritar jogo"
+                }
+                title={
+                  entry.item.favorite
+                    ? "Remover dos favoritos"
+                    : "Favoritar jogo"
+                }
+                onClick={() =>
+                  void action(() =>
+                    bridge.favorite(entry.item.id, !entry.item.favorite),
+                  )
+                }
+              >
+                <Heart
+                  size={16}
+                  fill={entry.item.favorite ? "currentColor" : "none"}
+                />
+              </button>
+              <button
+                className="button outline"
+                aria-label="Configurar"
+                title="Configurar"
+                onClick={() => setConfig(true)}
+              >
+                <Settings2 size={16} />
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="detail-body">
@@ -401,43 +396,6 @@ export function GamePage({
         )}
         <div className="detail-layout">
           <div className="detail-main">
-            <div className="detail-stats">
-              <div>
-                <Clock3 size={19} />
-                <span>
-                  Playtime
-                  <strong>
-                    {entry
-                      ? `${Math.floor(entry.item.playtime / 3600)}h ${Math.floor((entry.item.playtime % 3600) / 60)}m`
-                      : "Not played yet"}
-                  </strong>
-                </span>
-              </div>
-              <div>
-                <CalendarDays size={19} />
-                <span>
-                  Last played
-                  <strong>
-                    {entry?.item.lastPlayedAt
-                      ? new Date(entry.item.lastPlayedAt).toLocaleDateString()
-                      : "Never"}
-                  </strong>
-                </span>
-              </div>
-              <div>
-                <ShieldCheck size={19} />
-                <span>
-                  Source
-                  <strong>
-                    {entry
-                      ? "Your local file"
-                      : game.metadataProvider === "launchbox"
-                        ? "LaunchBox"
-                        : "Local metadata"}
-                  </strong>
-                </span>
-              </div>
-            </div>
             {entry && (
               <InGameMenuHelp
                 entry={entry}
@@ -489,19 +447,6 @@ export function GamePage({
                     </a>
                   )}
                 </div>
-                <aside>
-                  <h3>Detalhes do jogo</h3>
-                  <dl>
-                    <dt>Platform</dt>
-                    <dd>{platform?.name}</dd>
-                    <dt>Release year</dt>
-                    <dd>{game.year}</dd>
-                    <dt>Genre</dt>
-                    <dd>{game.genre}</dd>
-                    <dt>Developer</dt>
-                    <dd>{game.developer}</dd>
-                  </dl>
-                </aside>
               </div>
             ) : tab === "Saves" && entry ? (
               <SaveTimeline
@@ -633,14 +578,14 @@ export function GamePage({
             <section className="detail-aside-card">
               <h2>Informações do jogo</h2>
               <dl>
-                <dt>Platform</dt>
+                <dt>Plataforma</dt>
                 <dd>{platform?.name ?? game.platformId}</dd>
-                <dt>Released</dt>
-                <dd>{game.year || "Unknown"}</dd>
-                <dt>Genre</dt>
-                <dd>{game.genre || "Unknown"}</dd>
-                <dt>Developer</dt>
-                <dd>{game.developer || "Unknown"}</dd>
+                <dt>Lançamento</dt>
+                <dd>{game.year || "Desconhecido"}</dd>
+                <dt>Gênero</dt>
+                <dd>{game.genre || "Desconhecido"}</dd>
+                <dt>Desenvolvedora</dt>
+                <dd>{game.developer || "Desconhecida"}</dd>
                 {game.publisher && (
                   <>
                     <dt>Publicadora</dt>

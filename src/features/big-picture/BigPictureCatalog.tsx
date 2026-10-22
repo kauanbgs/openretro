@@ -1,3 +1,4 @@
+import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
 import { CatalogConnection } from "../discover/CatalogConnection";
 import {
   useEffect,
@@ -196,20 +197,7 @@ export function BigPictureCatalog({
     ),
     browse.fetchNextPage,
   );
-  const availability = useQuery({
-    queryKey: [
-      "catalog-download-availability",
-      games.map((game) => game.title),
-    ],
-    queryFn: () =>
-      bridge.availableDownloadTitles(games.map((game) => game.title)),
-    enabled: games.length > 0,
-    staleTime: 30000,
-  });
-  const downloads = useMemo(
-    () => new Set(availability.data ?? []),
-    [availability.data],
-  );
+  const downloads = useDownloadAvailability(games);
   const details = useQuery({
     queryKey: ["tv-catalog-detail", opened?.id, opened?.platformId],
     queryFn: () => metadataProvider.getGame(opened!.id, opened!.platformId),

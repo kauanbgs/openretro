@@ -1,4 +1,4 @@
-import { ArrowUpRight, Download, Heart } from "lucide-react";
+import { CalendarDays, Download, Heart, Library } from "lucide-react";
 import type { GameMetadata, LibraryItem } from "../types";
 import { platformById } from "../db/platforms";
 import { GameArtwork } from "./GameArtwork";
@@ -15,31 +15,35 @@ export function GameCard({
 }) {
   return (
     <button className="game-card" onClick={onClick}>
-      <div className="cover">
-        <GameArtwork game={game} />
-        <span className="platform-label">
-          {platformById(game.platformId)?.shortName}
-        </span>
-        {item?.favorite && (
-          <Heart className="card-heart" size={15} fill="currentColor" />
-        )}
-        {downloadAvailable && !item && (
-          <span className="card-download" title="Download disponível">
-            <Download size={13} /> Download
-          </span>
-        )}
-        <span className="card-open">
-          <ArrowUpRight size={20} />
-        </span>
-      </div>
-      <div className="card-title">{game.title}</div>
-      <div className="card-meta">
-        {platformById(game.platformId)?.name}
-        <span className="card-year">{game.year || "Ano desconhecido"}</span>
-      </div>
-      <div className="card-status">
-        <i className={item ? "installed" : ""} />
-        {item ? "Na biblioteca" : game.genre}
+      <GameArtwork game={game} hero loading="lazy" />
+      <div className="game-card-content">
+        <div className="game-card-title">
+          <p>{game.title}</p>
+          <span>{platformById(game.platformId)?.shortName}</span>
+        </div>
+        <div className="game-card-specifics">
+          {game.year > 0 && (
+            <span>
+              <CalendarDays size={13} /> {game.year}
+            </span>
+          )}
+          {item ? (
+            <span>
+              <Library size={13} /> Na biblioteca
+            </span>
+          ) : (
+            downloadAvailable && (
+              <span>
+                <Download size={13} /> Download disponível
+              </span>
+            )
+          )}
+          {item?.favorite && (
+            <span aria-label="Favorito">
+              <Heart size={13} fill="currentColor" />
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );

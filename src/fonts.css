@@ -7,3 +7,11 @@
   src: url("@fontsource-variable/nunito-sans/files/nunito-sans-latin-wght-normal.woff2")
     format("woff2");
 }
+@font-face {
+  font-family: "Noto Sans Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/noto-sans/files/noto-sans-latin-wght-normal.woff2")
+    format("woff2");
+}

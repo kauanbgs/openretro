@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { bridge } from "../../services/bridge";
+import { KeyboardMap } from "../../components/KeyboardMap";
 import type { SaveState } from "../../types";
 import { formatRelative } from "../../utils/format";
 import "./InGameOverlay.css";
@@ -38,6 +39,7 @@ export function InGameOverlay() {
   const [session, setSession] = useState<Session | null>(null);
   const [selected, setSelected] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [keyboard, setKeyboard] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmation, setConfirmation] = useState<"load" | "reset" | "quit">();
   const [confirmed, setConfirmed] = useState(false);
@@ -248,7 +250,11 @@ export function InGameOverlay() {
             : message ||
               "Estados dependem do suporte do core. Use ← / → para mudar o slot."}
         </p>
+        {keyboard && <KeyboardMap />}
         <div className="game-menu-links">
+          <button onClick={() => setKeyboard((value) => !value)}>
+            {keyboard ? "Esconder teclado" : "Controles no teclado"}
+          </button>
           <button
             onClick={() =>
               void bridge
@@ -273,7 +279,7 @@ export function InGameOverlay() {
           </button>
         </div>
         <footer>
-          A confirma · B continua · PS ou Share + Options abre/fecha
+          A confirma · B continua · PS, Share + Options ou F1 abre/fecha
         </footer>
       </section>
     </div>

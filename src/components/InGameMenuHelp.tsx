@@ -2,6 +2,7 @@ import { Camera, Gamepad2 } from "lucide-react";
 import type { Emulator, LibraryGame } from "../types";
 import { EmulatorManager } from "../services/EmulatorManager";
 import { bridge } from "../services/bridge";
+import { KeyboardMap } from "./KeyboardMap";
 
 export function hasRuntimeMenu(
   entry: LibraryGame | undefined,
@@ -43,7 +44,10 @@ export function InGameMenuHelp({
           Salve e carregue estados, escolha o slot, tire prints, reinicie ou
           encerre o jogo. Estados dependem do suporte do core.
         </p>
-        <small>Teclado: F2 salva · F4 carrega · F8 tira print</small>
+        <details className="keyboard-help">
+          <summary>Jogar no teclado</summary>
+          <KeyboardMap />
+        </details>
       </div>
       <button
         className="button secondary"

@@ -19,6 +19,7 @@
     "format:check": "prettier --check src tests index.html vite.config.ts *.json .github/workflows/*.yml"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans": "^5.3.0",
     "@fontsource-variable/nunito-sans": "^5.3.0",
     "@tanstack/react-query": "^5.90.0",
     "@tauri-apps/api": "^2.8.0",

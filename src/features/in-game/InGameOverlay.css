@@ -137,6 +137,16 @@ html.in-game-overlay #root {
   font-size: 11px;
   line-height: 1.6;
 }
+.game-menu-panel .keyboard-map {
+  margin: 0 0 16px;
+  --muted: #a9a9a9;
+  --quiet: #888;
+  --text: #eee;
+  --border: #ffffff2e;
+}
+.game-menu-panel .keyboard-map dl {
+  grid-template-columns: 1fr;
+}
 .game-menu-links {
   display: flex;
   justify-content: space-between;

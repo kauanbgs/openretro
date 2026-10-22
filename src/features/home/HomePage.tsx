@@ -1,23 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowUpRight,
-  Download,
-  FolderOpen,
-  Library,
-  Play,
-  Plus,
-} from "lucide-react";
-import { Artwork } from "../../components/Artwork";
+import { Dices, Flame, History, Star } from "lucide-react";
 import { GameArtwork } from "../../components/GameArtwork";
 import { GameCard } from "../../components/GameCard";
-import { PageHeader } from "../../components/PageHeader";
+import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
 import {
   metadataProvider,
   catalogGameDetails,
   isCatalogGame,
   catalogStatus,
 } from "../../providers/metadata/LaunchboxMetadataProvider";
+import type { CatalogRequest } from "../../providers/metadata/types";
 import { platformById } from "../../db/platforms";
 import { enrichGameMetadata } from "../../utils/metadata";
 import type { GameMetadata, LibraryGame } from "../../types";
@@ -29,14 +22,15 @@ interface Props {
   onDiscover: () => void;
   onDownloads: () => void;
 }
-export function HomePage({
-  library,
-  onSelect,
-  onImport,
-  onLibrary,
-  onDiscover,
-  onDownloads,
-}: Props) {
+type Sort = NonNullable<CatalogRequest["sort"]>;
+const categories: { sort: Sort; label: string; icon: typeof Flame }[] = [
+  { sort: "popular", label: "Em alta", icon: Flame },
+  { sort: "rating", label: "Melhor avaliados", icon: Star },
+  { sort: "oldest", label: "Clássicos", icon: History },
+];
+export function HomePage({ library, onSelect, onDiscover }: Props) {
+  const [sort, setSort] = useState<Sort>("popular");
+  const [surprising, setSurprising] = useState(false);
   const played = useMemo(
     () =>
       [...library]
@@ -55,15 +49,16 @@ export function HomePage({
         : false,
     retry: false,
   });
-  const spotlight = useQuery({
-    queryKey: ["catalog-spotlight"],
-    queryFn: () => metadataProvider.browse(),
-    enabled: status.data?.configured === true,
+  const ready = status.data?.configured === true;
+  const shelf = useQuery({
+    queryKey: ["catalog-home", sort],
+    queryFn: () => metadataProvider.browse("", "all", 1, undefined, sort),
+    enabled: ready,
     retry: false,
     staleTime: 86400000,
   });
-  const suggestions = spotlight.data?.games ?? [];
-  const primary = played[0]?.game ?? suggestions[0];
+  const games = shelf.data?.games ?? [];
+  const primary = played[0]?.game ?? games[0];
   const details = useQuery({
     queryKey: [
       "game-detail",
@@ -72,9 +67,7 @@ export function HomePage({
       primary?.platformId,
     ],
     queryFn: () => catalogGameDetails(primary!),
-    enabled:
-      status.data?.configured === true &&
-      Boolean(primary && isCatalogGame(primary)),
+    enabled: ready && Boolean(primary && isCatalogGame(primary)),
     retry: false,
     staleTime: 86400000,
   });
@@ -82,202 +75,104 @@ export function HomePage({
     () => (primary ? enrichGameMetadata(primary, details.data) : undefined),
     [primary, details.data],
   );
-  const shelf = library.slice(0, 3);
+  const grid = games.filter((game) => game.id !== featured?.id).slice(0, 12);
+  const downloads = useDownloadAvailability(grid);
+  const owned = new Map(library.map((x) => [x.game.id, x.item]));
+  async function surprise() {
+    setSurprising(true);
+    try {
+      const page = 1 + Math.floor(Math.random() * 40);
+      const result = await metadataProvider.browse("", "all", page);
+      const pick =
+        result.games[Math.floor(Math.random() * result.games.length)];
+      if (pick) onSelect(pick);
+    } finally {
+      setSurprising(false);
+    }
+  }
   return (
-    <div className="page-content home-content">
-      <PageHeader
-        title="Início"
-        description="Continue sua última partida ou descubra o próximo jogo."
-        actions={
-          <button className="text-button" onClick={onLibrary}>
-            <Library size={16} /> Abrir biblioteca
-          </button>
-        }
-      />
-      <div className="home-lead">
-        <section
-          className="feature-stage"
-          aria-label={played.length ? "Continue jogando" : "Jogo em destaque"}
-        >
-          {featured ? (
-            <GameArtwork game={featured} hero />
-          ) : (
-            <Artwork kind="astral" />
-          )}
-          <div className="feature-shade" />
-          <div className="feature-topline">
-            <span className="feature-label">
-              {played.length ? "Continue jogando" : "From the catalog"}
-            </span>
-            {featured && (
-              <span className="feature-system">
-                {platformById(featured.platformId)?.shortName}
+    <div className="page-content home">
+      {featured ? (
+        <button className="hero" onClick={() => onSelect(featured)}>
+          <GameArtwork game={featured} hero />
+          <div className="hero-backdrop">
+            <div className="hero-content">
+              <small>
+                {played.length ? "Continue jogando" : "Destaque do catálogo"}
+              </small>
+              <h2>{featured.title}</h2>
+              <p>{featured.description}</p>
+              <span>
+                {platformById(featured.platformId)?.name}
+                {featured.year ? `, ${featured.year}` : ""}
               </span>
-            )}
-          </div>
-          <div className="feature-copy">
-            <h2>{featured?.title ?? "Your next game is out there."}</h2>
-            {featured ? (
-              <div className="feature-facts">
-                <span>{platformById(featured.platformId)?.name}</span>
-                <span>{featured.year || "Release year unknown"}</span>
-              </div>
-            ) : (
-              <p>
-                Explore the classics or add a game from your own collection.
-              </p>
-            )}
-            <div className="hero-actions">
-              <button
-                className="button primary"
-                onClick={() => (featured ? onSelect(featured) : onDiscover())}
-              >
-                {played.length ? (
-                  <Play size={17} fill="currentColor" />
-                ) : (
-                  <ArrowUpRight size={18} />
-                )}{" "}
-                {played.length
-                  ? "Continue game"
-                  : featured
-                    ? "View game"
-                    : "Explore games"}
-              </button>
-              {featured && (
-                <button className="button on-art" onClick={onDiscover}>
-                  Explorar catálogo
-                </button>
-              )}
             </div>
           </div>
-        </section>
-        <aside className="collection-shelf">
-          <div className="shelf-heading">
-            <h2>Your collection</h2>
-            <span>
-              {library.length} {library.length === 1 ? "game" : "games"}
-            </span>
-          </div>
-          {shelf.length ? (
-            <div className="shelf-games">
-              {shelf.map(({ game, item }) => (
-                <button
-                  className="shelf-game"
-                  key={item.id}
-                  onClick={() => onSelect(game)}
-                >
-                  <GameArtwork game={game} />
-                  <span>
-                    <strong>{game.title}</strong>
-                    <small>{platformById(game.platformId)?.shortName}</small>
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="shelf-empty">
-              <div className="cartridge-outline">
-                <span />
-                <i />
-              </div>
-              <h3>No games added yet</h3>
-              <p>Download a game from your sources or add a local file.</p>
-            </div>
-          )}
-          <button
-            className="button secondary shelf-import"
-            onClick={shelf.length ? onImport : onDownloads}
-          >
-            {shelf.length ? (
-              <>
-                <Plus size={17} /> Add a game
-              </>
-            ) : (
-              <>
-                <Download size={17} /> Find downloads
-              </>
-            )}
-          </button>
-        </aside>
-      </div>
-      {played.length > 0 && (
-        <section className="game-section">
-          <div className="section-heading">
-            <h2>Continue jogando</h2>
-            <button className="text-button" onClick={onLibrary}>
-              Ver biblioteca
-            </button>
-          </div>
-          <div className="games-grid home-game-grid">
-            {played.slice(0, 4).map((x) => (
-              <GameCard
-                key={x.item.id}
-                game={x.game}
-                item={x.item}
-                onClick={() => onSelect(x.game)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-      <section className="game-section">
-        <div className="section-heading">
-          <div>
+        </button>
+      ) : (
+        <div className="hero hero-empty">
+          <div className="hero-content">
             <h2>
-              {library.length ? "Adicionados recentemente" : "Worth a look"}
+              {status.data?.state === "building"
+                ? "Preparando o catálogo"
+                : "Seus clássicos começam aqui"}
             </h2>
-            {!library.length && <p>Clássicos do LaunchBox Games Database.</p>}
+            <p>
+              {status.data?.state === "building"
+                ? "O OpenRetro está baixando a base de jogos do LaunchBox. Isso leva alguns minutos na primeira vez."
+                : status.data?.state === "unavailable"
+                  ? "O catálogo de jogos funciona no aplicativo desktop."
+                  : "Adicione um jogo do seu computador ou explore o catálogo."}
+            </p>
           </div>
-          <button
-            className="text-button"
-            onClick={library.length ? onLibrary : onDiscover}
-          >
-            {library.length ? "Ver biblioteca" : "Browse all games"}
-            <ArrowUpRight size={15} />
-          </button>
         </div>
-        <div className="games-grid home-game-grid">
-          {(library.length
-            ? library.slice(0, 4).map((x) => ({ game: x.game, item: x.item }))
-            : suggestions.slice(1, 5).map((game) => ({ game, item: undefined }))
-          ).map((x) => (
-            <GameCard
-              key={x.game.id}
-              game={x.game}
-              item={x.item}
-              onClick={() => onSelect(x.game)}
-            />
+      )}
+      <div className="home-categories">
+        <div role="tablist" aria-label="Categorias">
+          {categories.map((category) => (
+            <button
+              key={category.sort}
+              role="tab"
+              aria-selected={sort === category.sort}
+              className={`button ${sort === category.sort ? "primary" : "outline"}`}
+              onClick={() => setSort(category.sort)}
+            >
+              <category.icon size={15} /> {category.label}
+            </button>
           ))}
         </div>
-        {!library.length && !suggestions.length && (
-          <div className="catalog-invitation">
-            <FolderOpen size={24} />
-            <div>
-              <h3>
-                {status.data?.configured
-                  ? "O catálogo está indisponível no momento."
-                  : status.data?.state === "building"
-                    ? "Preparando o catálogo…"
-                    : "Explore o catálogo de jogos."}
-              </h3>
-              <p>
-                {status.data?.configured
-                  ? "Você pode continuar adicionando e jogando seus jogos locais."
-                  : status.data?.state === "unavailable"
-                    ? "O catálogo está disponível no app desktop."
-                    : "Acompanhe o preparo da base na tela Catálogo."}
-              </p>
-            </div>
-            <button className="button secondary" onClick={onDiscover}>
-              Abrir catálogo
-            </button>
-          </div>
-        )}
-      </section>
-      <footer className="page-footer">
-        <span>OpenRetro</span>
-        <span>Dados e imagens do LaunchBox Games Database.</span>
-      </footer>
+        <button
+          className="button outline"
+          disabled={!ready || surprising}
+          onClick={() => void surprise()}
+        >
+          <Dices size={15} /> Me surpreenda
+        </button>
+      </div>
+      {ready ? (
+        <div className="cards-grid">
+          {shelf.isPending
+            ? Array.from({ length: 8 }, (_, i) => (
+                <div className="game-card skeleton" key={i} />
+              ))
+            : grid.map((game) => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  item={owned.get(game.id)}
+                  downloadAvailable={downloads.has(game.title)}
+                  onClick={() => onSelect(game)}
+                />
+              ))}
+        </div>
+      ) : (
+        <div className="empty-panel">
+          <p>O catálogo aparece aqui quando estiver pronto.</p>
+          <button className="button outline" onClick={onDiscover}>
+            Abrir catálogo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
