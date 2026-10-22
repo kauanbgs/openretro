@@ -324,7 +324,7 @@ export function App() {
           </div>
           <div className="sidebar-version">
             <span>
-              {isDesktop ? "Desktop" : "Browser preview"} <b>v0.1.0</b>
+              {isDesktop ? "Desktop" : "Browser preview"} <b>v0.2.0</b>
             </span>
             <button
               className="icon-button"
