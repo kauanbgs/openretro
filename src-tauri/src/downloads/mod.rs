@@ -546,9 +546,7 @@ pub async fn start_source_download(
     let _guard = service.operations.lock().await;
     let app_clone = app.clone();
     let selected = tauri::async_runtime::spawn_blocking(move || {
-        sources::all_matches(&app_clone.state::<Database>(), "")?
-            .into_iter()
-            .find(|m| m.source_id == source_id && m.id == entry_id)
+        sources::find_entry(&app_clone, &source_id, &entry_id)?
             .ok_or("Download entry is unavailable. Enable or refresh its source.".to_string())
     })
     .await

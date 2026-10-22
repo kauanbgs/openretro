@@ -34,6 +34,7 @@ pub fn run() {
             app.manage(db);
             app.manage(metadata::CatalogService::default());
             app.manage(downloads::DownloadService::default());
+            app.manage(downloads::sources::SourceIndex::default());
             app.manage(in_game::InGameService::default());
             in_game::setup(app.handle())?;
             log::info!(

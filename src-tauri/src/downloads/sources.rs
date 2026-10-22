@@ -2,7 +2,12 @@ use crate::database::{error, Database, Result};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, io::Read, time::Duration};
+use std::{
+    collections::HashSet,
+    io::Read,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tauri::{Manager, State};
 
 pub const MAX_SOURCE_BYTES: usize = 16 * 1024 * 1024;
@@ -39,6 +44,124 @@ pub struct SourceMatch {
     pub source_name: String,
     #[serde(flatten)]
     pub entry: SourceEntry,
+}
+/// Enabled sources parsed once and kept in memory. Parsing every source JSON
+/// on each catalog page made availability checks take seconds; the index is
+/// rebuilt only after a source is saved, toggled or removed.
+#[derive(Default)]
+pub struct SourceIndex(Mutex<Option<Arc<Index>>>);
+pub struct Index {
+    entries: Vec<SourceMatch>,
+    /// Lowercase entry titles, one per line, aligned with `entries`.
+    titles: String,
+}
+pub fn invalidate(app: &tauri::AppHandle) {
+    if let Ok(mut index) = app.state::<SourceIndex>().0.lock() {
+        *index = None;
+    }
+}
+fn index(app: &tauri::AppHandle) -> Result<Arc<Index>> {
+    let state = app.state::<SourceIndex>();
+    // Holding this lock while building makes concurrent callers wait for one
+    // build instead of parsing the same sources in parallel.
+    let mut cached = state.0.lock().map_err(error)?;
+    if let Some(index) = cached.as_ref() {
+        return Ok(index.clone());
+    }
+    let rows = {
+        let db = app.state::<Database>();
+        let conn = db.0.lock().map_err(error)?;
+        let mut stmt = conn
+            .prepare("SELECT id,name,document FROM download_sources WHERE enabled=1 ORDER BY name")
+            .map_err(error)?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(error)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(error)?;
+        rows
+    };
+    // Parsing happens after the database lock is released.
+    let mut entries = Vec::new();
+    let mut titles = String::new();
+    for (source_id, source_name, document) in rows {
+        let doc: SourceDocument = serde_json::from_str(&document).map_err(error)?;
+        for entry in doc.downloads {
+            titles.push_str(&entry.title.to_lowercase().replace('\n', " "));
+            titles.push('\n');
+            entries.push(SourceMatch {
+                id: entry_id(&entry),
+                source_id: source_id.clone(),
+                source_name: source_name.clone(),
+                entry,
+            });
+        }
+    }
+    let index = Arc::new(Index { entries, titles });
+    *cached = Some(index.clone());
+    Ok(index)
+}
+impl Index {
+    fn matching<'a>(&'a self, query: &'a str) -> impl Iterator<Item = &'a SourceMatch> {
+        self.titles
+            .split('\n')
+            .zip(&self.entries)
+            .filter(move |(title, _)| query.is_empty() || title.contains(query))
+            .map(|(_, entry)| entry)
+    }
+    /// Titles that appear inside at least one entry title, in one pass over the index.
+    fn available(&self, titles: Vec<String>) -> Result<Vec<String>> {
+        let patterns: Vec<String> = titles.iter().map(|title| title.to_lowercase()).collect();
+        let checked: Vec<usize> = (0..patterns.len())
+            .filter(|&i| patterns[i].len() >= 3 && !patterns[i].contains('\n'))
+            .collect();
+        if checked.is_empty() {
+            return Ok(Vec::new());
+        }
+        let searcher =
+            aho_corasick::AhoCorasick::new(checked.iter().map(|&i| &patterns[i])).map_err(error)?;
+        let mut found = vec![false; checked.len()];
+        let mut remaining = checked.len();
+        for hit in searcher.find_overlapping_iter(&self.titles) {
+            let pattern = hit.pattern().as_usize();
+            if !found[pattern] {
+                found[pattern] = true;
+                remaining -= 1;
+                if remaining == 0 {
+                    break;
+                }
+            }
+        }
+        let available: HashSet<usize> = checked
+            .iter()
+            .zip(&found)
+            .filter(|(_, hit)| **hit)
+            .map(|(&i, _)| i)
+            .collect();
+        Ok(titles
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| available.contains(i))
+            .map(|(_, title)| title)
+            .collect())
+    }
+}
+pub fn find_entry(
+    app: &tauri::AppHandle,
+    source_id: &str,
+    entry_id: &str,
+) -> Result<Option<SourceMatch>> {
+    Ok(index(app)?
+        .entries
+        .iter()
+        .find(|m| m.source_id == source_id && m.id == entry_id)
+        .cloned())
 }
 pub fn magnet_hash(uri: &str) -> Result<String> {
     if uri.len() > 16384 {
@@ -212,11 +335,18 @@ pub async fn save_download_source(
         let db = app.state::<Database>(); let conn = db.0.lock().map_err(error)?;
         conn.execute("INSERT INTO download_sources(id,name,url,updated_at,document) VALUES(?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET name=excluded.name,url=excluded.url,updated_at=excluded.updated_at,document=excluded.document",
             params![id,doc.name,url,chrono::Utc::now().to_rfc3339(),serde_json::to_string(&doc).map_err(error)?]).map_err(|_| "Could not save source. This URL may already be registered.".to_string())?;
+        drop(conn);
+        invalidate(&app);
         Ok(())
     }).await.map_err(error)?
 }
 #[tauri::command]
-pub fn set_download_source(id: String, enabled: bool, db: State<Database>) -> Result<()> {
+pub fn set_download_source(
+    app: tauri::AppHandle,
+    id: String,
+    enabled: bool,
+    db: State<Database>,
+) -> Result<()> {
     db.0.lock()
         .map_err(error)?
         .execute(
@@ -224,47 +354,21 @@ pub fn set_download_source(id: String, enabled: bool, db: State<Database>) -> Re
             params![enabled, id],
         )
         .map_err(error)?;
+    invalidate(&app);
     Ok(())
 }
 #[tauri::command]
-pub fn remove_download_source(id: String, db: State<Database>) -> Result<()> {
+pub fn remove_download_source(
+    app: tauri::AppHandle,
+    id: String,
+    db: State<Database>,
+) -> Result<()> {
     db.0.lock()
         .map_err(error)?
         .execute("DELETE FROM download_sources WHERE id=?1", [id])
         .map_err(error)?;
+    invalidate(&app);
     Ok(())
-}
-pub fn all_matches(db: &Database, query: &str) -> Result<Vec<SourceMatch>> {
-    let conn = db.0.lock().map_err(error)?;
-    let mut stmt = conn
-        .prepare("SELECT id,name,document FROM download_sources WHERE enabled=1 ORDER BY name")
-        .map_err(error)?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, String>(2)?,
-            ))
-        })
-        .map_err(error)?;
-    let query = query.trim().to_lowercase();
-    let mut matches = Vec::new();
-    for row in rows {
-        let (source_id, source_name, document) = row.map_err(error)?;
-        let doc: SourceDocument = serde_json::from_str(&document).map_err(error)?;
-        for entry in doc.downloads {
-            if query.is_empty() || entry.title.to_lowercase().contains(&query) {
-                matches.push(SourceMatch {
-                    id: entry_id(&entry),
-                    source_id: source_id.clone(),
-                    source_name: source_name.clone(),
-                    entry,
-                });
-            }
-        }
-    }
-    Ok(matches)
 }
 #[tauri::command]
 pub async fn search_download_sources(
@@ -275,9 +379,8 @@ pub async fn search_download_sources(
         if query.len() > 1000 {
             return Err("Search is too long.".into());
         }
-        let mut matches = all_matches(&app.state::<Database>(), &query)?;
-        matches.truncate(60);
-        Ok(matches)
+        let query = query.trim().to_lowercase();
+        Ok(index(&app)?.matching(&query).take(60).cloned().collect())
     })
     .await
     .map_err(error)?
@@ -291,17 +394,7 @@ pub async fn available_download_titles(
         if titles.len() > 200 || titles.iter().any(|title| title.len() > 300) {
             return Err("Too many game titles to check.".into());
         }
-        let entries = all_matches(&app.state::<Database>(), "")?;
-        Ok(titles
-            .into_iter()
-            .filter(|title| {
-                let query = title.to_lowercase();
-                query.len() >= 3
-                    && entries
-                        .iter()
-                        .any(|entry| entry.entry.title.to_lowercase().contains(&query))
-            })
-            .collect())
+        index(&app)?.available(titles)
     })
     .await
     .map_err(error)?
@@ -347,6 +440,54 @@ mod tests {
             magnet_hash("magnet:?xt=urn:btih:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").unwrap(),
             "0".repeat(40)
         );
+    }
+    fn index_of(titles: &[&str]) -> Index {
+        Index {
+            entries: titles
+                .iter()
+                .map(|title| SourceMatch {
+                    id: title.to_string(),
+                    source_id: "s".into(),
+                    source_name: "S".into(),
+                    entry: SourceEntry {
+                        title: title.to_string(),
+                        uris: vec![],
+                        upload_date: String::new(),
+                        file_size: String::new(),
+                    },
+                })
+                .collect(),
+            titles: titles
+                .iter()
+                .map(|t| format!("{}\n", t.to_lowercase()))
+                .collect(),
+        }
+    }
+    #[test]
+    fn availability_matches_case_insensitive_substrings_in_order() {
+        let index = index_of(&["Super Mario World (USA)", "Super Metroid (Japan, USA)"]);
+        let titles = ["Super Metroid", "Zelda", "super mario world", "Su", "Mario"]
+            .map(String::from)
+            .to_vec();
+        assert_eq!(
+            index.available(titles).unwrap(),
+            vec!["Super Metroid", "super mario world", "Mario"]
+        );
+        // A title never matches across two entries.
+        assert!(index
+            .available(vec!["(USA) Super".into()])
+            .unwrap()
+            .is_empty());
+    }
+    #[test]
+    fn search_keeps_entries_aligned_with_titles() {
+        let index = index_of(&["Alpha", "Beta", "Alphabet"]);
+        let found: Vec<_> = index
+            .matching("alpha")
+            .map(|m| m.entry.title.as_str())
+            .collect();
+        assert_eq!(found, vec!["Alpha", "Alphabet"]);
+        assert_eq!(index.matching("").count(), 3);
     }
     #[test]
     fn deduplicates_entries() {
