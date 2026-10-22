@@ -4,8 +4,11 @@ use crate::{
     models::*,
 };
 use rusqlite::params;
+#[cfg(windows)]
 use std::process::Command;
-use tauri::{Emitter, Manager, State};
+#[cfg(windows)]
+use tauri::Emitter;
+use tauri::{Manager, State};
 
 struct InstallerSpec {
     id: &'static str,
@@ -108,6 +111,7 @@ pub async fn install_emulator(id: String, app: tauri::AppHandle) -> Result<Strin
         .await
         .map_err(error)?
 }
+#[cfg_attr(not(windows), allow(unused_variables))]
 fn install_emulator_blocking(id: &str, app: &tauri::AppHandle) -> Result<String> {
     let installer = INSTALLERS
         .iter()

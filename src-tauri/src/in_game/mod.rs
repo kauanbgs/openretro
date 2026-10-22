@@ -151,6 +151,7 @@ fn command_for(action: &str, slot: i32) -> Result<&'static str> {
         _ => Err("Ação de jogo inválida.".into()),
     }
 }
+#[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
 pub fn toggle(app: &tauri::AppHandle) -> Result<()> {
     let service = app.state::<InGameService>();
     let (info, pid, embedded_window) = {
@@ -252,17 +253,19 @@ pub fn open_steam_controller_settings(app: tauri::AppHandle) -> Result<()> {
     if let Some(window) = app.get_webview_window("game-menu") {
         window.set_always_on_top(false).map_err(error)?;
     }
-    #[cfg(target_os = "windows")]
-    std::process::Command::new("explorer.exe")
-        .arg("steam://settings/controller")
-        .spawn()
-        .map_err(error)?;
     #[cfg(not(target_os = "windows"))]
     return Err(
         "Abra Steam → Configurações → Controle e desligue ‘Botão Guia coloca a Steam em foco’."
             .into(),
     );
-    Ok(())
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer.exe")
+            .arg("steam://settings/controller")
+            .spawn()
+            .map_err(error)?;
+        Ok(())
+    }
 }
 
 pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
