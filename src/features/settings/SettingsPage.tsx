@@ -203,7 +203,7 @@ export function SettingsPage({
                 <BrandMark />
                 <div>
                   <strong>OpenRetro</strong>
-                  <p>Versão 0.3.8</p>
+                  <p>Versão 0.4.0</p>
                 </div>
               </div>
             </>

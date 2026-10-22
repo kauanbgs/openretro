@@ -628,7 +628,7 @@ export function App() {
               : "Nenhum download em andamento"}
         </button>
         <button onClick={() => setHelp(true)}>
-          OpenRetro v0.3.8{isDesktop ? "" : " · prévia no navegador"}
+          OpenRetro v0.4.0{isDesktop ? "" : " · prévia no navegador"}
         </button>
       </footer>
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
