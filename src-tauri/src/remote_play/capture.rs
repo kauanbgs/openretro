@@ -4,7 +4,6 @@
 //! soon as they arrive. The runtime draws with OpenGL into a child of
 //! OpenRetro's window, which window capture leaves out, so this captures the
 //! monitor and crops the game's area (or OpenRetro's window) on the GPU.
-use axum::body::Bytes;
 use std::{
     ffi::c_void,
     sync::{
@@ -13,7 +12,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::sync::broadcast;
 use windows_capture::{
     capture::{CaptureControl, Context, GraphicsCaptureApiHandler},
     frame::Frame,
@@ -30,8 +28,6 @@ const MAX_WIDTH: u32 = 960;
 const MAX_HEIGHT: u32 = 540;
 const QUALITY: u8 = 72;
 const FRAME_INTERVAL: Duration = Duration::from_millis(15);
-/// The first byte of every video message on the socket.
-pub const VIDEO: u8 = 1;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -98,7 +94,7 @@ fn crop(area: Rect, monitor: Rect, width: u32, height: u32) -> Option<(u32, u32,
 pub struct Target {
     pub app: tauri::AppHandle,
     pub main: isize,
-    pub frames: broadcast::Sender<Bytes>,
+    pub frames: super::video::Video,
     /// When the runtime last shared a frame itself; those take precedence.
     pub shared: Arc<AtomicU64>,
     monitor: Rect,
@@ -169,15 +165,8 @@ impl GraphicsCaptureApiHandler for Handler {
         let mut buffer = frame.buffer_crop(x0, y0, x1, y1)?;
         let (width, height, pitch) = (buffer.width(), buffer.height(), buffer.row_pitch() as usize);
         let (w, h) = downscale(buffer.as_raw_buffer(), pitch, width, height, &mut self.rgb);
-        let mut jpeg = vec![VIDEO];
-        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, QUALITY).encode(
-            &self.rgb,
-            w,
-            h,
-            image::ExtendedColorType::Rgb8,
-        )?;
         // A lagging phone skips frames instead of falling behind.
-        let _ = self.target.frames.send(Bytes::from(jpeg));
+        self.target.frames.publish(&self.rgb, w, h, QUALITY)?;
         Ok(())
     }
 }
@@ -188,7 +177,7 @@ impl VideoCapture {
     pub fn start(
         app: tauri::AppHandle,
         main: isize,
-        frames: broadcast::Sender<Bytes>,
+        frames: super::video::Video,
         shared: Arc<AtomicU64>,
     ) -> crate::database::Result<Self> {
         let handle = unsafe { MonitorFromWindow(main as *mut c_void, MONITOR_DEFAULTTONEAREST) };

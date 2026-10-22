@@ -3,7 +3,11 @@
 //! events and `/ws` streams the game. Opening the QR code's URL stores the
 //! pairing token in a cookie that every later request must carry. Capture
 //! runs only while a game screen is open.
-use super::{input, token_matches, SERVER_PORT};
+use super::{
+    input, token_matches,
+    video::{self, Layout, View},
+    SERVER_PORT,
+};
 use crate::database::{Database, Result};
 use axum::{
     body::Bytes,
@@ -35,7 +39,7 @@ const EVENTS: &[&str] = &["download-imported", "game-started", "game-finished"];
 struct Shared {
     app: tauri::AppHandle,
     token: String,
-    video: broadcast::Sender<Bytes>,
+    video: video::Video,
     audio: broadcast::Sender<Bytes>,
     events: broadcast::Sender<String>,
     devices: Arc<AtomicUsize>,
@@ -94,7 +98,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         app: app.clone(),
         token: token.clone(),
         // Two frames at most: a slow phone drops old frames instead of lagging.
-        video: broadcast::channel(2).0,
+        video: video::Video::default(),
         audio: broadcast::channel(64).0,
         events,
         devices: devices.clone(),
@@ -261,7 +265,9 @@ async fn file(
     }
     let paths = shared.app.path();
     let allowed: Vec<std::path::PathBuf> = [
-        paths.app_cache_dir().map(|dir| dir.join("launchbox-thumbnails")),
+        paths
+            .app_cache_dir()
+            .map(|dir| dir.join("launchbox-thumbnails")),
         paths.app_data_dir().map(|dir| dir.join("screenshots")),
     ]
     .into_iter()
@@ -373,10 +379,10 @@ fn connected(shared: &Shared, joined: bool) {
 }
 
 fn status(app: &tauri::AppHandle) -> Value {
-    let game = crate::in_game::in_game_status(app.clone())
-        .ok()
-        .flatten()
-        .map(|session| session.title().to_string());
+    let session = crate::in_game::in_game_status(app.clone()).ok().flatten();
+    let game = session.as_ref().map(|session| session.title().to_string());
+    let game_id = session.as_ref().map(|session| session.id());
+    let layout = current_layout(app);
     let library: Vec<Value> = app
         .state::<Database>()
         .0
@@ -395,20 +401,71 @@ fn status(app: &tauri::AppHandle) -> Value {
             })
         })
         .collect();
-    json!({ "type": "status", "game": game, "library": library })
+    json!({ "type": "status", "game": game, "gameId": game_id, "layout": layout, "library": library })
+}
+
+fn current_layout(app: &tauri::AppHandle) -> Layout {
+    let Some(session) = crate::in_game::in_game_status(app.clone()).ok().flatten() else {
+        return Layout::Full;
+    };
+    app.state::<Database>()
+        .0
+        .lock()
+        .ok()
+        .map(|conn| video::load_layout(&conn, session.id()))
+        .unwrap_or_default()
+}
+
+#[derive(Default)]
+struct ScreenChoice {
+    player: u8,
+    full: bool,
+    region: Option<u8>,
+}
+
+impl ScreenChoice {
+    fn view(&self, layout: Layout) -> View {
+        if self.full {
+            View::default()
+        } else {
+            View::new(layout, self.region.unwrap_or(self.player.clamp(1, 4)))
+        }
+    }
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum Incoming {
-    Pad { player: u8, buttons: u16, axes: [i16; 4] },
-    Launch { id: String },
-    Action { action: String },
+    Pad {
+        player: u8,
+        buttons: u16,
+        axes: [i16; 4],
+    },
+    Launch {
+        id: String,
+    },
+    Action {
+        action: String,
+    },
+    /// Shared layout saved for the running game; all phones receive it in status.
+    Layout {
+        layout: Layout,
+        #[serde(rename = "gameId")]
+        game_id: String,
+    },
+    /// Per-phone override. No region means follow this phone's controller port.
+    View {
+        full: bool,
+        region: Option<u8>,
+    },
 }
 
 async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
     connected(&shared, true);
-    let mut video = shared.video.subscribe();
+    let mut choice = ScreenChoice::default();
+    let mut selected = View::default();
+    let mut active_layout = Layout::Full;
+    let mut video = shared.video.subscribe(selected);
     let mut audio = shared.audio.subscribe();
     let mut relay = match input::Relay::new() {
         Ok(relay) => Some(relay),
@@ -421,6 +478,7 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
         }
     };
     let mut last_status = Value::Null;
+    let mut last_pad = std::time::Instant::now();
     let mut tick = tokio::time::interval(std::time::Duration::from_millis(1000));
     loop {
         let outgoing = tokio::select! {
@@ -435,7 +493,16 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
                 Err(_) => break,
             },
             _ = tick.tick() => {
+                if last_pad.elapsed() > std::time::Duration::from_millis(750) {
+                    if let Some(relay) = relay.as_mut() { relay.release(); }
+                }
                 let now = status(&shared.app);
+                active_layout = serde_json::from_value(now["layout"].clone()).unwrap_or_default();
+                let view = choice.view(active_layout);
+                if view != selected {
+                    video = shared.video.subscribe(view);
+                    selected = view;
+                }
                 (now != last_status).then(|| {
                     last_status = now.clone();
                     Message::Text(now.to_string().into())
@@ -443,7 +510,19 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
             },
             incoming = socket.recv() => match incoming {
                 Some(Ok(Message::Text(text))) => {
-                    handle(&shared, relay.as_mut(), &text);
+                    if let Ok(message) = serde_json::from_str::<Incoming>(&text) {
+                        if matches!(message, Incoming::Pad { .. }) { last_pad = std::time::Instant::now(); }
+                        let layout_changed = matches!(message, Incoming::Layout { .. });
+                        if let Err(error) = handle(&shared, relay.as_mut(), &mut choice, message) {
+                            if socket.send(Message::Text(json!({"type":"error","message":error}).to_string().into())).await.is_err() { break; }
+                        }
+                        if layout_changed { active_layout = current_layout(&shared.app); }
+                        let view = choice.view(active_layout);
+                        if view != selected {
+                            video = shared.video.subscribe(view);
+                            selected = view;
+                        }
+                    }
                     None
                 }
                 Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
@@ -461,12 +540,19 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
     connected(&shared, false);
 }
 
-fn handle(shared: &Shared, relay: Option<&mut input::Relay>, text: &str) {
-    let Ok(message) = serde_json::from_str::<Incoming>(text) else {
-        return;
-    };
+fn handle(
+    shared: &Shared,
+    relay: Option<&mut input::Relay>,
+    choice: &mut ScreenChoice,
+    message: Incoming,
+) -> Result<()> {
     match message {
-        Incoming::Pad { player, buttons, axes } => {
+        Incoming::Pad {
+            player,
+            buttons,
+            axes,
+        } => {
+            choice.player = player.clamp(1, 4);
             if let Some(relay) = relay {
                 relay.set_player(player);
                 relay.update(input::PadState { buttons, axes });
@@ -485,6 +571,61 @@ fn handle(shared: &Shared, relay: Option<&mut input::Relay>, text: &str) {
                 log::warn!("Phone play action: {e}");
             }
         }
+        Incoming::Layout { layout, game_id } => {
+            let session = crate::in_game::in_game_status(shared.app.clone())?
+                .ok_or("Abra um jogo para configurar a tela dividida.")?;
+            if session.id() != game_id {
+                return Err("O jogo mudou. Escolha o layout novamente.".into());
+            }
+            let database = shared.app.state::<Database>();
+            let conn = database.0.lock().map_err(crate::database::error)?;
+            video::save_layout(&conn, session.id(), layout)?;
+        }
+        Incoming::View { full, region } => {
+            if region.is_some_and(|region| !(1..=4).contains(&region)) {
+                return Err("Escolha uma região entre 1 e 4.".into());
+            }
+            choice.full = full;
+            choice.region = region;
+        }
     }
+    Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn screen_follows_player_without_changing_controller_for_manual_views() {
+        let mut choice = ScreenChoice {
+            player: 4,
+            ..ScreenChoice::default()
+        };
+        assert_eq!(choice.view(Layout::Grid), View::new(Layout::Grid, 4));
+        assert_eq!(choice.view(Layout::Stacked), View::default());
+        choice.region = Some(2);
+        assert_eq!(choice.view(Layout::Stacked), View::new(Layout::Stacked, 2));
+        assert_eq!(choice.player, 4);
+        choice.full = true;
+        assert_eq!(choice.view(Layout::Grid), View::default());
+        choice.full = false;
+        choice.region = None;
+        assert_eq!(choice.view(Layout::Grid), View::new(Layout::Grid, 4));
+    }
+
+    #[test]
+    fn layout_messages_require_a_known_layout_and_game_identity() {
+        assert!(serde_json::from_value::<Incoming>(
+            json!({"type":"layout","layout":"grid","gameId":"game"})
+        )
+        .is_ok());
+        assert!(serde_json::from_value::<Incoming>(
+            json!({"type":"layout","layout":"arbitrary","gameId":"game"})
+        )
+        .is_err());
+        assert!(
+            serde_json::from_value::<Incoming>(json!({"type":"layout","layout":"grid"})).is_err()
+        );
+    }
+}

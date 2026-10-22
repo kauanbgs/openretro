@@ -3,7 +3,6 @@
 //! own resolution; GPU cores (N64, PSP, PS2) publish a readback of the
 //! finished picture while OpenRetro marks a phone as watching. Both work with
 //! the PC's screen off or covered.
-use axum::body::Bytes;
 use std::{
     ffi::c_void,
     sync::{
@@ -12,7 +11,6 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::sync::broadcast;
 
 const MAGIC: u32 = 0x3246_524f;
 const HEADER: usize = 32;
@@ -200,7 +198,7 @@ impl SharedFrames {
     /// screen capture stays quiet while it is recent.
     pub fn start(
         app: tauri::AppHandle,
-        frames: broadcast::Sender<Bytes>,
+        frames: super::video::Video,
         last_frame: Arc<AtomicU64>,
     ) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
@@ -232,12 +230,8 @@ impl SharedFrames {
                     continue;
                 }
                 let (w, h) = to_rgb(&raw, width, height, pitch, format, &mut rgb);
-                let mut jpeg = vec![super::capture::VIDEO];
-                let encoded = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, QUALITY)
-                    .encode(&rgb, w as u32, h as u32, image::ExtendedColorType::Rgb8);
-                if encoded.is_ok() {
+                if frames.publish(&rgb, w as u32, h as u32, QUALITY).is_ok() {
                     last_frame.store(now_ms(), Ordering::Release);
-                    let _ = frames.send(Bytes::from(jpeg));
                 }
             }
         });

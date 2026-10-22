@@ -31,13 +31,15 @@
   #menu .players button { flex: 1; padding: 8px 0; border: 1px solid var(--border); text-align: center; }
   #menu .players button.on { background: var(--muted); color: #1c1c1c; }
   #menu small { padding: 8px 12px 0; color: var(--body); font-size: 11px; }
+  #menu label { display: grid; gap: 5px; padding: 8px 12px; font-size: 13px; }
+  #menu select { width: 100%; min-height: 36px; padding: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: inherit; }
   /* Touch controls float over the game where thumbs rest: the d-pad on the
      left, the face buttons on the right, both centred a little below the
      middle. Sizes follow the stage height so every phone gets the same feel. */
-  #controls { position: absolute; inset: 0; z-index: 4; --u: calc(var(--h, 100vh) / 100); --side: max(calc(var(--u) * 6), env(safe-area-inset-left)); }
+  #controls { position: absolute; inset: 0; z-index: 4; opacity: var(--control-opacity, .55); --u: calc(var(--h, 100vh) / 100); --side: max(calc(var(--u) * 6), env(safe-area-inset-left)); }
   #controls.hidden { display: none; }
-  .btn, #dpad { position: absolute; display: grid; place-items: center; border: 2px solid #ffffff38; background: #ffffff1c; color: #ffffffd9; font-weight: 700; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-  .btn.on { background: #ffffff59; border-color: #ffffff8c; }
+  .btn, #dpad { position: absolute; display: grid; place-items: center; border: 1px solid #ffffff70; background: #ffffff12; color: #ffffffeb; font-weight: 500; text-shadow: 0 1px 3px #0008; }
+  .btn.on { background: #ffffff40; border-color: #ffffffc0; }
   #dpad { left: var(--side); top: calc(var(--u) * 58); width: calc(var(--u) * 46); height: calc(var(--u) * 46); border-radius: 50%; transform: translateY(-50%); }
   #dpad i { position: absolute; width: 0; height: 0; border: calc(var(--u) * 3) solid transparent; opacity: .75; }
   #dpad .u { top: calc(var(--u) * 4); border-bottom-color: #fff; } #dpad .d { bottom: calc(var(--u) * 4); border-top-color: #fff; }
@@ -53,8 +55,7 @@
   .shoulder.small { width: calc(var(--u) * 18); }
   #l { left: var(--side); } #l2 { left: calc(var(--side) + var(--u) * 28); }
   #r { right: var(--side); } #r2 { right: calc(var(--side) + var(--u) * 28); }
-  .meta { bottom: calc(var(--u) * 4); width: calc(var(--u) * 22); height: calc(var(--u) * 9); border-radius: calc(var(--u) * 4.5); background: #000000a6; font-size: calc(var(--u) * 3.4); }
-  .meta.on { background: #000000d9; border-color: #ffffff8c; }
+  .meta { bottom: calc(var(--u) * 4); width: calc(var(--u) * 22); height: calc(var(--u) * 9); border-radius: calc(var(--u) * 4.5); font-size: calc(var(--u) * 3.4); letter-spacing: .08em; }
   #select { left: calc(50% - var(--u) * 24); } #start { left: calc(50% + var(--u) * 2); }
   /* Overlays */
   .sheet { position: absolute; inset: 0; z-index: 8; display: none; overflow-y: auto; padding: max(20px, env(safe-area-inset-top)) 20px 20px; background: var(--bg); }
@@ -81,16 +82,38 @@
 <div id="bar">
   <span id="title">OpenRetro</span>
   <button class="chip" id="player-chip">J1</button>
+  <button class="chip" id="view-chip" aria-pressed="false">Ver tela inteira</button>
   <button class="chip" id="menu-chip" aria-label="Menu">☰</button>
 </div>
 <div id="menu" role="menu">
   <div class="players" id="players"></div>
+  <label for="split-layout">Tela dividida deste jogo
+    <select id="split-layout">
+      <option value="full">Tela inteira compartilhada</option>
+      <option value="sideBySide">2 jogadores · esquerda / direita</option>
+      <option value="stacked">2 jogadores · cima / baixo</option>
+      <option value="grid">4 jogadores · quadrantes</option>
+    </select>
+  </label>
+  <label for="view-region">Minha parte da tela
+    <select id="view-region">
+      <option value="">Automática · acompanha meu jogador</option>
+      <option value="1">Região 1 · esquerda / superior esquerda</option>
+      <option value="2">Região 2 · direita / superior direita</option>
+      <option value="3">Região 3 · inferior esquerda</option>
+      <option value="4">Região 4 · inferior direita</option>
+    </select>
+  </label>
+  <small id="view-hint">O layout fica salvo para este jogo. O áudio é compartilhado.</small>
   <button data-action="save">Salvar estado</button>
   <button data-action="load">Carregar estado</button>
   <button id="home-button">Voltar ao OpenRetro</button>
   <button id="library-button">Escolher outro jogo</button>
   <button id="fullscreen">Tela cheia</button>
   <button id="touch-toggle">Esconder controles</button>
+  <label for="control-opacity">Visibilidade dos controles <output id="opacity-value">55%</output>
+    <input id="control-opacity" type="range" min="20" max="85" value="55">
+  </label>
   <button data-action="quit">Sair do jogo</button>
   <small id="stats"></small>
 </div>
@@ -120,8 +143,19 @@
   const token = new URLSearchParams(location.search).get("t") || "";
   const $ = (id) => document.getElementById(id);
   const screen = $("screen"), title = $("title"), notice = $("notice");
+  const opacity = Number(localStorage.getItem("openretro-control-opacity") || 55);
+  $("control-opacity").value = Number.isFinite(opacity) ? Math.min(85, Math.max(20, opacity)) : 55;
+  function applyOpacity() {
+    const value = Number($("control-opacity").value);
+    $("controls").style.setProperty("--control-opacity", value / 100);
+    $("opacity-value").textContent = `${value}%`;
+    localStorage.setItem("openretro-control-opacity", value);
+  }
+  $("control-opacity").oninput = applyOpacity;
+  applyOpacity();
   let ws, game = null, library = [], player = Number(localStorage.getItem("openretro-player") || 1);
   player = Number.isInteger(player) && player >= 1 && player <= 4 ? player : 1;
+  let layoutMode = "full", wholeScreen = false, region = null, gameId = null;
   let touchButtons = 0, dpadBits = 0, padButtons = 0, axes = [0, 0, 0, 0], sent = "";
   let frames = 0, bytes = 0, objectUrl = null, decoding = false, pending = null;
 
@@ -156,7 +190,7 @@
   let lastTap = 0;
   document.addEventListener("touchend", (e) => {
     const now = Date.now();
-    if (now - lastTap < 350 && e.target.closest && e.target.closest("#controls, #screen, #bar")) e.preventDefault();
+    if (now - lastTap < 350 && e.target.closest && e.target.closest("#controls, #screen")) e.preventDefault();
     lastTap = now;
   }, { passive: false });
 
@@ -180,6 +214,37 @@
       // avoids retrying a closed socket on every animation frame.
       sent = key;
     }
+  }
+
+  function sendView() {
+    send({ type: "view", full: wholeScreen, region });
+    updateView();
+  }
+  function updateView() {
+    const split = layoutMode !== "full";
+    $("view-chip").hidden = !split;
+    $("view-chip").textContent = wholeScreen ? "Ver minha tela" : "Ver tela inteira";
+    $("view-chip").setAttribute("aria-pressed", String(wholeScreen));
+    $("split-layout").value = layoutMode;
+    $("split-layout").disabled = !game;
+    $("view-region").disabled = !split;
+    const count = layoutMode === "grid" ? 4 : 2;
+    for (const option of $("view-region").options) {
+      option.disabled = Number(option.value) > count;
+    }
+    $("view-region").options[1].textContent = layoutMode === "stacked" ? "Região 1 · parte de cima"
+      : layoutMode === "sideBySide" ? "Região 1 · lado esquerdo" : "Região 1 · superior esquerda";
+    $("view-region").options[2].textContent = layoutMode === "stacked" ? "Região 2 · parte de baixo"
+      : layoutMode === "sideBySide" ? "Região 2 · lado direito" : "Região 2 · superior direita";
+    const selected = region || player;
+    const positions = layoutMode === "stacked" ? ["parte de cima", "parte de baixo"]
+      : layoutMode === "sideBySide" ? ["lado esquerdo", "lado direito"]
+      : ["superior esquerda", "superior direita", "inferior esquerda", "inferior direita"];
+    $("view-hint").textContent = !split
+      ? "O layout fica salvo para este jogo. O áudio é compartilhado."
+      : wholeScreen ? "Tela inteira apenas neste celular. Toque em Ver minha tela para voltar."
+      : selected > count ? "Este layout tem duas regiões. Você está vendo a tela inteira; escolha a região 1 ou 2."
+      : `Sua imagem: ${positions[selected - 1]}. O áudio é compartilhado. O layout fica salvo para este jogo.`;
   }
 
   // Video: show the newest frame; skip frames that arrive while one decodes.
@@ -215,9 +280,9 @@
   }
 
   function connect() {
-    ws = new WebSocket(`ws://${location.host}/ws?t=${encodeURIComponent(token)}`);
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?t=${encodeURIComponent(token)}`);
     ws.binaryType = "arraybuffer";
-    ws.onopen = () => { title.textContent = game || "Conectado"; sendPad(true); };
+    ws.onopen = () => { title.textContent = game || "Conectado"; sendPad(true); sendView(); };
     ws.onmessage = (event) => {
       if (typeof event.data === "string") return status(JSON.parse(event.data));
       const view = new DataView(event.data);
@@ -233,10 +298,14 @@
   }
 
   function status(message) {
+    if (message.type === "error") { toast(message.message); return; }
     if (message.type !== "status") return;
     // When the game closes, return to OpenRetro's interface.
     if (game && !message.game) return void location.assign("/");
     game = message.game; library = message.library || [];
+    gameId = message.gameId || null;
+    layoutMode = message.layout || "full";
+    updateView();
     title.textContent = game || "Nenhum jogo aberto";
     renderLibrary();
     $("library").classList.toggle("open", !game);
@@ -264,7 +333,7 @@
   }
 
   // Touch: each pointer presses whatever control is under it, sliding included.
-  const controls = $("controls"), dpad = $("dpad"), held = new Map();
+  const controls = $("controls"), dpad = $("dpad"), held = new Map(), activePointers = new Set();
   function dpadFrom(x, y) {
     const box = dpad.getBoundingClientRect();
     const sx = x - (box.left + box.width / 2), sy = y - (box.top + box.height / 2);
@@ -289,8 +358,8 @@
     dpad.className = ["u", "d", "l", "r"].filter((_, i) => dpadBits & (1 << (4 + i))).join(" ");
     sendPad();
   }
-  function track(event) {
-    const el = document.elementFromPoint(event.clientX, event.clientY);
+  function track(event, initialTarget) {
+    const el = initialTarget || document.elementFromPoint(event.clientX, event.clientY);
     const button = el && el.closest && el.closest(".btn");
     if (el && el.closest && el.closest("#dpad")) held.set(event.pointerId, { kind: "dpad", bits: dpadFrom(event.clientX, event.clientY) });
     else if (button) held.set(event.pointerId, { el: button, bit: Number(button.dataset.bit) });
@@ -299,18 +368,35 @@
   }
   controls.addEventListener("pointerdown", (e) => {
     e.preventDefault();
+    activePointers.add(e.pointerId);
+    // Use the actual button before capture; hit testing can differ across
+    // mobile engines when the landscape stage is transformed.
+    track(e, e.target);
     try { controls.setPointerCapture(e.pointerId); } catch {}
-    track(e);
     if (navigator.vibrate) navigator.vibrate(8);
   });
-  controls.addEventListener("pointermove", (e) => { if (held.has(e.pointerId)) track(e); });
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) controls.addEventListener(type, (e) => { held.delete(e.pointerId); refreshTouch(); });
+  controls.addEventListener("pointermove", (e) => { if (activePointers.has(e.pointerId)) track(e); });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) controls.addEventListener(type, (e) => {
+    if (type === "lostpointercapture" && e.target !== controls) return;
+    activePointers.delete(e.pointerId); held.delete(e.pointerId); refreshTouch();
+  });
+  function releaseInput() {
+    activePointers.clear(); held.clear(); padButtons = 0; axes = [0, 0, 0, 0]; refreshTouch();
+  }
+  window.addEventListener("blur", releaseInput);
+  window.addEventListener("pagehide", releaseInput);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) releaseInput(); });
+  // Re-send held input after the runtime opens its UDP listener, and after
+  // a reconnect. A single transition sent during startup must not be lost.
+  setInterval(() => { if (!document.hidden) sendPad(true); }, 100);
 
   // Bluetooth or USB controllers paired with the phone, in the standard layout.
   const standard = [0, 8, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7];
   function pollGamepads() {
     let buttons = 0, sticks = [0, 0, 0, 0], any = false;
-    for (const pad of (navigator.getGamepads ? navigator.getGamepads() : [])) {
+    let pads = [];
+    try { pads = navigator.getGamepads?.() || []; } catch {}
+    for (const pad of pads) {
       if (!pad) continue; any = true;
       pad.buttons.forEach((b, i) => { if (b.pressed && standard[i] !== undefined) buttons |= 1 << standard[i]; });
       sticks = sticks.map((value, i) => {
@@ -334,9 +420,19 @@
   function updatePlayer() {
     $("player-chip").textContent = `J${player}`;
     [...players.children].forEach((b, i) => b.classList.toggle("on", i + 1 === player));
+    updateView();
   }
+  $("view-chip").onclick = () => { wholeScreen = !wholeScreen; sendView(); };
+  $("split-layout").onchange = () => {
+    send({ type: "layout", layout: $("split-layout").value, gameId });
+    toast("Salvando layout para este jogo…");
+  };
+  $("view-region").onchange = () => {
+    region = Number($("view-region").value) || null;
+    sendView();
+  };
   $("player-chip").onclick = () => { player = player % 4 + 1; localStorage.setItem("openretro-player", player); updatePlayer(); sendPad(true); toast(`Você é o jogador ${player}`); };
-  $("menu-chip").onclick = () => $("menu").classList.toggle("open");
+  $("menu-chip").onclick = () => { releaseInput(); $("menu").classList.toggle("open"); };
   document.querySelectorAll("[data-action]").forEach((b) => b.onclick = () => {
     const action = b.dataset.action;
     if (action === "quit" && !confirm("Sair do jogo no computador?")) return;
@@ -348,6 +444,7 @@
   $("library-button").onclick = () => { $("library").classList.add("open"); $("menu").classList.remove("open"); };
   $("fullscreen").onclick = () => { void goFullscreen(); $("menu").classList.remove("open"); };
   $("touch-toggle").onclick = () => {
+    releaseInput();
     const hidden = controls.classList.toggle("hidden");
     $("touch-toggle").textContent = hidden ? "Mostrar controles" : "Esconder controles";
     $("menu").classList.remove("open");

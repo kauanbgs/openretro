@@ -73,6 +73,25 @@ The phone's **Jogar online** option also starts or joins the usual direct-IP
 netplay session on the PC; that mode still requires every remote emulator to
 have the same game file and core.
 
+For a split-screen game, open the phone's game menu and set **Tela dividida
+deste jogo** to left/right, top/bottom, or four quadrants. The PC saves that
+layout for the game and sends each phone only its player's region, cropped
+before JPEG encoding. J1/J2 receive the left/right or top/bottom halves; in a
+four-player layout J1–J4 receive top-left, top-right, bottom-left, bottom-right.
+**Minha parte da tela** overrides the image region without changing the
+controller's player. **Ver tela inteira** temporarily shows menus and results
+on that phone; **Ver minha tela** returns to its region. All phones share the
+same audio. A phone on J3/J4 sees the full picture in a two-region layout until
+it selects a valid image region. This uses the game's existing split-screen;
+shared-camera games keep the full-screen layout, and crops do not add detail
+or independent cameras.
+
+Touch controls are translucent by default. Adjust **Visibilidade dos controles**
+in the phone's game menu; that preference stays on the phone. Held buttons are
+refreshed while connected so starting the runtime or dropping an input packet
+does not permanently lose a press. Leaving the page releases its controls;
+the server also releases them if the phone stops sending input heartbeats.
+
 The page only opens with the random token in the QR code, which changes each
 time phone play starts. The runtime publishes each frame in shared memory, so
 the picture reaches the phone even with the PC's screen off: frames from

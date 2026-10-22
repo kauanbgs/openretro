@@ -17,6 +17,7 @@ mod frames;
 mod api;
 mod input;
 mod server;
+mod video;
 
 /// The runtime listens for player N on this port + N - 1, on loopback only.
 pub const REMOTE_PAD_BASE_PORT: u16 = 55400;
