@@ -1,12 +1,13 @@
 //! Phone play: a phone on the same network opens a page served by OpenRetro,
 //! watches the game, hears it and plays it. The page reaches the server only
-//! with the pairing token from the QR code. Video is the main window as JPEG
-//! frames, audio is the game runtime output as PCM, and each phone's buttons go to
+//! with the pairing token from the QR code. Video is H.264 over WebRTC, encoded
+//! by the PC's webview, or JPEG frames where WebRTC cannot connect; audio is
+//! the game runtime output as PCM, and each phone's buttons go to
 //! the runtime's loopback remote gamepad for the player it picked.
 use crate::database::{error, Result};
 use serde::Serialize;
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg(windows)]
 mod audio;
@@ -80,6 +81,8 @@ pub async fn remote_play_start(app: tauri::AppHandle) -> Result<RemotePlayStatus
             .ok_or("Conecte o computador a uma rede para jogar no celular.")?;
         let running = server::start(app.clone(), &address).await?;
         *app.state::<RemotePlay>().0.lock().map_err(error)? = Some(running);
+        // The webview's phone video encoder connects while phone play runs.
+        let _ = app.emit("remote-play-changed", true);
     }
     remote_play_status(app)
 }
@@ -89,6 +92,7 @@ pub fn remote_play_stop(app: tauri::AppHandle) -> Result<()> {
     let running = app.state::<RemotePlay>().0.lock().map_err(error)?.take();
     if let Some(running) = running {
         running.stop();
+        let _ = app.emit("remote-play-changed", false);
     }
     Ok(())
 }

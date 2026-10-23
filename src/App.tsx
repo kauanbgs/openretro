@@ -42,6 +42,7 @@ import { bridge, isDesktop, isRemote } from "./services/bridge";
 import { invoke, isTauri } from "./services/transport";
 import { listen } from "./services/transport";
 import { useUpdates } from "./services/updates";
+import { setPhoneFrameRate, startPhoneVideoHost } from "./services/phoneVideo";
 import {
   defaultSettings,
   type GameMetadata,
@@ -153,6 +154,8 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("custom-titlebar", titleBar);
   }, [titleBar]);
+  // Encodes phone play video while phone play runs, from any screen.
+  useEffect(() => startPhoneVideoHost(), []);
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
@@ -174,6 +177,10 @@ export function App() {
       queryKey: ["settings"],
       queryFn: bridge.settings,
     });
+  useEffect(
+    () => setPhoneFrameRate(settings.phoneFrameRate ?? 30),
+    [settings.phoneFrameRate],
+  );
   const updates = useUpdates({
     enabled: isTauri && settingsLoaded,
     automatic: settings.autoUpdate !== false,

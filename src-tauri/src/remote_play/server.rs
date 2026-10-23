@@ -3,6 +3,12 @@
 //! events and `/ws` streams the game. Opening the QR code's URL stores the
 //! pairing token in a cookie that every later request must carry. Capture
 //! runs only while a game screen is open.
+//!
+//! Video starts as JPEG over `/ws`. Where the phone's browser can, it then
+//! moves to WebRTC: the PC's webview connects to `/phone-encoder` from
+//! loopback, receives raw frames, and encodes one H.264 track per view. This
+//! server only relays the offer, answer and candidates between the two, and
+//! stops a phone's JPEG while its WebRTC picture plays.
 use super::{
     input, token_matches,
     video::{self, Layout, View},
@@ -13,7 +19,7 @@ use axum::{
     body::Bytes,
     extract::{
         ws::{Message, WebSocket},
-        Query, State, WebSocketUpgrade,
+        ConnectInfo, Query, State, WebSocketUpgrade,
     },
     http::{header, HeaderMap, StatusCode, Uri},
     response::{Html, IntoResponse, Redirect, Response},
@@ -23,12 +29,13 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Arc, Mutex,
 };
 use tauri::{Listener, Manager};
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 const PLAY_PAGE: &str = include_str!("phone.html");
 const COOKIE: &str = "openretro";
@@ -46,11 +53,40 @@ struct Shared {
     players: Arc<Mutex<HashMap<u64, u8>>>,
     next_connection: AtomicU64,
     party_devices: Mutex<usize>,
+    /// The phone video encoder in the PC's webview, by connection, if any.
+    encoder: Mutex<Option<(u64, mpsc::UnboundedSender<String>)>>,
+    /// Phones that asked for WebRTC video, by connection.
+    rtc_phones: Mutex<HashMap<u64, RtcPhone>>,
     #[cfg(windows)]
     media: Mutex<Option<Media>>,
 }
 
+struct RtcPhone {
+    to_phone: mpsc::UnboundedSender<String>,
+    view: View,
+}
+
+fn view_json(view: View) -> Value {
+    json!({ "layout": view.layout, "region": view.region })
+}
+
+/// Only these WebRTC messages cross the relay, in either direction.
+fn relayable(signal: &Value, allowed: &[&str]) -> bool {
+    signal["type"]
+        .as_str()
+        .is_some_and(|kind| allowed.contains(&kind))
+        && signal.to_string().len() <= 16 * 1024
+}
+
 impl Shared {
+    fn to_encoder(&self, message: Value) {
+        if let Ok(encoder) = self.encoder.lock() {
+            if let Some((_, encoder)) = encoder.as_ref() {
+                let _ = encoder.send(message.to_string());
+            }
+        }
+    }
+
     /// Players other phones already control, so a phone can pick a free one.
     fn taken_by_others(&self, connection: u64) -> Vec<u8> {
         let mut taken: Vec<u8> = self
@@ -140,6 +176,8 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         players: players.clone(),
         next_connection: AtomicU64::new(0),
         party_devices: Mutex::new(0),
+        encoder: Mutex::new(None),
+        rtc_phones: Mutex::new(HashMap::new()),
         #[cfg(windows)]
         media: Mutex::new(None),
     });
@@ -148,6 +186,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         .route("/play", get(play))
         .route("/ws", get(socket))
         .route("/party-stream", get(party_socket))
+        .route("/phone-encoder", get(encoder_socket))
         .route("/events", get(event_socket))
         .route("/api/invoke", post(api))
         .route("/file", get(file))
@@ -158,11 +197,14 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         .map_err(|_| format!("A porta {SERVER_PORT} já está em uso por outro programa."))?;
     let (shutdown, stopped) = oneshot::channel::<()>();
     tauri::async_runtime::spawn(async move {
-        let served = axum::serve(listener, router)
-            .with_graceful_shutdown(async {
-                let _ = stopped.await;
-            })
-            .await;
+        let served = axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(async {
+            let _ = stopped.await;
+        })
+        .await;
         if let Err(e) = served {
             log::warn!("Phone play server stopped: {e}");
         }
@@ -392,6 +434,125 @@ async fn party_socket(
     upgrade.on_upgrade(move |socket| session(shared, socket, true))
 }
 
+/// The next packet of an optional feed; without one, never.
+async fn next(
+    feed: &mut Option<broadcast::Receiver<Bytes>>,
+) -> std::result::Result<Bytes, broadcast::error::RecvError> {
+    match feed.as_mut() {
+        Some(feed) => feed.recv().await,
+        None => std::future::pending().await,
+    }
+}
+
+/// The PC's own webview, never a phone: it decides what each phone receives.
+async fn encoder_socket(
+    State(shared): State<Arc<Shared>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    Query(pairing): Query<Pairing>,
+    headers: HeaderMap,
+    upgrade: WebSocketUpgrade,
+) -> Response {
+    if !peer.ip().is_loopback() || !paired(&shared, &pairing, &headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    upgrade.on_upgrade(move |socket| encoder_session(shared, socket))
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum FromEncoder {
+    Signal {
+        id: u64,
+        signal: Value,
+    },
+    /// The phone smoothness setting, 30 or 60.
+    Rate {
+        fps: u64,
+    },
+}
+
+async fn encoder_session(shared: Arc<Shared>, mut socket: WebSocket) {
+    let id = shared.next_connection.fetch_add(1, Ordering::Relaxed);
+    let (to_encoder, mut outgoing) = mpsc::unbounded_channel();
+    if let (Ok(mut encoder), Ok(phones)) = (shared.encoder.lock(), shared.rtc_phones.lock()) {
+        // Phones that asked before the encoder was ready join now.
+        for (phone, rtc) in phones.iter() {
+            let _ = to_encoder.send(
+                json!({ "type": "join", "id": phone, "view": view_json(rtc.view) }).to_string(),
+            );
+        }
+        *encoder = Some((id, to_encoder));
+    }
+    // Frames flow only while a phone wants WebRTC video.
+    let mut frames: Option<broadcast::Receiver<Bytes>> = None;
+    let mut tick = tokio::time::interval(std::time::Duration::from_millis(250));
+    loop {
+        let message = tokio::select! {
+            message = outgoing.recv() => match message {
+                Some(text) => Message::Text(text.into()),
+                None => break,
+            },
+            frame = next(&mut frames) => match frame {
+                Ok(frame) => Message::Binary(frame),
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => {
+                    frames = None;
+                    continue;
+                }
+            },
+            _ = tick.tick() => {
+                let wanted = shared.rtc_phones.lock().is_ok_and(|phones| !phones.is_empty());
+                if wanted != frames.is_some() {
+                    frames = wanted.then(|| shared.video.subscribe_rtc());
+                }
+                continue;
+            },
+            incoming = socket.recv() => match incoming {
+                Some(Ok(Message::Text(text))) => {
+                    match serde_json::from_str::<FromEncoder>(&text) {
+                        Ok(FromEncoder::Signal { id, signal })
+                            if relayable(&signal, &["offer", "candidate"]) =>
+                        {
+                            if let Ok(phones) = shared.rtc_phones.lock() {
+                                if let Some(phone) = phones.get(&id) {
+                                    let _ = phone.to_phone.send(
+                                        json!({ "type": "rtc", "signal": signal }).to_string(),
+                                    );
+                                }
+                            }
+                        }
+                        Ok(FromEncoder::Rate { fps }) => shared.video.set_rtc_frame_rate(fps),
+                        _ => {}
+                    }
+                    continue;
+                }
+                Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                Some(Ok(_)) => continue,
+            },
+        };
+        if socket.send(message).await.is_err() {
+            break;
+        }
+    }
+    let current = shared.encoder.lock().is_ok_and(|mut encoder| {
+        let current = encoder.as_ref().is_some_and(|(owner, _)| *owner == id);
+        if current {
+            *encoder = None;
+        }
+        current
+    });
+    if current {
+        // Back to JPEG until an encoder offers again.
+        if let Ok(phones) = shared.rtc_phones.lock() {
+            for phone in phones.values() {
+                let _ = phone
+                    .to_phone
+                    .send(json!({ "type": "rtc", "signal": { "type": "stop" } }).to_string());
+            }
+        }
+    }
+}
+
 /// Starts capture for the first phone and stops it after the last one leaves.
 #[cfg_attr(not(windows), allow(unused_variables))]
 fn connected(shared: &Shared, joined: bool) {
@@ -528,6 +689,86 @@ enum Incoming {
         full: bool,
         region: Option<u8>,
     },
+    /// WebRTC video: `hello`, `answer` and `candidate` reach the encoder;
+    /// `active` says whether the WebRTC picture is playing on this phone.
+    Rtc {
+        signal: Value,
+    },
+}
+
+/// A phone's video: its JPEG feed unless WebRTC plays, and the encoder's view.
+struct PhoneVideo {
+    connection: u64,
+    selected: View,
+    jpeg: Option<broadcast::Receiver<Bytes>>,
+}
+
+impl PhoneVideo {
+    fn select(&mut self, shared: &Shared, view: View) {
+        if view == self.selected {
+            return;
+        }
+        self.selected = view;
+        if self.jpeg.is_some() {
+            self.jpeg = Some(shared.video.subscribe(view));
+        }
+        let asked = shared.rtc_phones.lock().is_ok_and(|mut phones| {
+            phones
+                .get_mut(&self.connection)
+                .map(|phone| phone.view = view)
+                .is_some()
+        });
+        if asked {
+            shared.to_encoder(
+                json!({ "type": "view", "id": self.connection, "view": view_json(view) }),
+            );
+        }
+    }
+
+    fn signal(&mut self, shared: &Shared, to_phone: &mpsc::UnboundedSender<String>, signal: Value) {
+        match signal["type"].as_str() {
+            Some("hello") => {
+                if let Ok(mut phones) = shared.rtc_phones.lock() {
+                    phones.insert(
+                        self.connection,
+                        RtcPhone {
+                            to_phone: to_phone.clone(),
+                            view: self.selected,
+                        },
+                    );
+                }
+                shared.to_encoder(json!({
+                    "type": "join",
+                    "id": self.connection,
+                    "view": view_json(self.selected),
+                }));
+            }
+            Some("active") => {
+                // A playing WebRTC picture makes this phone's JPEG redundant.
+                // Sound stays PCM: phones play WebRTC audio at call volume.
+                let playing = signal["on"].as_bool().unwrap_or(false);
+                if playing == self.jpeg.is_some() {
+                    self.jpeg = (!playing).then(|| shared.video.subscribe(self.selected));
+                }
+            }
+            _ if relayable(&signal, &["answer", "candidate"]) => shared.to_encoder(json!({
+                "type": "signal",
+                "id": self.connection,
+                "signal": signal,
+            })),
+            _ => {}
+        }
+    }
+
+    fn leave(&self, shared: &Shared) {
+        let asked = shared
+            .rtc_phones
+            .lock()
+            .is_ok_and(|mut phones| phones.remove(&self.connection).is_some());
+        if asked {
+            shared.to_encoder(json!({ "type": "leave", "id": self.connection }));
+        }
+    }
 }
 
 // Serialize joins and leaves with the runtime command so a reconnect cannot
@@ -556,13 +797,17 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
     connected(&shared, true);
     let connection = shared.next_connection.fetch_add(1, Ordering::Relaxed);
     let mut choice = ScreenChoice::default();
-    let mut selected = View::default();
     let mut active_layout = Layout::Full;
-    let mut video = if party {
-        shared.video.subscribe_party()
-    } else {
-        shared.video.subscribe(selected)
+    let mut phone = PhoneVideo {
+        connection,
+        selected: View::default(),
+        jpeg: Some(if party {
+            shared.video.subscribe_party()
+        } else {
+            shared.video.subscribe(View::default())
+        }),
     };
+    let (to_phone, mut from_encoder) = mpsc::unbounded_channel::<String>();
     let mut audio = shared.audio.subscribe();
     let mut relay = match input::Relay::new() {
         Ok(relay) => Some(relay),
@@ -579,11 +824,12 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
     let mut tick = tokio::time::interval(std::time::Duration::from_millis(1000));
     loop {
         let outgoing = tokio::select! {
-            frame = video.recv() => match frame {
+            frame = next(&mut phone.jpeg) => match frame {
                 Ok(frame) => Some(Message::Binary(frame)),
                 Err(broadcast::error::RecvError::Lagged(_)) => None,
                 Err(_) => break,
             },
+            signal = from_encoder.recv() => signal.map(|text| Message::Text(text.into())),
             sound = audio.recv() => match sound {
                 Ok(sound) => Some(Message::Binary(sound)),
                 Err(broadcast::error::RecvError::Lagged(_)) => None,
@@ -596,10 +842,8 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
                 let mut now = status(&shared.app);
                 now["taken"] = json!(shared.taken_by_others(connection));
                 active_layout = serde_json::from_value(now["layout"].clone()).unwrap_or_default();
-                let view = choice.view(active_layout);
-                if !party && view != selected {
-                    video = shared.video.subscribe(view);
-                    selected = view;
+                if !party {
+                    phone.select(&shared, choice.view(active_layout));
                 }
                 (now != last_status).then(|| {
                     last_status = now.clone();
@@ -609,6 +853,12 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
             incoming = socket.recv() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     if let Ok(message) = serde_json::from_str::<Incoming>(&text) {
+                        if let Incoming::Rtc { signal } = message {
+                            if !party {
+                                phone.signal(&shared, &to_phone, signal);
+                            }
+                            continue;
+                        }
                         if matches!(message, Incoming::Pad { .. }) { last_pad = std::time::Instant::now(); }
                         let layout_changed = matches!(message, Incoming::Layout { .. });
                         if let Incoming::Pad { player, .. } = message {
@@ -620,10 +870,8 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
                             if socket.send(Message::Text(json!({"type":"error","message":error}).to_string().into())).await.is_err() { break; }
                         }
                         if layout_changed { active_layout = current_layout(&shared.app); }
-                        let view = choice.view(active_layout);
-                        if !party && view != selected {
-                            video = shared.video.subscribe(view);
-                            selected = view;
+                        if !party {
+                            phone.select(&shared, choice.view(active_layout));
                         }
                     }
                     None
@@ -649,6 +897,7 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
     }
     // Dropping the relay releases every button this phone held.
     drop(relay);
+    phone.leave(&shared);
     if let Ok(mut players) = shared.players.lock() {
         players.remove(&connection);
     }
@@ -699,6 +948,8 @@ fn handle(
             let conn = database.0.lock().map_err(crate::database::error)?;
             video::save_layout(&conn, session.id(), layout)?;
         }
+        // Handled by the session, which owns the phone's video.
+        Incoming::Rtc { .. } => {}
         Incoming::View { full, region } => {
             if region.is_some_and(|region| !(1..=4).contains(&region)) {
                 return Err("Escolha uma região entre 1 e 4.".into());
@@ -730,6 +981,28 @@ mod tests {
         choice.full = false;
         choice.region = None;
         assert_eq!(choice.view(Layout::Grid), View::new(Layout::Grid, 4));
+    }
+
+    #[test]
+    fn only_webrtc_negotiation_crosses_the_relay() {
+        let answer = json!({"type":"answer","sdp":{"type":"answer","sdp":"v=0"}});
+        assert!(relayable(&answer, &["answer", "candidate"]));
+        assert!(!relayable(&answer, &["offer", "candidate"]));
+        assert!(!relayable(
+            &json!({"type":"launch"}),
+            &["answer", "candidate"]
+        ));
+        assert!(!relayable(&json!({"sdp":"v=0"}), &["answer"]));
+        let huge = json!({"type":"candidate","candidate":"x".repeat(20_000)});
+        assert!(!relayable(&huge, &["candidate"]));
+        assert!(serde_json::from_value::<Incoming>(
+            json!({"type":"rtc","signal":{"type":"hello"}})
+        )
+        .is_ok());
+        assert_eq!(
+            view_json(View::new(Layout::SideBySide, 2)),
+            json!({"layout":"sideBySide","region":2})
+        );
     }
 
     #[test]

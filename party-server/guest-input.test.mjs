@@ -39,3 +39,32 @@ test("guest releases a controller and keeps it neutral while another app has foc
   vm.runInContext('input();', context);
   assert.equal(packets.at(-1).buttons, 0);
 });
+
+test("guest sends a controller change on the next frame and stays quiet otherwise", () => {
+  let pad = { mapping: "standard", buttons: [], axes: [0, 0, 0, 0] };
+  const packets = [], frames = [];
+  const element = { value: "", addEventListener() {}, focus() {}, classList: { remove() {} } };
+  const context = vm.createContext({
+    document: {
+      hidden: false, hasFocus: () => true, getElementById: () => element,
+      querySelectorAll: () => [], addEventListener() {},
+    },
+    location: { pathname: "/party" },
+    window: { addEventListener() {} },
+    navigator: { getGamepads: () => [pad] },
+    setInterval() {}, clearInterval() {},
+    requestAnimationFrame: (fn) => frames.push(fn),
+  });
+  vm.runInContext(readFileSync(new URL("public/guest.js", import.meta.url), "utf8"), context);
+  context.record = (value) => packets.push(JSON.parse(value));
+  vm.runInContext('channel = { readyState: "open", bufferedAmount: 0, send: record }; input();', context);
+  const frame = () => frames.shift()();
+  frame();
+  assert.equal(packets.length, 1);
+  pad = { ...pad, buttons: [{ pressed: true }] };
+  frame();
+  assert.equal(packets.length, 2);
+  assert.equal(packets.at(-1).buttons, 1 << 8);
+  frame();
+  assert.equal(packets.length, 2);
+});

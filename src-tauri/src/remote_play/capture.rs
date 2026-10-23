@@ -171,12 +171,7 @@ impl GraphicsCaptureApiHandler for Handler {
         let shared = self.target.shared.load(Ordering::Acquire);
         if self.target.frames.receiver_count() == 0
             || self.sent.is_some_and(|sent| {
-                sent.elapsed()
-                    < if self.target.frames.party_active() {
-                        Duration::from_micros(33_333)
-                    } else {
-                        FRAME_INTERVAL
-                    }
+                sent.elapsed() < self.target.frames.encoder_gap().unwrap_or(FRAME_INTERVAL)
             })
             || super::frames::now_ms().saturating_sub(shared) < 500
         {
@@ -199,7 +194,7 @@ impl GraphicsCaptureApiHandler for Handler {
             width,
             height,
             &mut self.rgb,
-            self.target.frames.party_active(),
+            self.target.frames.encoder_active(),
         );
         // A lagging phone skips frames instead of falling behind.
         self.target.frames.publish(&self.rgb, w, h, QUALITY)?;

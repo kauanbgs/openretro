@@ -283,6 +283,32 @@ export function SettingsPage({
                     </p>
                   </div>
                 </div>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Fluidez no celular")}</strong>
+                    <p>
+                      {t(
+                        "Quadros por segundo do vídeo enviado ao celular. 60 deixa o movimento mais suave, mas pesa mais no PC e no Wi-Fi.",
+                      )}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Fluidez no celular")}
+                    value={String(settings.phoneFrameRate ?? 30)}
+                    onChange={(e) =>
+                      void save({
+                        phoneFrameRate: Number(
+                          e.target.value,
+                        ) as AppSettings["phoneFrameRate"],
+                      })
+                    }
+                  >
+                    <option value="30">
+                      {t("30 quadros/s · recomendado")}
+                    </option>
+                    <option value="60">{t("60 quadros/s · mais suave")}</option>
+                  </select>
+                </div>
               </Group>
               <Group title={t("Sistema")}>
                 <div className="setting-row">

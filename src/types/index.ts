@@ -179,6 +179,8 @@ export interface AppSettings {
   ps2Resolution?: "1x" | "2x" | "4x" | "8x";
   /** Image sizing for PS2 and retro games in the managed runtime. */
   gameScreenMode?: "original" | "stretch";
+  /** Frames per second of phone play's WebRTC video. */
+  phoneFrameRate?: 30 | 60;
 }
 export const defaultSettings: AppSettings = {
   autoResume: true,

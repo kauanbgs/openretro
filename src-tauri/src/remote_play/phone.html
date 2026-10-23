@@ -18,9 +18,11 @@
      like any mobile game; --w and --h are its landscape size in pixels. */
   #app { position: fixed; top: 0; left: 0; width: var(--w, 100vw); height: var(--h, 100vh); overflow: hidden; transform-origin: 0 0; }
   #app.turned { transform: translateX(var(--h)) rotate(90deg); }
-  #screen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  #screen, #rtc-screen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  #screen[hidden], #rtc-screen[hidden] { display: none; }
   #bar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: 8px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); background: linear-gradient(#000b, #0000); z-index: 5; }
   #title { flex: 1; overflow: hidden; color: var(--text); font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+  #stats { overflow: hidden; color: var(--body); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   .chip { height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: #0008; font-size: 13px; font-weight: 600; }
   .chip.on { background: var(--muted); color: #1c1c1c; border-color: transparent; }
   #menu { position: absolute; top: 52px; right: 12px; max-height: calc(var(--h, 100vh) - 64px); overflow-y: auto; z-index: 6; display: none; min-width: 190px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
@@ -86,8 +88,10 @@
 <body>
 <div id="app">
 <img id="screen" alt="">
+<video id="rtc-screen" autoplay muted playsinline disablepictureinpicture hidden></video>
 <div id="bar">
   <span id="title">OpenRetro</span>
+  <small id="stats"></small>
   <button class="chip" id="player-chip">J1</button>
   <button class="chip" id="view-chip" aria-pressed="false">Ver tela inteira</button>
   <button class="chip" id="menu-chip" aria-label="Menu">☰</button>
@@ -123,7 +127,6 @@
     <input id="control-opacity" type="range" min="20" max="85" value="55">
   </label>
   <button data-action="quit">Sair do jogo</button>
-  <small id="stats"></small>
 </div>
 <div id="controls">
   <div id="dpad"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i></div>
@@ -226,6 +229,9 @@
     "computador": "computer",
     "livre": "free",
     "{frames} quadros/s · {mbits} Mbit/s": "{frames} frames/s · {mbits} Mbit/s",
+    "{n} pacotes perdidos": "{n} packets lost",
+    "{n} travadas": "{n} freezes",
+    "pausa {net} ms, PC {pc} ms": "pause {net} ms, PC {pc} ms",
     "Um jogo já está aberto no computador.": "A game is already open on the computer.",
     "Esta ação só está disponível no computador.": "This action is only available on the computer.",
     "Abra um jogo para configurar a tela dividida.": "Open a game to set up split screen.",
@@ -369,6 +375,120 @@
     screen.src = url;
   }
 
+  // WebRTC video: the PC offers an H.264 track of this phone's view. The JPEG
+  // picture stays until WebRTC frames decode, and returns when they stop.
+  const rtcScreen = $("rtc-screen");
+  let pc = null, rtcPending = [], rtcOn = false, rtcLast = { frames: 0, bytes: 0 };
+  // The longest pause between frames this second, twice: as the PC made
+  // them (RTP timestamps) and as they arrived. Equal pauses come from the PC;
+  // a longer arrival pause comes from the network.
+  let lastFrame = null, pause = { pc: 0, net: 0 }, watching = false;
+  function watchFrames() {
+    if (watching || !rtcScreen.requestVideoFrameCallback) return;
+    watching = true;
+    const step = (_, meta) => {
+      if (meta.rtpTimestamp !== undefined && meta.receiveTime !== undefined) {
+        if (lastFrame) {
+          pause.pc = Math.max(pause.pc, ((meta.rtpTimestamp - lastFrame.rtp) >>> 0) / 90);
+          pause.net = Math.max(pause.net, meta.receiveTime - lastFrame.receive);
+        }
+        lastFrame = { rtp: meta.rtpTimestamp, receive: meta.receiveTime };
+      }
+      rtcScreen.requestVideoFrameCallback(step);
+    };
+    rtcScreen.requestVideoFrameCallback(step);
+  }
+  // The PC's addresses arrive hidden as random .local names. The phone already
+  // reaches the PC at this page's address, so candidates use that instead.
+  const pcAddress = /^\d+\.\d+\.\d+\.\d+$/.test(location.hostname) ? location.hostname : null;
+  function reachable(text) {
+    return pcAddress ? text.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.local/gi, pcAddress) : text;
+  }
+  function rtcSend(signal) { send({ type: "rtc", signal }); }
+  // Sound stays PCM over the socket: phones play WebRTC audio like a voice
+  // call, at call volume.
+  function rtcActive(on) {
+    if (rtcOn === on) return;
+    rtcOn = on;
+    rtcScreen.hidden = !on; screen.hidden = on;
+    rtcSend({ type: "active", on });
+  }
+  function rtcClose() {
+    if (pc) { pc.onconnectionstatechange = null; pc.close(); pc = null; }
+    rtcPending = []; rtcScreen.srcObject = null; rtcLast = { frames: 0, bytes: 0 };
+    rtcActive(false);
+  }
+  async function rtcSignal(signal) {
+    if (!signal) return;
+    if (signal.type === "stop") return rtcClose();
+    if (signal.type === "offer" && signal.sdp) {
+      const early = rtcPending;
+      rtcClose();
+      rtcPending = early;
+      const peer = pc = new RTCPeerConnection();
+      peer.ontrack = (event) => {
+        // Play each frame as soon as it decodes; the browser's default
+        // buffering suits calls, not a game being played.
+        try {
+          if ("jitterBufferTarget" in event.receiver) event.receiver.jitterBufferTarget = 0;
+          else if ("playoutDelayHint" in event.receiver) event.receiver.playoutDelayHint = 0;
+        } catch {}
+        if (event.track.kind !== "video") return;
+        rtcScreen.srcObject = new MediaStream([event.track]);
+        rtcScreen.play().catch(() => {});
+        lastFrame = null;
+        watchFrames();
+      };
+      peer.onicecandidate = (event) => {
+        if (event.candidate && pc === peer) rtcSend({ type: "candidate", candidate: event.candidate.toJSON() });
+      };
+      // A still game sends no frames, so only the connection decides when
+      // the JPEG picture returns; decoded frames bring WebRTC back.
+      peer.onconnectionstatechange = () => {
+        if (pc !== peer) return;
+        if (peer.connectionState === "failed" || peer.connectionState === "closed") rtcClose();
+        else if (peer.connectionState === "disconnected") rtcActive(false);
+      };
+      await peer.setRemoteDescription({ type: "offer", sdp: reachable(signal.sdp.sdp || "") });
+      await peer.setLocalDescription(await peer.createAnswer());
+      if (pc !== peer) return;
+      rtcSend({ type: "answer", sdp: peer.localDescription });
+      for (const candidate of rtcPending.splice(0)) await peer.addIceCandidate(candidate);
+      return;
+    }
+    if (signal.type === "candidate" && signal.candidate) {
+      const candidate = { ...signal.candidate, candidate: reachable(signal.candidate.candidate || "") };
+      if (pc && pc.remoteDescription) await pc.addIceCandidate(candidate);
+      else rtcPending.push(candidate);
+    }
+  }
+  // Once a second: frames decoded decide which picture shows.
+  async function rtcPoll() {
+    const peer = pc;
+    if (!peer) return null;
+    let report;
+    try { report = await peer.getStats(); } catch { return null; }
+    if (pc !== peer) return null;
+    let now = null;
+    report.forEach((entry) => { if (entry.type === "inbound-rtp" && entry.kind === "video") now = entry; });
+    if (!now) return null;
+    // Per-second deltas; lost packets and freezes say whether a stutter
+    // comes from the Wi-Fi or from the PC sending fewer frames.
+    const total = {
+      frames: now.framesDecoded || 0, bytes: now.bytesReceived || 0,
+      lost: now.packetsLost || 0, freezes: now.freezeCount || 0,
+    };
+    const delta = (key) => Math.max(0, total[key] - (rtcLast[key] || 0));
+    const result = {
+      frames: delta("frames"), bytes: delta("bytes"), lost: delta("lost"), freezes: delta("freezes"),
+      codec: report.get(now.codecId)?.mimeType?.replace(/^video\//i, "") || "",
+      size: now.frameWidth ? `${now.frameWidth}×${now.frameHeight}` : "",
+    };
+    rtcLast = total;
+    if (result.frames > 0 && peer.connectionState === "connected") rtcActive(true);
+    return result;
+  }
+
   // Audio: schedule PCM chunks just ahead of the clock and drop backlog.
   let audio = null, playAt = 0;
   // Off when the phone sits next to the PC, which plays the same sound.
@@ -393,15 +513,24 @@
   function connect() {
     ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?t=${encodeURIComponent(token)}`);
     ws.binaryType = "arraybuffer";
-    ws.onopen = () => { title.textContent = game || tr("Conectado"); sendPad(true); sendView(); };
+    ws.onopen = () => {
+      title.textContent = game || tr("Conectado"); sendPad(true); sendView();
+      if (window.RTCPeerConnection) rtcSend({ type: "hello" });
+    };
     ws.onmessage = (event) => {
-      if (typeof event.data === "string") return status(JSON.parse(event.data));
+      if (typeof event.data === "string") {
+        const message = JSON.parse(event.data);
+        // A phone that cannot negotiate keeps the JPEG picture.
+        if (message.type === "rtc") return void rtcSignal(message.signal).catch(rtcClose);
+        return status(message);
+      }
       const view = new DataView(event.data);
       bytes += event.data.byteLength;
       if (view.getUint8(0) === 1) { frames++; showFrame(new Uint8Array(event.data, 1)); }
       else if (view.getUint8(0) === 2) playSound(view);
     };
     ws.onclose = () => {
+      rtcClose();
       title.textContent = tr("Reconectando…");
       sent = "";
       setTimeout(connect, 1000);
@@ -616,8 +745,24 @@
   };
   $("sound-toggle").textContent = tr(soundOn ? "Som no celular: ligado" : "Som no celular: desligado");
   renderWho();
-  setInterval(() => {
-    $("stats").textContent = tr("{frames} quadros/s · {mbits} Mbit/s", { frames, mbits: (bytes * 8 / 1e6).toFixed(1) });
+  setInterval(async () => {
+    let rtc = null;
+    try { rtc = await rtcPoll(); } catch {}
+    const webrtc = rtcOn && rtc;
+    const parts = [tr("{frames} quadros/s · {mbits} Mbit/s", {
+      frames: webrtc ? rtc.frames : frames,
+      mbits: ((bytes + (rtc ? rtc.bytes : 0)) * 8 / 1e6).toFixed(1),
+    })];
+    if (webrtc) {
+      parts.push([rtc.codec, rtc.size].filter(Boolean).join(" "));
+      if (rtc.lost) parts.push(tr("{n} pacotes perdidos", { n: rtc.lost }));
+      if (rtc.freezes) parts.push(tr("{n} travadas", { n: rtc.freezes }));
+      if (pause.net >= 100) parts.push(tr("pausa {net} ms, PC {pc} ms", {
+        net: Math.round(pause.net), pc: Math.round(pause.pc),
+      }));
+    } else parts.push("JPEG");
+    pause = { pc: 0, net: 0 };
+    $("stats").textContent = parts.filter(Boolean).join(" · ");
     frames = 0; bytes = 0;
   }, 1000);
   updatePlayer();

@@ -186,20 +186,22 @@ mod tests {
 
     #[test]
     fn a_held_button_is_recovered_when_the_runtime_starts_late() {
-        let port = UdpSocket::bind("127.0.0.1:0").unwrap();
-        let base = port.local_addr().unwrap().port();
-        drop(port);
+        // The port stays bound throughout: releasing and rebinding it let a
+        // parallel test take it in between. Discarding stands in for loss.
+        let runtime = UdpSocket::bind("127.0.0.1:0").unwrap();
+        runtime
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
         let mut relay = Relay::new().unwrap();
-        relay.base_port = base;
+        relay.base_port = runtime.local_addr().unwrap().port();
         let held = PadState {
             buttons: 1 << 8,
             axes: [1234, 0, 0, 0],
         };
         relay.update(held); // No runtime yet: the initial datagrams are lost.
-        let runtime = UdpSocket::bind(("127.0.0.1", base)).unwrap();
-        runtime
-            .set_read_timeout(Some(Duration::from_secs(1)))
-            .unwrap();
+        for _ in 0..20 {
+            runtime.recv(&mut [0; 20]).unwrap();
+        }
         relay.synced = Instant::now() - Duration::from_secs(1);
         relay.update(held); // Identical state must still reach a new listener.
         let mut packets = Vec::new();

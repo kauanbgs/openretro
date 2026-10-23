@@ -1,8 +1,17 @@
 import { bridge } from "../../services/bridge";
 import { invoke, isTauri } from "../../services/transport";
 import { validatePartyServer } from "./partyConfig";
-import { preferPartyVideoCodec } from "./partyCodecs";
-import { rawPartyFrame } from "./partyFrames";
+import { preferH264VideoCodec } from "./partyCodecs";
+import {
+  canvasSource,
+  frameTrack,
+  frameTracksSupported,
+  FULL_VIEW,
+  packetDecoder,
+  retire,
+  type FrameTrack,
+  type Source,
+} from "../../services/frameTracks";
 
 export interface PartyGuest {
   id: string;
@@ -51,7 +60,10 @@ let stream: MediaStream | undefined;
 let timeout: ReturnType<typeof setTimeout> | undefined;
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 let generation = 0;
-let decoding = false;
+let video: FrameTrack | undefined;
+let latest: Source | undefined;
+let decode = packetDecoder();
+let refresh: ReturnType<typeof setInterval> | undefined;
 let audioTime = 0;
 let playing = false;
 const peers = new Map<
@@ -61,6 +73,7 @@ const peers = new Map<
     pad: WebSocket;
     channel: RTCDataChannel;
     lastInput: number;
+    lastState: string;
     seq: number;
     pending: RTCIceCandidateInit[];
   }
@@ -82,6 +95,13 @@ function waiting() {
   paint.fillStyle = theme.getPropertyValue("--body").trim() || "#8e919b";
   paint.font = "26px sans-serif";
   paint.fillText("Aguardando um jogo no PC…", 640, 390);
+  if (frameTracksSupported) show(canvasSource(canvas));
+}
+/** Sends a frame to every guest; the previous one closes once unused. */
+function show(source: Source) {
+  if (latest) retire(latest);
+  latest = source;
+  void video?.show(source);
 }
 function send(message: object) {
   if (signaling?.readyState === WebSocket.OPEN)
@@ -106,12 +126,17 @@ export function endParty() {
   media?.close();
   media = undefined;
   for (const id of [...peers.keys()]) dropPeer(id);
+  clearInterval(refresh);
+  video?.close();
+  video = undefined;
   stream?.getTracks().forEach((track) => track.stop());
   stream = undefined;
+  if (latest) retire(latest);
+  latest = undefined;
+  decode = packetDecoder();
   void context?.close();
   context = undefined;
   playing = false;
-  decoding = false;
   audioTime = 0;
   update({ ...initial });
 }
@@ -130,6 +155,10 @@ export async function startParty() {
   try {
     if (!isTauri)
       throw new Error("Abra o aplicativo desktop para transmitir uma partida.");
+    if (!frameTracksSupported)
+      throw new Error(
+        "Atualize o Microsoft Edge WebView2 para transmitir uma partida.",
+      );
     const configuration = await invoke<{ url: string }>("party_configuration");
     if (run !== generation) return;
     if (!configuration.url)
@@ -163,9 +192,16 @@ export async function startParty() {
         );
       reservation = result;
     }
-    stream = canvas.captureStream(30);
-    for (const track of stream.getVideoTracks()) track.contentHint = "detail";
+    // Every frame the server paces at 30 fps becomes a video frame, without
+    // a canvas: a capture capped at that same rate dropped frames that
+    // arrived close together and left doubled gaps.
+    video = frameTrack(FULL_VIEW);
+    stream = video.stream;
     for (const track of audio.stream.getAudioTracks()) stream.addTrack(track);
+    // A guest who connects while nothing changes still gets a picture.
+    refresh = setInterval(() => {
+      if (!playing) waiting();
+    }, 1000);
     const remote = await bridge.remotePlayStart();
     if (run !== generation) return;
     if (!remote.url)
@@ -194,53 +230,13 @@ export async function startParty() {
       if (!playing) return;
       const data = new DataView(event.data as ArrayBuffer);
       if (data.byteLength === 0) return;
-      if (data.getUint8(0) === 4) {
-        const frame = rawPartyFrame(event.data as ArrayBuffer);
+      if (data.getUint8(0) === 4 || data.getUint8(0) === 3) {
+        // Frames keep their aspect ratio instead of encoding black bars, and
+        // small retro frames grow by whole pixels (frameTracks.ts).
+        const frame = await decode(event.data as ArrayBuffer);
         if (!frame) return;
-        if (canvas.width !== frame.width || canvas.height !== frame.height) {
-          canvas.width = frame.width;
-          canvas.height = frame.height;
-        }
-        for (const track of stream?.getVideoTracks() ?? [])
-          if (track.contentHint !== "motion") track.contentHint = "motion";
-        paint.putImageData(
-          new ImageData(frame.pixels, frame.width, frame.height),
-          0,
-          0,
-        );
-      } else if (
-        (data.getUint8(0) === 1 || data.getUint8(0) === 3) &&
-        !decoding
-      ) {
-        decoding = true;
-        try {
-          const image = await createImageBitmap(
-            new Blob([new Uint8Array(event.data, 1)], {
-              type: data.getUint8(0) === 3 ? "image/png" : "image/jpeg",
-            }),
-          );
-          if (playing && run === generation) {
-            for (const track of stream?.getVideoTracks() ?? [])
-              if (track.contentHint !== "detail") track.contentHint = "detail";
-            // Match the source aspect ratio instead of encoding black bars.
-            // Upscale small retro frames by whole pixels; never stretch them.
-            const scale = Math.max(
-              1,
-              Math.floor(Math.min(1280 / image.width, 720 / image.height)),
-            );
-            const width = image.width * scale;
-            const height = image.height * scale;
-            if (canvas.width !== width || canvas.height !== height) {
-              canvas.width = width;
-              canvas.height = height;
-            }
-            paint.imageSmoothingEnabled = false;
-            paint.drawImage(image, 0, 0, width, height);
-          }
-          image.close();
-        } finally {
-          decoding = false;
-        }
+        if (playing && run === generation) show(frame);
+        else retire(frame);
       } else if (data.getUint8(0) === 2 && context && data.byteLength >= 9) {
         const rate = data.getUint32(1, true),
           length = Math.floor((data.byteLength - 5) / 4);
@@ -317,6 +313,7 @@ export async function startParty() {
             pad,
             channel,
             lastInput: 0,
+            lastState: "",
             seq: -1,
             pending: [] as RTCIceCandidateInit[],
           };
@@ -332,7 +329,7 @@ export async function startParty() {
           stream!.getTracks().forEach((track) => pc.addTrack(track, stream!));
           for (const transceiver of pc.getTransceivers()) {
             if (transceiver.sender.track?.kind === "video")
-              preferPartyVideoCodec(
+              preferH264VideoCodec(
                 transceiver,
                 RTCRtpSender.getCapabilities("video"),
                 RTCRtpReceiver.getCapabilities("video"),
@@ -343,7 +340,8 @@ export async function startParty() {
             const parameters = sender.getParameters();
             if (parameters.encodings.length) {
               parameters.encodings[0].maxBitrate = 5_000_000;
-              parameters.encodings[0].maxFramerate = 30;
+              // A ceiling above the paced rate, for the same reason.
+              parameters.encodings[0].maxFramerate = 60;
               // Keep gameplay moving if the encoder or connection is overloaded.
               parameters.degradationPreference = "maintain-framerate";
               await sender.setParameters(parameters);
@@ -354,7 +352,12 @@ export async function startParty() {
               if (typeof input.data !== "string" || input.data.length > 512)
                 return;
               const value = JSON.parse(input.data);
-              if (Date.now() - peer.lastInput < 8) return;
+              // Repeats of the same state are throttled; a change always
+              // passes, or a press right after a repeat would wait for the
+              // guest's next repeat.
+              const state = JSON.stringify([value.buttons, value.axes]);
+              if (Date.now() - peer.lastInput < 8 && state === peer.lastState)
+                return;
               if (
                 !Number.isSafeInteger(value.seq) ||
                 value.seq <= peer.seq ||
@@ -371,6 +374,7 @@ export async function startParty() {
                 return;
               peer.seq = value.seq;
               peer.lastInput = Date.now();
+              peer.lastState = state;
               if (playing && pad.readyState === WebSocket.OPEN)
                 pad.send(
                   JSON.stringify({

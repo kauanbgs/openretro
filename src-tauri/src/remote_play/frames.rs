@@ -266,9 +266,12 @@ impl SharedFrames {
                         mapping.want();
                     }
                 }
-                // The Party track is 30 fps. Do not copy and convert 60+ large
-                // GPU frames a second only to throw half of them away later.
-                if frames.party_active() && prepared.elapsed() < Duration::from_micros(33_333) {
+                // WebRTC tracks are 30 or 60 fps. Do not copy and convert
+                // more large GPU frames than that only to throw them away.
+                if frames
+                    .encoder_gap()
+                    .is_some_and(|gap| prepared.elapsed() < gap)
+                {
                     std::thread::sleep(Duration::from_millis(1));
                     continue;
                 }
@@ -289,7 +292,7 @@ impl SharedFrames {
                     pitch,
                     format,
                     &mut rgb,
-                    frames.party_active(),
+                    frames.encoder_active(),
                 );
                 let quality = if format == Format::BgraFlipped {
                     READBACK_QUALITY

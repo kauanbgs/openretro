@@ -168,7 +168,7 @@ have the same game file and core.
 For a split-screen game, open the phone's game menu and set **Tela dividida
 deste jogo** to left/right, top/bottom, or four quadrants. The PC saves that
 layout for the game and sends each phone only its player's region, cropped
-before JPEG encoding. J1/J2 receive the left/right or top/bottom halves; in a
+before encoding. J1/J2 receive the left/right or top/bottom halves; in a
 four-player layout J1–J4 receive top-left, top-right, bottom-left, bottom-right.
 **Minha parte da tela** overrides the image region without changing the
 controller's player. **Ver tela inteira** temporarily shows menus and results
@@ -177,6 +177,16 @@ same audio. A phone on J3/J4 sees the full picture in a two-region layout until
 it selects a valid image region. This uses the game's existing split-screen;
 shared-camera games keep the full-screen layout, and crops do not add detail
 or independent cameras.
+
+The picture starts as JPEG frames and moves to WebRTC video once it plays:
+OpenRetro's own window encodes one H.264 stream per screen region (VP8/VP9
+when H.264 is unavailable), up to 720p, sent directly over the local
+network. Sound stays PCM, since phones play WebRTC audio at call volume. **Settings → General →
+Fluidez no celular** chooses 30 (default) or 60 frames per second. The
+phone's top bar shows the frame rate, bitrate, codec and resolution, plus
+lost packets, freezes and whether a pause came from the PC or the network.
+Where WebRTC cannot connect, for example through a TCP-only port forward, the
+phone keeps the JPEG picture.
 
 Touch controls are translucent by default. Adjust **Visibilidade dos controles**
 in the phone's game menu; that preference stays on the phone. Held buttons are

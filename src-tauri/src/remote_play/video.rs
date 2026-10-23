@@ -1,9 +1,14 @@
 //! Capture once, crop before JPEG encoding, and share each requested view.
 //! Slow phones keep only the latest two frames; unused views cost no encoding.
+//! Party and phone WebRTC share one uncompressed loopback packet instead: the
+//! PC's webview crops and encodes it as H.264 or VP9.
 use axum::body::Bytes;
 use image::ImageEncoder;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::Ordering;
 use tokio::sync::broadcast;
+
+const PARTY_INTERVAL_US: u64 = 33_333;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +66,10 @@ impl View {
 #[derive(Clone)]
 pub struct Video {
     party: broadcast::Sender<Bytes>,
+    /// The phone WebRTC encoder in the PC's webview.
+    rtc: broadcast::Sender<Bytes>,
+    /// Its frame interval in microseconds, from the phone smoothness setting.
+    rtc_interval: std::sync::Arc<std::sync::atomic::AtomicU64>,
     channels: std::sync::Arc<Vec<(View, broadcast::Sender<Bytes>)>>,
 }
 
@@ -74,6 +83,8 @@ impl Default for Video {
         }
         Self {
             party: broadcast::channel(2).0,
+            rtc: broadcast::channel(2).0,
+            rtc_interval: std::sync::Arc::new(PARTY_INTERVAL_US.into()),
             channels: std::sync::Arc::new(
                 views
                     .into_iter()
@@ -93,6 +104,35 @@ impl Video {
         self.party.receiver_count() > 0
     }
 
+    pub fn subscribe_rtc(&self) -> broadcast::Receiver<Bytes> {
+        self.rtc.subscribe()
+    }
+
+    /// A WebRTC encoder takes frames up to 720p instead of phone JPEG sizes.
+    pub fn encoder_active(&self) -> bool {
+        self.party_active() || self.rtc.receiver_count() > 0
+    }
+
+    /// Phone play's 30 or 60 fps; Party stays at 30 over the internet.
+    pub fn set_rtc_frame_rate(&self, fps: u64) {
+        self.rtc_interval
+            .store(1_000_000 / fps.clamp(30, 60), Ordering::Relaxed);
+    }
+
+    /// The shortest gap between frames an active encoder takes. It sits a
+    /// fifth below the interval: a 60 fps source paced at exactly 33.3 ms
+    /// drops a frame that arrives a little early and leaves a doubled gap.
+    pub fn encoder_gap(&self) -> Option<std::time::Duration> {
+        let interval = if self.party_active() {
+            PARTY_INTERVAL_US
+        } else if self.rtc.receiver_count() > 0 {
+            self.rtc_interval.load(Ordering::Relaxed)
+        } else {
+            return None;
+        };
+        Some(std::time::Duration::from_micros(interval * 4 / 5))
+    }
+
     pub fn subscribe(&self, view: View) -> broadcast::Receiver<Bytes> {
         self.channels
             .iter()
@@ -104,6 +144,7 @@ impl Video {
 
     pub fn receiver_count(&self) -> usize {
         self.party.receiver_count()
+            + self.rtc.receiver_count()
             + self
                 .channels
                 .iter()
@@ -121,16 +162,21 @@ impl Video {
         // Large game frames cross loopback as RGBA: avoid a PNG encode/decode
         // before WebRTC compresses them. Small pixel-art frames stay compact.
         // Neither local format travels through the public TURN service.
-        if self.party_active() {
+        if self.encoder_active() {
             let packet = party_packet(rgb, width, height)?;
-            let _ = self.party.send(packet);
+            if self.party_active() {
+                let _ = self.party.send(packet.clone());
+            }
+            if self.rtc.receiver_count() > 0 {
+                let _ = self.rtc.send(packet);
+            }
         }
-        // Keep phone JPEG bandwidth at its previous size even during a Party.
+        // Keep phone JPEG bandwidth at its previous size beside an encoder.
         let phone = if self
             .channels
             .iter()
             .any(|(_, sender)| sender.receiver_count() > 0)
-            && self.party_active()
+            && self.encoder_active()
             && quality <= 75
             && (width > 640 || height > 480)
         {
@@ -311,6 +357,44 @@ mod tests {
             (640, 360)
         );
         assert_eq!(video.receiver_count(), 2);
+    }
+
+    #[test]
+    fn phone_encoder_shares_the_party_packet_without_counting_as_party() {
+        let video = Video::default();
+        let mut rtc = video.subscribe_rtc();
+        assert!(video.encoder_active());
+        assert!(!video.party_active());
+        let mut party = video.subscribe_party();
+        let rgb: Vec<u8> = (0..1280 * 720 * 3).map(|i| (i % 7) as u8).collect();
+        video.publish(&rgb, 1280, 720, 75).unwrap();
+        let shared = rtc.try_recv().unwrap();
+        assert_eq!(shared[0], 4);
+        assert_eq!(shared.as_ptr(), party.try_recv().unwrap().as_ptr());
+        drop(party);
+        video.publish(&rgb, 1280, 720, 75).unwrap();
+        assert_eq!(rtc.try_recv().unwrap()[0], 4);
+        assert_eq!(video.receiver_count(), 1);
+        drop(rtc);
+        assert!(!video.encoder_active());
+    }
+
+    #[test]
+    fn phones_choose_their_rate_and_party_keeps_thirty() {
+        use std::time::Duration;
+        let video = Video::default();
+        assert_eq!(video.encoder_gap(), None);
+        let rtc = video.subscribe_rtc();
+        // Early frames of a 60 fps source still pass at 30 fps.
+        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(26_666)));
+        video.set_rtc_frame_rate(60);
+        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(13_332)));
+        video.set_rtc_frame_rate(500);
+        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(13_332)));
+        let party = video.subscribe_party();
+        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(26_666)));
+        drop((rtc, party));
+        assert_eq!(video.encoder_gap(), None);
     }
 
     #[test]

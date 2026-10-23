@@ -23,8 +23,7 @@ function clearInput() {
     .forEach((el) => el.classList.remove("pressed"));
   input(true);
 }
-function input(clear = false) {
-  if (channel?.readyState !== "open" || channel.bufferedAmount > 4096) return;
+function reading(clear) {
   let buttons = 0,
     axes = [0, 0, 0, 0];
   if (!clear && !document.hidden && document.hasFocus()) {
@@ -43,9 +42,25 @@ function input(clear = false) {
       );
     }
   }
-  channel.send(JSON.stringify({ seq: seq++, buttons, axes }));
+  return { buttons, axes };
 }
+let lastSent = "";
+function input(clear = false) {
+  if (channel?.readyState !== "open" || channel.bufferedAmount > 4096) return;
+  const state = reading(clear);
+  lastSent = JSON.stringify(state);
+  channel.send(JSON.stringify({ seq: seq++, ...state }));
+}
+// The timer repeats the held state in case a packet is lost. A controller is
+// also read every display frame and sent the moment it changes, instead of
+// waiting up to 33 ms for the next repeat.
 const inputTimer = setInterval(() => input(), 33);
+function pollPad() {
+  if (channel?.readyState === "open" && JSON.stringify(reading()) !== lastSent)
+    input();
+  requestAnimationFrame(pollPad);
+}
+if (typeof requestAnimationFrame === "function") requestAnimationFrame(pollPad);
 function ended(message) {
   clearInterval(heartbeat);
   joined = false;
@@ -143,6 +158,15 @@ async function receive(m) {
     };
     const tracks = new MediaStream();
     pc.ontrack = (event) => {
+      // Play as soon as media decodes: the browser's default buffer suits
+      // calls, not a game being played. Sound too, or lip sync would hold
+      // the picture back to match it.
+      try {
+        if ("jitterBufferTarget" in event.receiver)
+          event.receiver.jitterBufferTarget = 0;
+        else if ("playoutDelayHint" in event.receiver)
+          event.receiver.playoutDelayHint = 0;
+      } catch {}
       tracks.addTrack(event.track);
       $("screen").srcObject = tracks;
       void activate();

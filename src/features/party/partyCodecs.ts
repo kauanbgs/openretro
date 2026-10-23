@@ -1,41 +1,55 @@
-// Keep the browser's complete codec list, including retransmission/FEC codecs.
-// Prefer VP9 profile 0 for efficient 8-bit game video; retain every fallback so
-// guests without VP9 can still negotiate their normal video codec.
-export function partyVideoCodecs(
+// Phone play and Party prefer H.264, which the PC encodes in hardware and
+// receivers decode in hardware: VP9 squeezed more quality from each bit but
+// encoded in software, which queued frames and added delay. The browser's
+// complete codec list is kept, including retransmission/FEC codecs, so a
+// receiver without H.264 still negotiates its normal codec.
+function codecKey(codec: RTCRtpCodec) {
+  return [
+    codec.mimeType.toLowerCase(),
+    codec.clockRate,
+    codec.channels ?? 0,
+    (codec.sdpFmtpLine ?? "")
+      .toLowerCase()
+      .split(";")
+      .map((part) => part.trim())
+      .sort()
+      .join(";"),
+  ].join("|");
+}
+
+function fmtp(codec: RTCRtpCodec, name: string) {
+  return new RegExp(`(?:^|;)\\s*${name}=([0-9a-f]+)`, "i").exec(
+    codec.sdpFmtpLine ?? "",
+  )?.[1];
+}
+
+/** H.264 that every decoder accepts first: constrained baseline in
+ * packetization mode 1, then other profiles, then everything else. Only
+ * profiles the PC can encode are moved; SDP parameters are never changed. */
+export function h264VideoCodecs(
   sending: RTCRtpCodec[],
   receiving: RTCRtpCodec[],
 ): RTCRtpCodec[] {
-  const key = (codec: RTCRtpCodec) =>
-    [
-      codec.mimeType.toLowerCase(),
-      codec.clockRate,
-      codec.channels ?? 0,
-      (codec.sdpFmtpLine ?? "")
-        .toLowerCase()
-        .split(";")
-        .map((part) => part.trim())
-        .sort()
-        .join(";"),
-    ].join("|");
-  const encoders = new Set(sending.map(key));
-  const isVp9 = (codec: RTCRtpCodec) =>
-    codec.mimeType.toLowerCase() === "video/vp9";
-  const efficient = receiving.filter(
-    (codec) => isVp9(codec) && encoders.has(key(codec)),
+  const encoders = new Set(sending.map(codecKey));
+  const h264 = receiving.filter(
+    (codec) =>
+      codec.mimeType.toLowerCase() === "video/h264" &&
+      encoders.has(codecKey(codec)),
   );
-  if (!efficient.length) return [];
-  // A missing profile-id means profile 0. Never invent or modify SDP parameters.
+  if (!h264.length) return [];
   const rank = (codec: RTCRtpCodec) => {
-    const profile =
-      /(?:^|;)\s*profile-id=(\d+)/i.exec(codec.sdpFmtpLine ?? "")?.[1] ?? "0";
-    return profile === "0" ? 0 : 1;
+    const profile = (fmtp(codec, "profile-level-id") ?? "42e01f").toLowerCase();
+    const baseline = profile.startsWith("42e0") || profile.startsWith("4200");
+    return (
+      (fmtp(codec, "packetization-mode") === "1" ? 0 : 2) + (baseline ? 0 : 1)
+    );
   };
-  efficient.sort((a, b) => rank(a) - rank(b));
-  const preferred = new Set(efficient);
-  return [...efficient, ...receiving.filter((codec) => !preferred.has(codec))];
+  h264.sort((a, b) => rank(a) - rank(b));
+  const preferred = new Set(h264);
+  return [...h264, ...receiving.filter((codec) => !preferred.has(codec))];
 }
 
-export function preferPartyVideoCodec(
+export function preferH264VideoCodec(
   transceiver: RTCRtpTransceiver,
   sending: Pick<RTCRtpCapabilities, "codecs"> | null,
   receiving: Pick<RTCRtpCapabilities, "codecs"> | null,
@@ -46,14 +60,14 @@ export function preferPartyVideoCodec(
     !receiving
   )
     return false;
-  const codecs = partyVideoCodecs(sending.codecs, receiving.codecs);
+  const codecs = h264VideoCodecs(sending.codecs, receiving.codecs);
   if (!codecs.length) return false;
   try {
     transceiver.setCodecPreferences(codecs);
     return true;
   } catch {
     // Some WebView versions expose preferences but reject a capability list.
-    // Keep the default negotiation instead of failing the Party connection.
+    // Keep the default negotiation instead of failing the connection.
     return false;
   }
 }
