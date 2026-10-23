@@ -42,11 +42,14 @@ import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
 import { NetplayDialog } from "./NetplayDialog";
+import { ModsTab } from "./ModsTab";
+import { playedSha256 } from "../../services/mods";
 import { formatRelative } from "../../utils/format";
 
 const tabLabels: Record<string, string> = {
   Overview: "Visão geral",
   Saves: "Saves",
+  Mods: "Traduções e mods",
   Screenshots: "Imagens",
   Details: "Detalhes",
 };
@@ -228,6 +231,15 @@ export function GamePage({
               .join(", ")}
           </p>
           <div className="detail-badges">
+            {entry?.item.activeVariant && (
+              <button
+                className="detail-badge accent"
+                title="Esta versão é usada ao jogar"
+                onClick={() => setTab("Mods")}
+              >
+                Versão: {entry.item.activeVariant.name}
+              </button>
+            )}
             {game.rating !== undefined && (
               <span
                 className="detail-badge"
@@ -419,6 +431,7 @@ export function GamePage({
               {[
                 "Overview",
                 ...(entry ? ["Saves"] : []),
+                ...(isRemote ? [] : ["Mods"]),
                 "Screenshots",
                 "Details",
               ].map((t) => (
@@ -466,6 +479,14 @@ export function GamePage({
                 running={running || busy}
                 onPlay={(slot) => void play(slot)}
                 notify={notify}
+              />
+            ) : tab === "Mods" ? (
+              <ModsTab
+                game={game}
+                entry={entry}
+                running={running || busy}
+                notify={notify}
+                refresh={refresh}
               />
             ) : tab === "Screenshots" ? (
               details.isFetching || captures.isLoading ? (
@@ -927,7 +948,8 @@ export function GamePage({
         <NetplayDialog
           title={game.title}
           platformId={entry.item.platformId}
-          sha256={entry.item.sha256}
+          sha256={playedSha256(entry.item)}
+          variant={entry.item.activeVariant?.name}
           notify={notify}
           onClose={() => setNetplay(false)}
           onStart={(session) => {

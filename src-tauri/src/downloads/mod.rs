@@ -1,4 +1,4 @@
-mod direct;
+pub(crate) mod direct;
 pub mod region;
 pub mod sources;
 use crate::{

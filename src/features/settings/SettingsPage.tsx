@@ -246,6 +246,30 @@ export function SettingsPage({
               </div>
               <div className="setting-row">
                 <div>
+                  <strong>Formato da tela dos jogos</strong>
+                  <p>
+                    Mantenha a proporção original ou estique a imagem para
+                    preencher toda a tela, mesmo que ela fique mais larga. Vale
+                    para PS2 e jogos retrô no runtime integrado, a partir do
+                    próximo jogo aberto.
+                  </p>
+                </div>
+                <select
+                  aria-label="Formato da tela dos jogos"
+                  value={settings.gameScreenMode ?? "original"}
+                  onChange={(e) =>
+                    void save({
+                      gameScreenMode: e.target
+                        .value as AppSettings["gameScreenMode"],
+                    })
+                  }
+                >
+                  <option value="original">Proporção original</option>
+                  <option value="stretch">Esticar para preencher</option>
+                </select>
+              </div>
+              <div className="setting-row">
+                <div>
                   <strong>Resolução do PlayStation 2</strong>
                   <p>
                     Desenha os jogos de PS2 em uma resolução maior que a do
@@ -331,7 +355,9 @@ export function SettingsPage({
                   aria-label="Apagar o arquivo compactado após instalar"
                   className={`switch ${settings.deleteArchives !== false ? "on" : ""}`}
                   onClick={() =>
-                    void save({ deleteArchives: settings.deleteArchives === false })
+                    void save({
+                      deleteArchives: settings.deleteArchives === false,
+                    })
                   }
                 >
                   <span />

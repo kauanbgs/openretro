@@ -67,6 +67,9 @@ fn directories(data: &Path, runtime: &Path, game: &Path, hash: &str, player: &st
             Some(value) => PathBuf::from(value),
         }
     };
+    with_subfolders(base)
+}
+fn with_subfolders(base: PathBuf) -> Vec<PathBuf> {
     let mut result = vec![base.clone()];
     if let Ok(entries) = std::fs::read_dir(&base) {
         result.extend(
@@ -139,6 +142,11 @@ fn locate(app: &tauri::AppHandle, id: &str) -> Result<Vec<StateFile>> {
         .and_then(|stem| stem.to_str())
         .ok_or("The game file name is invalid.")?;
     let data = app.path().app_data_dir().map_err(error)?;
+    // A modified version keeps its own states (see `mods::variant_saves`).
+    if let Some(variant) = &entry.item.active_variant {
+        let saves = crate::mods::variant_saves(&data, &player, variant)?;
+        return Ok(state_files(&with_subfolders(saves.states), stem));
+    }
     Ok(state_files(
         &directories(&data, runtime, &game, &entry.item.sha256, &player),
         stem,

@@ -386,6 +386,14 @@ export const bridge = {
       title: "Select emulator executable",
     });
   },
+  async pickModPatch(): Promise<string | null> {
+    if (!isDesktop)
+      throw new Error("Importe patches pelo aplicativo OpenRetro.");
+    return pickPath({
+      directory: false,
+      title: "Selecione o patch (.ips, .bps, .ups, .xdelta) ou um .zip/.7z",
+    });
+  },
   async pickBios(): Promise<string | null> {
     if (!isDesktop)
       throw new Error("BIOS configuration requires the desktop app.");

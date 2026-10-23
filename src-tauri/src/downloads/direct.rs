@@ -16,7 +16,12 @@ const MAX_RESUME_BLOCKS: u64 = 16_384;
 const MAX_RESUME_BYTES: u64 = 256 * 1024;
 
 pub fn client() -> Result<Client> {
+    client_with_headers(header::HeaderMap::new())
+}
+/// Headers such as Authorization are dropped by reqwest on redirects to another host.
+pub fn client_with_headers(headers: header::HeaderMap) -> Result<Client> {
     Client::builder()
+        .default_headers(headers)
         .user_agent(concat!("OpenRetro/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15))
         .read_timeout(Duration::from_secs(30))

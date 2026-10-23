@@ -6,8 +6,11 @@ export interface NetplayInvite {
   address: string;
   port: number;
   platformId: string;
+  /** The played file: a translation's or hack's own hash when one is selected. */
   sha256: string;
   title: string;
+  /** Name of the translation or hack, so others know which version to pick. */
+  variant?: string;
 }
 
 /** A single host, without a port, URL, path or command-line arguments. */
@@ -39,7 +42,9 @@ function validate(value: unknown): NetplayInvite {
     !/^[a-f0-9]{64}$/i.test(invite.sha256) ||
     typeof invite.title !== "string" ||
     !invite.title.trim() ||
-    invite.title.length > 256
+    invite.title.length > 256 ||
+    (invite.variant !== undefined &&
+      (typeof invite.variant !== "string" || invite.variant.length > 120))
   )
     throw new Error("Convite inválido. Peça um novo código ao anfitrião.");
   return {
@@ -48,6 +53,7 @@ function validate(value: unknown): NetplayInvite {
     platformId: invite.platformId,
     sha256: invite.sha256.toLowerCase(),
     title: invite.title,
+    ...(invite.variant?.trim() ? { variant: invite.variant.trim() } : {}),
   };
 }
 
@@ -91,6 +97,8 @@ export function checkInviteGame(
     invite.sha256 !== sha256.toLowerCase()
   )
     throw new Error(
-      `Este convite é para ${invite.title}. Abra a mesma versão e o mesmo arquivo do jogo para entrar.`,
+      invite.variant
+        ? `Este convite é para ${invite.title} com "${invite.variant}". Instale e escolha essa mesma versão em Traduções e mods para entrar.`
+        : `Este convite é para ${invite.title}. Abra a mesma versão e o mesmo arquivo do jogo para entrar; se você escolheu uma tradução ou mod, volte para o jogo original.`,
     );
 }

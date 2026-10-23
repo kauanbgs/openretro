@@ -1,0 +1,61 @@
+{
+  "note": "Game artwork belongs to its respective owners. Displayed as game identification and product illustration. Metadata/artwork source: LaunchBox Games Database.",
+  "sources": [
+    {
+      "file": "fonts/pixel.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/PressStart2P-Regular.ttf"
+    },
+    {
+      "file": "licenses/press-start-2p.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/OFL.txt"
+    },
+    {
+      "file": "art/mario-kart.jpg",
+      "source": "https://images.launchbox-app.com/b9b4f5ea-b515-4796-bee9-8e3a2d96d8bd.jpg"
+    },
+    {
+      "file": "art/final-fantasy.jpg",
+      "source": "https://images.launchbox-app.com/r2_b55e4cc2-0545-4f19-8742-7492d07dd8ef.jpg"
+    },
+    {
+      "file": "art/mario-world.jpg",
+      "source": "https://images.launchbox-app.com/72860dbf-227f-4267-93f1-69fe537441c4.jpg"
+    },
+    {
+      "file": "art/castlevania.jpg",
+      "source": "https://images.launchbox-app.com/857a9a42-9cf9-4043-a466-55f2cdb3d81e.jpg"
+    },
+    {
+      "file": "art/tekken.jpg",
+      "source": "https://images.launchbox-app.com/338d54cc-b688-4362-a30f-d8d366a0d5dd.jpg"
+    },
+    {
+      "file": "art/crash.jpg",
+      "source": "https://images.launchbox-app.com/5e4c09b0-12d2-4ae9-aeb9-74fb30858e42.jpg"
+    },
+    {
+      "file": "art/metroid.jpg",
+      "source": "https://images.launchbox-app.com/df06e969-d69e-44ba-b209-1d0ac28d77bc.jpg"
+    },
+    {
+      "file": "art/donkey-kong.jpg",
+      "source": "https://images.launchbox-app.com/7bd75652-b9ef-4b89-be0c-92ec9900059b.jpg"
+    },
+    {
+      "file": "art/sonic.jpg",
+      "source": "https://images.launchbox-app.com/d8617c40-e3f8-4dc2-a0ba-e907e0346109.jpg"
+    },
+    {
+      "file": "art/zelda.jpg",
+      "source": "https://images.launchbox-app.com/r2_a42c2627-21d8-4085-8be7-55342757af03.jpg"
+    },
+    {
+      "file": "art/chrono-trigger.jpg",
+      "source": "https://images.launchbox-app.com/5db08b42-02db-4a10-b073-6a44abf60720.jpg"
+    },
+    {
+      "file": "art/mario-kart-scene.png",
+      "source": "https://images.launchbox-app.com/24d7d56e-d48d-49aa-8155-1ba9f892975c.png"
+    }
+  ]
+}

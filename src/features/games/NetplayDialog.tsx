@@ -16,13 +16,16 @@ export function NetplayDialog({
   title,
   platformId,
   sha256,
+  variant,
   onStart,
   onClose,
   notify,
 }: {
   title: string;
   platformId: string;
+  /** The hash of the file Play starts: the selected translation's or hack's. */
   sha256: string;
+  variant?: string;
   onStart: (session: NetplaySession) => void;
   onClose: () => void;
   notify: (message: string) => void;
@@ -69,6 +72,7 @@ export function NetplayDialog({
         title,
         platformId,
         sha256,
+        ...(variant ? { variant } : {}),
       });
     } catch {
       /* Legacy imports without a fingerprint can still use direct IP. */

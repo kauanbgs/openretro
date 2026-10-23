@@ -2540,3 +2540,238 @@ html[data-animations="false"] *:after {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   line-height: 1.5;
 }
+
+/* Traduções e mods */
+button.detail-badge {
+  cursor: pointer;
+  font-family: inherit;
+}
+.mods-tab {
+  display: grid;
+  gap: 22px;
+  margin-top: 20px;
+}
+.mods-section {
+  display: grid;
+  gap: 12px;
+}
+.mods-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mods-heading h2 {
+  font-size: 17px;
+}
+.mods-heading small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.variant-list,
+.mod-sources {
+  display: grid;
+  gap: 8px;
+}
+.variant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.variant-row[data-active] {
+  border-color: var(--accent);
+}
+.variant-row > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.variant-row small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.variant-actions,
+.mods-toolbar,
+.mod-actions,
+.mod-job-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mod-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+}
+.mod-badge[data-status="confirmed"] {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+}
+.mod-badge[data-status="incompatible"] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+.mod-job {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel2);
+}
+.mod-job-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mod-job-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.mod-job progress {
+  width: 100%;
+}
+.mod-job label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.mod-list {
+  display: grid;
+  gap: 12px;
+}
+.mod-card {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.mod-card:not(:has(.mod-images)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.mod-images {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.mod-images img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #00000040;
+}
+.mod-thumbs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.mod-thumbs button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--border);
+}
+.mod-thumbs button[data-selected] {
+  background: var(--accent);
+}
+.mod-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.mod-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mod-title h3 {
+  font-size: 16px;
+}
+.mod-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.mod-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.mod-description {
+  line-height: 1.6;
+}
+.mod-reason {
+  color: var(--muted);
+  font-size: 13px;
+}
+.mod-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+}
+.mod-details dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.mod-details dt {
+  color: var(--muted);
+}
+.mod-details ul {
+  display: grid;
+  gap: 4px;
+  padding-left: 16px;
+}
+.local-patch-info {
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 720px) {
+  .mod-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .variant-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+.mods-search {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mods-search .download-option-search {
+  flex: 1 1 260px;
+}

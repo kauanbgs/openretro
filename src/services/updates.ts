@@ -11,7 +11,7 @@ const CHECK_EVERY = 6 * 60 * 60 * 1000;
 /**
  * Finds new releases on start and every few hours. With automatic updates on,
  * one found at start is installed right away (nothing is open yet) and one
- * found later is downloaded in the background, so restarting applies it.
+ * found later is downloaded in the background for the player to install.
  */
 export function useUpdates({
   enabled,
@@ -57,15 +57,20 @@ export function useUpdates({
         notify(
           `OpenRetro ${update.version} foi baixado. Reinicie para atualizar.`,
         );
-      } catch {
-        // Offline or a failed download: offer the manual button instead.
-        if (alive) setPhase(found.current ? "available" : "idle");
+      } catch (error) {
+        console.error("Automatic update failed:", error);
+        if (alive) {
+          setPhase(found.current ? "available" : "idle");
+          notify(`Não foi possível atualizar o OpenRetro: ${String(error)}`);
+        }
       }
     };
     const startup = !startupChecked.current;
-    startupChecked.current = true;
     const first = window.setTimeout(
-      () => void run(startup),
+      () => {
+        startupChecked.current = true;
+        void run(startup);
+      },
       startup ? STARTUP_DELAY : 0,
     );
     const timer = window.setInterval(() => void run(false), CHECK_EVERY);

@@ -7,6 +7,7 @@ mod in_game;
 mod launcher;
 mod metadata;
 mod models;
+mod mods;
 mod profiles;
 mod remote_play;
 use tauri::Manager;
@@ -45,6 +46,8 @@ pub fn run() {
             app.manage(downloads::sources::SourceIndex::default());
             app.manage(in_game::InGameService::default());
             app.manage(remote_play::RemotePlay::default());
+            app.manage(mods::ModService::default());
+            mods::recover(app.handle());
             in_game::setup(app.handle())?;
             #[cfg(windows)]
             {
@@ -122,7 +125,21 @@ pub fn run() {
             launcher::save_states::delete_save_state,
             in_game::in_game_status,
             in_game::in_game_action,
-            in_game::open_steam_controller_settings
+            in_game::open_steam_controller_settings,
+            mods::mods_overview,
+            mods::mods_search_plaza,
+            mods::mods_set_plaza_key,
+            mods::mods_inspect_patch,
+            mods::mods_install,
+            mods::mods_jobs,
+            mods::mods_cancel,
+            mods::mods_dismiss,
+            mods::mods_select_variant,
+            mods::mods_remove_variant,
+            mods::mods_sources,
+            mods::mods_add_source,
+            mods::mods_set_source,
+            mods::mods_remove_source
         ])
         .run(tauri::generate_context!())
         .expect("OpenRetro failed to start");

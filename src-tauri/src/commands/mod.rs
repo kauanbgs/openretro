@@ -580,7 +580,12 @@ pub fn insert_library_game(
     Ok(())
 }
 #[tauri::command]
-pub fn remove_game(id: String, delete_file: bool, db: State<Database>) -> Result<()> {
+pub fn remove_game(
+    app: tauri::AppHandle,
+    id: String,
+    delete_file: bool,
+    db: State<Database>,
+) -> Result<()> {
     let conn = db.0.lock().map_err(error)?;
     let active: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM play_sessions WHERE library_item_id=?1 AND finished_at IS NULL)", [&id], |r| r.get(0)).map_err(error)?;
     if active {
@@ -602,6 +607,8 @@ pub fn remove_game(id: String, delete_file: bool, db: State<Database>) -> Result
         }
         std::fs::remove_file(path).map_err(error)?;
     }
+    // Modified copies are OpenRetro's own files; they go with the game.
+    crate::mods::forget_library_item(&app, &id)?;
     let conn = db.0.lock().map_err(error)?;
     conn.execute("DELETE FROM library_items WHERE id=?1", [id])
         .map_err(error)?;

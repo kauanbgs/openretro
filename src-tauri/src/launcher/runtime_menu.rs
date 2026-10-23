@@ -138,12 +138,15 @@ pub fn prepare_player(
     player: &str,
     auto_save: bool,
     auto_load: bool,
+    stretch: bool,
+    variant: Option<(&str, &crate::mods::VariantSaves)>,
 ) -> Result<PathBuf> {
     if player != "default" && uuid::Uuid::parse_str(player).is_err() {
         return Err("Perfil de jogador inválido.".into());
     }
     let base = prepare(data, executable, hash)?;
     let mut config = std::fs::read_to_string(base).map_err(error)?;
+    config.push_str(screen_config(stretch));
     config.push_str(&format!("savestate_auto_save = \"{auto_save}\"\nsavestate_auto_load = \"{auto_load}\"\ninput_max_users = \"4\"\n"));
     for port in 1..=4 {
         config.push_str(&format!(
@@ -153,16 +156,28 @@ pub fn prepare_player(
     }
     // Existing saves and custom paths remain with the original player. New
     // players get isolated paths, including per-game separation for same names.
+    let mut directories: Vec<(&str, PathBuf)> = Vec::new();
     if player != "default" {
         let root = data.join("players").join(player).join(hash);
-        for (key, folder) in [
-            ("savefile_directory", "saves"),
-            ("savestate_directory", "states"),
-        ] {
-            let path = root.join(folder);
-            std::fs::create_dir_all(&path).map_err(error)?;
-            config.push_str(&format!("{key} = \"{}\"\n", quoted_path(&path)));
+        directories.push(("savefile_directory", root.join("saves")));
+        directories.push(("savestate_directory", root.join("states")));
+    }
+    // A modified version never writes over the original's states, nor over
+    // its saves unless the author confirmed they are compatible.
+    if let Some((_, saves)) = variant {
+        directories.retain(|(key, _)| {
+            *key != "savestate_directory" && (saves.saves.is_none() || *key != "savefile_directory")
+        });
+        if let Some(path) = &saves.saves {
+            directories.push(("savefile_directory", path.clone()));
         }
+        directories.push(("savestate_directory", saves.states.clone()));
+    }
+    for (key, path) in directories {
+        std::fs::create_dir_all(&path).map_err(error)?;
+        config.push_str(&format!("{key} = \"{}\"\n", quoted_path(&path)));
+    }
+    if player != "default" {
         // PS2 memory cards live in the system folder, so each player gets one
         // with a mirrored copy of the shared BIOS files.
         let shared = super::bios::system_dir(data);
@@ -173,11 +188,24 @@ pub fn prepare_player(
             &format!("system_directory = \"{}\"", quoted_path(&system)),
         );
     }
-    let path = data
-        .join("runtime-config")
-        .join(format!("{player}-{hash}.cfg"));
+    let name = match variant {
+        Some((id, _)) => format!("{player}-{hash}-{id}.cfg"),
+        None => format!("{player}-{hash}.cfg"),
+    };
+    let path = data.join("runtime-config").join(name);
     std::fs::write(&path, config).map_err(error)?;
     Ok(path)
+}
+
+/// RetroArch 1.22.2: 22 = core-provided aspect, 24 = full viewport.
+/// Disable integer scaling in both modes so it cannot leave unused borders.
+/// Full viewport also disables aspect enforcement to follow window resizes.
+fn screen_config(stretch: bool) -> &'static str {
+    if stretch {
+        "aspect_ratio_index = \"24\"\nvideo_force_aspect = \"false\"\nvideo_scale_integer = \"false\"\n"
+    } else {
+        "aspect_ratio_index = \"22\"\nvideo_force_aspect = \"true\"\nvideo_scale_integer = \"false\"\n"
+    }
 }
 
 /// The PS2 core's internal resolution values, keyed by OpenRetro's setting.
@@ -369,7 +397,9 @@ input_state_slot_decrease = "f6"
         crate::remote_play::REMOTE_PAD_BASE_PORT
     ));
     for player in 1..=4 {
-        config.push_str(&format!("network_remote_enable_user_p{player} = \"true\"\n"));
+        config.push_str(&format!(
+            "network_remote_enable_user_p{player} = \"true\"\n"
+        ));
     }
     // Preserve the runtime's normal autoconfig library (Xbox, 8BitDo, etc.)
     // when supplied. The bundled SDL profiles are a fallback for small runtimes.
@@ -406,14 +436,49 @@ input_state_slot_decrease = "f6"
 mod tests {
     use super::*;
     #[test]
+    fn screen_mode_fills_viewport_and_can_return_to_core_proportions() {
+        let root = std::env::temp_dir().join(format!("openretro-screen-{}", uuid::Uuid::new_v4()));
+        let executable = root.join("runtime/retroarch.exe");
+        let hash = "c".repeat(64);
+        let path =
+            prepare_player(&root, &executable, &hash, "default", false, false, true, None).unwrap();
+        let stretched = std::fs::read_to_string(&path).unwrap();
+        assert!(stretched.contains("aspect_ratio_index = \"24\""));
+        assert!(stretched.contains("video_force_aspect = \"false\""));
+        assert!(stretched.contains("video_scale_integer = \"false\""));
+
+        let original =
+            prepare_player(&root, &executable, &hash, "default", false, false, false, None).unwrap();
+        assert_eq!(path, original);
+        let original = std::fs::read_to_string(original).unwrap();
+        assert!(original.contains("aspect_ratio_index = \"22\""));
+        assert!(original.contains("video_force_aspect = \"true\""));
+        assert!(!original.contains("aspect_ratio_index = \"24\""));
+        assert!(!original.contains("savefile_directory"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn keyboard_keys_are_unique_and_clear_of_active_hotkeys() {
         let keys: Vec<&str> = KEYBOARD_BINDINGS.iter().map(|(_, key)| *key).collect();
         let unique: std::collections::HashSet<_> = keys.iter().collect();
         assert_eq!(unique.len(), keys.len(), "a key is bound twice");
         // RetroArch's hotkeys that stay enabled, and OpenRetro's own F keys.
         for hotkey in [
-            "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f11", "scroll_lock",
-            "backquote", "add", "subtract",
+            "f1",
+            "f2",
+            "f3",
+            "f4",
+            "f5",
+            "f6",
+            "f7",
+            "f8",
+            "f9",
+            "f11",
+            "scroll_lock",
+            "backquote",
+            "add",
+            "subtract",
         ] {
             assert!(!keys.contains(&hotkey), "{hotkey} is a hotkey");
         }
@@ -480,6 +545,8 @@ mod tests {
             &player,
             true,
             true,
+            false,
+            None,
         )
         .unwrap();
         let text = std::fs::read_to_string(path).unwrap();
@@ -499,6 +566,8 @@ mod tests {
             "default",
             false,
             false,
+            false,
+            None,
         )
         .unwrap();
         let text = std::fs::read_to_string(default).unwrap();
@@ -515,7 +584,9 @@ mod tests {
             &hash,
             "../outside",
             true,
-            true
+            true,
+            false,
+            None
         )
         .is_err());
         std::fs::remove_dir_all(root).unwrap();

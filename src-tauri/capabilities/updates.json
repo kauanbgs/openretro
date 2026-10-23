@@ -1,0 +1,6 @@
+{
+  "identifier": "updates",
+  "description": "Allow the main window to check, download and install signed updates and restart OpenRetro.",
+  "windows": ["main"],
+  "permissions": ["updater:default", "process:allow-restart"]
+}

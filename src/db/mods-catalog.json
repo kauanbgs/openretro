@@ -1,0 +1,308 @@
+{
+  "schema": "openretro-mods/1",
+  "name": "Catálogo OpenRetro",
+  "entries": [
+    {
+      "id": "shadowone333.zelda1-redux.3.3.3",
+      "kind": "romhack",
+      "title": "The Legend of Zelda Redux",
+      "description": "Revisão do Zelda original com rebalanceamento, correções de bugs, mapa automático, novos gráficos, variações de música nas masmorras e créditos com os nomes reais da equipe, mantendo o design do jogo.",
+      "authors": ["ShadowOne333"],
+      "version": "3.3.3",
+      "language": "en",
+      "sourceUrl": "https://github.com/ShadowOne333/The-Legend-of-Zelda-Redux",
+      "license": "GPL-3.0",
+      "credits": [
+        "BogaaBogaa: flechas, 999 rupias, HUD, créditos e animações",
+        "Fiskbit: animação MMC1",
+        "Stratoform: flauta e Pols Voice, Game Over do PRG1, paredes rachadas",
+        "gzip: correção do Select, cachoeira e Zelda Hack Pack",
+        "tacoschip: variações de música nas masmorras",
+        "kalita-kan e lexluthermeister: patches opcionais"
+      ],
+      "requirements": [
+        "ROM Legend of Zelda, The (USA).nes, MD5 337bd6f1a1163df31bf2633665589ab0",
+        "Os patches opcionais do pacote não são aplicados"
+      ],
+      "game": {
+        "title": "The Legend of Zelda",
+        "aliases": ["Legend of Zelda, The"],
+        "platformId": "nes",
+        "region": "USA",
+        "revision": "PRG0"
+      },
+      "base": { "md5": "337bd6f1a1163df31bf2633665589ab0" },
+      "patch": {
+        "format": "ips",
+        "url": "https://github.com/ShadowOne333/The-Legend-of-Zelda-Redux/releases/download/v3.3.3/Zelda1-Redux.zip",
+        "sha256": "c181d4830d23c3cfb9c697ce9629b4267bb39277f0618990bd6cb87441e02902",
+        "size": 1833976,
+        "path": "Zelda1_Redux.ips",
+        "fileSha256": "04baf0e9834ed5470b719c09d2ce35baf38eb2b281f6326d964c41ff1e4cdb06"
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    },
+    {
+      "id": "shadowone333.zelda2-redux.3.0",
+      "kind": "romhack",
+      "title": "Zelda II Redux",
+      "description": "Rebalanceamento de Zelda II: inimigos não roubam mais experiência, ajustes de qualidade de vida, gráficos retocados, créditos com os nomes reais da equipe e flashes reduzidos para quem é fotossensível.",
+      "authors": ["ShadowOne333"],
+      "version": "3.0",
+      "language": "en",
+      "sourceUrl": "https://github.com/ShadowOne333/Zelda2-Redux",
+      "license": "GPL-3.0",
+      "credits": [
+        "IcePenguin: rotinas em assembly e patches opcionais",
+        "JaSp e Trax: animação do mapa (de Shadow of Night)",
+        "darthvaderx: gráficos opcionais",
+        "njosro: reinício no palácio atual"
+      ],
+      "requirements": [
+        "ROM Zelda II - The Adventure of Link (USA).nes, MD5 764d36fa8a2450834da5e8194281035a",
+        "Os patches opcionais do pacote não são aplicados"
+      ],
+      "game": {
+        "title": "Zelda II: The Adventure of Link",
+        "aliases": [
+          "Zelda II - The Adventure of Link",
+          "Zelda 2: The Adventure of Link",
+          "The Adventure of Link"
+        ],
+        "platformId": "nes",
+        "region": "USA"
+      },
+      "base": { "md5": "764d36fa8a2450834da5e8194281035a" },
+      "patch": {
+        "format": "ips",
+        "url": "https://github.com/ShadowOne333/Zelda2-Redux/releases/download/v3.0/Zelda2-Redux.zip",
+        "sha256": "1191d0ac4247d7081744726d8b2ea0a0b4ec4afffc9940134c5d1dc2ba6a3ba3",
+        "size": 71315,
+        "path": "Zelda2-Redux.ips",
+        "fileSha256": "ef1235888ddcea2ac8ea3df6596992122caab6ce9c5ab2875404dfeafcecd3b6"
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    },
+    {
+      "id": "shadowone333.alttp-redux.10.2.4",
+      "kind": "romhack",
+      "title": "A Link to the Past Redux",
+      "description": "Derivado de A Link to the Past DX, com inventário de espaços individuais, nomes alinhados ao restante da franquia, paletas fiéis às artes oficiais, Palácio de Gelo no estilo da versão de GBA e conteúdo restaurado da versão japonesa.",
+      "authors": ["ShadowOne333"],
+      "version": "10.2.4",
+      "language": "en",
+      "sourceUrl": "https://github.com/ShadowOne333/A-Link-to-the-Past-Redux",
+      "license": "GPL-3.0",
+      "credits": [
+        "Conn e qwertymodo: A Link to the Past DX, base deste projeto",
+        "Zarby89 e Jared Brian: ZScream",
+        "SCD: conteúdo restaurado e localização",
+        "Skarsnik: scompress",
+        "PowerPanda: patches opcionais"
+      ],
+      "requirements": [
+        "ROM Legend of Zelda, The - A Link to the Past (USA).sfc sem cabeçalho (No-Intro)",
+        "Se o arquivo tiver cabeçalho de 512 bytes, o OpenRetro o remove na cópia",
+        "Áudio MSU-1 é opcional e não está incluído"
+      ],
+      "game": {
+        "title": "The Legend of Zelda: A Link to the Past",
+        "aliases": [
+          "Legend of Zelda, The - A Link to the Past",
+          "A Link to the Past"
+        ],
+        "platformId": "snes",
+        "region": "USA"
+      },
+      "base": {
+        "sha1": "6d4f10a8b10e10dbe624cb23cf03b88bb8252973",
+        "md5": "608c22b8ff930c62dc2de54bcd6eba72",
+        "crc32": "777aac2f"
+      },
+      "patch": {
+        "format": "ips",
+        "url": "https://github.com/ShadowOne333/A-Link-to-the-Past-Redux/releases/download/v10.2.4/A.Link.to.the.Past.Redux.zip",
+        "sha256": "a6516294858243525ba1790638e41b58a8d83944937f68688e7c1b9dce6e627d",
+        "size": 4063123,
+        "path": "Link to the Past Redux.ips",
+        "fileSha256": "437175b800bd5757ec48abd57122145821fbe7681f5db7b6f5c042c1f89ed6f7"
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    },
+    {
+      "id": "shadowone333.alttp-retranslation-redux.10.2.4",
+      "kind": "translation",
+      "title": "A Link to the Past Retranslation Redux",
+      "description": "Tudo do A Link to the Past Redux com o roteiro inteiro retraduzido do japonês pela Translation Quest: nomes, locais, itens e referências mais próximos do original. Substitui o Redux comum; não aplique os dois.",
+      "authors": ["ShadowOne333", "Translation Quest"],
+      "version": "10.2.4",
+      "language": "en",
+      "sourceUrl": "https://github.com/ShadowOne333/A-Link-to-the-Past-Redux",
+      "license": "GPL-3.0",
+      "credits": [
+        "Translation Quest (Chicken Knife, nejimakipiyo e Dattebayo): nova tradução do roteiro japonês",
+        "Conn e qwertymodo: A Link to the Past DX, base deste projeto"
+      ],
+      "requirements": [
+        "ROM Legend of Zelda, The - A Link to the Past (USA).sfc sem cabeçalho (No-Intro)",
+        "Instale no jogo original, não sobre o Redux comum"
+      ],
+      "game": {
+        "title": "The Legend of Zelda: A Link to the Past",
+        "aliases": [
+          "Legend of Zelda, The - A Link to the Past",
+          "A Link to the Past"
+        ],
+        "platformId": "snes",
+        "region": "USA"
+      },
+      "base": {
+        "sha1": "6d4f10a8b10e10dbe624cb23cf03b88bb8252973",
+        "md5": "608c22b8ff930c62dc2de54bcd6eba72",
+        "crc32": "777aac2f"
+      },
+      "patch": {
+        "format": "ips",
+        "url": "https://github.com/ShadowOne333/A-Link-to-the-Past-Redux/releases/download/v10.2.4/A.Link.to.the.Past.Redux.zip",
+        "sha256": "a6516294858243525ba1790638e41b58a8d83944937f68688e7c1b9dce6e627d",
+        "size": 4063123,
+        "path": "Retranslation Redux.ips",
+        "fileSha256": "7f89111140794cb6b479c7cd00dd3c3ff7c376266578d423b290032946c0dbb2"
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    },
+    {
+      "id": "shadowone333.maternalbound-redux.1.1",
+      "kind": "romhack",
+      "title": "MaternalBound Redux",
+      "description": "EarthBound com o roteiro reescrito a partir do livro Legends of Localization, dezenas de correções de bugs, sprites retrabalhados, redução de efeitos fotossensíveis, novos controles e suporte a MSU-1.",
+      "authors": ["ShadowOne333"],
+      "version": "1.1",
+      "language": "en",
+      "images": [
+        "https://i.imgur.com/331VwHb.png",
+        "https://i.imgur.com/rpWFcjd.jpg"
+      ],
+      "sourceUrl": "https://github.com/ShadowOne333/MaternalBound-Redux",
+      "license": "GPL-3.0",
+      "credits": [
+        "TragicManner: livro Legends of Localization: EarthBound, base do novo roteiro",
+        "Howisthisaname: sprites de EarthBound Enhanced",
+        "Crav (Great Space Pickle): sprites de Mother: Cognitive Dissonance",
+        "D-Man: marcador em losango de Mother 2"
+      ],
+      "requirements": [
+        "ROM EarthBound (USA).sfc sem cabeçalho, SHA-1 d67a8ef36ef616bc39306aa1b486e1bd3047815a",
+        "Áudio MSU-1 é opcional e não está incluído"
+      ],
+      "game": {
+        "title": "EarthBound",
+        "aliases": ["Earthbound (USA)"],
+        "platformId": "snes",
+        "region": "USA"
+      },
+      "base": {
+        "size": 3145728,
+        "sha1": "d67a8ef36ef616bc39306aa1b486e1bd3047815a",
+        "crc32": "dc9bb451"
+      },
+      "result": { "size": 4194304, "crc32": "28e2abbb" },
+      "patch": {
+        "format": "bps",
+        "url": "https://github.com/ShadowOne333/MaternalBound-Redux/releases/download/v1.1/MaternalBound-Redux.bps",
+        "sha256": "d3157892afeab6dd40f15fb73f8899a175247a71d93370d23e643a13e1371b56",
+        "size": 972411
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    },
+    {
+      "id": "erickfb.medabots-metabee-ptbr.1.3.0",
+      "kind": "translation",
+      "title": "Medabots: Metabee em português",
+      "description": "Tradução para o português do Brasil de diálogos, textos dinâmicos, itens, técnicas, mensagens e créditos. Rótulos desenhados direto nos gráficos, como menus, lojas e batalha, continuam em inglês.",
+      "authors": ["Erickfb"],
+      "version": "1.3.0",
+      "language": "pt-BR",
+      "sourceUrl": "https://github.com/Erickfb/medabots-metabee-ptbr",
+      "credits": ["Erickfb: tradução, revisão, testes e manutenção"],
+      "requirements": [
+        "ROM Medabots: Metabee (USA), código A8BE, 8.388.608 bytes",
+        "Não serve para a edição Rokusho nem para ROMs já modificadas"
+      ],
+      "game": {
+        "title": "Medabots: Metabee",
+        "aliases": [
+          "Medabots - Metabee",
+          "Medabots Metabee",
+          "Medabots: Metabee Version"
+        ],
+        "platformId": "gba",
+        "region": "USA",
+        "revision": "A8BE"
+      },
+      "base": {
+        "size": 8388608,
+        "sha256": "78c3b7f9ac9dbc4380237d08743a82fb04c92fb0a67c3d1803e7df5e2cea92c5"
+      },
+      "result": {
+        "size": 16777216,
+        "sha256": "84dafa36a2717a5ec074259a4d2b17b1b6a0ae2caaf6e60a23bf57a1c6382501"
+      },
+      "patch": {
+        "format": "bps",
+        "url": "https://github.com/Erickfb/medabots-metabee-ptbr/releases/download/v1.3.0/medabots-metabee-ptbr-v1.3.0.bps",
+        "sha256": "9478be7eed7e612a4f7147b118b4827eb840ede1620ef7614d176a1422d2222f",
+        "size": 546820
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    },
+    {
+      "id": "erickfb.medabots-rokusho-ptbr.1.3.0",
+      "kind": "translation",
+      "title": "Medabots: Rokusho em português",
+      "description": "Tradução para o português do Brasil de diálogos, textos dinâmicos, itens, técnicas, mensagens e créditos, incluindo as falas exclusivas de Rokusho. Rótulos desenhados direto nos gráficos continuam em inglês.",
+      "authors": ["Erickfb"],
+      "version": "1.3.0",
+      "language": "pt-BR",
+      "sourceUrl": "https://github.com/Erickfb/medabots-metabee-ptbr",
+      "credits": ["Erickfb: tradução, revisão, testes e manutenção"],
+      "requirements": [
+        "ROM Medabots: Rokusho (USA), código A9BE, 8.388.608 bytes",
+        "Não serve para a edição Metabee nem para ROMs já modificadas"
+      ],
+      "game": {
+        "title": "Medabots: Rokusho",
+        "aliases": [
+          "Medabots - Rokusho",
+          "Medabots Rokusho",
+          "Medabots: Rokusho Version"
+        ],
+        "platformId": "gba",
+        "region": "USA",
+        "revision": "A9BE"
+      },
+      "base": {
+        "size": 8388608,
+        "sha256": "4c960c252877059bd0a17600187ecca6d01e9a3c0c4c1f13b9de4e8b3fa20311"
+      },
+      "result": {
+        "size": 16777216,
+        "sha256": "2568a35c4de292a659d7e9d5e8ac661d5389d3c790c1f1e785b7a9d9a8f65392"
+      },
+      "patch": {
+        "format": "bps",
+        "url": "https://github.com/Erickfb/medabots-metabee-ptbr/releases/download/v1.3.0/medabots-rokusho-ptbr-v1.3.0.bps",
+        "sha256": "55992f09db0c69a6a1cbc21cca98a838a66ef74578d05412b811dd45ff3008e9",
+        "size": 546819
+      },
+      "distribution": "direct",
+      "saves": "separate"
+    }
+  ]
+}

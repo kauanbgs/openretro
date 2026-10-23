@@ -32,6 +32,8 @@ pub fn initialize(path: &Path) -> Result<Database> {
         tx.execute_batch(include_str!("005_player_appearance.sql"))
             .map_err(error)?;
     }
+    tx.execute_batch(include_str!("006_game_variants.sql"))
+        .map_err(error)?;
     // Restart requires explicit resume, which rechecks the partial files.
     tx.execute("UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')", []).map_err(error)?;
     let platforms: serde_json::Value =
@@ -53,7 +55,7 @@ pub fn initialize(path: &Path) -> Result<Database> {
     Ok(Database(Mutex::new(db)))
 }
 pub fn library(db: &Connection) -> Result<Vec<LibraryGame>> {
-    let mut stmt = db.prepare("SELECT g.metadata,l.id,l.game_id,l.platform_id,l.source_provider,l.source_path,l.emulator_id,l.installed,l.favorite,l.added_at,l.last_played_at,l.playtime,l.sha256,l.bios_path,l.runtime_args FROM library_items l JOIN games g ON l.game_id=g.id ORDER BY l.added_at DESC").map_err(error)?;
+    let mut stmt = db.prepare("SELECT g.metadata,l.id,l.game_id,l.platform_id,l.source_provider,l.source_path,l.emulator_id,l.installed,l.favorite,l.added_at,l.last_played_at,l.playtime,l.sha256,l.bios_path,l.runtime_args,v.id,v.path,v.sha256,v.data,(SELECT COUNT(*) FROM game_variants c WHERE c.library_item_id=l.id) FROM library_items l JOIN games g ON l.game_id=g.id LEFT JOIN game_variant_selection s ON s.library_item_id=l.id LEFT JOIN game_variants v ON v.id=s.variant_id ORDER BY l.added_at DESC").map_err(error)?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -74,6 +76,13 @@ pub fn library(db: &Connection) -> Result<Vec<LibraryGame>> {
                     bios_path: r.get(13)?,
                     runtime_args: serde_json::from_str(&r.get::<_, String>(14)?)
                         .unwrap_or_default(),
+                    active_variant: crate::mods::active_from_row(
+                        r.get(15)?,
+                        r.get(16)?,
+                        r.get(17)?,
+                        r.get(18)?,
+                    ),
+                    variant_count: r.get(19)?,
                 },
             ))
         })

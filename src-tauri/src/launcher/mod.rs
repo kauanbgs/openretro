@@ -155,7 +155,7 @@ pub async fn launch_game(
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,player,auto_resume,ps2_resolution,sdl_library) = {
+ let (entry,emulator,player,auto_resume,ps2_resolution,stretch,sdl_library) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
@@ -164,11 +164,14 @@ pub async fn launch_game(
   let settings=serde_json::from_str::<serde_json::Value>(&settings).ok();
   let auto_resume=settings.as_ref().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
   let ps2_resolution=settings.as_ref().and_then(|v|v["ps2Resolution"].as_str().map(String::from));
+  let stretch=settings.as_ref().is_some_and(|v|v["gameScreenMode"]=="stretch");
   // The runtime's SDL2 tells which controllers are connected.
   let sdl_library=database::emulators(&conn)?.into_iter().find(|e|e.id=="openretro-retroarch").and_then(|e|std::path::Path::new(&e.executable_path).parent().map(|dir|dir.join("SDL2.dll")));
-  (entry,emulator,player,auto_resume,ps2_resolution,sdl_library)
+  (entry,emulator,player,auto_resume,ps2_resolution,stretch,sdl_library)
  };
- let game_path=filesystem::canonical_file(&entry.item.source_path)?;
+ // The selected translation or hack plays instead of the original file.
+ let variant=entry.item.active_variant.clone();
+ let game_path=filesystem::canonical_file(variant.as_ref().map_or(&entry.item.source_path,|v|&v.path)).map_err(|e| if variant.is_some() { "O arquivo da versão modificada sumiu. Volte para o jogo original ou reinstale a modificação em \"Traduções e mods\".".to_string() } else { e })?;
  // PS3 games install their emulator, system software and disc keys on first use.
  let ps3=emulator.id=="openretro-rpcs3";
  let managed_retroarch=is_managed_runtime(&emulator,&entry);
@@ -213,7 +216,9 @@ pub async fn launch_game(
     runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "LRPS2", &runtime_menu::ps2_options(ps2_resolution.as_deref(), num_cpus::get_physical()))?;
  }
  let mut args:Vec<String>=if managed_retroarch {
-    let config=runtime_menu::prepare_player(&app.path().app_data_dir().map_err(error)?, &executable, &entry.item.sha256, &player, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining)?;
+    let data=app.path().app_data_dir().map_err(error)?;
+    let variant_saves=variant.as_ref().map(|v|crate::mods::variant_saves(&data,&player,v)).transpose()?;
+    let config=runtime_menu::prepare_player(&data, &executable, &entry.item.sha256, &player, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)))?;
     let mut args:Vec<String>=vec!["--appendconfig".into(),config.to_string_lossy().into_owned()];
     if let Some(netplay)=&netplay {
       let mut file=std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?;

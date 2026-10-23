@@ -9,3 +9,4 @@ src-tauri/gen/
 .env*
 !.env.example
 .cache/
+web/.openai/local/

@@ -48,6 +48,21 @@ pub struct LibraryItem {
     pub sha256: String,
     pub bios_path: Option<String>,
     pub runtime_args: Vec<String>,
+    /// The translation or hack that Play starts instead of the original.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_variant: Option<ActiveVariant>,
+    #[serde(default)]
+    pub variant_count: u32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveVariant {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub sha256: String,
+    /// The author confirmed the original's saves work in this version.
+    pub saves_shared: bool,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryGame {

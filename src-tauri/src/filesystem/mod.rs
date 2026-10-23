@@ -33,6 +33,10 @@ fn platform_extensions() -> &'static PlatformExtensions {
         extensions
     })
 }
+/// Whether `id` names one of OpenRetro's consoles.
+pub fn is_platform_id(id: &str) -> bool {
+    platform_extensions().values().flatten().any(|platform| platform == id) || id == "ps3"
+}
 pub fn platform_ids_for_extension(extension: &str) -> Vec<String> {
     platform_extensions()
         .get(extension)

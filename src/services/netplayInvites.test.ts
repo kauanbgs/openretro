@@ -100,3 +100,32 @@ describe("portable VPN invitations", () => {
       expect(validNetplayHost(host)).toBe(false);
   });
 });
+
+describe("invitations for translations and hacks", () => {
+  const modded = {
+    ...game,
+    sha256: "cd".repeat(32),
+    variant: "Tradução PT-BR 1.3",
+  };
+  it("carries the version name and requires the modified file's hash", () => {
+    const invite = parseNetplayInvite(createNetplayInvite(modded));
+    expect(invite.variant).toBe("Tradução PT-BR 1.3");
+    expect(() => checkInviteGame(invite, "snes", modded.sha256)).not.toThrow();
+    // The original file is a different version for the session.
+    expect(() => checkInviteGame(invite, "snes", game.sha256)).toThrow(
+      /Tradução PT-BR 1.3/,
+    );
+  });
+  it("tells an original-game invite apart from a modified local copy", () => {
+    const invite = parseNetplayInvite(createNetplayInvite(game));
+    expect(invite).not.toHaveProperty("variant");
+    expect(() => checkInviteGame(invite, "snes", modded.sha256)).toThrow(
+      /jogo original/,
+    );
+  });
+  it("rejects oversized version names", () => {
+    expect(() =>
+      createNetplayInvite({ ...modded, variant: "x".repeat(121) }),
+    ).toThrow();
+  });
+});

@@ -96,6 +96,16 @@ export interface LibraryItem {
   sha256: string;
   biosPath: string | null;
   runtimeArgs: string[];
+  /** The translation or hack that Play starts instead of the original. */
+  activeVariant?: ActiveVariant;
+  variantCount?: number;
+}
+export interface ActiveVariant {
+  id: string;
+  name: string;
+  path: string;
+  sha256: string;
+  savesShared: boolean;
 }
 export interface LibraryGame {
   game: GameMetadata;
@@ -163,6 +173,8 @@ export interface AppSettings {
   ps3Updates?: boolean;
   /** Internal resolution of PS2 games in the managed runtime. */
   ps2Resolution?: "1x" | "2x" | "4x" | "8x";
+  /** Image sizing for PS2 and retro games in the managed runtime. */
+  gameScreenMode?: "original" | "stretch";
 }
 export const defaultSettings: AppSettings = {
   autoResume: true,
@@ -175,6 +187,7 @@ export const defaultSettings: AppSettings = {
   bandwidthLimit: 0,
   developerMode: false,
   ps2Resolution: "2x",
+  gameScreenMode: "original",
   navigationSounds: true,
   autoUpdate: true,
   deleteArchives: true,
@@ -241,4 +254,149 @@ export interface DownloadedFile {
   path: string;
   filename: string;
   platformIds: string[];
+}
+export type ModCompatibilityStatus = "confirmed" | "unknown" | "incompatible";
+export interface ModCompatibility {
+  status: ModCompatibilityStatus;
+  reason: string;
+  /** The original matches once its 512-byte copier header is removed. */
+  stripHeader: boolean;
+}
+export interface ModHashes {
+  size?: number;
+  sha256?: string;
+  sha1?: string;
+  md5?: string;
+  crc32?: string;
+}
+export interface ModEntry {
+  id: string;
+  kind: "translation" | "romhack";
+  title: string;
+  description: string;
+  authors: string[];
+  version: string;
+  language: string;
+  images: string[];
+  sourceUrl: string;
+  license?: string | null;
+  credits: string[];
+  requirements: string[];
+  game: {
+    title: string;
+    aliases: string[];
+    platformId: string;
+    region?: string | null;
+    revision?: string | null;
+  };
+  base: ModHashes;
+  result?: ModHashes | null;
+  patch: {
+    format: string;
+    url?: string | null;
+    sha256?: string | null;
+    size?: number | null;
+    path?: string | null;
+  };
+  /** "link": the author's page is the only place to download it. */
+  distribution: "direct" | "link";
+  saves?: "shared" | "separate" | null;
+  stacksOn: string[];
+}
+export interface ModListing {
+  sourceId: string;
+  sourceName: string;
+  entry: ModEntry;
+  /** Absent when the game is not in the library yet. */
+  compatibility?: ModCompatibility | null;
+  /** Installed versions this patch is confirmed to apply on top of. */
+  variantTargets: string[];
+  installedVariantId?: string | null;
+}
+export interface GameVariant {
+  id: string;
+  libraryItemId: string;
+  parentId?: string | null;
+  name: string;
+  kind: "translation" | "romhack" | "local";
+  entryId?: string | null;
+  sourceId: string;
+  sourceName: string;
+  version?: string | null;
+  language?: string | null;
+  authors: string[];
+  credits: string[];
+  sourceUrl?: string | null;
+  license?: string | null;
+  format: string;
+  saves: "shared" | "separate";
+  compatibility: ModCompatibilityStatus;
+  path: string;
+  sha256: string;
+  size: number;
+  createdAt: string;
+}
+export interface ModSource {
+  id: string;
+  name: string;
+  url?: string | null;
+  enabled: boolean;
+  entries: number;
+  updatedAt?: string | null;
+}
+export interface ModsOverview {
+  listings: ModListing[];
+  variants: GameVariant[];
+  activeVariantId?: string | null;
+  sources: ModSource[];
+  plazaConfigured: boolean;
+  /** Why this game cannot receive patches at all. */
+  unpatchable?: string | null;
+}
+export type ModJobState =
+  | "QUEUED"
+  | "DOWNLOADING"
+  | "PATCHING"
+  | "VERIFYING"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED"
+  | "NEEDS_CHOICE";
+export interface ModJob {
+  id: string;
+  libraryItemId: string;
+  name: string;
+  state: ModJobState;
+  progress: number;
+  stage: string;
+  error?: string | null;
+  choiceKind?: "archive" | "file" | null;
+  choices: string[];
+  variantId?: string | null;
+}
+export interface ModInstallRequest {
+  libraryItemId: string;
+  parentVariantId?: string | null;
+  origin: "catalog" | "romhackplaza" | "local";
+  sourceId?: string | null;
+  entryId?: string | null;
+  localPath?: string | null;
+  archivePath?: string | null;
+  downloadFile?: string | null;
+  name?: string | null;
+  confirmUnknown?: boolean;
+  confirmStack?: boolean;
+}
+export interface LocalPatchInfo {
+  name?: string | null;
+  info?: {
+    format?: string | null;
+    sourceSize?: number | null;
+    sourceCrc32?: string | null;
+    targetSize?: number | null;
+    targetCrc32?: string | null;
+    verifiesSource: boolean;
+  } | null;
+  compatibility?: ModCompatibility | null;
+  choices: string[];
 }
