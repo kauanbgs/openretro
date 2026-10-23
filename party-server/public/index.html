@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#121212" />
+    <title>OpenRetro Party</title>
+    <link rel="stylesheet" href="/guest.css" />
+    <script type="module" src="/guest.js"></script>
+  </head>
+  <body>
+    <header>
+      <a href="/" class="brand">OpenRetro <span>Party</span></a
+      ><span id="connection">Convite para jogar</span>
+    </header>
+    <main>
+      <section id="lobby" class="lobby">
+        <form id="join-form" class="ticket">
+          <h1>Entre na partida.</h1>
+          <p>
+            Jogue com seu amigo pelo navegador.<br />Você não precisa instalar o
+            jogo.
+          </p>
+          <label for="room-code">Código da sala</label>
+          <input
+            id="room-code"
+            name="room-code"
+            maxlength="6"
+            minlength="6"
+            pattern="[a-zA-Z2-9]{6}"
+            required
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="5JKL3A"
+          />
+          <label for="name">Seu nome</label
+          ><input
+            id="name"
+            name="name"
+            maxlength="24"
+            required
+            autocomplete="nickname"
+            placeholder="Nome ou apelido"
+          /><button id="join" type="submit">Pedir para entrar</button>
+          <p id="status" role="status" aria-live="polite">
+            O anfitrião precisa aprovar sua entrada.
+          </p>
+          <small
+            >Use fones. Você pode jogar com controle, teclado ou os botões na
+            tela.</small
+          >
+        </form>
+      </section>
+      <section id="stage" hidden>
+        <div class="stage-bar">
+          <span id="player">Seu controle</span
+          ><span id="input-hint"
+            >Setas para mover · Z / X para jogar · Enter para iniciar</span
+          ><button id="fullscreen" type="button">Tela cheia</button
+          ><button id="leave" type="button">Sair</button>
+        </div>
+        <div class="screen-wrap">
+          <video id="screen" autoplay playsinline></video
+          ><button id="play" hidden type="button">
+            Toque para ativar imagem e som
+          </button>
+        </div>
+        <div id="touch" aria-label="Controle na tela">
+          <div class="dpad">
+            <button data-bit="4" class="up" aria-label="Cima">▲</button
+            ><button data-bit="6" class="left" aria-label="Esquerda">◀</button
+            ><button data-bit="5" class="down" aria-label="Baixo">▼</button
+            ><button data-bit="7" class="right" aria-label="Direita">▶</button>
+          </div>
+          <div class="meta">
+            <button data-bit="10">L</button><button data-bit="2">Select</button
+            ><button data-bit="3">Start</button><button data-bit="11">R</button>
+          </div>
+          <div class="faces">
+            <button data-bit="9" class="up">X</button
+            ><button data-bit="1" class="left">Y</button
+            ><button data-bit="0" class="down">B</button
+            ><button data-bit="8" class="right">A</button>
+          </div>
+        </div>
+        <p class="stage-note">
+          Controle USB ou Bluetooth também funciona em navegadores compatíveis.
+          Conecte e pressione um botão.
+        </p>
+      </section>
+    </main>
+    <footer>OpenRetro Party</footer>
+  </body>
+</html>

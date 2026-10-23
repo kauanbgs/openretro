@@ -58,6 +58,7 @@ import { playUiSound, setNavigationSounds, soundFor } from "./navigationSounds";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
 import { PhonePlayDialog } from "../../components/PhonePlayDialog";
+import { PartyDialog } from "../party/PartyDialog";
 import { NETPLAY_PLATFORMS } from "../../types";
 import { PlayerAvatar, playerAccent } from "../../components/PlayerAvatar";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
@@ -121,6 +122,7 @@ export function BigPicture({
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [partyOpen, setPartyOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceRoute>();
   const workspaceInput = useRef<((key: string) => boolean) | null>(null);
   const { data: players } = useQuery({
@@ -346,7 +348,7 @@ export function BigPicture({
         : section === "emulators"
           ? emulators.length
           : section === "system"
-            ? 8
+            ? 9
             : visibleGames.length;
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
@@ -418,6 +420,7 @@ export function BigPicture({
     const page = [
       "players",
       "phone",
+      "party",
       "Discover",
       "Settings",
       "Emulators",
@@ -426,6 +429,7 @@ export function BigPicture({
       "exit",
     ][selected];
     if (page === "phone") return setPhoneOpen(true);
+    if (page === "party") return setPartyOpen(true);
     page === "exit"
       ? close()
       : page === "Discover"
@@ -455,7 +459,8 @@ export function BigPicture({
         !navFocused &&
         !powerOpen &&
         !playersOpen &&
-        !phoneOpen
+        !phoneOpen &&
+        !partyOpen
       ) {
         workspaceInput.current?.(key);
         return;
@@ -881,6 +886,9 @@ export function BigPicture({
           onClose={() => setPhoneOpen(false)}
         />
       )}
+      {partyOpen && (
+        <PartyDialog input={selectInput} onClose={() => setPartyOpen(false)} />
+      )}
       {playersOpen && (
         <PlayerPicker
           input={selectInput}
@@ -1234,6 +1242,12 @@ export function BigPicture({
                     Smartphone,
                   ] as const,
                   [
+                    "OpenRetro Party",
+                    "Convide amigos para jogar pelo navegador",
+                    "party",
+                    Users,
+                  ] as const,
+                  [
                     t("Encontrar jogos"),
                     t("Descubra títulos e fontes"),
                     "Discover",
@@ -1281,20 +1295,22 @@ export function BigPicture({
                         ? setPlayersOpen(true)
                         : page === "phone"
                           ? setPhoneOpen(true)
-                          : page === "exit"
-                            ? close()
-                            : page === "Discover"
-                              ? selectSection("catalog")
-                              : setWorkspace({
-                                  page:
-                                    page === "Emulators"
-                                      ? "emulators"
-                                      : page === "sources"
-                                        ? "sources"
-                                        : page === "import"
-                                          ? "import"
-                                          : "settings",
-                                })
+                          : page === "party"
+                            ? setPartyOpen(true)
+                            : page === "exit"
+                              ? close()
+                              : page === "Discover"
+                                ? selectSection("catalog")
+                                : setWorkspace({
+                                    page:
+                                      page === "Emulators"
+                                        ? "emulators"
+                                        : page === "sources"
+                                          ? "sources"
+                                          : page === "import"
+                                            ? "import"
+                                            : "settings",
+                                  })
                     }
                   >
                     <Icon size={25} />

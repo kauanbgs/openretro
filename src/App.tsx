@@ -18,6 +18,7 @@ import {
   Settings,
   Search,
   Smartphone,
+  Users,
   Plus,
   X,
   Gamepad2,
@@ -35,6 +36,7 @@ import { PlayerPicker } from "./components/PlayerPicker";
 import { BrandMark } from "./components/Brand";
 import { TitleBar } from "./components/TitleBar";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
+import { PartyDialog } from "./features/party/PartyDialog";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop, isRemote } from "./services/bridge";
 import { invoke, isTauri } from "./services/transport";
@@ -154,6 +156,7 @@ export function App() {
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [partyOpen, setPartyOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState("");
   const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
@@ -499,6 +502,12 @@ export function App() {
                 </button>
                 <button
                   className="button secondary"
+                  onClick={() => setPartyOpen(true)}
+                >
+                  <Users size={16} /> Party
+                </button>
+                <button
+                  className="button secondary"
                   onClick={() => setBigPicture(true)}
                 >
                   <Gamepad2 size={16} /> {t("Big Picture")}
@@ -662,6 +671,7 @@ export function App() {
         </button>
       </footer>
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
+      {partyOpen && <PartyDialog onClose={() => setPartyOpen(false)} />}
       {phoneOpen && (
         <PhonePlayDialog onClose={() => setPhoneOpen(false)} notify={notify} />
       )}

@@ -1,7 +1,7 @@
 //! Phone play: a phone on the same network opens a page served by OpenRetro,
 //! watches the game, hears it and plays it. The page reaches the server only
 //! with the pairing token from the QR code. Video is the main window as JPEG
-//! frames, audio is the PC's output as PCM, and each phone's buttons go to
+//! frames, audio is the game runtime output as PCM, and each phone's buttons go to
 //! the runtime's loopback remote gamepad for the player it picked.
 use crate::database::{error, Result};
 use serde::Serialize;
@@ -22,6 +22,15 @@ mod video;
 /// The runtime listens for player N on this port + N - 1, on loopback only.
 pub const REMOTE_PAD_BASE_PORT: u16 = 55400;
 pub const SERVER_PORT: u16 = 47820;
+
+/// Deployment configuration belongs to the app, never to the Party screen.
+#[tauri::command]
+pub fn party_configuration() -> serde_json::Value {
+    let url = std::env::var("OPENRETRO_PARTY_URL")
+        .unwrap_or_else(|_| option_env!("OPENRETRO_PARTY_URL")
+            .unwrap_or(include_str!("party-url.txt").trim()).to_string());
+    serde_json::json!({ "url": url })
+}
 
 #[derive(Default)]
 pub struct RemotePlay(Mutex<Option<server::Running>>);

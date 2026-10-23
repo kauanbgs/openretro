@@ -12,7 +12,7 @@ pub(crate) mod sdl;
 use screen_view::ScreenView;
 
 #[derive(Default)]
-pub struct InGameService(Mutex<Option<Session>>);
+pub struct InGameService(Mutex<Option<Session>>, std::sync::atomic::AtomicBool);
 struct Session {
     info: SessionInfo,
     stdin: Option<ChildStdin>,
@@ -34,6 +34,9 @@ pub struct SessionInfo {
     view_available: bool,
 }
 impl SessionInfo {
+    pub fn remote_available(&self) -> bool {
+        self.view_available
+    }
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -76,6 +79,9 @@ impl SessionGuard {
         session.stdin = Some(stdin);
         session.pid = pid;
         session.sdl_library = executable.parent().map(|path| path.join("SDL2.dll"));
+        if service.1.load(std::sync::atomic::Ordering::Acquire) {
+            write_command(session, "OPENRETRO_PARTY 1")?;
+        }
         drop(guard);
         self.host(pid)
     }
@@ -160,6 +166,25 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Resu
     })
 }
 
+pub(crate) fn set_party_input(app: &tauri::AppHandle, enabled: bool) -> Result<()> {
+    let service = app.state::<InGameService>();
+    let mut guard = service.0.lock().map_err(error)?;
+    service
+        .1
+        .store(enabled, std::sync::atomic::Ordering::Release);
+    if let Some(session) = guard.as_mut().filter(|session| session.stdin.is_some()) {
+        write_command(
+            session,
+            if enabled {
+                "OPENRETRO_PARTY 1"
+            } else {
+                "OPENRETRO_PARTY 0"
+            },
+        )?;
+    }
+    Ok(())
+}
+
 fn write_command(session: &mut Session, command: &str) -> Result<()> {
     let stdin = session
         .stdin
@@ -211,6 +236,10 @@ pub fn toggle(app: &tauri::AppHandle) -> Result<()> {
 
 #[tauri::command]
 pub fn in_game_status(app: tauri::AppHandle) -> Result<Option<SessionInfo>> {
+    current_session(&app)
+}
+
+pub(crate) fn current_session(app: &tauri::AppHandle) -> Result<Option<SessionInfo>> {
     Ok(app
         .state::<InGameService>()
         .0

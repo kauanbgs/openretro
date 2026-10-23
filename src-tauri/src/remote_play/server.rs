@@ -45,6 +45,7 @@ struct Shared {
     /// The player each connected phone controls, by connection.
     players: Arc<Mutex<HashMap<u64, u8>>>,
     next_connection: AtomicU64,
+    party_devices: Mutex<usize>,
     #[cfg(windows)]
     media: Mutex<Option<Media>>,
 }
@@ -138,6 +139,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         devices: devices.clone(),
         players: players.clone(),
         next_connection: AtomicU64::new(0),
+        party_devices: Mutex::new(0),
         #[cfg(windows)]
         media: Mutex::new(None),
     });
@@ -145,6 +147,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         .route("/", get(interface))
         .route("/play", get(play))
         .route("/ws", get(socket))
+        .route("/party-stream", get(party_socket))
         .route("/events", get(event_socket))
         .route("/api/invoke", post(api))
         .route("/file", get(file))
@@ -373,7 +376,20 @@ async fn socket(
     if !paired(&shared, &pairing, &headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    upgrade.on_upgrade(move |socket| session(shared, socket))
+    upgrade.on_upgrade(move |socket| session(shared, socket, false))
+}
+
+// Party's local bridge never sends the launcher's fallback screen to guests.
+async fn party_socket(
+    State(shared): State<Arc<Shared>>,
+    Query(pairing): Query<Pairing>,
+    headers: HeaderMap,
+    upgrade: WebSocketUpgrade,
+) -> Response {
+    if !paired(&shared, &pairing, &headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    upgrade.on_upgrade(move |socket| session(shared, socket, true))
 }
 
 /// Starts capture for the first phone and stops it after the last one leaves.
@@ -396,7 +412,7 @@ fn connected(shared: &Shared, joined: bool) {
                 .and_then(|window| window.hwnd().ok())
                 .map(|hwnd| hwnd.0 as isize);
             // The runtime's own frames come first; screen capture shows the
-            // launcher. Sound plays even without a picture.
+            // launcher. Sound comes only from the running game.
             let last_shared = Arc::new(std::sync::atomic::AtomicU64::new(0));
             let screen = match hwnd.map(|hwnd| {
                 super::capture::VideoCapture::start(
@@ -420,7 +436,7 @@ fn connected(shared: &Shared, joined: bool) {
                     last_shared,
                 ),
                 screen,
-                sound: super::audio::AudioCapture::start(shared.audio.clone()),
+                sound: super::audio::AudioCapture::start(shared.app.clone(), shared.audio.clone()),
             });
         } else if !joined && before == 1 {
             *media = None;
@@ -429,7 +445,7 @@ fn connected(shared: &Shared, joined: bool) {
 }
 
 fn status(app: &tauri::AppHandle) -> Value {
-    let session = crate::in_game::in_game_status(app.clone()).ok().flatten();
+    let session = crate::in_game::current_session(app).ok().flatten();
     let game = session.as_ref().map(|session| session.title().to_string());
     let game_id = session.as_ref().map(|session| session.id());
     let layout = current_layout(app);
@@ -451,11 +467,15 @@ fn status(app: &tauri::AppHandle) -> Value {
             })
         })
         .collect();
-    json!({ "type": "status", "game": game, "gameId": game_id, "layout": layout, "library": library })
+    let party_available = cfg!(windows)
+        && session
+            .as_ref()
+            .is_some_and(|session| session.remote_available());
+    json!({ "type": "status", "game": game, "gameId": game_id, "layout": layout, "library": library, "partyAvailable": party_available })
 }
 
 fn current_layout(app: &tauri::AppHandle) -> Layout {
-    let Some(session) = crate::in_game::in_game_status(app.clone()).ok().flatten() else {
+    let Some(session) = crate::in_game::current_session(app).ok().flatten() else {
         return Layout::Full;
     };
     app.state::<Database>()
@@ -510,13 +530,39 @@ enum Incoming {
     },
 }
 
-async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
+// Serialize joins and leaves with the runtime command so a reconnect cannot
+// restore local inputs after the replacement Party connection has joined.
+fn party_connected(shared: &Shared, joined: bool) {
+    let Ok(mut count) = shared.party_devices.lock() else {
+        return;
+    };
+    let previous = *count;
+    *count = if joined {
+        previous + 1
+    } else {
+        previous.saturating_sub(1)
+    };
+    if (previous == 0) != (*count == 0) {
+        if let Err(error) = crate::in_game::set_party_input(&shared.app, *count > 0) {
+            log::warn!("Could not update Party controller ownership: {error}");
+        }
+    }
+}
+
+async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
+    if party {
+        party_connected(&shared, true);
+    }
     connected(&shared, true);
     let connection = shared.next_connection.fetch_add(1, Ordering::Relaxed);
     let mut choice = ScreenChoice::default();
     let mut selected = View::default();
     let mut active_layout = Layout::Full;
-    let mut video = shared.video.subscribe(selected);
+    let mut video = if party {
+        shared.video.subscribe_party()
+    } else {
+        shared.video.subscribe(selected)
+    };
     let mut audio = shared.audio.subscribe();
     let mut relay = match input::Relay::new() {
         Ok(relay) => Some(relay),
@@ -551,7 +597,7 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
                 now["taken"] = json!(shared.taken_by_others(connection));
                 active_layout = serde_json::from_value(now["layout"].clone()).unwrap_or_default();
                 let view = choice.view(active_layout);
-                if view != selected {
+                if !party && view != selected {
                     video = shared.video.subscribe(view);
                     selected = view;
                 }
@@ -575,7 +621,7 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
                         }
                         if layout_changed { active_layout = current_layout(&shared.app); }
                         let view = choice.view(active_layout);
-                        if view != selected {
+                        if !party && view != selected {
                             video = shared.video.subscribe(view);
                             selected = view;
                         }
@@ -587,6 +633,15 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
             },
         };
         if let Some(message) = outgoing {
+            if party
+                && matches!(message, Message::Binary(_))
+                && !crate::in_game::current_session(&shared.app)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|session| session.remote_available())
+            {
+                continue;
+            }
             if socket.send(message).await.is_err() {
                 break;
             }
@@ -596,6 +651,9 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket) {
     drop(relay);
     if let Ok(mut players) = shared.players.lock() {
         players.remove(&connection);
+    }
+    if party {
+        party_connected(&shared, false);
     }
     connected(&shared, false);
 }
@@ -632,7 +690,7 @@ fn handle(
             }
         }
         Incoming::Layout { layout, game_id } => {
-            let session = crate::in_game::in_game_status(shared.app.clone())?
+            let session = crate::in_game::current_session(&shared.app)?
                 .ok_or("Abra um jogo para configurar a tela dividida.")?;
             if session.id() != game_id {
                 return Err("O jogo mudou. Escolha o layout novamente.".into());

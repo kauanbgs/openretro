@@ -136,6 +136,17 @@ needed. **Endereço e porta** remains available for manual connections and older
 imports without fingerprints. The same invitation flow also works over LAN with
 the host's local address. It does not add video/audio streaming or a lobby.
 
+## Party
+
+**Party** creates an approval-based browser room for up to three remote guests.
+The host runs the game and guests receive WebRTC video/audio and send controller
+input. Players click Create, share a six-character code and approve their friends.
+Invitations use the standard `/party/ABC234` address. Cloudflare Workers and
+Durable Objects manage rooms; Cloudflare Realtime TURN carries the stream.
+Users never enter server addresses or keys. The operator configures TURN once
+with `npm run turn:configure --prefix party-server`.
+See [Party setup and validation](docs/PARTY.md).
+
 ## Play on your phone
 
 **Celular → Ativar** in the header shows a QR code. A phone on the same Wi-Fi

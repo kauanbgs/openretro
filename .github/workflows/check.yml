@@ -14,6 +14,8 @@ jobs:
         shell: pwsh
         run: ./scripts/test-runtime-recipe.ps1
       - run: npm test
+      - run: npm ci --prefix party-server
+      - run: npm test --prefix party-server
       - run: npm run build
   desktop:
     strategy:
@@ -38,6 +40,9 @@ jobs:
       - run: npm run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Check concurrent Windows runtime handles
+        if: runner.os == 'Windows'
+        run: cargo run --manifest-path src-tauri/Cargo.toml --example runtime_thread_stress
       # Release tags can restore caches from main, but not from other tags.
       # Warm the optimized, custom-protocol dependency build before publishing.
       - name: Warm Windows release dependencies

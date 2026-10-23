@@ -1,0 +1,5 @@
+# Local tests only. Never set this variable in a published Worker.
+ALLOW_LOCAL_TEST=true
+# Production secrets are entered with wrangler secret put, never committed.
+# TURN_KEY_ID=your-realtime-turn-key-id
+# TURN_API_TOKEN=your-realtime-turn-api-token

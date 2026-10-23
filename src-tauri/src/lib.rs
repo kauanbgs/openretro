@@ -116,6 +116,7 @@ pub fn run() {
             launcher::launch_game,
             launcher::netplay::netplay_local_address,
             remote_play::remote_play_status,
+            remote_play::party_configuration,
             remote_play::remote_play_start,
             remote_play::remote_play_stop,
             launcher::runtime_menu::open_game_screenshots,

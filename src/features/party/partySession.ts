@@ -1,0 +1,448 @@
+import { bridge } from "../../services/bridge";
+import { invoke, isTauri } from "../../services/transport";
+import { validatePartyServer } from "./partyConfig";
+import { preferPartyVideoCodec } from "./partyCodecs";
+import { rawPartyFrame } from "./partyFrames";
+
+export interface PartyGuest {
+  id: string;
+  name: string;
+  player: number | null;
+}
+export interface PartyState {
+  phase: "idle" | "connecting" | "open";
+  url: string;
+  code: string;
+  guests: PartyGuest[];
+  connected: string[];
+  error: string;
+  game: string;
+  relay: boolean;
+}
+const initial: PartyState = {
+  phase: "idle",
+  url: "",
+  code: "",
+  guests: [],
+  connected: [],
+  error: "",
+  game: "",
+  relay: false,
+};
+let state = initial;
+const listeners = new Set<() => void>();
+function update(value: Partial<PartyState>) {
+  state = { ...state, ...value };
+  listeners.forEach((fn) => fn());
+}
+export const partyStore = {
+  subscribe(fn: () => void) {
+    listeners.add(fn);
+    return () => {
+      listeners.delete(fn);
+    };
+  },
+  snapshot: () => state,
+};
+let signaling: WebSocket | undefined;
+let media: WebSocket | undefined;
+let context: AudioContext | undefined;
+let stream: MediaStream | undefined;
+let timeout: ReturnType<typeof setTimeout> | undefined;
+let heartbeat: ReturnType<typeof setInterval> | undefined;
+let generation = 0;
+let decoding = false;
+let audioTime = 0;
+let playing = false;
+const peers = new Map<
+  string,
+  {
+    pc: RTCPeerConnection;
+    pad: WebSocket;
+    channel: RTCDataChannel;
+    lastInput: number;
+    seq: number;
+    pending: RTCIceCandidateInit[];
+  }
+>();
+const canvas = document.createElement("canvas");
+canvas.width = 1280;
+canvas.height = 720;
+const paint = canvas.getContext("2d")!;
+function waiting() {
+  canvas.width = 1280;
+  canvas.height = 720;
+  const theme = getComputedStyle(document.documentElement);
+  paint.fillStyle = theme.getPropertyValue("--bg").trim() || "#121212";
+  paint.fillRect(0, 0, 1280, 720);
+  paint.textAlign = "center";
+  paint.fillStyle = theme.getPropertyValue("--text").trim() || "#e9eaee";
+  paint.font = "700 48px sans-serif";
+  paint.fillText("OpenRetro Party", 640, 330);
+  paint.fillStyle = theme.getPropertyValue("--body").trim() || "#8e919b";
+  paint.font = "26px sans-serif";
+  paint.fillText("Aguardando um jogo no PC…", 640, 390);
+}
+function send(message: object) {
+  if (signaling?.readyState === WebSocket.OPEN)
+    signaling.send(JSON.stringify(message));
+}
+function dropPeer(id: string) {
+  const peer = peers.get(id);
+  if (!peer) return;
+  peers.delete(id);
+  peer.channel.close();
+  peer.pc.close();
+  peer.pad.close();
+  update({ connected: state.connected.filter((value) => value !== id) });
+}
+export function endParty() {
+  generation++;
+  clearTimeout(timeout);
+  clearInterval(heartbeat);
+  const previous = signaling;
+  signaling = undefined;
+  previous?.close();
+  media?.close();
+  media = undefined;
+  for (const id of [...peers.keys()]) dropPeer(id);
+  stream?.getTracks().forEach((track) => track.stop());
+  stream = undefined;
+  void context?.close();
+  context = undefined;
+  playing = false;
+  decoding = false;
+  audioTime = 0;
+  update({ ...initial });
+}
+export function acceptGuest(id: string) {
+  send({ type: "accept", id });
+}
+export function removeGuest(id: string) {
+  dropPeer(id);
+  send({ type: "remove", id });
+}
+export async function startParty() {
+  endParty();
+  const run = generation;
+  update({ phase: "connecting" });
+  waiting();
+  try {
+    if (!isTauri)
+      throw new Error("Abra o aplicativo desktop para transmitir uma partida.");
+    const configuration = await invoke<{ url: string }>("party_configuration");
+    if (run !== generation) return;
+    if (!configuration.url)
+      throw new Error("O serviço Party ainda não foi ativado nesta versão.");
+    const url = validatePartyServer(configuration.url);
+    context = new AudioContext();
+    await context.resume();
+    if (run !== generation) return;
+    const audio = context.createMediaStreamDestination();
+    const reservationResponse = await fetch(new URL("/api/rooms", url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (run !== generation) return;
+    let reservation: { code?: string; ticket?: string } = {};
+    // The standalone development server still supports the original handshake.
+    if (reservationResponse.status !== 404) {
+      const result = await reservationResponse.json();
+      if (!reservationResponse.ok)
+        throw new Error(
+          result.error || "Não foi possível criar a sala. Tente novamente.",
+        );
+      if (
+        !/^[A-Z2-9]{6}$/.test(result.code || "") ||
+        !/^[a-f0-9]{64}$/.test(result.ticket || "")
+      )
+        throw new Error(
+          "O serviço não respondeu como esperado. Tente novamente.",
+        );
+      reservation = result;
+    }
+    stream = canvas.captureStream(30);
+    for (const track of stream.getVideoTracks()) track.contentHint = "detail";
+    for (const track of audio.stream.getAudioTracks()) stream.addTrack(track);
+    const remote = await bridge.remotePlayStart();
+    if (run !== generation) return;
+    if (!remote.url)
+      throw new Error("Não foi possível iniciar a captura do PC.");
+    const local = new URL(remote.url);
+    local.protocol = "ws:";
+    local.hostname = "127.0.0.1";
+    local.pathname = "/party-stream";
+    media = new WebSocket(local);
+    media.binaryType = "arraybuffer";
+    media.onclose = () => {
+      if (run === generation)
+        fail("A captura foi interrompida. Crie a sala novamente.");
+    };
+    media.onmessage = async (event) => {
+      if (run !== generation) return;
+      if (typeof event.data === "string") {
+        const message = JSON.parse(event.data);
+        if (message.type === "status") {
+          playing = Boolean(message.partyAvailable);
+          update({ game: playing ? message.game : "" });
+          if (!playing) waiting();
+        }
+        return;
+      }
+      if (!playing) return;
+      const data = new DataView(event.data as ArrayBuffer);
+      if (data.byteLength === 0) return;
+      if (data.getUint8(0) === 4) {
+        const frame = rawPartyFrame(event.data as ArrayBuffer);
+        if (!frame) return;
+        if (canvas.width !== frame.width || canvas.height !== frame.height) {
+          canvas.width = frame.width;
+          canvas.height = frame.height;
+        }
+        for (const track of stream?.getVideoTracks() ?? [])
+          if (track.contentHint !== "motion") track.contentHint = "motion";
+        paint.putImageData(
+          new ImageData(frame.pixels, frame.width, frame.height),
+          0,
+          0,
+        );
+      } else if (
+        (data.getUint8(0) === 1 || data.getUint8(0) === 3) &&
+        !decoding
+      ) {
+        decoding = true;
+        try {
+          const image = await createImageBitmap(
+            new Blob([new Uint8Array(event.data, 1)], {
+              type: data.getUint8(0) === 3 ? "image/png" : "image/jpeg",
+            }),
+          );
+          if (playing && run === generation) {
+            for (const track of stream?.getVideoTracks() ?? [])
+              if (track.contentHint !== "detail") track.contentHint = "detail";
+            // Match the source aspect ratio instead of encoding black bars.
+            // Upscale small retro frames by whole pixels; never stretch them.
+            const scale = Math.max(
+              1,
+              Math.floor(Math.min(1280 / image.width, 720 / image.height)),
+            );
+            const width = image.width * scale;
+            const height = image.height * scale;
+            if (canvas.width !== width || canvas.height !== height) {
+              canvas.width = width;
+              canvas.height = height;
+            }
+            paint.imageSmoothingEnabled = false;
+            paint.drawImage(image, 0, 0, width, height);
+          }
+          image.close();
+        } finally {
+          decoding = false;
+        }
+      } else if (data.getUint8(0) === 2 && context && data.byteLength >= 9) {
+        const rate = data.getUint32(1, true),
+          length = Math.floor((data.byteLength - 5) / 4);
+        if (rate < 8000 || rate > 192000) return;
+        const buffer = context.createBuffer(2, length, rate);
+        for (let c = 0; c < 2; c++) {
+          const samples = buffer.getChannelData(c);
+          for (let i = 0; i < length; i++)
+            samples[i] = data.getInt16(5 + i * 4 + c * 2, true) / 32768;
+        }
+        if (audioTime > context.currentTime + 0.2) return;
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audio);
+        audioTime = Math.max(context.currentTime + 0.015, audioTime);
+        source.start(audioTime);
+        audioTime += buffer.duration;
+      }
+    };
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = "/signal";
+    if (reservation.code) url.searchParams.set("room", reservation.code);
+    const socket = new WebSocket(url);
+    signaling = socket;
+    let iceServers: RTCIceServer[] = [];
+    let policy: RTCIceTransportPolicy = "relay";
+    timeout = setTimeout(() => {
+      if (run === generation && state.phase === "connecting")
+        fail("O servidor não respondeu. Confira o endereço e tente novamente.");
+    }, 15000);
+    socket.onopen = () => {
+      send({
+        type: "create",
+        ...(reservation.ticket ? { ticket: reservation.ticket } : {}),
+      });
+      if (reservation.ticket)
+        heartbeat = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) socket.send("ping");
+        }, 20000);
+    };
+    socket.onclose = () => {
+      if (run === generation)
+        fail("A conexão com a sala terminou. Crie outra sala para continuar.");
+    };
+    socket.onmessage = (event) => {
+      if (event.data === "pong") return;
+      void (async () => {
+        if (run !== generation) return;
+        const m = JSON.parse(event.data);
+        if (m.type === "created") {
+          clearTimeout(timeout);
+          iceServers = m.iceServers;
+          policy = m.policy === "all" ? "all" : "relay";
+          update({ phase: "open", url: m.url, code: m.code, relay: m.relay });
+        }
+        if (m.type === "roster") update({ guests: m.guests });
+        if (m.type === "error") {
+          if (state.phase === "connecting") fail(m.message);
+          else update({ error: m.message });
+        }
+        if (m.type === "left") dropPeer(m.id);
+        if (m.type === "peer") {
+          const pc = new RTCPeerConnection({
+            iceServers,
+            iceTransportPolicy: policy,
+          });
+          const pad = new WebSocket(local);
+          const channel = pc.createDataChannel("pad", {
+            ordered: false,
+            maxRetransmits: 0,
+          });
+          const peer = {
+            pc,
+            pad,
+            channel,
+            lastInput: 0,
+            seq: -1,
+            pending: [] as RTCIceCandidateInit[],
+          };
+          peers.set(m.id, peer);
+          pad.onclose = () => {
+            if (peers.get(m.id) !== peer) return;
+            removeGuest(m.id);
+            update({
+              error:
+                "A conexão de um controle foi interrompida. Peça ao amigo para entrar novamente.",
+            });
+          };
+          stream!.getTracks().forEach((track) => pc.addTrack(track, stream!));
+          for (const transceiver of pc.getTransceivers()) {
+            if (transceiver.sender.track?.kind === "video")
+              preferPartyVideoCodec(
+                transceiver,
+                RTCRtpSender.getCapabilities("video"),
+                RTCRtpReceiver.getCapabilities("video"),
+              );
+          }
+          for (const sender of pc.getSenders()) {
+            if (sender.track?.kind !== "video") continue;
+            const parameters = sender.getParameters();
+            if (parameters.encodings.length) {
+              parameters.encodings[0].maxBitrate = 5_000_000;
+              parameters.encodings[0].maxFramerate = 30;
+              // Keep gameplay moving if the encoder or connection is overloaded.
+              parameters.degradationPreference = "maintain-framerate";
+              await sender.setParameters(parameters);
+            }
+          }
+          channel.onmessage = (input) => {
+            try {
+              if (typeof input.data !== "string" || input.data.length > 512)
+                return;
+              const value = JSON.parse(input.data);
+              if (Date.now() - peer.lastInput < 8) return;
+              if (
+                !Number.isSafeInteger(value.seq) ||
+                value.seq <= peer.seq ||
+                !Number.isInteger(value.buttons) ||
+                value.buttons < 0 ||
+                value.buttons > 65535 ||
+                !Array.isArray(value.axes) ||
+                value.axes.length !== 4 ||
+                !value.axes.every(
+                  (n: number) =>
+                    Number.isInteger(n) && n >= -32768 && n <= 32767,
+                )
+              )
+                return;
+              peer.seq = value.seq;
+              peer.lastInput = Date.now();
+              if (playing && pad.readyState === WebSocket.OPEN)
+                pad.send(
+                  JSON.stringify({
+                    type: "pad",
+                    player: m.player,
+                    buttons: value.buttons,
+                    axes: value.axes,
+                  }),
+                );
+            } catch {
+              /* Ignore malformed guest input. */
+            }
+          };
+          pc.onicecandidate = (event) => {
+            if (event.candidate)
+              send({
+                type: "signal",
+                id: m.id,
+                signal: {
+                  type: "candidate",
+                  candidate: event.candidate.toJSON(),
+                },
+              });
+          };
+          pc.onconnectionstatechange = () => {
+            update({
+              connected: [...peers.entries()]
+                .filter(([, p]) => p.pc.connectionState === "connected")
+                .map(([id]) => id),
+            });
+            if (pc.connectionState === "failed") {
+              removeGuest(m.id);
+              update({
+                error:
+                  "Não foi possível conectar um amigo. Peça para ele entrar novamente.",
+              });
+            }
+          };
+          await pc.setLocalDescription(await pc.createOffer());
+          send({
+            type: "signal",
+            id: m.id,
+            signal: { type: "offer", sdp: pc.localDescription },
+          });
+        }
+        if (m.type === "signal") {
+          const peer = peers.get(m.id);
+          if (!peer) return;
+          if (m.signal.type === "answer") {
+            await peer.pc.setRemoteDescription(m.signal.sdp);
+            for (const candidate of peer.pending.splice(0))
+              await peer.pc.addIceCandidate(candidate);
+          } else if (m.signal.type === "candidate") {
+            if (peer.pc.remoteDescription)
+              await peer.pc.addIceCandidate(m.signal.candidate);
+            else peer.pending.push(m.signal.candidate);
+          }
+        }
+      })().catch(() => {
+        if (run === generation)
+          update({
+            error:
+              "Não foi possível conectar o participante. Remova-o e peça para entrar novamente.",
+          });
+      });
+    };
+  } catch (error) {
+    if (run === generation)
+      fail(String(error instanceof Error ? error.message : error));
+  }
+}
+function fail(error: string) {
+  endParty();
+  update({ error });
+}

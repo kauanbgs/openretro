@@ -34,7 +34,13 @@ const WANTED: usize = 6;
 #[link(name = "kernel32")]
 extern "system" {
     fn OpenFileMappingW(access: u32, inherit: i32, name: *const u16) -> *mut c_void;
-    fn MapViewOfFile(mapping: *mut c_void, access: u32, high: u32, low: u32, size: usize) -> *mut c_void;
+    fn MapViewOfFile(
+        mapping: *mut c_void,
+        access: u32,
+        high: u32,
+        low: u32,
+        size: usize,
+    ) -> *mut c_void;
     fn UnmapViewOfFile(view: *const c_void) -> i32;
     fn CloseHandle(handle: *mut c_void) -> i32;
     fn GetTickCount() -> u32;
@@ -70,11 +76,16 @@ impl Format {
 
 /// Core frames keep their size so pixel art stays sharp on the phone;
 /// window-sized readbacks are scaled to fit the stream.
-fn output_size(width: usize, height: usize, format: Format) -> (usize, usize) {
-    if format != Format::BgraFlipped || (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
+fn output_size(width: usize, height: usize, format: Format, party: bool) -> (usize, usize) {
+    let (max_width, max_height) = if party {
+        (1280, 720)
+    } else {
+        (MAX_WIDTH, MAX_HEIGHT)
+    };
+    if format != Format::BgraFlipped || (width <= max_width && height <= max_height) {
         return (width, height);
     }
-    let scale = (MAX_WIDTH as f64 / width as f64).min(MAX_HEIGHT as f64 / height as f64);
+    let scale = (max_width as f64 / width as f64).min(max_height as f64 / height as f64);
     (
         ((width as f64 * scale).round() as usize).max(1),
         ((height as f64 * scale).round() as usize).max(1),
@@ -89,8 +100,9 @@ fn to_rgb(
     pitch: usize,
     format: Format,
     out: &mut Vec<u8>,
+    party: bool,
 ) -> (usize, usize) {
-    let (w, h) = output_size(width, height, format);
+    let (w, h) = output_size(width, height, format, party);
     out.clear();
     out.reserve(w * h * 3);
     let expand5 = |v: u16| ((v << 3) | (v >> 2)) as u8;
@@ -104,15 +116,25 @@ fn to_rgb(
             let at = x * width / w * format.bytes();
             let px = &row[at..at + format.bytes()];
             match format {
-                Format::Xrgb8888 | Format::BgraFlipped => out.extend_from_slice(&[px[2], px[1], px[0]]),
+                Format::Xrgb8888 | Format::BgraFlipped => {
+                    out.extend_from_slice(&[px[2], px[1], px[0]])
+                }
                 Format::Rgb565 => {
                     let v = u16::from_le_bytes([px[0], px[1]]);
                     let g = (v >> 5) & 0x3f;
-                    out.extend_from_slice(&[expand5(v >> 11), ((g << 2) | (g >> 4)) as u8, expand5(v & 0x1f)]);
+                    out.extend_from_slice(&[
+                        expand5(v >> 11),
+                        ((g << 2) | (g >> 4)) as u8,
+                        expand5(v & 0x1f),
+                    ]);
                 }
                 Format::Rgb1555 => {
                     let v = u16::from_le_bytes([px[0], px[1]]);
-                    out.extend_from_slice(&[expand5((v >> 10) & 0x1f), expand5((v >> 5) & 0x1f), expand5(v & 0x1f)]);
+                    out.extend_from_slice(&[
+                        expand5((v >> 10) & 0x1f),
+                        expand5((v >> 5) & 0x1f),
+                        expand5(v & 0x1f),
+                    ]);
                 }
             }
         }
@@ -165,7 +187,11 @@ impl Mapping {
             return None;
         }
         std::sync::atomic::fence(Ordering::Acquire);
-        let (width, height, pitch) = (self.field(2) as usize, self.field(3) as usize, self.field(4) as usize);
+        let (width, height, pitch) = (
+            self.field(2) as usize,
+            self.field(3) as usize,
+            self.field(4) as usize,
+        );
         let format = Format::from(self.field(5))?;
         let size = pitch.checked_mul(height)?;
         if width == 0 || height == 0 || size > MAX_BYTES || pitch < width * format.bytes() {
@@ -225,6 +251,7 @@ impl SharedFrames {
             let (mut mapping, mut pid) = (None::<Mapping>, 0u32);
             let (mut sequence, mut raw, mut rgb) = (0u32, Vec::new(), Vec::new());
             let mut checked = Instant::now() - Duration::from_secs(1);
+            let mut prepared = Instant::now() - Duration::from_secs(1);
             while !flag.load(Ordering::Acquire) {
                 if checked.elapsed() > Duration::from_millis(500) {
                     checked = Instant::now();
@@ -234,9 +261,16 @@ impl SharedFrames {
                         mapping = (pid != 0).then(|| Mapping::open(pid)).flatten();
                         sequence = 0;
                     }
-                    if let Some(mapping) = mapping.as_ref().filter(|_| frames.receiver_count() > 0) {
+                    if let Some(mapping) = mapping.as_ref().filter(|_| frames.receiver_count() > 0)
+                    {
                         mapping.want();
                     }
+                }
+                // The Party track is 30 fps. Do not copy and convert 60+ large
+                // GPU frames a second only to throw half of them away later.
+                if frames.party_active() && prepared.elapsed() < Duration::from_micros(33_333) {
+                    std::thread::sleep(Duration::from_millis(1));
+                    continue;
                 }
                 let read = mapping.as_ref().and_then(|m| m.read(sequence, &mut raw));
                 let Some((next, format, width, height, pitch)) = read else {
@@ -247,8 +281,21 @@ impl SharedFrames {
                 if frames.receiver_count() == 0 {
                     continue;
                 }
-                let (w, h) = to_rgb(&raw, width, height, pitch, format, &mut rgb);
-                let quality = if format == Format::BgraFlipped { READBACK_QUALITY } else { CORE_QUALITY };
+                prepared = Instant::now();
+                let (w, h) = to_rgb(
+                    &raw,
+                    width,
+                    height,
+                    pitch,
+                    format,
+                    &mut rgb,
+                    frames.party_active(),
+                );
+                let quality = if format == Format::BgraFlipped {
+                    READBACK_QUALITY
+                } else {
+                    CORE_QUALITY
+                };
                 match encode.try_send((std::mem::take(&mut rgb), w as u32, h as u32, quality)) {
                     Ok(()) => {}
                     Err(std::sync::mpsc::TrySendError::Full((back, ..))) => rgb = back,
@@ -271,17 +318,67 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore = "manual GPU-frame conversion throughput benchmark"]
+    fn gpu_conversion_throughput() {
+        let raw = vec![128; 1920 * 1080 * 4];
+        let mut out = Vec::new();
+        let start = Instant::now();
+        for _ in 0..30 {
+            std::hint::black_box(to_rgb(
+                &raw,
+                1920,
+                1080,
+                1920 * 4,
+                Format::BgraFlipped,
+                &mut out,
+                true,
+            ));
+        }
+        println!(
+            "1080p BGRA to 720p RGB: {:.2} ms/frame",
+            start.elapsed().as_secs_f64() * 1000.0 / 30.0
+        );
+    }
+
+    #[test]
     fn converts_every_libretro_format() {
         let mut out = Vec::new();
         // XRGB8888 is stored as B, G, R, X; the second row sits after padding.
         let xrgb = [1, 2, 3, 0, 9, 9, 9, 9, 4, 5, 6, 0, 9, 9, 9, 9];
-        assert_eq!(to_rgb(&xrgb, 1, 2, 8, Format::Xrgb8888, &mut out), (1, 2));
+        assert_eq!(
+            to_rgb(&xrgb, 1, 2, 8, Format::Xrgb8888, &mut out, false),
+            (1, 2)
+        );
         assert_eq!(out, [3, 2, 1, 6, 5, 4]);
-        to_rgb(&0xf800u16.to_le_bytes(), 1, 1, 2, Format::Rgb565, &mut out);
+        to_rgb(
+            &0xf800u16.to_le_bytes(),
+            1,
+            1,
+            2,
+            Format::Rgb565,
+            &mut out,
+            false,
+        );
         assert_eq!(out, [255, 0, 0]);
-        to_rgb(&0x07e0u16.to_le_bytes(), 1, 1, 2, Format::Rgb565, &mut out);
+        to_rgb(
+            &0x07e0u16.to_le_bytes(),
+            1,
+            1,
+            2,
+            Format::Rgb565,
+            &mut out,
+            false,
+        );
         assert_eq!(out, [0, 255, 0]);
-        to_rgb(&0x001fu16.to_le_bytes(), 1, 1, 2, Format::Rgb1555, &mut out);
+        to_rgb(
+            &0x001fu16.to_le_bytes(),
+            1,
+            1,
+            2,
+            Format::Rgb1555,
+            &mut out,
+            false,
+        );
         assert_eq!(out, [0, 0, 255]);
         assert_eq!(Format::from(7), None);
     }
@@ -291,11 +388,34 @@ mod tests {
         let mut out = Vec::new();
         // Bottom row first: the top row of the picture is the second one.
         let bgra = [1, 2, 3, 255, 7, 8, 9, 255];
-        assert_eq!(to_rgb(&bgra, 1, 2, 4, Format::BgraFlipped, &mut out), (1, 2));
+        assert_eq!(
+            to_rgb(&bgra, 1, 2, 4, Format::BgraFlipped, &mut out, false),
+            (1, 2)
+        );
         assert_eq!(out, [9, 8, 7, 3, 2, 1]);
-        assert_eq!(output_size(1920, 1080, Format::BgraFlipped), (640, 360));
-        assert_eq!(output_size(1440, 1080, Format::BgraFlipped), (640, 480));
-        assert_eq!(output_size(640, 448, Format::BgraFlipped), (640, 448));
-        assert_eq!(output_size(1920, 1080, Format::Xrgb8888), (1920, 1080));
+        assert_eq!(
+            output_size(1920, 1080, Format::BgraFlipped, false),
+            (640, 360)
+        );
+        assert_eq!(
+            output_size(1920, 1080, Format::BgraFlipped, true),
+            (1280, 720)
+        );
+        assert_eq!(
+            output_size(1440, 1080, Format::BgraFlipped, true),
+            (960, 720)
+        );
+        assert_eq!(
+            output_size(1440, 1080, Format::BgraFlipped, false),
+            (640, 480)
+        );
+        assert_eq!(
+            output_size(640, 448, Format::BgraFlipped, false),
+            (640, 448)
+        );
+        assert_eq!(
+            output_size(1920, 1080, Format::Xrgb8888, false),
+            (1920, 1080)
+        );
     }
 }

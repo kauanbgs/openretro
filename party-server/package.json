@@ -1,0 +1,25 @@
+{
+  "name": "openretro-party-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "wrangler dev --config cloudflare/wrangler.jsonc",
+    "start:standalone": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test test.mjs deploy.test.mjs cloudflare.test.mjs guest-input.test.mjs",
+    "deploy": "wrangler deploy --config cloudflare/wrangler.jsonc",
+    "deploy:check": "wrangler deploy --dry-run --config cloudflare/wrangler.jsonc",
+    "cf:whoami": "wrangler whoami --config cloudflare/wrangler.jsonc",
+    "cf:login": "wrangler login --config cloudflare/wrangler.jsonc",
+    "turn:configure": "node cloudflare/configure-turn.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "devDependencies": {
+    "miniflare": "5.20261019.2-beta",
+    "wrangler": "^4.152.0"
+  }
+}

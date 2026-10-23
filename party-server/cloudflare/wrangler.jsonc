@@ -1,0 +1,30 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "openretro-party",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-23",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "../public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "DIRECTORY", "class_name": "PartyDirectory" },
+      { "name": "ROOMS", "class_name": "PartyRoom" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PartyDirectory", "PartyRoom"] },
+  ],
+  "vars": {
+    "MAX_ROOMS": "32",
+    "MAX_ROOMS_PER_IP": "2",
+    "MAX_CREATES_PER_10_MIN": "12",
+  },
+  "dev": { "ip": "127.0.0.1", "port": 8787 },
+  "observability": { "enabled": false },
+}

@@ -1,0 +1,109 @@
+diff --git a/command.h b/command.h
+--- a/command.h
++++ b/command.h
+@@ -422,6 +422,7 @@
+    const char *arg_desc;
+ };
+ 
++bool command_openretro_party(command_t *cmd, const char* arg);
+ bool command_version(command_t *cmd, const char* arg);
+ bool command_get_status(command_t *cmd, const char* arg);
+ bool command_get_config_param(command_t *cmd, const char* arg);
+@@ -440,6 +441,7 @@
+ bool command_load_core(command_t *cmd, const char* arg);
+ 
+ static const struct cmd_action_map action_map[] = {
++   { "OPENRETRO_PARTY", command_openretro_party, "<0|1>" },
+ #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_SLANG) || defined(HAVE_HLSL)
+    { "SET_SHADER",       command_set_shader,       "<shader path>" },
+ #endif
+diff --git a/command.c b/command.c
+--- a/command.c
++++ b/command.c
+@@ -1029,6 +1029,17 @@
+ 
+    *max_bytes = 0;
+    return NULL;
++}
++
++/* Runs on the emulation thread alongside ordinary stdin commands. */
++void input_driver_set_openretro_party(bool enabled);
++bool command_openretro_party(command_t *cmd, const char* arg)
++{
++   (void)cmd;
++   if (strcmp(arg, "0") && strcmp(arg, "1"))
++      return false;
++   input_driver_set_openretro_party(!strcmp(arg, "1"));
++   return true;
+ }
+ 
+ bool command_get_status(command_t *cmd, const char* arg)
+diff --git a/input/input_driver.c b/input/input_driver.c
+--- a/input/input_driver.c
++++ b/input/input_driver.c
+@@ -1834,6 +1834,13 @@
+ }
+ 
+ 
++#include "openretro_party_input.h"
++static bool openretro_party_active = false;
++void input_driver_set_openretro_party(bool enabled)
++{
++   openretro_party_active = enabled;
++}
++
+ static int16_t input_state_internal(
+       input_driver_state_t *input_st,
+       settings_t *settings,
+@@ -1864,6 +1871,22 @@
+    bool bitmask_enabled                    = false;
+ 
+    device                                 &= RETRO_DEVICE_MASK;
++#ifdef HAVE_NETWORKGAMEPAD
++   /* J2-J4 belong to remote players even at neutral. Ignore local keyboard,
++    * joypads and remaps instead of falling back when a remote button is up. */
++   if (openretro_party_active && port > 0 && port < 4)
++   {
++      int16_t analog[4];
++      unsigned axis;
++      if (!input_st->remote)
++         return 0;
++      for (axis = 0; axis < 4; axis++)
++         analog[axis] = input_st->remote_st_ptr.analog[axis][port];
++      return openretro_party_input(device, idx, id,
++            input_st->remote_st_ptr.buttons[port], analog);
++   }
++#endif
++
+    bitmask_enabled                         =    (device == RETRO_DEVICE_JOYPAD)
+                                              && (id == RETRO_DEVICE_ID_JOYPAD_MASK);
+    joypad_info.axis_threshold              = settings->floats.input_axis_threshold;
+diff --git a/input/openretro_party_input.h b/input/openretro_party_input.h
+new file mode 100644
+--- /dev/null
++++ b/input/openretro_party_input.h
+@@ -0,0 +1,24 @@
++/* Party seats never inherit local input, including when remote is neutral. */
++#ifndef OPENRETRO_PARTY_INPUT_H
++#define OPENRETRO_PARTY_INPUT_H
++#include <stdint.h>
++#include <libretro.h>
++static int16_t openretro_party_input(unsigned device, unsigned idx, unsigned id,
++      uint64_t buttons, const int16_t analog[4])
++{
++   if (device == RETRO_DEVICE_JOYPAD)
++   {
++      if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
++         return (int16_t)(buttons & UINT64_C(0xffff));
++      return id < 16 ? (int16_t)((buttons >> id) & 1) : 0;
++   }
++   if (device == RETRO_DEVICE_ANALOG)
++   {
++      if (idx < 2 && id < 2)
++         return analog[idx * 2 + id];
++      if (idx == RETRO_DEVICE_INDEX_ANALOG_BUTTON && id < 16)
++         return (buttons & (UINT64_C(1) << id)) ? 32767 : 0;
++   }
++   return 0;
++}
++#endif

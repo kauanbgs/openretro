@@ -46,17 +46,40 @@ checkout_pinned() {
   }
 }
 
+# Patches can depend on earlier patches. Restack in reverse order when the
+# recipe changes; checking each older patch in isolation fails after a later
+# patch edits its context. An unchanged incremental build skips this entirely.
+PATCH_FILES=("$SCRIPT_DIR"/patches/*.patch)
+PATCH_STAMP="$(cat "${PATCH_FILES[@]}" | sha256sum | cut -d' ' -f1)"
+NEEDS_PATCHES=1
+if [[ "$INCREMENTAL" == 1 && -d "$SOURCE_DIR/.git" \
+   && "$(git -C "$SOURCE_DIR" rev-parse HEAD)" == "$RETROARCH_COMMIT" \
+   && "$(cat "$SOURCE_DIR/.openretro-patches" 2>/dev/null)" == "$PATCH_STAMP" ]]; then
+  NEEDS_PATCHES=0
+elif [[ -d "$SOURCE_DIR/.git" ]]; then
+  for ((i=${#PATCH_FILES[@]}-1; i>=0; i--)); do
+    if git -C "$SOURCE_DIR" apply --reverse --check --whitespace=nowarn "${PATCH_FILES[i]}" 2>/dev/null; then
+      git -C "$SOURCE_DIR" apply --reverse --whitespace=nowarn "${PATCH_FILES[i]}"
+    fi
+  done
+fi
+
 checkout_pinned "$RETROARCH_REPOSITORY" "$RETROARCH_COMMIT" "$SOURCE_DIR"
 checkout_pinned "$AUTOCONFIG_REPOSITORY" "$AUTOCONFIG_COMMIT" "$AUTOCONFIG_DIR"
+if [[ "$NEEDS_PATCHES" == 1 ]]; then
+  for patch in "${PATCH_FILES[@]}"; do
+    git -C "$SOURCE_DIR" apply --whitespace=nowarn "$patch"
+  done
+  echo "$PATCH_STAMP" > "$SOURCE_DIR/.openretro-patches"
+fi
 
-# The pinned release does not compile with both the menu and networking
-# disabled. These patches backport the equivalent upstream fixes.
-for patch in "$SCRIPT_DIR"/patches/*.patch; do
-  if [[ "$INCREMENTAL" == 1 ]] && git -C "$SOURCE_DIR" apply --reverse --check --whitespace=nowarn "$patch" 2>/dev/null; then
-    continue
-  fi
-  git -C "$SOURCE_DIR" apply --whitespace=nowarn "$patch"
-done
+# Exercise the same input reducer compiled into the runtime.
+gcc -std=c99 -I"$SOURCE_DIR/input" -I"$SOURCE_DIR/libretro-common/include" \
+  "$SCRIPT_DIR/tests/party-input.c" -o "$CACHE_ROOT/party-input-test.exe"
+"$CACHE_ROOT/party-input-test.exe"
+
+gcc -std=c99 -I"$SOURCE_DIR/audio" "$SCRIPT_DIR/tests/game-audio.c" -o "$CACHE_ROOT/game-audio-test.exe"
+"$CACHE_ROOT/game-audio-test.exe"
 
 mapfile -t CONFIGURE_FLAGS < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$SCRIPT_DIR/configure-flags.txt")
 
@@ -195,6 +218,7 @@ git -C "$SOURCE_DIR" archive --format=tar --prefix="RetroArch-$RETROARCH_VERSION
   -o "$SOURCE_STAGE/source.tar" "$RETROARCH_COMMIT"
 cp "$SCRIPT_DIR"/{build-mingw64.sh,configure-flags.txt,retroarch.cfg,upstream.env} \
   "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
+cp -R "$SCRIPT_DIR/tests" "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
 cp -R "$SCRIPT_DIR/patches" "$SOURCE_STAGE/RetroArch-$RETROARCH_VERSION/openretro-build/"
 tar -rf "$SOURCE_STAGE/source.tar" -C "$SOURCE_STAGE" "RetroArch-$RETROARCH_VERSION/openretro-build"
 gzip -9 -c "$SOURCE_STAGE/source.tar" \

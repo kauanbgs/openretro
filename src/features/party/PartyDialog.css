@@ -1,0 +1,235 @@
+.modal:has(.party-room) {
+  width: min(720px, calc(100vw - 40px));
+  max-width: 720px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  overflow: auto;
+}
+.modal:has(.party-room) > header {
+  padding: 20px 24px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+.modal:has(.party-room) > header h2 {
+  font-size: 16px;
+  color: var(--text);
+}
+.party-room {
+  padding: 26px 24px 20px;
+  font-family: inherit;
+}
+.party-heading h3 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.party-heading p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--body);
+  margin: 0;
+  max-width: 60ch;
+}
+.party-seats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 26px 0;
+}
+.party-seat {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 13px 14px 17px;
+  color: var(--body);
+}
+.party-seat.occupied {
+  border: 1px solid var(--border-strong);
+  background: var(--panel2);
+  color: var(--text);
+}
+.party-seat-top {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  height: 25px;
+  margin-bottom: 16px;
+}
+.party-seat-top > span {
+  font-size: 12px;
+  font-weight: 600;
+}
+.party-seat-top .icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 2px;
+}
+.party-seat strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.party-seat small {
+  font-size: 11px;
+  margin-top: 5px;
+  color: var(--body);
+}
+.party-invite {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.party-invite strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.party-invite-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.party-status {
+  font-size: 11px;
+  color: var(--muted);
+}
+.party-invite p,
+.party-note {
+  font-size: 12px;
+  color: var(--body);
+  line-height: 1.7;
+  margin: 8px 0 0;
+}
+.party-create {
+  margin-top: 18px;
+  min-width: 128px;
+}
+.party-link {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.party-link input {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  padding: 10px 12px;
+}
+.party-link > .button {
+  flex-shrink: 0;
+  height: auto;
+}
+.party-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 17px;
+}
+.party-footer > span {
+  font-size: 11px;
+  color: var(--body);
+}
+.party-footer > div {
+  display: flex;
+  gap: 8px;
+}
+.party-error {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--danger);
+  margin-top: 14px;
+}
+.party-now {
+  border-top: 1px solid var(--border);
+  padding-top: 17px;
+  margin-top: 18px;
+}
+.party-now strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.party-now p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--body);
+  margin-top: 5px;
+}
+.party-requests {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.party-requests > div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  color: var(--text);
+}
+.party-requests span {
+  flex: 1;
+  min-width: 0;
+}
+.party-requests strong {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.party-requests small {
+  display: block;
+  font-size: 11px;
+  color: var(--body);
+}
+@media (max-width: 580px) {
+  .party-room {
+    padding: 22px 18px;
+  }
+  .party-seats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .party-link {
+    flex-direction: column;
+  }
+  .party-link > .button {
+    height: 38px;
+  }
+  .party-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .party-heading h3 {
+    font-size: 22px;
+  }
+  .party-seat-top {
+    margin-bottom: 8px;
+  }
+}
+.party-link input.party-code {
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  min-width: 0;
+}

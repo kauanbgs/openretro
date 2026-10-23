@@ -86,8 +86,14 @@ fn client_on_screen(window: isize) -> Option<Rect> {
 /// The part of `area` inside a monitor frame, in frame pixels.
 fn crop(area: Rect, monitor: Rect, width: u32, height: u32) -> Option<(u32, u32, u32, u32)> {
     let clamp = |value: i32, max: u32| value.clamp(0, max as i32) as u32;
-    let (x0, y0) = (clamp(area.left - monitor.left, width), clamp(area.top - monitor.top, height));
-    let (x1, y1) = (clamp(area.right - monitor.left, width), clamp(area.bottom - monitor.top, height));
+    let (x0, y0) = (
+        clamp(area.left - monitor.left, width),
+        clamp(area.top - monitor.top, height),
+    );
+    let (x1, y1) = (
+        clamp(area.right - monitor.left, width),
+        clamp(area.bottom - monitor.top, height),
+    );
     (x1 > x0 && y1 > y0).then_some((x0, y0, x1, y1))
 }
 
@@ -107,9 +113,14 @@ struct Handler {
 }
 
 /// Nearest-neighbour scaling keeps pixel art crisp and costs one read per pixel.
-fn fit(width: u32, height: u32) -> (u32, u32) {
-    let scale = (MAX_WIDTH as f64 / width as f64)
-        .min(MAX_HEIGHT as f64 / height as f64)
+fn fit(width: u32, height: u32, party: bool) -> (u32, u32) {
+    let (max_width, max_height) = if party {
+        (1280, 720)
+    } else {
+        (MAX_WIDTH, MAX_HEIGHT)
+    };
+    let scale = (max_width as f64 / width as f64)
+        .min(max_height as f64 / height as f64)
         .min(1.0);
     (
         ((width as f64 * scale).round() as u32).max(1),
@@ -117,8 +128,15 @@ fn fit(width: u32, height: u32) -> (u32, u32) {
     )
 }
 
-fn downscale(rgba: &[u8], pitch: usize, width: u32, height: u32, out: &mut Vec<u8>) -> (u32, u32) {
-    let (w, h) = fit(width, height);
+fn downscale(
+    rgba: &[u8],
+    pitch: usize,
+    width: u32,
+    height: u32,
+    out: &mut Vec<u8>,
+    party: bool,
+) -> (u32, u32) {
+    let (w, h) = fit(width, height, party);
     out.clear();
     out.reserve((w * h * 3) as usize);
     for y in 0..h {
@@ -136,7 +154,11 @@ impl GraphicsCaptureApiHandler for Handler {
     type Error = Error;
 
     fn new(context: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        Ok(Self { target: context.flags, rgb: Vec::new(), sent: None })
+        Ok(Self {
+            target: context.flags,
+            rgb: Vec::new(),
+            sent: None,
+        })
     }
 
     fn on_frame_arrived(
@@ -148,7 +170,14 @@ impl GraphicsCaptureApiHandler for Handler {
         // update interval on the capture itself, so the handler skips frames.
         let shared = self.target.shared.load(Ordering::Acquire);
         if self.target.frames.receiver_count() == 0
-            || self.sent.is_some_and(|sent| sent.elapsed() < FRAME_INTERVAL)
+            || self.sent.is_some_and(|sent| {
+                sent.elapsed()
+                    < if self.target.frames.party_active() {
+                        Duration::from_micros(33_333)
+                    } else {
+                        FRAME_INTERVAL
+                    }
+            })
             || super::frames::now_ms().saturating_sub(shared) < 500
         {
             return Ok(());
@@ -164,7 +193,14 @@ impl GraphicsCaptureApiHandler for Handler {
         self.sent = Some(Instant::now());
         let mut buffer = frame.buffer_crop(x0, y0, x1, y1)?;
         let (width, height, pitch) = (buffer.width(), buffer.height(), buffer.row_pitch() as usize);
-        let (w, h) = downscale(buffer.as_raw_buffer(), pitch, width, height, &mut self.rgb);
+        let (w, h) = downscale(
+            buffer.as_raw_buffer(),
+            pitch,
+            width,
+            height,
+            &mut self.rgb,
+            self.target.frames.party_active(),
+        );
         // A lagging phone skips frames instead of falling behind.
         self.target.frames.publish(&self.rgb, w, h, QUALITY)?;
         Ok(())
@@ -200,7 +236,13 @@ impl VideoCapture {
             MinimumUpdateIntervalSettings::Default,
             DirtyRegionSettings::Default,
             ColorFormat::Rgba8,
-            Target { app, main, frames, shared, monitor: info.monitor },
+            Target {
+                app,
+                main,
+                frames,
+                shared,
+                monitor: info.monitor,
+            },
         );
         let control = Handler::start_free_threaded(settings)
             .map_err(|e| format!("Não foi possível capturar a tela do jogo: {e}"))?;
@@ -222,17 +264,35 @@ mod tests {
 
     #[test]
     fn frames_fit_the_stream_and_keep_their_shape() {
-        assert_eq!(fit(1920, 1080), (960, 540));
-        assert_eq!(fit(1440, 1080), (720, 540));
-        assert_eq!(fit(640, 480), (640, 480));
+        assert_eq!(fit(1920, 1080, false), (960, 540));
+        assert_eq!(fit(1440, 1080, false), (720, 540));
+        assert_eq!(fit(640, 480, false), (640, 480));
     }
 
     #[test]
     fn crops_the_visible_part_of_a_window() {
-        let monitor = Rect { left: -1920, top: 0, right: 0, bottom: 1080 };
-        let window = Rect { left: -1000, top: 100, right: 200, bottom: 700 };
-        assert_eq!(crop(window, monitor, 1920, 1080), Some((920, 100, 1920, 700)));
-        let elsewhere = Rect { left: 10, top: 10, right: 50, bottom: 50 };
+        let monitor = Rect {
+            left: -1920,
+            top: 0,
+            right: 0,
+            bottom: 1080,
+        };
+        let window = Rect {
+            left: -1000,
+            top: 100,
+            right: 200,
+            bottom: 700,
+        };
+        assert_eq!(
+            crop(window, monitor, 1920, 1080),
+            Some((920, 100, 1920, 700))
+        );
+        let elsewhere = Rect {
+            left: 10,
+            top: 10,
+            right: 50,
+            bottom: 50,
+        };
         assert_eq!(crop(elsewhere, monitor, 1920, 1080), None);
     }
 
@@ -247,7 +307,7 @@ mod tests {
             rgba.extend_from_slice(&[0; 4]);
         }
         let mut out = Vec::new();
-        assert_eq!(downscale(&rgba, 20, 4, 2, &mut out), (4, 2));
+        assert_eq!(downscale(&rgba, 20, 4, 2, &mut out, false), (4, 2));
         assert_eq!(&out[..6], &[0, 0, 9, 1, 0, 9]);
         assert_eq!(&out[12..15], &[0, 1, 9]);
     }

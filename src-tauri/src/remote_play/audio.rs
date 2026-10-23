@@ -1,79 +1,169 @@
-//! Records what the PC plays (WASAPI loopback on the default output) and
-//! sends it to phones as 16-bit stereo PCM.
+//! Reads game-only PCM from the managed runtime. Never records a system
+//! output device: calls, notifications and browser audio stay on the host.
 use axum::body::Bytes;
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    ffi::c_void,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
 };
 use tokio::sync::broadcast;
 
-/// The first byte of every audio message, followed by the sample rate as a
-/// little-endian u32 and interleaved stereo i16 samples.
 pub const AUDIO: u8 = 2;
+const MAGIC: u32 = 0x3141_524f;
+const HEADER: usize = 32;
+const FRAMES: usize = 16384;
+const RING_BYTES: usize = FRAMES * 4; // interleaved stereo i16
+const FILE_MAP_READ: u32 = 4;
 
-/// Mixes any channel layout down to stereo i16.
-fn stereo(samples: &[f32], channels: usize, rate: u32) -> Vec<u8> {
-    let mut packet = Vec::with_capacity(5 + samples.len() / channels.max(1) * 4);
-    packet.push(AUDIO);
-    packet.extend_from_slice(&rate.to_le_bytes());
-    for frame in samples.chunks(channels.max(1)) {
-        let (left, right) = match frame {
-            [mono] => (*mono, *mono),
-            [left, right, ..] => (*left, *right),
-            [] => (0.0, 0.0),
-        };
-        for sample in [left, right] {
-            let value = (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
-            packet.extend_from_slice(&value.to_le_bytes());
+#[link(name = "kernel32")]
+extern "system" {
+    fn OpenFileMappingW(access: u32, inherit: i32, name: *const u16) -> *mut c_void;
+    fn MapViewOfFile(
+        mapping: *mut c_void,
+        access: u32,
+        high: u32,
+        low: u32,
+        size: usize,
+    ) -> *mut c_void;
+    fn UnmapViewOfFile(view: *const c_void) -> i32;
+    fn CloseHandle(handle: *mut c_void) -> i32;
+}
+
+#[derive(Default)]
+struct Cursor {
+    written: Option<u32>,
+    rate: u32,
+}
+impl Cursor {
+    fn packet(&mut self, ring: &[u8], written: u32, rate: u32) -> Option<Bytes> {
+        if ring.len() != RING_BYTES || !(8000..=192000).contains(&rate) {
+            return None;
+        }
+        let previous = self.written.replace(written);
+        if previous.is_none() || self.rate != rate {
+            // Start at live audio, not at stale samples from before joining.
+            self.rate = rate;
+            return None;
+        }
+        let available = written.wrapping_sub(previous.unwrap()) as usize;
+        let frames = available.min(FRAMES).min((rate / 10) as usize);
+        if frames == 0 {
+            return None;
+        }
+        let start = written.wrapping_sub(frames as u32) as usize % FRAMES;
+        let first = frames.min(FRAMES - start);
+        let mut packet = Vec::with_capacity(5 + frames * 4);
+        packet.push(AUDIO);
+        packet.extend_from_slice(&rate.to_le_bytes());
+        packet.extend_from_slice(&ring[start * 4..(start + first) * 4]);
+        packet.extend_from_slice(&ring[..(frames - first) * 4]);
+        Some(Bytes::from(packet))
+    }
+}
+
+struct Mapping {
+    handle: *mut c_void,
+    view: *const u8,
+    ring: Vec<u8>,
+    cursor: Cursor,
+}
+impl Mapping {
+    fn open(pid: u32) -> Option<Self> {
+        let name: Vec<u16> = format!("Local\\OpenRetroAudio-{pid}")
+            .encode_utf16()
+            .chain(Some(0))
+            .collect();
+        unsafe {
+            let handle = OpenFileMappingW(FILE_MAP_READ, 0, name.as_ptr());
+            if handle.is_null() {
+                return None;
+            }
+            // Explicit size makes Windows reject a mapping shorter than the protocol.
+            let view = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, HEADER + RING_BYTES) as *const u8;
+            if view.is_null() {
+                CloseHandle(handle);
+                return None;
+            }
+            Some(Self {
+                handle,
+                view,
+                ring: vec![0; RING_BYTES],
+                cursor: Cursor::default(),
+            })
         }
     }
-    packet
+    fn field(&self, index: usize) -> u32 {
+        unsafe { std::ptr::read_volatile((self.view as *const u32).add(index)) }
+    }
+    fn read(&mut self) -> Option<Bytes> {
+        if self.field(0) != MAGIC || self.field(4) != FRAMES as u32 || self.field(5) != 2 {
+            return None;
+        }
+        let sequence = self.field(1);
+        if sequence % 2 != 0 {
+            return None;
+        }
+        std::sync::atomic::fence(Ordering::Acquire);
+        let (written, rate) = (self.field(2), self.field(3));
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.view.add(HEADER),
+                self.ring.as_mut_ptr(),
+                RING_BYTES,
+            );
+        }
+        std::sync::atomic::fence(Ordering::Acquire);
+        if self.field(1) != sequence {
+            return None;
+        }
+        self.cursor.packet(&self.ring, written, rate)
+    }
+}
+impl Drop for Mapping {
+    fn drop(&mut self) {
+        unsafe {
+            UnmapViewOfFile(self.view as *const c_void);
+            CloseHandle(self.handle);
+        }
+    }
 }
 
 pub struct AudioCapture {
     stop: Arc<AtomicBool>,
 }
-
 impl AudioCapture {
-    /// Sound is optional: without an output device the stream continues mute.
-    pub fn start(sound: broadcast::Sender<Bytes>) -> Self {
+    pub fn start(app: tauri::AppHandle, sound: broadcast::Sender<Bytes>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
-        // cpal streams are not Send, so one thread owns the stream until stopped.
         std::thread::spawn(move || {
-            let result = (|| -> Result<(), String> {
-                let device = cpal::default_host()
-                    .default_output_device()
-                    .ok_or("Nenhuma saída de áudio encontrada.")?;
-                let config = device.default_output_config().map_err(|e| e.to_string())?;
-                let (channels, rate) = (config.channels() as usize, config.sample_rate());
-                let stream = device
-                    .build_input_stream(
-                        config.config(),
-                        move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                            if sound.receiver_count() > 0 {
-                                let _ = sound.send(Bytes::from(stereo(data, channels, rate)));
-                            }
-                        },
-                        |error| log::warn!("Phone play audio: {error}"),
-                        None,
-                    )
-                    .map_err(|e| e.to_string())?;
-                stream.play().map_err(|e| e.to_string())?;
-                while !flag.load(Ordering::Acquire) {
-                    std::thread::park_timeout(std::time::Duration::from_millis(200));
+            let (mut mapping, mut pid) = (None::<Mapping>, 0u32);
+            let mut checked = Instant::now() - Duration::from_secs(1);
+            while !flag.load(Ordering::Acquire) {
+                if checked.elapsed() >= Duration::from_millis(100) {
+                    let running = crate::in_game::runtime_pid(&app).unwrap_or(0);
+                    if running != pid {
+                        mapping = None;
+                        pid = running;
+                    }
+                    if pid != 0 && mapping.is_none() {
+                        mapping = Mapping::open(pid);
+                    }
+                    checked = Instant::now();
                 }
-                Ok(())
-            })();
-            if let Err(message) = result {
-                log::warn!("Phone play audio unavailable: {message}");
+                if sound.receiver_count() > 0 {
+                    if let Some(packet) = mapping.as_mut().and_then(Mapping::read) {
+                        let _ = sound.send(packet);
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(3));
             }
         });
         Self { stop }
     }
 }
-
 impl Drop for AudioCapture {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
@@ -83,17 +173,106 @@ impl Drop for AudioCapture {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn sample(ring: &mut [u8], at: usize, left: i16, right: i16) {
+        ring[at * 4..at * 4 + 2].copy_from_slice(&left.to_le_bytes());
+        ring[at * 4 + 2..at * 4 + 4].copy_from_slice(&right.to_le_bytes());
+    }
+    #[test]
+    fn reads_only_the_selected_runtime_mapping_and_rejects_incomplete_writes() {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn CreateFileMappingW(
+                file: *mut c_void,
+                attributes: *const c_void,
+                protection: u32,
+                high: u32,
+                low: u32,
+                name: *const u16,
+            ) -> *mut c_void;
+        }
+        let pid = std::process::id();
+        let name: Vec<u16> = format!("Local\\OpenRetroAudio-{pid}")
+            .encode_utf16()
+            .chain(Some(0))
+            .collect();
+        unsafe {
+            let handle = CreateFileMappingW(
+                -1isize as *mut c_void,
+                std::ptr::null(),
+                4,
+                0,
+                (HEADER + RING_BYTES) as u32,
+                name.as_ptr(),
+            );
+            assert!(!handle.is_null());
+            let view = MapViewOfFile(handle, 6, 0, 0, HEADER + RING_BYTES) as *mut u8;
+            assert!(!view.is_null());
+            // Mapping's Drop also releases this test publisher's writable view.
+            let publisher = Mapping {
+                handle,
+                view,
+                ring: Vec::new(),
+                cursor: Cursor::default(),
+            };
+            let fields = view as *mut u32;
+            fields.add(0).write(MAGIC);
+            fields.add(3).write(48000);
+            fields.add(4).write(FRAMES as u32);
+            fields.add(5).write(2);
+            let mut reader = Mapping::open(pid).unwrap();
+            assert!(Mapping::open(u32::MAX).is_none());
+            assert!(reader.read().is_none());
+            fields.add(1).write_volatile(1);
+            std::ptr::copy_nonoverlapping([1u8, 2, 3, 4].as_ptr(), view.add(HEADER), 4);
+            fields.add(2).write(1);
+            assert!(reader.read().is_none());
+            fields.add(1).write_volatile(2);
+            let packet = reader.read().unwrap();
+            assert_eq!(&packet[5..], &[1, 2, 3, 4]);
+            assert!(reader.read().is_none());
+            drop(reader);
+            drop(publisher);
+        }
+    }
 
     #[test]
-    fn mixes_to_stereo_with_a_header() {
-        let packet = stereo(&[1.0, -1.0, 0.9, 0.5, 0.0, 0.0], 3, 48000);
-        assert_eq!(packet[0], AUDIO);
-        assert_eq!(&packet[1..5], &48000u32.to_le_bytes());
-        let samples: Vec<i16> = packet[5..]
-            .chunks(2)
-            .map(|b| i16::from_le_bytes([b[0], b[1]]))
-            .collect();
-        assert_eq!(samples, vec![i16::MAX, -i16::MAX, 16383, 0]);
-        assert_eq!(stereo(&[0.25], 1, 44100)[5..].len(), 4);
+    fn starts_live_and_preserves_stereo_pcm_format() {
+        let mut ring = vec![0; RING_BYTES];
+        sample(&mut ring, 10, 1000, -2000);
+        let mut cursor = Cursor::default();
+        assert!(cursor.packet(&ring, 10, 48000).is_none());
+        let packet = cursor.packet(&ring, 11, 48000).unwrap();
+        assert_eq!(&packet[..5], &[2, 128, 187, 0, 0]);
+        assert_eq!(&packet[5..], &[232, 3, 48, 248]);
+        assert!(cursor.packet(&ring, 11, 48000).is_none());
+    }
+    #[test]
+    fn ring_and_u32_counter_wrap_keep_samples_in_order() {
+        let mut ring = vec![0; RING_BYTES];
+        sample(&mut ring, FRAMES - 1, 1, 2);
+        sample(&mut ring, 0, 3, 4);
+        let mut cursor = Cursor::default();
+        cursor.packet(&ring, u32::MAX, 44100);
+        let packet = cursor.packet(&ring, 1, 44100).unwrap();
+        assert_eq!(&packet[5..], &[1, 0, 2, 0, 3, 0, 4, 0]);
+    }
+    #[test]
+    fn slow_readers_drop_old_audio_and_rate_changes_restart_live() {
+        let ring = vec![0; RING_BYTES];
+        let mut cursor = Cursor::default();
+        cursor.packet(&ring, 0, 48000);
+        assert_eq!(
+            cursor.packet(&ring, 48000, 48000).unwrap().len(),
+            5 + 4800 * 4
+        );
+        assert!(cursor.packet(&ring, 49000, 44100).is_none());
+        assert_eq!(cursor.packet(&ring, 49010, 44100).unwrap().len(), 45);
+    }
+    #[test]
+    fn malformed_buffers_and_sample_rates_are_rejected() {
+        let mut cursor = Cursor::default();
+        assert!(cursor.packet(&[], 1, 48000).is_none());
+        assert!(cursor.packet(&vec![0; RING_BYTES], 1, 0).is_none());
+        assert!(cursor.written.is_none());
     }
 }

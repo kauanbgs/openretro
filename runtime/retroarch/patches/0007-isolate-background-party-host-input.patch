@@ -1,0 +1,56 @@
+diff --git a/input/openretro_party_input.h b/input/openretro_party_input.h
+--- a/input/openretro_party_input.h
++++ b/input/openretro_party_input.h
+@@ -3,6 +3,11 @@
+ #define OPENRETRO_PARTY_INPUT_H
+ #include <stdint.h>
+ #include <libretro.h>
++static bool openretro_party_local_input_allowed(bool party, unsigned port, bool focused)
++{
++   return !party || port != 0 || focused;
++}
++
+ static int16_t openretro_party_input(unsigned device, unsigned idx, unsigned id,
+       uint64_t buttons, const int16_t analog[4])
+ {
+diff --git a/input/input_driver.c b/input/input_driver.c
+--- a/input/input_driver.c
++++ b/input/input_driver.c
+@@ -1835,6 +1835,26 @@
+ 
+ 
+ #include "openretro_party_input.h"
++#ifdef _WIN32
++#include <windows.h>
++#endif
++
++/* The emulator is embedded in OpenRetro, so its top-level ancestor is the
++ * launcher window. Comparing only the emulator HWND would reject host input
++ * even while its embedded game is focused. Remote seats ignore this check. */
++static bool openretro_party_host_has_focus(void)
++{
++#ifdef _WIN32
++   HWND game = (HWND)video_driver_window_get();
++   HWND foreground = GetForegroundWindow();
++   if (!game || !foreground)
++      return false;
++   return GetAncestor(game, GA_ROOT) == GetAncestor(foreground, GA_ROOT);
++#else
++   return video_driver_has_focus();
++#endif
++}
++
+ static bool openretro_party_active = false;
+ void input_driver_set_openretro_party(bool enabled)
+ {
+@@ -1886,6 +1906,10 @@
+             input_st->remote_st_ptr.buttons[port], analog);
+    }
+ #endif
++
++   if (!openretro_party_local_input_allowed(openretro_party_active, port,
++            !openretro_party_active || openretro_party_host_has_focus()))
++      return 0;
+ 
+    bitmask_enabled                         =    (device == RETRO_DEVICE_JOYPAD)
+                                              && (id == RETRO_DEVICE_ID_JOYPAD_MASK);

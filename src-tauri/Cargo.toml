@@ -1,6 +1,6 @@
 [package]
 name = "openretro"
-version = "0.4.6"
+version = "0.4.7"
 description = "An open home for your classic games"
 authors = ["OpenRetro contributors"]
 edition = "2021"
@@ -49,9 +49,8 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["util
 sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["util", "compress"] }
 
 [target.'cfg(windows)'.dependencies]
-# Phone play: screen capture for OpenRetro's own screens, and the PC's sound.
+# Phone play: screen capture. Audio comes directly from the managed game runtime.
 windows-capture = "2"
-cpal = "0.18"
 
 [target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
 # Upstream SHA-1 uses AWS-LC. Use its shipped assembly objects on Windows.
@@ -64,6 +63,11 @@ debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
+
+# Our capture code and image's generic pixel conversions must keep up with
+# 720p frames even during development. Retain debug checks and backtraces.
+[profile.dev.package.openretro]
+opt-level = 3
 
 # Phone play encodes every frame as JPEG; keep that fast in debug builds too.
 [profile.dev.package.image]
@@ -88,3 +92,8 @@ opt-level = 3
 
 [profile.dev.package.sevenz-rust2]
 opt-level = 3
+
+# Keep worker-thread AppHandle clones from touching Tao's non-atomic Rc counts.
+# See vendor/tauri-runtime-wry/OPENRETRO-PATCH.md.
+[patch.crates-io]
+tauri-runtime-wry = { path = "vendor/tauri-runtime-wry" }

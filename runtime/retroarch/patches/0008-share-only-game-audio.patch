@@ -1,0 +1,106 @@
+diff --git a/audio/openretro_game_audio.h b/audio/openretro_game_audio.h
+new file mode 100644
+--- /dev/null
++++ b/audio/openretro_game_audio.h
+@@ -0,0 +1,44 @@
++/* Game-only PCM bridge. No desktop output device or microphone is captured. */
++#ifndef OPENRETRO_GAME_AUDIO_H
++#define OPENRETRO_GAME_AUDIO_H
++#include <stdint.h>
++#include <stddef.h>
++#include <string.h>
++#define OPENRETRO_AUDIO_MAGIC UINT32_C(0x3141524f)
++#define OPENRETRO_AUDIO_FRAMES 16384u
++struct openretro_audio_ring {
++   uint32_t magic;
++   volatile int32_t sequence;
++   uint32_t written;
++   uint32_t rate;
++   uint32_t capacity;
++   uint32_t channels;
++   uint32_t reserved[2];
++   int16_t samples[OPENRETRO_AUDIO_FRAMES * 2];
++};
++
++static void openretro_audio_store(struct openretro_audio_ring *ring,
++      const float *samples, size_t frames, unsigned rate)
++{
++   size_t frame;
++   uint32_t written = ring->written;
++   /* Oversized batches retain only the newest samples, with the original
++    * monotonic cursor so readers can detect and discard an overrun. */
++   size_t first = frames > OPENRETRO_AUDIO_FRAMES ? frames - OPENRETRO_AUDIO_FRAMES : 0;
++   ring->rate = rate;
++   for (frame = first; frame < frames; frame++)
++   {
++      unsigned channel;
++      size_t slot = ((written + (uint32_t)frame) % OPENRETRO_AUDIO_FRAMES) * 2;
++      for (channel = 0; channel < 2; channel++)
++      {
++         float sample = samples[frame * 2 + channel];
++         if (!(sample == sample)) sample = 0.0f;
++         if (sample > 1.0f) sample = 1.0f;
++         if (sample < -1.0f) sample = -1.0f;
++         ring->samples[slot + channel] = (int16_t)(sample * 32767.0f);
++      }
++   }
++   ring->written = written + (uint32_t)frames;
++}
++#endif
+diff --git a/audio/audio_driver.c b/audio/audio_driver.c
+--- a/audio/audio_driver.c
++++ b/audio/audio_driver.c
+@@ -69,6 +69,41 @@
+ #include "../runloop.h"
+ #include "../verbosity.h"
+ 
++#ifdef _WIN32
++#include <windows.h>
++#include "openretro_game_audio.h"
++/* Published after the game's DSP/resampling, before it reaches WASAPI. */
++static void openretro_publish_game_audio(const float *samples, size_t frames, unsigned rate)
++{
++   static struct openretro_audio_ring *ring = NULL;
++   static bool unavailable = false;
++   if (!frames || rate < 8000 || rate > 192000)
++      return;
++   if (!ring && !unavailable)
++   {
++      char name[64];
++      HANDLE mapping;
++      snprintf(name, sizeof(name), "Local\\OpenRetroAudio-%lu", (unsigned long)GetCurrentProcessId());
++      mapping = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE,
++            0, sizeof(*ring), name);
++      if (mapping)
++      {
++         ring = (struct openretro_audio_ring*)MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(*ring));
++         if (!ring) CloseHandle(mapping); /* Retain the named section until process exit. */
++      }
++      if (!ring) { unavailable = true; return; }
++      ring->capacity = OPENRETRO_AUDIO_FRAMES;
++      ring->channels = 2;
++      ring->magic = OPENRETRO_AUDIO_MAGIC;
++   }
++   if (!ring)
++      return;
++   InterlockedIncrement((volatile LONG*)&ring->sequence);
++   openretro_audio_store(ring, samples, frames, rate);
++   InterlockedIncrement((volatile LONG*)&ring->sequence);
++}
++#endif
++
+ #define AUDIO_CHUNK_SIZE_BLOCKING      512
+ 
+ /* So we don't get complete line-noise when fast-forwarding audio. */
+@@ -595,6 +630,11 @@
+       audio_mixer_mix(audio_st->output_samples_buf,
+             src_data.output_frames, mixer_gain, override);
+    }
++#endif
++
++#ifdef _WIN32
++   openretro_publish_game_audio(audio_st->output_samples_buf,
++         src_data.output_frames, config_get_ptr()->uints.audio_output_sample_rate);
+ #endif
+ 
+    /* Now we write our processed audio output to the driver.

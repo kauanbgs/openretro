@@ -20,8 +20,10 @@ phone's buttons; OpenRetro's patches bind it to loopback and make it read every
 queued packet. On Windows another patch publishes frames in shared memory
 named after the runtime's process, which OpenRetro streams to phones: every
 software frame from the core, and, while OpenRetro marks a phone as watching,
-an asynchronous readback of GPU-drawn frames. The build has no SSL or LAN
-discovery.
+an asynchronous readback of GPU-drawn frames. Game-only stereo PCM is also
+published through a process-specific shared-memory ring, after DSP and
+resampling; OpenRetro never needs to record the Windows output device. The
+build has no SSL or LAN discovery.
 
 It excludes the RetroArch menu drivers, widgets, database, playlists, online
 updater, netplay lobby and discovery, achievements, Discord, recording, streaming,

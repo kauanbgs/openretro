@@ -9,4 +9,9 @@ src-tauri/gen/
 .env*
 !.env.example
 .cache/
+party-server/deploy/generated/
+party-server/.wrangler/
+party-server/cloudflare/.wrangler/
+.dev.vars*
+!.dev.vars.example
 web/.openai/local/

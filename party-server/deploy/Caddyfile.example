@@ -1,0 +1,7 @@
+# Point this domain at the server. Caddy handles HTTPS and WebSocket upgrades.
+# Keep the Node backend on loopback; do not expose port 8787 publicly.
+party.example.com {
+    reverse_proxy 127.0.0.1:8787 {
+        header_up X-Party-Client-IP {remote_host}
+    }
+}
