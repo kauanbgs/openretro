@@ -158,7 +158,7 @@
   border-color: #303030;
 }
 .tv-workspace .settings-layout {
-  gap: 36px;
+  gap: 0;
 }
 .tv-workspace .settings-nav {
   min-width: 180px;

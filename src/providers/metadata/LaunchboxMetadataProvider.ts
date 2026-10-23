@@ -10,6 +10,7 @@ import type {
   MetadataProvider,
   PlayersFilter,
 } from "./types";
+import { t } from "../../i18n";
 export interface CatalogStatus {
   configured: boolean;
   state: "missing" | "building" | "ready" | "failed" | "unavailable";
@@ -73,7 +74,7 @@ export class LaunchboxMetadataProvider implements MetadataProvider {
   }
   async getGame(id: string, _platformId?: string): Promise<GameMetadata> {
     if (!/^lb-\d+$/.test(id))
-      throw new Error("Identificador inválido do LaunchBox.");
+      throw new Error(t("Identificador inválido do LaunchBox."));
     return invoke("catalog_game", { id: Number(id.slice(3)) });
   }
   async match(
@@ -113,9 +114,9 @@ export function matchesPlayers(
 }
 /** Labels shown wherever the players filter appears. */
 export const playersFilters: { id: PlayersFilter; name: string }[] = [
-  { id: "multi", name: "Multijogador (2+)" },
-  { id: "coop", name: "Cooperativo" },
-  { id: "party", name: "3 jogadores ou mais" },
+  { id: "multi", name: t("Multijogador (2+)") },
+  { id: "coop", name: t("Cooperativo") },
+  { id: "party", name: t("3 jogadores ou mais") },
 ];
 export async function catalogGameDetails(game: GameMetadata) {
   if (game.metadataProvider === "launchbox")

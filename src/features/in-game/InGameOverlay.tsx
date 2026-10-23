@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../services/transport";
 import { listen } from "@tauri-apps/api/event";
 import {
   Camera,
@@ -20,6 +20,7 @@ import { KeyboardMap } from "../../components/KeyboardMap";
 import type { SaveState } from "../../types";
 import { formatRelative } from "../../utils/format";
 import "./InGameOverlay.css";
+import { t } from "../../i18n";
 
 interface Session {
   id: string;
@@ -34,13 +35,13 @@ interface Session {
   };
 }
 const baseActions = [
-  { id: "resume", label: "Continuar jogando", icon: Play },
-  { id: "save", label: "Salvar estado", icon: Save },
-  { id: "load", label: "Carregar estado", icon: Upload },
-  { id: "screenshot", label: "Tirar screenshot", icon: Camera },
-  { id: "undo_load", label: "Desfazer carregamento", icon: Undo2 },
-  { id: "reset", label: "Reiniciar jogo", icon: RotateCcw },
-  { id: "quit", label: "Encerrar jogo", icon: Square },
+  { id: "resume", label: t("Continuar jogando"), icon: Play },
+  { id: "save", label: t("Salvar estado"), icon: Save },
+  { id: "load", label: t("Carregar estado"), icon: Upload },
+  { id: "screenshot", label: t("Tirar screenshot"), icon: Camera },
+  { id: "undo_load", label: t("Desfazer carregamento"), icon: Undo2 },
+  { id: "reset", label: t("Reiniciar jogo"), icon: RotateCcw },
+  { id: "quit", label: t("Encerrar jogo"), icon: Square },
 ];
 export function InGameOverlay() {
   const [session, setSession] = useState<Session | null>(null);
@@ -56,21 +57,21 @@ export function InGameOverlay() {
   const [states, setStates] = useState<SaveState[]>([]);
   const view = session?.screenView;
   const layoutLabels = {
-    full: "Tela inteira",
-    sideBySide: "Esquerda / direita",
-    stacked: "Cima / baixo",
-    grid: "4 quadrantes",
+    full: t("Tela inteira"),
+    sideBySide: t("Esquerda / direita"),
+    stacked: t("Cima / baixo"),
+    grid: t("4 quadrantes"),
   };
   const regionLabels =
     view?.layout === "stacked"
-      ? ["Cima", "Baixo"]
+      ? [t("Cima"), t("Baixo")]
       : view?.layout === "sideBySide"
-        ? ["Esquerda", "Direita"]
+        ? [t("Esquerda"), t("Direita")]
         : [
-            "Superior esquerda",
-            "Superior direita",
-            "Inferior esquerda",
-            "Inferior direita",
+            t("Superior esquerda"),
+            t("Superior direita"),
+            t("Inferior esquerda"),
+            t("Inferior direita"),
           ];
   const actions = [...baseActions];
   if (session?.viewAvailable && view) {
@@ -79,19 +80,23 @@ export function InGameOverlay() {
       0,
       {
         id: "view_layout",
-        label: `Tela dividida: ${layoutLabels[view.layout]}`,
+        label: t("Tela dividida: {layout}", {
+          layout: layoutLabels[view.layout],
+        }),
         icon: Monitor,
       },
       ...(view.layout !== "full"
         ? [
             {
               id: "view_region",
-              label: `Minha região: ${regionLabels[view.region - 1]}`,
+              label: t("Minha região: {region}", {
+                region: regionLabels[view.region - 1],
+              }),
               icon: Monitor,
             },
             {
               id: "view_toggle",
-              label: view.full ? "Ver minha tela" : "Ver tela inteira",
+              label: view.full ? t("Ver minha tela") : t("Ver tela inteira"),
               icon: Monitor,
             },
           ]
@@ -176,13 +181,14 @@ export function InGameOverlay() {
       setMessage(
         (
           {
-            save: "Solicitação de salvamento enviada ao jogo.",
-            load: "Solicitação de carregamento enviada ao jogo.",
-            screenshot:
+            save: t("Solicitação de salvamento enviada ao jogo."),
+            load: t("Solicitação de carregamento enviada ao jogo."),
+            screenshot: t(
               "Solicitação de captura enviada. Confira em Minhas capturas.",
-            reset: "Reiniciando o jogo…",
-            quit: "Encerrando o jogo…",
-            undo_load: "Solicitação para desfazer carregamento enviada.",
+            ),
+            reset: t("Reiniciando o jogo…"),
+            quit: t("Encerrando o jogo…"),
+            undo_load: t("Solicitação para desfazer carregamento enviada."),
           } as Record<string, string>
         )[action] ?? "",
       );
@@ -222,28 +228,28 @@ export function InGameOverlay() {
     <div className="game-menu-scene">
       <section
         className="game-menu-panel"
-        aria-label="Menu do jogo"
+        aria-label={t("Menu do jogo")}
         role="dialog"
         aria-modal="true"
       >
         <header>
           <span>
-            <Gamepad2 size={22} /> OpenRetro
+            <Gamepad2 size={22} /> {t("OpenRetro")}
           </span>
           <button
-            aria-label="Continuar jogando"
+            aria-label={t("Continuar jogando")}
             onClick={() => void run("resume")}
           >
             <X size={22} />
           </button>
         </header>
         <h1>{session.title}</h1>
-        <p className="game-menu-paused">Jogo pausado</p>
+        <p className="game-menu-paused">{t("Jogo pausado")}</p>
         <div className="game-menu-slot">
-          <span>Slot do estado</span>
+          <span>{t("Slot do estado")}</span>
           <button
             disabled={busy || session.slot === 0}
-            aria-label="Slot anterior"
+            aria-label={t("Slot anterior")}
             onClick={() => void run("slot_previous")}
           >
             <ChevronLeft size={19} />
@@ -251,7 +257,7 @@ export function InGameOverlay() {
           <strong>{session.slot}</strong>
           <button
             disabled={busy || session.slot === 99}
-            aria-label="Próximo slot"
+            aria-label={t("Próximo slot")}
             onClick={() => void run("slot_next")}
           >
             <ChevronRight size={19} />
@@ -265,32 +271,34 @@ export function InGameOverlay() {
           )}
           <p>
             {slotState
-              ? `Salvo ${formatRelative(new Date(slotState.modifiedAt))}`
-              : "Slot vazio"}
+              ? t("Salvo {when}", {
+                  when: formatRelative(new Date(slotState.modifiedAt)),
+                })
+              : t("Slot vazio")}
           </p>
         </div>
         {confirmation ? (
           <div className="game-menu-confirm">
             <h2>
               {confirmation === "load"
-                ? "Carregar este estado?"
+                ? t("Carregar este estado?")
                 : confirmation === "reset"
-                  ? "Reiniciar o jogo?"
-                  : "Encerrar o jogo?"}
+                  ? t("Reiniciar o jogo?")
+                  : t("Encerrar o jogo?")}
             </h2>
-            <p>O progresso que não foi salvo pode ser perdido.</p>
+            <p>{t("O progresso que não foi salvo pode ser perdido.")}</p>
             <button
               className={!confirmed ? "selected" : ""}
               onClick={() => setConfirmation(undefined)}
             >
-              Cancelar
+              {t("Cancelar")}
             </button>
             <button
               className={confirmed ? "selected" : ""}
               onClick={() => void run(confirmation)}
               disabled={busy}
             >
-              Confirmar
+              {t("Confirmar")}
             </button>
           </div>
         ) : (
@@ -312,22 +320,23 @@ export function InGameOverlay() {
         )}
         {session.viewAvailable && (
           <p className="game-menu-view-hint">
-            Tela dividida alterna entre esquerda/direita, cima/baixo e
-            quadrantes. Escolha sua região e volte à tela inteira para ver menus
-            e resultados. O recorte muda apenas a imagem neste PC e não troca
-            seu jogador.
+            {t(
+              "Tela dividida alterna entre esquerda/direita, cima/baixo e quadrantes. Escolha sua região e volte à tela inteira para ver menus e resultados. O recorte muda apenas a imagem neste PC e não troca seu jogador.",
+            )}
           </p>
         )}
         <p className="game-menu-message" role="status">
           {busy
-            ? "Enviando comando…"
+            ? t("Enviando comando…")
             : message ||
-              "Estados dependem do suporte do core. Use ← / → para mudar o slot."}
+              t(
+                "Estados dependem do suporte do core. Use ← / → para mudar o slot.",
+              )}
         </p>
         {keyboard && <KeyboardMap />}
         <div className="game-menu-links">
           <button onClick={() => setKeyboard((value) => !value)}>
-            {keyboard ? "Esconder teclado" : "Controles no teclado"}
+            {keyboard ? t("Esconder teclado") : t("Controles no teclado")}
           </button>
           <button
             onClick={() =>
@@ -336,24 +345,26 @@ export function InGameOverlay() {
                 .catch((error) => setMessage(String(error)))
             }
           >
-            Minhas capturas
+            {t("Minhas capturas")}
           </button>
           <button
             onClick={() =>
               void invoke("open_steam_controller_settings")
                 .then(() =>
                   setMessage(
-                    "Na Steam, desligue ‘Botão Guia coloca a Steam em foco’. Depois volte ao jogo.",
+                    t(
+                      "Na Steam, desligue ‘Botão Guia coloca a Steam em foco’. Depois volte ao jogo.",
+                    ),
                   ),
                 )
                 .catch((error) => setMessage(String(error)))
             }
           >
-            Conflito com Steam?
+            {t("Conflito com Steam?")}
           </button>
         </div>
         <footer>
-          A confirma · B continua · PS, Share + Options ou F1 abre/fecha
+          {t("A confirma · B continua · PS, Share + Options ou F1 abre/fecha")}
         </footer>
       </section>
     </div>

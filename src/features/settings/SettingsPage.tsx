@@ -1,21 +1,117 @@
 import { BrandMark } from "../../components/Brand";
 import { PageHeader } from "../../components/PageHeader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
-import { Check, AlertCircle, ExternalLink, Folder } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import {
+  Check,
+  AlertCircle,
+  ExternalLink,
+  Folder,
+  Settings,
+  Library,
+  Gamepad2,
+  Download,
+  Palette,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { SourceManager } from "../downloads/SourceManager";
 import { PlayerPicker } from "../../components/PlayerPicker";
 import { PlayerAvatar } from "../../components/PlayerAvatar";
-const sectionLabels: Record<string, string> = {
-  General: "Geral",
-  Library: "Biblioteca",
-  Emulators: "Emuladores",
-  Downloads: "Downloads",
-  Appearance: "Aparência",
-  Advanced: "Avançado",
+import { version as appVersion } from "../../../package.json";
+import {
+  adoptLanguage,
+  language,
+  languages,
+  t,
+  type Language,
+} from "../../i18n";
+type Section =
+  "General" | "Library" | "Emulators" | "Downloads" | "Appearance" | "Advanced";
+const sections: {
+  id: Section;
+  label: string;
+  icon: LucideIcon;
+  description: string;
+}[] = [
+  {
+    id: "General",
+    label: t("Geral"),
+    icon: Settings,
+    description: t(
+      "Seu perfil de jogador, como o OpenRetro abre e se atualiza.",
+    ),
+  },
+  {
+    id: "Library",
+    label: t("Biblioteca"),
+    icon: Library,
+    description: t("Onde ficam os jogos que você adicionou."),
+  },
+  {
+    id: "Emulators",
+    label: t("Emuladores"),
+    icon: Gamepad2,
+    description: t("Consoles instalados e como a imagem dos jogos aparece."),
+  },
+  {
+    id: "Downloads",
+    label: "Downloads",
+    icon: Download,
+    description: t("Fontes de jogos, pasta de destino e o que fazer depois."),
+  },
+  {
+    id: "Appearance",
+    label: t("Aparência"),
+    icon: Palette,
+    description: t("Tema, tamanho dos jogos, animações e sons."),
+  },
+  {
+    id: "Advanced",
+    label: t("Avançado"),
+    icon: Wrench,
+    description: t("Pastas internas do aplicativo e ferramentas técnicas."),
+  },
+];
+const pathLabels: Record<string, string> = {
+  database: t("Banco de dados"),
+  cache: "Cache",
+  logs: t("Registros"),
 };
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="settings-group">
+      <h3>{title}</h3>
+      <div className="settings-group-body">{children}</div>
+    </section>
+  );
+}
+function Switch({
+  label,
+  on,
+  disabled,
+  onToggle,
+}: {
+  label: string;
+  on: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-label={label}
+      aria-checked={on}
+      disabled={disabled}
+      className={`switch ${on ? "on" : ""}`}
+      onClick={onToggle}
+    >
+      <span />
+    </button>
+  );
+}
 export function SettingsPage({
   onEmulators,
   notify,
@@ -23,7 +119,7 @@ export function SettingsPage({
   onEmulators: () => void;
   notify: (s: string) => void;
 }) {
-  const [section, setSection] = useState("General");
+  const [section, setSection] = useState<Section>("General");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const writes = useRef(Promise.resolve());
@@ -72,12 +168,14 @@ export function SettingsPage({
       if (revision === version.current) setSaving(false);
     }
   }
+  const current = sections.find((s) => s.id === section)!;
+  const activePlayer = players?.players.find((p) => p.id === players.activeId);
   return (
     <div className="page-content">
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
       <PageHeader
-        title="Configurações"
-        description="Personalize como você organiza e joga."
+        title={t("Configurações")}
+        description={t("Personalize como você organiza e joga.")}
         actions={
           <span
             className="saved-status"
@@ -88,435 +186,476 @@ export function SettingsPage({
             {saving
               ? "Salvando…"
               : saveError
-                ? "Alteração não salva"
-                : "Salvamento automático"}
+                ? t("Alteração não salva")
+                : t("Salvamento automático")}
           </span>
         }
       />
       {saveError && (
         <p className="error-message" role="alert">
-          Não foi possível salvar. As preferências foram recarregadas.{" "}
+          {t("Não foi possível salvar. As preferências foram recarregadas.")}{" "}
           {saveError}
         </p>
       )}
       <div className="settings-layout">
-        <nav className="settings-nav">
-          {[
-            "General",
-            "Library",
-            "Emulators",
-            "Downloads",
-            "Appearance",
-            "Advanced",
-          ].map((s) => (
+        <nav
+          className="settings-nav"
+          aria-label={t("Seções das configurações")}
+        >
+          {sections.map((s) => (
             <button
-              className={s === section ? "selected" : ""}
-              key={s}
-              onClick={() => setSection(s)}
+              className={s.id === section ? "selected" : ""}
+              aria-current={s.id === section ? "page" : undefined}
+              key={s.id}
+              onClick={() => setSection(s.id)}
             >
-              {sectionLabels[s]}
+              <s.icon size={17} aria-hidden="true" />
+              {s.label}
             </button>
           ))}
+          <div className="settings-nav-about">
+            <BrandMark />
+            <div>
+              <strong>{t("OpenRetro")}</strong>
+              <span>
+                {t("Versão")} {appVersion}
+              </span>
+            </div>
+          </div>
         </nav>
-        <div className="settings-panel">
-          <h2>{sectionLabels[section]}</h2>
+        <div className="settings-panel" key={section}>
+          <header className="settings-panel-head">
+            <span className="settings-panel-icon" aria-hidden="true">
+              <current.icon size={22} />
+            </span>
+            <div>
+              <h2>{current.label}</h2>
+              <p>{current.description}</p>
+            </div>
+          </header>
           {section === "General" ? (
             <>
-              <div className="setting-row">
-                <div className="player-chip">
-                  <PlayerAvatar
-                    player={players?.players.find(
-                      (p) => p.id === players.activeId,
-                    )}
-                    size={40}
-                  />
+              <Group title={t("Perfil")}>
+                <div className="setting-row">
+                  <div className="player-chip">
+                    <PlayerAvatar player={activePlayer} size={44} />
+                    <div>
+                      <strong>{activePlayer?.name ?? t("Jogador 1")}</strong>
+                      <p>
+                        {t("Cada jogador tem seus próprios saves e favoritos.")}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="button secondary"
+                    onClick={() => setPlayersOpen(true)}
+                  >
+                    {t("Trocar ou personalizar")}
+                  </button>
+                </div>
+              </Group>
+              <Group title={t("Jogando")}>
+                <div className="setting-row">
                   <div>
-                    <strong>Jogador</strong>
+                    <strong>{t("Continuar de onde parou")}</strong>
                     <p>
-                      {players?.players.find((p) => p.id === players.activeId)
-                        ?.name ?? "Jogador 1"}{" "}
-                      · saves e favoritos individuais
+                      {t(
+                        "No runtime integrado, salva ao encerrar normalmente e retoma ao jogar novamente. Depende do suporte a estados do core.",
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Continuar de onde parou")}
+                    on={settings.autoResume !== false}
+                    disabled={saving}
+                    onToggle={() =>
+                      void save({ autoResume: settings.autoResume === false })
+                    }
+                  />
+                </div>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Coop de sofá")}</strong>
+                    <p>
+                      {t(
+                        "O runtime integrado configura até 4 controles na ordem detectada. Conecte-os antes de jogar. A quantidade de jogadores depende do jogo; multitap não é ativado automaticamente.",
+                      )}
                     </p>
                   </div>
                 </div>
-                <button
-                  className="button secondary"
-                  onClick={() => setPlayersOpen(true)}
-                >
-                  Trocar ou personalizar
-                </button>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Continuar de onde parou</strong>
-                  <p>
-                    No runtime integrado, salva ao encerrar normalmente e retoma
-                    ao jogar novamente. Depende do suporte a estados do core.
-                  </p>
+              </Group>
+              <Group title={t("Sistema")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Idioma da interface")}</strong>
+                    <p>
+                      {t(
+                        "Muda os textos do OpenRetro. O aplicativo reabre a tela ao trocar. Menus dos emuladores externos seguem o idioma deles.",
+                      )}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Idioma da interface")}
+                    value={language}
+                    disabled={saving}
+                    onChange={(e) => {
+                      const next = e.target.value as Language;
+                      // The window reloads in the new language once saved.
+                      void save({ interfaceLanguage: next }).then(() =>
+                        adoptLanguage(next),
+                      );
+                    }}
+                  >
+                    {languages.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <button
-                  className={`switch ${settings.autoResume !== false ? "on" : ""}`}
-                  role="switch"
-                  aria-label="Continuar de onde parou"
-                  aria-checked={settings.autoResume !== false}
-                  disabled={saving}
-                  onClick={() =>
-                    void save({ autoResume: settings.autoResume === false })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Coop de sofá</strong>
-                  <p>
-                    O runtime integrado configura até 4 controles na ordem
-                    detectada. Conecte-os antes de jogar. A quantidade de
-                    jogadores depende do jogo; multitap não é ativado
-                    automaticamente.
-                  </p>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Atualizar automaticamente")}</strong>
+                    <p>
+                      {t(
+                        "Baixa novas versões em segundo plano e instala ao abrir o OpenRetro.",
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Atualizar automaticamente")}
+                    on={settings.autoUpdate !== false}
+                    onToggle={() =>
+                      void save({ autoUpdate: settings.autoUpdate === false })
+                    }
+                  />
                 </div>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Idioma da interface</strong>
-                  <p>
-                    Algumas telas e mensagens dos emuladores aparecem em inglês.
-                  </p>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Iniciar com o sistema")}</strong>
+                    <p>
+                      {t(
+                        "A inicialização junto com o sistema ainda não está disponível.",
+                      )}
+                    </p>
+                  </div>
+                  <span className="badge">{t("Em breve")}</span>
                 </div>
-                <select disabled aria-label="Idioma da interface">
-                  <option>Português / English</option>
-                </select>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Iniciar com o sistema</strong>
-                  <p>
-                    A inicialização junto com o sistema ainda não está
-                    disponível.
-                  </p>
-                </div>
-                <span className="badge">Em breve</span>
-              </div>
-              <div className="about-box">
-                <BrandMark />
-                <div>
-                  <strong>OpenRetro</strong>
-                  <p>Versão 0.4.2</p>
-                </div>
-              </div>
+              </Group>
             </>
           ) : section === "Library" ? (
-            <>
+            <Group title={t("Arquivos")}>
               <div className="setting-row">
                 <div>
-                  <strong>Pastas da biblioteca</strong>
+                  <strong>{t("Pastas da biblioteca")}</strong>
                   <p>
-                    Seus arquivos permanecem nas pastas em que foram importados.
-                    <br />
-                    Altere o caminho na aba de detalhes do jogo.
+                    {t(
+                      "Seus arquivos permanecem nas pastas em que foram importados. Altere o caminho na aba de detalhes do jogo.",
+                    )}
                   </p>
                 </div>
                 <Folder size={21} />
               </div>
               <div className="setting-row">
                 <div>
-                  <strong>Buscar novos jogos automaticamente</strong>
+                  <strong>{t("Buscar novos jogos automaticamente")}</strong>
                   <p>
-                    Use Adicionar jogo para importar um arquivo ou uma pasta.
+                    {t(
+                      "Use Adicionar jogo para importar um arquivo ou uma pasta.",
+                    )}
                   </p>
                 </div>
-                <span className="badge">Em breve</span>
+                <span className="badge">{t("Em breve")}</span>
               </div>
-            </>
+            </Group>
           ) : section === "Emulators" ? (
             <>
-              <div className="setting-row">
-                <div>
-                  <strong>Emuladores e consoles</strong>
-                  <p>
-                    Instale, teste e escolha o emulador padrão para cada
-                    console.
-                  </p>
+              <Group title={t("Consoles")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Emuladores e consoles")}</strong>
+                    <p>
+                      {t(
+                        "Instale, teste e escolha o emulador padrão para cada console.",
+                      )}
+                    </p>
+                  </div>
+                  <button className="button secondary" onClick={onEmulators}>
+                    {t("Gerenciar")} <ExternalLink size={15} />
+                  </button>
                 </div>
-                <button className="button secondary" onClick={onEmulators}>
-                  Gerenciar <ExternalLink size={15} />
-                </button>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Formato da tela dos jogos</strong>
-                  <p>
-                    Mantenha a proporção original ou estique a imagem para
-                    preencher toda a tela, mesmo que ela fique mais larga. Vale
-                    para PS2 e jogos retrô no runtime integrado, a partir do
-                    próximo jogo aberto.
-                  </p>
+              </Group>
+              <Group title={t("Imagem")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Formato da tela dos jogos")}</strong>
+                    <p>
+                      {t(
+                        "Mantenha a proporção original ou estique a imagem para preencher toda a tela, mesmo que ela fique mais larga. Vale para PS2 e jogos retrô no runtime integrado, a partir do próximo jogo aberto.",
+                      )}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Formato da tela dos jogos")}
+                    value={settings.gameScreenMode ?? "original"}
+                    onChange={(e) =>
+                      void save({
+                        gameScreenMode: e.target
+                          .value as AppSettings["gameScreenMode"],
+                      })
+                    }
+                  >
+                    <option value="original">{t("Proporção original")}</option>
+                    <option value="stretch">
+                      {t("Esticar para preencher")}
+                    </option>
+                  </select>
                 </div>
-                <select
-                  aria-label="Formato da tela dos jogos"
-                  value={settings.gameScreenMode ?? "original"}
-                  onChange={(e) =>
-                    void save({
-                      gameScreenMode: e.target
-                        .value as AppSettings["gameScreenMode"],
-                    })
-                  }
-                >
-                  <option value="original">Proporção original</option>
-                  <option value="stretch">Esticar para preencher</option>
-                </select>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Resolução do PlayStation 2</strong>
-                  <p>
-                    Desenha os jogos de PS2 em uma resolução maior que a do
-                    console, deixando a imagem mais nítida. Valores altos exigem
-                    mais da placa de vídeo. Vale a partir do próximo jogo
-                    aberto.
-                  </p>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Resolução do PlayStation 2")}</strong>
+                    <p>
+                      {t(
+                        "Desenha os jogos de PS2 em uma resolução maior que a do console, deixando a imagem mais nítida. Valores altos exigem mais da placa de vídeo. Vale a partir do próximo jogo aberto.",
+                      )}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Resolução do PlayStation 2")}
+                    value={settings.ps2Resolution ?? "2x"}
+                    onChange={(e) =>
+                      void save({
+                        ps2Resolution: e.target
+                          .value as AppSettings["ps2Resolution"],
+                      })
+                    }
+                  >
+                    <option value="1x">{t("Nativa (640×448)")}</option>
+                    <option value="2x">
+                      {t("2x · recomendado (~1280×896)")}
+                    </option>
+                    <option value="4x">
+                      {t("4x · mais nítido (~2560×1792)")}
+                    </option>
+                    <option value="8x">{t("8x · muito pesado")}</option>
+                  </select>
                 </div>
-                <select
-                  aria-label="Resolução do PlayStation 2"
-                  value={settings.ps2Resolution ?? "2x"}
-                  onChange={(e) =>
-                    void save({
-                      ps2Resolution: e.target
-                        .value as AppSettings["ps2Resolution"],
-                    })
-                  }
-                >
-                  <option value="1x">Nativa (640×448)</option>
-                  <option value="2x">2x · recomendado (~1280×896)</option>
-                  <option value="4x">4x · mais nítido (~2560×1792)</option>
-                  <option value="8x">8x · muito pesado</option>
-                </select>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Atualizar jogos de PlayStation 3</strong>
-                  <p>
-                    Antes de abrir um jogo de PS3, baixa e instala a última
-                    atualização oficial dele. Muitos jogos rodam melhor
-                    atualizados.
-                  </p>
+              </Group>
+              <Group title={t("Atualizações")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Atualizar jogos de PlayStation 3")}</strong>
+                    <p>
+                      {t(
+                        "Antes de abrir um jogo de PS3, baixa e instala a última atualização oficial dele. Muitos jogos rodam melhor atualizados.",
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Atualizar jogos de PlayStation 3")}
+                    on={settings.ps3Updates !== false}
+                    onToggle={() =>
+                      void save({ ps3Updates: settings.ps3Updates === false })
+                    }
+                  />
                 </div>
-                <button
-                  role="switch"
-                  aria-checked={settings.ps3Updates !== false}
-                  aria-label="Atualizar jogos de PlayStation 3"
-                  className={`switch ${settings.ps3Updates !== false ? "on" : ""}`}
-                  onClick={() =>
-                    void save({ ps3Updates: settings.ps3Updates === false })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
+              </Group>
             </>
           ) : section === "Downloads" ? (
             <>
               <SourceManager />
-              <label>
-                Pasta de downloads
-                <input
-                  disabled
-                  value={settings.downloadDirectory}
-                  placeholder="OpenRetro application data / downloads"
-                  readOnly
-                />
-              </label>
-              <button
-                className="button secondary"
-                onClick={() =>
-                  void bridge
-                    .pickDownloadDirectory()
-                    .then((path) => {
-                      if (path) return save({ downloadDirectory: path });
-                    })
-                    .catch((e) => notify(String(e)))
-                }
-              >
-                <Folder size={16} /> Escolher pasta de downloads
-              </button>
-              <div className="setting-row">
-                <div>
-                  <strong>Apagar o arquivo compactado após instalar</strong>
-                  <p>
-                    Depois de extrair o jogo, remove o .zip baixado e libera o
-                    espaço que ele ocupa.
-                  </p>
+              <Group title={t("Destino")}>
+                <div className="setting-row setting-row-stack">
+                  <div>
+                    <strong>{t("Pasta de downloads")}</strong>
+                    <p>{t("Os jogos baixados são salvos e extraídos aqui.")}</p>
+                  </div>
+                  <div className="settings-path-field">
+                    <input
+                      aria-label={t("Pasta de downloads")}
+                      value={settings.downloadDirectory}
+                      placeholder={t("Pasta de dados do OpenRetro")}
+                      readOnly
+                    />
+                    <button
+                      className="button secondary"
+                      onClick={() =>
+                        void bridge
+                          .pickDownloadDirectory()
+                          .then((path) => {
+                            if (path) return save({ downloadDirectory: path });
+                          })
+                          .catch((e) => notify(String(e)))
+                      }
+                    >
+                      <Folder size={16} /> {t("Escolher pasta")}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  role="switch"
-                  aria-checked={settings.deleteArchives !== false}
-                  aria-label="Apagar o arquivo compactado após instalar"
-                  className={`switch ${settings.deleteArchives !== false ? "on" : ""}`}
-                  onClick={() =>
-                    void save({
-                      deleteArchives: settings.deleteArchives === false,
-                    })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Downloads simultâneos</strong>
-                  <p>
-                    Os downloads são independentes. O limite da fila ainda não
-                    está disponível.
-                  </p>
+              </Group>
+              <Group title={t("Depois do download")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>
+                      {t("Apagar o arquivo compactado após instalar")}
+                    </strong>
+                    <p>
+                      {t(
+                        "Depois de extrair o jogo, remove o .zip baixado e libera o espaço que ele ocupa.",
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Apagar o arquivo compactado após instalar")}
+                    on={settings.deleteArchives !== false}
+                    onToggle={() =>
+                      void save({
+                        deleteArchives: settings.deleteArchives === false,
+                      })
+                    }
+                  />
                 </div>
-                <input
-                  disabled
-                  type="number"
-                  value={settings.concurrentDownloads}
-                  readOnly
-                />
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Limite de velocidade</strong>
-                  <p>O controle de velocidade ainda não está disponível.</p>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Downloads simultâneos")}</strong>
+                    <p>
+                      {t(
+                        "Os downloads são independentes. O limite da fila ainda não está disponível.",
+                      )}
+                    </p>
+                  </div>
+                  <input
+                    disabled
+                    type="number"
+                    aria-label={t("Downloads simultâneos")}
+                    value={settings.concurrentDownloads}
+                    readOnly
+                  />
                 </div>
-                <input
-                  disabled
-                  type="number"
-                  value={settings.bandwidthLimit}
-                  readOnly
-                />
-              </div>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Limite de velocidade")}</strong>
+                    <p>
+                      {t("O controle de velocidade ainda não está disponível.")}
+                    </p>
+                  </div>
+                  <input
+                    disabled
+                    type="number"
+                    aria-label={t("Limite de velocidade")}
+                    value={settings.bandwidthLimit}
+                    readOnly
+                  />
+                </div>
+              </Group>
             </>
           ) : section === "Appearance" ? (
             <>
-              <div className="setting-row">
-                <div>
-                  <strong>Tema</strong>
-                  <p>Escolha a aparência da interface.</p>
+              <Group title={t("Visual")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Tema")}</strong>
+                    <p>{t("Escolha a aparência da interface.")}</p>
+                  </div>
+                  <select
+                    aria-label={t("Tema")}
+                    value={settings.theme}
+                    onChange={(e) =>
+                      void save({
+                        theme: e.target.value as AppSettings["theme"],
+                      })
+                    }
+                  >
+                    <option value="dark">{t("Escuro")}</option>
+                    <option value="light">{t("Claro")}</option>
+                  </select>
                 </div>
-                <select
-                  aria-label="Theme"
-                  value={settings.theme}
-                  onChange={(e) =>
-                    void save({ theme: e.target.value as AppSettings["theme"] })
-                  }
-                >
-                  <option value="dark">Escuro</option>
-                  <option value="light">Claro</option>
-                </select>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Densidade da biblioteca</strong>
-                  <p>Ajuste o tamanho dos jogos exibidos na biblioteca.</p>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Densidade da biblioteca")}</strong>
+                    <p>
+                      {t("Ajuste o tamanho dos jogos exibidos na biblioteca.")}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Densidade da biblioteca")}
+                    value={settings.density}
+                    onChange={(e) =>
+                      void save({
+                        density: e.target.value as AppSettings["density"],
+                      })
+                    }
+                  >
+                    <option value="comfortable">{t("Confortável")}</option>
+                    <option value="compact">{t("Compacta")}</option>
+                  </select>
                 </div>
-                <select
-                  aria-label="Densidade da biblioteca"
-                  value={settings.density}
-                  onChange={(e) =>
-                    void save({
-                      density: e.target.value as AppSettings["density"],
-                    })
-                  }
-                >
-                  <option value="comfortable">Confortável</option>
-                  <option value="compact">Compacta</option>
-                </select>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Animações da interface</strong>
-                  <p>Transições curtas ao navegar e abrir menus.</p>
+              </Group>
+              <Group title={t("Movimento e som")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Animações da interface")}</strong>
+                    <p>{t("Transições curtas ao navegar e abrir menus.")}</p>
+                  </div>
+                  <Switch
+                    label={t("Animações da interface")}
+                    on={settings.animations}
+                    onToggle={() =>
+                      void save({ animations: !settings.animations })
+                    }
+                  />
                 </div>
-                <button
-                  role="switch"
-                  aria-checked={settings.animations}
-                  aria-label="Animações da interface"
-                  className={`switch ${settings.animations ? "on" : ""}`}
-                  onClick={() =>
-                    void save({ animations: !settings.animations })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Sons de navegação</strong>
-                  <p>Sons curtos ao mover e escolher no modo console.</p>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Sons de navegação")}</strong>
+                    <p>
+                      {t("Sons curtos ao mover e escolher no modo console.")}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Sons de navegação")}
+                    on={settings.navigationSounds !== false}
+                    onToggle={() =>
+                      void save({
+                        navigationSounds: settings.navigationSounds === false,
+                      })
+                    }
+                  />
                 </div>
-                <button
-                  role="switch"
-                  aria-checked={settings.navigationSounds !== false}
-                  aria-label="Sons de navegação"
-                  className={`switch ${settings.navigationSounds !== false ? "on" : ""}`}
-                  onClick={() =>
-                    void save({
-                      navigationSounds: settings.navigationSounds === false,
-                    })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>Atualizar automaticamente</strong>
-                  <p>
-                    Baixa novas versões em segundo plano e instala ao abrir o
-                    OpenRetro.
-                  </p>
-                </div>
-                <button
-                  role="switch"
-                  aria-checked={settings.autoUpdate !== false}
-                  aria-label="Atualizar automaticamente"
-                  className={`switch ${settings.autoUpdate !== false ? "on" : ""}`}
-                  onClick={() =>
-                    void save({ autoUpdate: settings.autoUpdate === false })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
+              </Group>
             </>
           ) : (
             <>
-              <p className="hint">
-                Local data belongs to you. Imported game files are never copied
-                or modified.
-              </p>
-              {Object.entries(paths ?? {}).map(([key, value]) => (
-                <div className="setting-row" key={key}>
-                  <div>
-                    <strong>
-                      {key[0].toUpperCase() + key.slice(1)} location
-                    </strong>
-                    <code className="path-text">{value}</code>
+              <Group title={t("Pastas do aplicativo")}>
+                <p className="settings-group-note">
+                  {t(
+                    "Seus dados ficam no seu computador. Os arquivos de jogos importados nunca são copiados nem alterados.",
+                  )}
+                </p>
+                {Object.entries(paths ?? {}).map(([key, value]) => (
+                  <div className="setting-row" key={key}>
+                    <div>
+                      <strong>{pathLabels[key] ?? key}</strong>
+                      <code className="path-text">{value}</code>
+                    </div>
                   </div>
+                ))}
+              </Group>
+              <Group title={t("Desenvolvimento")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Modo de desenvolvedor")}</strong>
+                    <p>{t("Mostre informações técnicas na barra lateral.")}</p>
+                  </div>
+                  <Switch
+                    label={t("Modo de desenvolvedor")}
+                    on={settings.developerMode}
+                    onToggle={() =>
+                      void save({ developerMode: !settings.developerMode })
+                    }
+                  />
                 </div>
-              ))}
-              <div className="setting-row">
-                <div>
-                  <strong>Modo de desenvolvedor</strong>
-                  <p>Mostre informações técnicas na barra lateral.</p>
-                </div>
-                <button
-                  role="switch"
-                  aria-checked={settings.developerMode}
-                  aria-label="Modo de desenvolvedor"
-                  className={`switch ${settings.developerMode ? "on" : ""}`}
-                  onClick={() =>
-                    void save({ developerMode: !settings.developerMode })
-                  }
-                >
-                  <span />
-                </button>
-              </div>
+              </Group>
             </>
           )}
         </div>

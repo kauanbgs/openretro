@@ -70,16 +70,17 @@ import {
   pulseGlyph,
   useCardTilt,
 } from "./ConsoleFx";
+import { t } from "../../i18n";
 
 type Section =
   "home" | "catalog" | "library" | "downloads" | "emulators" | "system";
 const sections: { id: Section; label: string; icon: typeof Home }[] = [
-  { id: "home", label: "Início", icon: Home },
-  { id: "catalog", label: "Catálogo", icon: Grid2X2 },
-  { id: "library", label: "Biblioteca", icon: Library },
+  { id: "home", label: t("Início"), icon: Home },
+  { id: "catalog", label: t("Catálogo"), icon: Grid2X2 },
+  { id: "library", label: t("Biblioteca"), icon: Library },
   { id: "downloads", label: "Downloads", icon: Download },
-  { id: "emulators", label: "Emuladores", icon: MonitorCog },
-  { id: "system", label: "Configurações", icon: Settings },
+  { id: "emulators", label: t("Emuladores"), icon: MonitorCog },
+  { id: "system", label: t("Configurações"), icon: Settings },
 ];
 const activeDownload = (state: string) =>
   ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING", "INSTALLING"].includes(
@@ -206,7 +207,9 @@ export function BigPicture({
     setNavFocused(false);
     setSelected(index);
     feedback(
-      `${ordered[index].game.title} foi adicionado à biblioteca. Pronto para jogar.`,
+      t("{title} foi adicionado à biblioteca. Pronto para jogar.", {
+        title: ordered[index].game.title,
+      }),
     );
     requestAnimationFrame(() => {
       content.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -371,8 +374,8 @@ export function BigPicture({
       await refresh();
       feedback(
         selectedGame.item.favorite
-          ? "Removido dos favoritos."
-          : "Adicionado aos favoritos.",
+          ? t("Removido dos favoritos.")
+          : t("Adicionado aos favoritos."),
       );
     } catch (error) {
       feedback(String(error));
@@ -391,7 +394,7 @@ export function BigPicture({
       await refresh();
       setSelected(0);
       setRemoveTarget(undefined);
-      feedback("Jogo removido da biblioteca. O arquivo foi mantido.");
+      feedback(t("Jogo removido da biblioteca. O arquivo foi mantido."));
     } catch (error) {
       feedback(String(error));
     } finally {
@@ -694,7 +697,9 @@ export function BigPicture({
     <section className="tv-game-shelf">
       <div className="tv-section-title">
         <h2>{title}</h2>
-        <span>{entries.length} jogos</span>
+        <span>
+          {entries.length} {t("jogos")}
+        </span>
       </div>
       <div
         className={`tv-game-grid ${libraryView === "list" ? "tv-library-list" : ""}`}
@@ -733,11 +738,11 @@ export function BigPicture({
               setRemoveTarget(entry);
               setConfirmRemove(false);
             }}
-            aria-label={`Jogar ${entry.game.title}`}
+            aria-label={t("Jogar {title}", { title: entry.game.title })}
           >
             <GameArtwork game={entry.game} />
             <i className="tv-card-play">
-              <Play size={20} fill="currentColor" /> Jogar
+              <Play size={20} fill="currentColor" /> {t("Jogar")}
             </i>
             <span>{entry.game.title}</span>
             <small>
@@ -759,7 +764,7 @@ export function BigPicture({
       className={`console-mode ${navFocused ? "menu-open" : ""}`}
       style={playerAccent(activePlayer)}
       data-section={workspace ? workspace.page : section}
-      aria-label="Modo console do OpenRetro"
+      aria-label={t("Modo console do OpenRetro")}
       onClickCapture={(event) => {
         if ((event.target as Element).closest("button:not(:disabled)"))
           playUiSound("select");
@@ -782,7 +787,7 @@ export function BigPicture({
       {navFocused && (
         <button
           className="tv-menu-scrim"
-          aria-label="Fechar menu"
+          aria-label={t("Fechar menu")}
           onClick={() => setNavFocused(false)}
         />
       )}
@@ -793,8 +798,8 @@ export function BigPicture({
       >
         <button
           className="tv-profile"
-          title="Abrir menu"
-          aria-label="Abrir menu"
+          title={t("Abrir menu")}
+          aria-label={t("Abrir menu")}
           onClick={() => setNavFocused((value) => !value)}
         >
           <Gamepad2 size={25} />
@@ -802,7 +807,7 @@ export function BigPicture({
         </button>
         <nav
           className={`tv-nav ${navFocused ? "focused" : ""}`}
-          aria-label="Navegação principal"
+          aria-label={t("Navegação principal")}
         >
           <span
             className="tv-nav-cursor"
@@ -852,20 +857,20 @@ export function BigPicture({
               navFocused && navIndex === sections.length ? "nav-focus" : ""
             }
             onClick={() => selectSection("catalog")}
-            aria-label="Catálogo"
+            aria-label={t("Catálogo")}
           >
             <Search size={22} />
-            <span>Catálogo</span>
+            <span>{t("Catálogo")}</span>
           </button>
           <button
             className={
               navFocused && navIndex === sections.length + 1 ? "nav-focus" : ""
             }
             onClick={() => setPowerOpen(true)}
-            aria-label="Energia"
+            aria-label={t("Energia")}
           >
             <Power size={20} />
-            <span>Energia</span>
+            <span>{t("Energia")}</span>
           </button>
         </div>
       </div>
@@ -887,28 +892,28 @@ export function BigPicture({
           <span>
             <ChevronLeft size={20} />{" "}
             {section === "home"
-              ? "Início"
+              ? t("Início")
               : sections.find((item) => item.id === section)?.label}
           </span>
           <div>
             <button
               onClick={() => setPlayersOpen(true)}
-              aria-label="Trocar jogador"
+              aria-label={t("Trocar jogador")}
             >
               <PlayerAvatar player={activePlayer} size={24} />
-              {activePlayer?.name ?? "Jogadores"}
+              {activePlayer?.name ?? t("Jogadores")}
             </button>
             <ConsoleClock />
             <span
               className="tv-controller-status"
-              title={connected ? "Controle conectado" : "Teclado e mouse"}
+              title={connected ? t("Controle conectado") : t("Teclado e mouse")}
             >
               <Gamepad2 size={17} />
               <i className={connected ? "connected" : ""} />
-              {connected ? "Controle conectado" : "Teclado e mouse"}
+              {connected ? t("Controle conectado") : t("Teclado e mouse")}
             </span>
             <button
-              aria-label="Pesquisar jogos"
+              aria-label={t("Pesquisar jogos")}
               onClick={() =>
                 section === "catalog"
                   ? catalogInput.current?.("open-search")
@@ -918,7 +923,7 @@ export function BigPicture({
               <Search size={22} />
             </button>
             <button className="tv-exit" onClick={close}>
-              Sair do modo console
+              {t("Sair do modo console")}
             </button>
           </div>
         </header>
@@ -999,16 +1004,20 @@ export function BigPicture({
                   className="tv-hero-copy"
                   key={heroGame?.item.id ?? "empty"}
                 >
-                  <h1>{heroGame?.game.title ?? "Sua coleção começa aqui"}</h1>
+                  <h1>
+                    {heroGame?.game.title ?? t("Sua coleção começa aqui")}
+                  </h1>
                   <p className="tv-kicker">
                     {heroGame?.item.lastPlayedAt
-                      ? "Continue jogando"
-                      : "Pronto para jogar"}
+                      ? t("Continue jogando")
+                      : t("Pronto para jogar")}
                   </p>
                   <p className="tv-hero-meta">
                     {heroGame
-                      ? `${heroPlatform}  ·  ${heroGame.game.genre || "Jogo"}`
-                      : "Adicione seus arquivos ou encontre jogos no catálogo."}
+                      ? `${heroPlatform}  ·  ${heroGame.game.genre || t("Jogo")}`
+                      : t(
+                          "Adicione seus arquivos ou encontre jogos no catálogo.",
+                        )}
                   </p>
                   {heroGame ? (
                     <div className="tv-hero-actions">
@@ -1018,7 +1027,7 @@ export function BigPicture({
                         onClick={() => void launch()}
                       >
                         <Play size={19} fill="currentColor" />
-                        {launching ? "Iniciando…" : "Jogar"}
+                        {launching ? "Iniciando…" : t("Jogar")}
                       </button>
                       {NETPLAY_PLATFORMS.includes(heroGame.game.platformId) && (
                         <button
@@ -1031,7 +1040,7 @@ export function BigPicture({
                             })
                           }
                         >
-                          <Users size={18} /> Jogar online
+                          <Users size={18} /> {t("Jogar online")}
                         </button>
                       )}
                       <button
@@ -1041,7 +1050,7 @@ export function BigPicture({
                           setWorkspace({ page: "game", game: heroGame.game })
                         }
                       >
-                        <Settings size={18} /> Gerenciar
+                        <Settings size={18} /> {t("Gerenciar")}
                       </button>
                       <button
                         className="tv-secondary"
@@ -1053,7 +1062,9 @@ export function BigPicture({
                             heroGame.item.favorite ? "currentColor" : "none"
                           }
                         />
-                        {heroGame.item.favorite ? "Favorito" : "Favoritar"}
+                        {heroGame.item.favorite
+                          ? t("Favorito")
+                          : t("Favoritar")}
                       </button>
                     </div>
                   ) : (
@@ -1062,21 +1073,22 @@ export function BigPicture({
                         className="tv-secondary"
                         onClick={() => setWorkspace({ page: "import" })}
                       >
-                        Adicionar jogos
+                        {t("Adicionar jogos")}
                       </button>
                       <button
                         className="tv-play"
                         onClick={() => selectSection("catalog")}
                       >
                         <Search size={19} />
-                        Encontrar jogos
+                        {t("Encontrar jogos")}
                       </button>
                     </div>
                   )}
                   {hasRuntimeMenu(heroGame, emulators) && (
                     <p className="tv-runtime-hint">
-                      Durante o jogo: PS abre o menu · Share + Options ou F1
-                      como alternativa
+                      {t(
+                        "Durante o jogo: PS abre o menu · Share + Options ou F1 como alternativa",
+                      )}
                     </p>
                   )}
                 </div>
@@ -1088,18 +1100,18 @@ export function BigPicture({
                         ? `${Math.floor(heroGame.item.playtime / 3600)}h ${Math.floor((heroGame.item.playtime % 3600) / 60)}m`
                         : "0h"}
                     </strong>
-                    <span>Tempo jogado</span>
+                    <span>{t("Tempo jogado")}</span>
                   </div>
                 )}
               </section>
               <section className="tv-library">
                 <div className="tv-library-tools">
-                  <h2>Sua biblioteca</h2>
+                  <h2>{t("Sua biblioteca")}</h2>
                   <label className="tv-search">
                     <Search size={19} />
                     <input
-                      aria-label="Pesquisar biblioteca"
-                      placeholder="Pesquisar biblioteca"
+                      aria-label={t("Pesquisar biblioteca")}
+                      placeholder={t("Pesquisar biblioteca")}
                       value={query}
                       onChange={(event) => {
                         setQuery(event.target.value);
@@ -1108,8 +1120,8 @@ export function BigPicture({
                     />
                     <button
                       className="tv-open-keyboard"
-                      aria-label="Buscar biblioteca com controle"
-                      title="Teclado na tela"
+                      aria-label={t("Buscar biblioteca com controle")}
+                      title={t("Teclado na tela")}
                       onClick={() => setKeyboardOpen(true)}
                     >
                       <Keyboard size={20} />
@@ -1117,28 +1129,28 @@ export function BigPicture({
                   </label>
                   <ControllerSelect
                     input={selectInput}
-                    label="Ordenar biblioteca"
+                    label={t("Ordenar biblioteca")}
                     value={librarySort}
                     onChange={(value) => {
                       setLibrarySort(value);
                       setSelected(0);
                     }}
                     options={[
-                      { value: "recent", label: "Jogado recentemente" },
-                      { value: "title", label: "Nome" },
-                      { value: "playtime", label: "Tempo jogado" },
+                      { value: "recent", label: t("Jogado recentemente") },
+                      { value: "title", label: t("Nome") },
+                      { value: "playtime", label: t("Tempo jogado") },
                     ]}
                   />
                   <ControllerSelect
                     input={selectInput}
-                    label="Filtrar biblioteca por console"
+                    label={t("Filtrar biblioteca por console")}
                     value={libraryPlatform}
                     onChange={(value) => {
                       setLibraryPlatform(value);
                       setSelected(0);
                     }}
                     options={[
-                      { value: "all", label: "Todos os consoles" },
+                      { value: "all", label: t("Todos os consoles") },
                       ...[
                         ...new Set(
                           library.map((entry) => entry.game.platformId),
@@ -1151,14 +1163,14 @@ export function BigPicture({
                   />
                   <div className="tv-library-view">
                     <button
-                      aria-label="Visualização em lista"
+                      aria-label={t("Visualização em lista")}
                       aria-pressed={libraryView === "list"}
                       onClick={() => setLibraryView("list")}
                     >
                       <List size={20} />
                     </button>
                     <button
-                      aria-label="Visualização em grade"
+                      aria-label={t("Visualização em grade")}
                       aria-pressed={libraryView === "grid"}
                       onClick={() => setLibraryView("grid")}
                     >
@@ -1174,7 +1186,8 @@ export function BigPicture({
                       setSelected(0);
                     }}
                   >
-                    Todos ({games.length})
+                    {t("Todos (")}
+                    {games.length})
                   </button>
                   <button
                     className={filter === "favorites" ? "active" : ""}
@@ -1183,7 +1196,7 @@ export function BigPicture({
                       setSelected(0);
                     }}
                   >
-                    Favoritos (
+                    {t("Favoritos (")}
                     {games.filter((entry) => entry.item.favorite).length})
                   </button>
                 </div>
@@ -1191,8 +1204,8 @@ export function BigPicture({
                 {!visibleGames.length && (
                   <p className="tv-empty">
                     {query
-                      ? "Nenhum jogo encontrado. Tente outro nome."
-                      : "Adicione jogos à sua biblioteca para jogar aqui."}
+                      ? t("Nenhum jogo encontrado. Tente outro nome.")
+                      : t("Adicione jogos à sua biblioteca para jogar aqui.")}
                   </p>
                 )}
               </section>
@@ -1202,57 +1215,57 @@ export function BigPicture({
             <section className="tv-panel">
               <div className="tv-section-title">
                 <div>
-                  <h1>Sistema</h1>
-                  <p>Ferramentas do OpenRetro.</p>
+                  <h1>{t("Sistema")}</h1>
+                  <p>{t("Ferramentas do OpenRetro.")}</p>
                 </div>
               </div>
               <div className="tv-system-grid">
                 {[
                   [
-                    "Jogadores",
-                    "Troque o perfil e mantenha seus saves separados",
+                    t("Jogadores"),
+                    t("Troque o perfil e mantenha seus saves separados"),
                     "players",
                     UserRound,
                   ] as const,
                   [
-                    "Jogar no celular",
-                    "Jogue pelo navegador do celular na mesma rede",
+                    t("Jogar no celular"),
+                    t("Jogue pelo navegador do celular na mesma rede"),
                     "phone",
                     Smartphone,
                   ] as const,
                   [
-                    "Encontrar jogos",
-                    "Descubra títulos e fontes",
+                    t("Encontrar jogos"),
+                    t("Descubra títulos e fontes"),
                     "Discover",
                     Search,
                   ] as const,
                   [
-                    "Configurações",
-                    "Ajuste a experiência",
+                    t("Configurações"),
+                    t("Ajuste a experiência"),
                     "Settings",
                     Settings,
                   ] as const,
                   [
-                    "Gerenciar emuladores",
-                    "Revise sistemas e cores",
+                    t("Gerenciar emuladores"),
+                    t("Revise sistemas e cores"),
                     "Emulators",
                     MonitorCog,
                   ] as const,
                   [
-                    "Adicionar jogos",
-                    "Importe arquivos ou uma pasta",
+                    t("Adicionar jogos"),
+                    t("Importe arquivos ou uma pasta"),
                     "import",
                     FolderPlus,
                   ] as const,
                   [
-                    "Fontes de download",
-                    "Adicione e gerencie suas fontes",
+                    t("Fontes de download"),
+                    t("Adicione e gerencie suas fontes"),
                     "sources",
                     Download,
                   ] as const,
                   [
-                    "Sair do modo console",
-                    "Voltar para o modo desktop",
+                    t("Sair do modo console"),
+                    t("Voltar para o modo desktop"),
                     "exit",
                     Power,
                   ] as const,
@@ -1296,38 +1309,38 @@ export function BigPicture({
       )}
       <footer className="tv-controls">
         <span>
-          <b data-glyph="a">A</b> Selecionar
+          <b data-glyph="a">A</b> {t("Selecionar")}
         </span>
         <span>
-          <b data-glyph="b">B</b> {workspace ? "Voltar / Menu" : "Menu"}
+          <b data-glyph="b">B</b> {workspace ? t("Voltar / Menu") : t("Menu")}
         </span>
         {workspace ? (
           <span>
-            <b data-glyph="lb rb">LB / RB</b> Campos
+            <b data-glyph="lb rb">{t("LB / RB")}</b> {t("Campos")}
           </span>
         ) : section === "catalog" ? (
           <span>
-            <b data-glyph="lb rb">LB / RB</b> Filtros
+            <b data-glyph="lb rb">{t("LB / RB")}</b> {t("Filtros")}
           </span>
         ) : section === "home" ? (
           <span>
-            <b data-glyph="search">Share / View</b> Catálogo
+            <b data-glyph="search">{t("Share / View")}</b> {t("Catálogo")}
           </span>
         ) : section === "library" ? (
           <>
             <span>
-              <b data-glyph="x">X</b> Favoritar
+              <b data-glyph="x">X</b> {t("Favoritar")}
             </span>
             <span>
-              <b data-glyph="y">Y</b> Remover
+              <b data-glyph="y">Y</b> {t("Remover")}
             </span>
             <span>
-              <b data-glyph="search">Share / View</b> Buscar
+              <b data-glyph="search">{t("Share / View")}</b> {t("Buscar")}
             </span>
           </>
         ) : null}
         <span>
-          <b data-glyph="left right up down">← ↑ ↓ →</b> Navegar
+          <b data-glyph="left right up down">← ↑ ↓ →</b> {t("Navegar")}
         </span>
       </footer>
       {notice && (
@@ -1335,7 +1348,7 @@ export function BigPicture({
           <Info size={19} />
           <span>{notice.text}</span>
           <button
-            aria-label="Fechar aviso"
+            aria-label={t("Fechar aviso")}
             onClick={() => setNotice(undefined)}
           >
             <X size={17} />
@@ -1354,14 +1367,17 @@ export function BigPicture({
             className="tv-confirm-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="Remover jogo"
+            aria-label={t("Remover jogo")}
             onClick={(event) => event.stopPropagation()}
           >
             <Trash2 size={27} />
-            <h2>Remover {removeTarget.game.title}?</h2>
+            <h2>
+              {t("Remover")} {removeTarget.game.title}?
+            </h2>
             <p>
-              O jogo sai da biblioteca. O arquivo no seu computador será
-              mantido.
+              {t(
+                "O jogo sai da biblioteca. O arquivo no seu computador será mantido.",
+              )}
             </p>
             <div>
               <button
@@ -1370,17 +1386,17 @@ export function BigPicture({
                 className={!confirmRemove ? "focused" : ""}
                 onClick={() => setRemoveTarget(undefined)}
               >
-                Cancelar
+                {t("Cancelar")}
               </button>
               <button
                 disabled={removing}
                 className={`danger ${confirmRemove ? "focused" : ""}`}
                 onClick={() => void doRemove()}
               >
-                {removing ? "Removendo…" : "Remover da biblioteca"}
+                {removing ? "Removendo…" : t("Remover da biblioteca")}
               </button>
             </div>
-            <small>A confirma a opção selecionada · B cancela</small>
+            <small>{t("A confirma a opção selecionada · B cancela")}</small>
           </section>
         </div>
       )}
@@ -1401,23 +1417,23 @@ export function BigPicture({
             className="tv-power-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="Energia"
+            aria-label={t("Energia")}
             onClick={(event) => event.stopPropagation()}
           >
             <button
               className="tv-dialog-close"
-              aria-label="Fechar energia"
+              aria-label={t("Fechar energia")}
               onClick={() => setPowerOpen(false)}
             >
               <X size={21} />
             </button>
-            <h2>Energia</h2>
-            <p>Escolha o que fazer com o OpenRetro.</p>
+            <h2>{t("Energia")}</h2>
+            <p>{t("Escolha o que fazer com o OpenRetro.")}</p>
             <button className="tv-power-action" onClick={close}>
               <Power size={24} />
               <span>
-                <strong>Sair do Big Picture</strong>
-                <small>Voltar ao modo desktop</small>
+                <strong>{t("Sair do Big Picture")}</strong>
+                <small>{t("Voltar ao modo desktop")}</small>
               </span>
             </button>
           </section>

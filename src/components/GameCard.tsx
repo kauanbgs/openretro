@@ -2,6 +2,7 @@ import { CalendarDays, Download, Heart, Library } from "lucide-react";
 import type { GameMetadata, LibraryItem } from "../types";
 import { platformById } from "../db/platforms";
 import { GameArtwork } from "./GameArtwork";
+import { t } from "../i18n";
 export function GameCard({
   game,
   item,
@@ -29,17 +30,17 @@ export function GameCard({
           )}
           {item ? (
             <span>
-              <Library size={13} /> Na biblioteca
+              <Library size={13} /> {t("Na biblioteca")}
             </span>
           ) : (
             downloadAvailable && (
               <span>
-                <Download size={13} /> Download disponível
+                <Download size={13} /> {t("Download disponível")}
               </span>
             )
           )}
           {item?.favorite && (
-            <span aria-label="Favorito">
+            <span aria-label={t("Favorito")}>
               <Heart size={13} fill="currentColor" />
             </span>
           )}

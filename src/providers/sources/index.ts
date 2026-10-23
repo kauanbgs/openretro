@@ -1,4 +1,5 @@
 import type { GameMetadata, LibraryItem, SourceResolution } from "../../types";
+import { t } from "../../i18n";
 export interface GameSourceProvider {
   id: string;
   name: string;
@@ -7,7 +8,7 @@ export interface GameSourceProvider {
 }
 export class LocalFileProvider implements GameSourceProvider {
   id = "local";
-  name = "Your local files";
+  name = t("Your local files");
   constructor(
     private item: LibraryItem | undefined,
     private exists: (path: string) => Promise<boolean>,
@@ -21,22 +22,24 @@ export class LocalFileProvider implements GameSourceProvider {
       ? { available: true, localPath: path }
       : {
           available: false,
-          reason:
+          reason: t(
             "Locate your game file to continue. Your original file is never modified.",
+          ),
         };
   }
 }
 export class MockFreewareProvider implements GameSourceProvider {
   id = "mock-freeware";
-  name = "Development fixtures";
+  name = t("Development fixtures");
   async canHandle() {
     return false;
   }
   async resolve(): Promise<SourceResolution> {
     return {
       available: false,
-      reason:
+      reason: t(
         "This catalog contains fictional metadata only. No downloadable game is provided.",
+      ),
     };
   }
 }

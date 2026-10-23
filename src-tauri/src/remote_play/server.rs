@@ -252,7 +252,18 @@ async fn play(
     if !paired(&shared, &pairing, &headers) {
         return forbidden();
     }
-    Html(PLAY_PAGE).into_response()
+    Html(play_page(&shared.app)).into_response()
+}
+
+/// The phone page in the interface language chosen on the PC. Left unset, the
+/// page follows the phone's own language.
+fn play_page(app: &tauri::AppHandle) -> String {
+    let language = crate::commands::get_settings(app.state::<Database>())
+        .ok()
+        .and_then(|settings| settings["interfaceLanguage"].as_str().map(String::from))
+        .filter(|language| language == "en" || language == "pt-BR")
+        .unwrap_or_default();
+    PLAY_PAGE.replace("__OPENRETRO_LANGUAGE__", &language)
 }
 
 /// The interface's scripts, styles and fonts.

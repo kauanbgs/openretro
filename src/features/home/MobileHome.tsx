@@ -7,15 +7,15 @@ import {
   catalogStatus,
   metadataProvider,
 } from "../../providers/metadata/LaunchboxMetadataProvider";
-import type { CatalogRequest } from "../../providers/metadata/types";
+import type { PlayersFilter } from "../../providers/metadata/types";
 import type { GameMetadata, LibraryGame } from "../../types";
+import { t } from "../../i18n";
 
-type Sort = NonNullable<CatalogRequest["sort"]>;
-
-function useShelf(sort: Sort, ready: boolean) {
+function useShelf(ready: boolean, players?: PlayersFilter) {
   return useQuery({
-    queryKey: ["catalog-home", sort],
-    queryFn: () => metadataProvider.browse("", "all", 1, undefined, sort),
+    queryKey: ["catalog-home", "popular", players ?? null],
+    queryFn: () =>
+      metadataProvider.browse("", "all", 1, undefined, "popular", players),
     enabled: ready,
     retry: false,
     staleTime: 86400000,
@@ -41,9 +41,8 @@ export function MobileHome({
     retry: false,
   });
   const ready = status.data?.configured === true;
-  const popular = useShelf("popular", ready);
-  const rated = useShelf("rating", ready);
-  const classics = useShelf("oldest", ready);
+  const popular = useShelf(ready);
+  const multiplayer = useShelf(ready, "multi");
   const played = useMemo(
     () =>
       [...library]
@@ -68,30 +67,25 @@ export function MobileHome({
   const shelves: { title: string; games: GameMetadata[]; more: () => void }[] =
     [
       {
-        title: "Continue jogando",
+        title: t("▶️ Continue jogando"),
         games: played.slice(0, 10).map((x) => x.game),
         more: onLibrary,
       },
       {
-        title: "Em alta",
+        title: t("🔥 Em alta"),
         games: popular.data?.games.slice(6) ?? [],
         more: onDiscover,
       },
       {
-        title: "Melhor avaliados",
-        games: rated.data?.games ?? [],
-        more: onDiscover,
-      },
-      {
-        title: "Clássicos",
-        games: classics.data?.games ?? [],
+        title: t("🎮 Multiplayer"),
+        games: multiplayer.data?.games ?? [],
         more: onDiscover,
       },
     ];
   return (
     <div className="mobile-home">
       {featured.length > 0 && (
-        <section className="featured" aria-label="Destaques">
+        <section className="featured" aria-label={t("Destaques")}>
           <div
             className="featured-track"
             onScroll={(event) => {
@@ -109,8 +103,8 @@ export function MobileHome({
                 <span className="featured-caption">
                   <small>
                     {lastPlayed.has(game.id)
-                      ? "Continue jogando"
-                      : "Destaque do catálogo"}
+                      ? t("Continue jogando")
+                      : t("Destaque do catálogo")}
                   </small>
                   <strong>{game.title}</strong>
                   <span>
@@ -135,7 +129,7 @@ export function MobileHome({
           <section className="shelf" key={row.title}>
             <header>
               <h2>{row.title}</h2>
-              <button onClick={row.more}>Ver tudo</button>
+              <button onClick={row.more}>{t("Ver tudo")}</button>
             </header>
             <div className="shelf-track">
               {row.games.map((game) => (
@@ -152,8 +146,8 @@ export function MobileHome({
         <div className="empty-panel">
           <p>
             {status.data?.state === "building"
-              ? "O computador está preparando o catálogo de jogos."
-              : "O catálogo de jogos aparece aqui quando estiver pronto."}
+              ? t("O computador está preparando o catálogo de jogos.")
+              : t("O catálogo de jogos aparece aqui quando estiver pronto.")}
           </p>
         </div>
       )}

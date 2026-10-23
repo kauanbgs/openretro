@@ -7,6 +7,7 @@ import type {
 } from "../types";
 import { LocalFileProvider } from "../providers/sources";
 import { EmulatorManager } from "./EmulatorManager";
+import { t } from "../i18n";
 /** The managed runtime launches with its own arguments and keeps BIOS files itself. */
 export const MANAGED_RUNTIME_ID = "openretro-retroarch";
 /** PS3's emulator installs itself, with the console's system, on the first launch. */
@@ -26,7 +27,7 @@ export class GameResolver {
     if (!platform)
       return {
         state: "UNSUPPORTED",
-        message: "This platform is not supported yet.",
+        message: t("This platform is not supported yet."),
       };
     const source = await new LocalFileProvider(item, this.exists).resolve();
     if (!source.available)
@@ -38,7 +39,7 @@ export class GameResolver {
     if (emulator?.id === MANAGED_PS3_ID)
       return {
         state: "READY",
-        message: "Everything is ready. Let’s play.",
+        message: t("Everything is ready. Let’s play."),
         emulator,
         file: source.localPath,
         args: [],
@@ -46,18 +47,24 @@ export class GameResolver {
     if (!emulator || !(await this.exists(emulator.executablePath)))
       return {
         state: "MISSING_EMULATOR",
-        message: `An emulator is required to play this game. Configure a compatible emulator for ${platform.name}.`,
+        message: t(
+          "An emulator is required to play this game. Configure a compatible emulator for {console}.",
+          { console: platform.name },
+        ),
       };
     if (emulator.id === MANAGED_RUNTIME_ID) {
       if (!(await this.runtimeBios(platform.id)))
         return {
           state: "MISSING_BIOS",
-          message: `O ${platform.name} precisa da BIOS do console. Selecione o arquivo .bin da BIOS (ou um .zip com ela); o OpenRetro guarda uma cópia para todos os jogadores.`,
+          message: t(
+            "O {console} precisa da BIOS do console. Selecione o arquivo .bin da BIOS (ou um .zip com ela); o OpenRetro guarda uma cópia para todos os jogadores.",
+            { console: platform.name },
+          ),
           emulator,
         };
       return {
         state: "READY",
-        message: "Everything is ready. Let’s play.",
+        message: t("Everything is ready. Let’s play."),
         emulator,
         file: source.localPath,
         args: [],
@@ -69,8 +76,9 @@ export class GameResolver {
     )
       return {
         state: "MISSING_BIOS",
-        message:
+        message: t(
           "This platform needs a legally obtained BIOS. Configure its path and the arguments required by your emulator.",
+        ),
         emulator,
       };
     if (
@@ -79,8 +87,9 @@ export class GameResolver {
     )
       return {
         state: "CONFIGURATION_REQUIRED",
-        message:
+        message: t(
           "Add the BIOS argument expected by your emulator using the {bios} placeholder.",
+        ),
         emulator,
       };
     const args = (item?.runtimeArgs ?? []).map((arg) =>
@@ -92,7 +101,7 @@ export class GameResolver {
       args.push(source.localPath!);
     return {
       state: "READY",
-      message: "Everything is ready. Let’s play.",
+      message: t("Everything is ready. Let’s play."),
       emulator,
       file: source.localPath,
       args,

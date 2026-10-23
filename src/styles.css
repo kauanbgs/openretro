@@ -92,8 +92,8 @@
   --console-text: #f3f3f3;
   --console-muted: #a1a1a1;
   --console-quiet: #929292;
-  --console-accent: #e7a15c;
-  --console-accent-text: #17100a;
+  --console-accent: #12ace2;
+  --console-accent-text: #04131a;
   --bg: var(--console-bg);
   --sidebar: var(--console-bg);
   --panel: var(--console-panel);
@@ -154,7 +154,7 @@ h3 {
   font-weight: 500;
 }
 ::selection {
-  background: #e7a15c40;
+  background: #12ace240;
 }
 button:focus-visible,
 a:focus-visible,
@@ -184,7 +184,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px #e7a15c12;
+  box-shadow: 0 0 0 2px #12ace212;
 }
 select {
   color-scheme: dark;
@@ -327,7 +327,7 @@ main {
   color: var(--accentText);
 }
 .button.primary:hover:not(:disabled) {
-  background: #f1b77d;
+  background: #4cc4ef;
 }
 .button.secondary {
   background: var(--panel2);
@@ -1523,8 +1523,8 @@ html[data-theme="light"] {
   --text: #1b2435;
   --muted: #536179;
   --quiet: #63718a;
-  --accent: #9a571d;
-  --accentText: #fff8f0;
+  --accent: #0a759e;
+  --accentText: #f3fbff;
   --brand-cutout: #e3e9f1;
   --danger: #ac3c43;
   --success: #377b57;
@@ -1533,7 +1533,7 @@ html[data-theme="light"] select {
   color-scheme: light;
 }
 html[data-theme="light"] .button.primary:hover:not(:disabled) {
-  background: #7e4314;
+  background: #075f80;
 }
 html[data-animations="false"] *,
 html[data-animations="false"] *:before,
@@ -1541,6 +1541,11 @@ html[data-animations="false"] *:after {
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
+}
+html[data-playing="true"] *,
+html[data-playing="true"] *:before,
+html[data-playing="true"] *:after {
+  animation-play-state: paused !important;
 }
 
 @media (min-width: 1600px) {
@@ -1854,7 +1859,7 @@ html[data-animations="false"] *:after {
   gap: 14px;
 }
 .player-picker .button:focus-visible {
-  outline: 2px solid var(--accent, #e9ae70);
+  outline: 2px solid var(--accent, #12ace2);
   outline-offset: 2px;
 }
 
@@ -1864,7 +1869,7 @@ html[data-animations="false"] *:after {
   flex: none;
   place-items: center;
   border-radius: 50%;
-  color: #17100a;
+  color: #04131a;
   background: var(--player-color);
   box-shadow:
     0 0 0 2px color-mix(in srgb, var(--player-color) 35%, transparent),
@@ -1925,7 +1930,7 @@ html[data-animations="false"] *:after {
 }
 .player-color-grid button {
   border-radius: 50%;
-  color: #17100a;
+  color: #04131a;
 }
 .player-avatar-grid button[aria-pressed="true"] {
   border-color: var(--accent);

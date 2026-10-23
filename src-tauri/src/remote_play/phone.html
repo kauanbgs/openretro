@@ -154,6 +154,99 @@
 (() => {
   const token = new URLSearchParams(location.search).get("t") || "";
   const $ = (id) => document.getElementById(id);
+  // Language: the one chosen on the PC, else the phone's own.
+  const chosenLanguage = "__OPENRETRO_LANGUAGE__";
+  const english = chosenLanguage.startsWith("__") || !chosenLanguage
+    ? !(navigator.language || "").toLowerCase().startsWith("pt")
+    : chosenLanguage === "en";
+  const EN = {
+    "OpenRetro no celular": "OpenRetro on your phone",
+    "Ver tela inteira": "View full screen",
+    "Ver minha tela": "View my screen",
+    "Tela dividida deste jogo": "Split screen for this game",
+    "Tela inteira compartilhada": "Shared full screen",
+    "2 jogadores · esquerda / direita": "2 players · left / right",
+    "2 jogadores · cima / baixo": "2 players · top / bottom",
+    "4 jogadores · quadrantes": "4 players · quadrants",
+    "Minha parte da tela": "My part of the screen",
+    "Automática · acompanha meu jogador": "Automatic · follows my player",
+    "Região 1 · esquerda / superior esquerda": "Area 1 · left / top left",
+    "Região 2 · direita / superior direita": "Area 2 · right / top right",
+    "Região 3 · inferior esquerda": "Area 3 · bottom left",
+    "Região 4 · inferior direita": "Area 4 · bottom right",
+    "Região 1 · parte de cima": "Area 1 · top",
+    "Região 1 · lado esquerdo": "Area 1 · left side",
+    "Região 1 · superior esquerda": "Area 1 · top left",
+    "Região 2 · parte de baixo": "Area 2 · bottom",
+    "Região 2 · lado direito": "Area 2 · right side",
+    "Região 2 · superior direita": "Area 2 · top right",
+    "parte de cima": "top",
+    "parte de baixo": "bottom",
+    "lado esquerdo": "left side",
+    "lado direito": "right side",
+    "superior esquerda": "top left",
+    "superior direita": "top right",
+    "inferior esquerda": "bottom left",
+    "inferior direita": "bottom right",
+    "O layout fica salvo para este jogo. O áudio é compartilhado.": "The layout is saved for this game. Audio is shared.",
+    "Tela inteira apenas neste celular. Toque em Ver minha tela para voltar.": "Full screen on this phone only. Tap View my screen to go back.",
+    "Este layout tem duas regiões. Você está vendo a tela inteira; escolha a região 1 ou 2.": "This layout has two areas. You're seeing the full screen; choose area 1 or 2.",
+    "Sua imagem: {position}. O áudio é compartilhado. O layout fica salvo para este jogo.": "Your picture: {position}. Audio is shared. The layout is saved for this game.",
+    "Salvar estado": "Save state",
+    "Carregar estado": "Load state",
+    "Voltar ao OpenRetro": "Back to OpenRetro",
+    "Escolher outro jogo": "Choose another game",
+    "Tela cheia": "Full screen",
+    "Esconder controles": "Hide controls",
+    "Mostrar controles": "Show controls",
+    "Som no celular: ligado": "Sound on phone: on",
+    "Som no celular: desligado": "Sound on phone: off",
+    "Visibilidade dos controles": "Control visibility",
+    "Sair do jogo": "Quit game",
+    "Escolha um jogo": "Choose a game",
+    "O jogo abre no computador e aparece aqui.": "The game opens on the computer and shows up here.",
+    "Quem é você?": "Who are you?",
+    "Quem joga no computador usa o controle ou o teclado como Jogador 1.": "Whoever plays on the computer uses the controller or keyboard as Player 1.",
+    "Conectado": "Connected",
+    "Reconectando…": "Reconnecting…",
+    "Nenhum jogo aberto": "No game open",
+    "Jogando {title}. Escolher outro fecha o atual no computador.": "Playing {title}. Choosing another closes the current one on the computer.",
+    "Adicione jogos à biblioteca no computador para jogar aqui.": "Add games to the library on the computer to play here.",
+    "Abrindo {title}…": "Opening {title}…",
+    "Controle conectado": "Controller connected",
+    "J{n}": "P{n}",
+    "Outro celular também controla o J{n}": "Another phone also controls P{n}",
+    "Salvando layout para este jogo…": "Saving layout for this game…",
+    "Você é o jogador {n}": "You are player {n}",
+    "Sair do jogo no computador?": "Quit the game on the computer?",
+    "Estado salvo": "State saved",
+    "Estado carregado": "State loaded",
+    "Saindo do jogo…": "Quitting the game…",
+    "ocupado": "taken",
+    "computador": "computer",
+    "livre": "free",
+    "{frames} quadros/s · {mbits} Mbit/s": "{frames} frames/s · {mbits} Mbit/s",
+    "Um jogo já está aberto no computador.": "A game is already open on the computer.",
+    "Esta ação só está disponível no computador.": "This action is only available on the computer.",
+    "Abra um jogo para configurar a tela dividida.": "Open a game to set up split screen.",
+    "O jogo mudou. Escolha o layout novamente.": "The game changed. Choose the layout again.",
+    "Escolha uma região entre 1 e 4.": "Choose an area between 1 and 4.",
+    "Nenhum jogo em execução.": "No game running."
+  };
+  /** Translates `text`, filling {name} placeholders from `values`. */
+  function tr(text, values = {}) {
+    const found = english ? EN[text] : undefined;
+    return (found || text).replace(/\{(\w+)\}/g, (match, name) => name in values ? values[name] : match);
+  }
+  if (english) {
+    document.documentElement.lang = "en";
+    document.title = tr(document.title);
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const text = node.nodeValue.trim();
+      if (EN[text]) node.nodeValue = node.nodeValue.replace(text, EN[text]);
+    }
+  }
   const screen = $("screen"), title = $("title"), notice = $("notice");
   const opacity = Number(localStorage.getItem("openretro-control-opacity") || 55);
   $("control-opacity").value = Number.isFinite(opacity) ? Math.min(85, Math.max(20, opacity)) : 55;
@@ -209,7 +302,7 @@
   }, { passive: false });
 
   function toast(text) {
-    notice.textContent = text; notice.classList.add("show");
+    notice.textContent = tr(text); notice.classList.add("show");
     clearTimeout(toast.timer); toast.timer = setTimeout(() => notice.classList.remove("show"), 2200);
   }
   function send(message) {
@@ -238,7 +331,7 @@
   function updateView() {
     const split = layoutMode !== "full";
     $("view-chip").hidden = !split;
-    $("view-chip").textContent = wholeScreen ? "Ver minha tela" : "Ver tela inteira";
+    $("view-chip").textContent = tr(wholeScreen ? "Ver minha tela" : "Ver tela inteira");
     $("view-chip").setAttribute("aria-pressed", String(wholeScreen));
     $("split-layout").value = layoutMode;
     $("split-layout").disabled = !game;
@@ -247,19 +340,20 @@
     for (const option of $("view-region").options) {
       option.disabled = Number(option.value) > count;
     }
-    $("view-region").options[1].textContent = layoutMode === "stacked" ? "Região 1 · parte de cima"
-      : layoutMode === "sideBySide" ? "Região 1 · lado esquerdo" : "Região 1 · superior esquerda";
-    $("view-region").options[2].textContent = layoutMode === "stacked" ? "Região 2 · parte de baixo"
-      : layoutMode === "sideBySide" ? "Região 2 · lado direito" : "Região 2 · superior direita";
+    $("view-region").options[1].textContent = tr(layoutMode === "stacked" ? "Região 1 · parte de cima"
+      : layoutMode === "sideBySide" ? "Região 1 · lado esquerdo" : "Região 1 · superior esquerda");
+    $("view-region").options[2].textContent = tr(layoutMode === "stacked" ? "Região 2 · parte de baixo"
+      : layoutMode === "sideBySide" ? "Região 2 · lado direito" : "Região 2 · superior direita");
     const selected = region || player;
     const positions = layoutMode === "stacked" ? ["parte de cima", "parte de baixo"]
       : layoutMode === "sideBySide" ? ["lado esquerdo", "lado direito"]
       : ["superior esquerda", "superior direita", "inferior esquerda", "inferior direita"];
+    const position = tr(positions[selected - 1] || "");
     $("view-hint").textContent = !split
-      ? "O layout fica salvo para este jogo. O áudio é compartilhado."
-      : wholeScreen ? "Tela inteira apenas neste celular. Toque em Ver minha tela para voltar."
-      : selected > count ? "Este layout tem duas regiões. Você está vendo a tela inteira; escolha a região 1 ou 2."
-      : `Sua imagem: ${positions[selected - 1]}. O áudio é compartilhado. O layout fica salvo para este jogo.`;
+      ? tr("O layout fica salvo para este jogo. O áudio é compartilhado.")
+      : wholeScreen ? tr("Tela inteira apenas neste celular. Toque em Ver minha tela para voltar.")
+      : selected > count ? tr("Este layout tem duas regiões. Você está vendo a tela inteira; escolha a região 1 ou 2.")
+      : tr("Sua imagem: {position}. O áudio é compartilhado. O layout fica salvo para este jogo.", { position });
   }
 
   // Video: show the newest frame; skip frames that arrive while one decodes.
@@ -299,7 +393,7 @@
   function connect() {
     ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?t=${encodeURIComponent(token)}`);
     ws.binaryType = "arraybuffer";
-    ws.onopen = () => { title.textContent = game || "Conectado"; sendPad(true); sendView(); };
+    ws.onopen = () => { title.textContent = game || tr("Conectado"); sendPad(true); sendView(); };
     ws.onmessage = (event) => {
       if (typeof event.data === "string") return status(JSON.parse(event.data));
       const view = new DataView(event.data);
@@ -308,7 +402,7 @@
       else if (view.getUint8(0) === 2) playSound(view);
     };
     ws.onclose = () => {
-      title.textContent = "Reconectando…";
+      title.textContent = tr("Reconectando…");
       sent = "";
       setTimeout(connect, 1000);
     };
@@ -326,7 +420,7 @@
     updatePlayer();
     layoutMode = message.layout || "full";
     updateView();
-    title.textContent = game || "Nenhum jogo aberto";
+    title.textContent = game || tr("Nenhum jogo aberto");
     renderLibrary();
     $("library").classList.toggle("open", !game);
   }
@@ -334,8 +428,8 @@
   function renderLibrary() {
     const list = $("games"); list.textContent = "";
     $("library-hint").textContent = library.length
-      ? (game ? `Jogando ${game}. Escolher outro fecha o atual no computador.` : "O jogo abre no computador e aparece aqui.")
-      : "Adicione jogos à biblioteca no computador para jogar aqui.";
+      ? (game ? tr("Jogando {title}. Escolher outro fecha o atual no computador.", { title: game }) : tr("O jogo abre no computador e aparece aqui."))
+      : tr("Adicione jogos à biblioteca no computador para jogar aqui.");
     for (const entry of library) {
       const button = document.createElement("button");
       const art = entry.cover ? Object.assign(document.createElement("img"), { src: entry.cover, loading: "lazy", referrerPolicy: "no-referrer", alt: "" }) : Object.assign(document.createElement("div"), { className: "art" });
@@ -346,7 +440,7 @@
         if (game) { send({ type: "action", action: "quit" }); setTimeout(() => send({ type: "launch", id: entry.id }), 1500); }
         else send({ type: "launch", id: entry.id });
         $("library").classList.remove("open");
-        toast(`Abrindo ${entry.title}…`);
+        toast(tr("Abrindo {title}…", { title: entry.title }));
       };
       list.append(button);
     }
@@ -433,15 +527,15 @@
   // Menu
   const players = $("players");
   for (let n = 1; n <= 4; n++) {
-    const b = Object.assign(document.createElement("button"), { textContent: `J${n}` });
+    const b = Object.assign(document.createElement("button"), { textContent: tr("J{n}", { n }) });
     b.onclick = () => {
       player = n; localStorage.setItem("openretro-player", n); updatePlayer(); sendPad(true);
-      if (taken.includes(n)) toast(`Outro celular também controla o J${n}`);
+      if (taken.includes(n)) toast(tr("Outro celular também controla o J{n}", { n }));
     };
     players.append(b);
   }
   function updatePlayer() {
-    $("player-chip").textContent = `J${player}`;
+    $("player-chip").textContent = tr("J{n}", { n: player });
     [...players.children].forEach((b, i) => {
       b.classList.toggle("on", i + 1 === player);
       b.classList.toggle("taken", taken.includes(i + 1));
@@ -461,12 +555,12 @@
     // Next free player; with all taken, simply the next one.
     const order = [1, 2, 3, 4].map((step) => (player - 1 + step) % 4 + 1);
     player = order.find((n) => !taken.includes(n)) || order[0];
-    localStorage.setItem("openretro-player", player); updatePlayer(); sendPad(true); toast(`Você é o jogador ${player}`);
+    localStorage.setItem("openretro-player", player); updatePlayer(); sendPad(true); toast(tr("Você é o jogador {n}", { n: player }));
   };
   $("menu-chip").onclick = () => { releaseInput(); $("menu").classList.toggle("open"); };
   document.querySelectorAll("[data-action]").forEach((b) => b.onclick = () => {
     const action = b.dataset.action;
-    if (action === "quit" && !confirm("Sair do jogo no computador?")) return;
+    if (action === "quit" && !confirm(tr("Sair do jogo no computador?"))) return;
     send({ type: "action", action });
     toast({ save: "Estado salvo", load: "Estado carregado", quit: "Saindo do jogo…" }[action]);
     $("menu").classList.remove("open");
@@ -477,7 +571,7 @@
   $("touch-toggle").onclick = () => {
     releaseInput();
     const hidden = controls.classList.toggle("hidden");
-    $("touch-toggle").textContent = hidden ? "Mostrar controles" : "Esconder controles";
+    $("touch-toggle").textContent = tr(hidden ? "Mostrar controles" : "Esconder controles");
     $("menu").classList.remove("open");
   };
   // Choosing a player is also the tap the browser needs for sound and full screen.
@@ -496,8 +590,8 @@
       const busy = taken.includes(n);
       button.className = n === pick ? "on" : "";
       button.disabled = busy;
-      button.append(`J${n}`, Object.assign(document.createElement("small"), {
-        textContent: busy ? "ocupado" : n === 1 ? "computador" : "livre",
+      button.append(tr("J{n}", { n }), Object.assign(document.createElement("small"), {
+        textContent: tr(busy ? "ocupado" : n === 1 ? "computador" : "livre"),
       }));
       button.onclick = () => start(n);
       box.append(button);
@@ -512,18 +606,18 @@
     $("start-overlay").remove();
     try { audio = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" }); audio.resume(); } catch {}
     void goFullscreen();
-    toast(`Você é o jogador ${n}`);
+    toast(tr("Você é o jogador {n}", { n }));
   }
   $("sound-toggle").onclick = () => {
     soundOn = !soundOn;
     localStorage.setItem("openretro-sound", soundOn ? "on" : "off");
-    $("sound-toggle").textContent = `Som no celular: ${soundOn ? "ligado" : "desligado"}`;
+    $("sound-toggle").textContent = tr(soundOn ? "Som no celular: ligado" : "Som no celular: desligado");
     $("menu").classList.remove("open");
   };
-  $("sound-toggle").textContent = `Som no celular: ${soundOn ? "ligado" : "desligado"}`;
+  $("sound-toggle").textContent = tr(soundOn ? "Som no celular: ligado" : "Som no celular: desligado");
   renderWho();
   setInterval(() => {
-    $("stats").textContent = `${frames} quadros/s · ${(bytes * 8 / 1e6).toFixed(1)} Mbit/s`;
+    $("stats").textContent = tr("{frames} quadros/s · {mbits} Mbit/s", { frames, mbits: (bytes * 8 / 1e6).toFixed(1) });
     frames = 0; bytes = 0;
   }, 1000);
   updatePlayer();

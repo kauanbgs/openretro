@@ -6,6 +6,7 @@ import {
   invoke as tauriInvoke,
 } from "@tauri-apps/api/core";
 import { listen as tauriListen } from "@tauri-apps/api/event";
+import { t } from "../i18n";
 
 type Window = typeof globalThis & {
   __TAURI_INTERNALS__?: unknown;
@@ -28,23 +29,34 @@ export function backendAvailable() {
   );
 }
 
+/** Desktop errors arrive as text; they are shown in the interface language. */
+function translated(error: unknown): unknown {
+  return typeof error === "string" ? t(error) : error;
+}
+
 export async function invoke<T>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  if (!isRemote)
-    return args === undefined
-      ? tauriInvoke<T>(command)
-      : tauriInvoke<T>(command, args);
+  if (!isRemote) {
+    try {
+      return await (args === undefined
+        ? tauriInvoke<T>(command)
+        : tauriInvoke<T>(command, args));
+    } catch (error) {
+      throw translated(error);
+    }
+  }
   const response = await fetch("/api/invoke", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: command, args: args ?? {} }),
   });
   if (response.status === 403)
-    throw "A conexão com o computador expirou. Abra pelo QR code de novo.";
+    throw t("A conexão com o computador expirou. Abra pelo QR code de novo.");
   const body = (await response.json()) as { result?: T; error?: string };
-  if (!response.ok) throw body.error ?? "O computador não respondeu.";
+  if (!response.ok)
+    throw translated(body.error ?? t("O computador não respondeu."));
   return body.result as T;
 }
 

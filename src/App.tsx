@@ -47,6 +47,8 @@ import {
   type LibraryGame,
   type DownloadImported,
 } from "./types";
+import { t } from "./i18n";
+import { version as appVersion } from "../package.json";
 const HomePage = lazy(() =>
   import("./features/home/HomePage").then((module) => ({
     default: module.HomePage,
@@ -100,12 +102,12 @@ const BigPicture = lazy(() =>
 type Page =
   "Home" | "Library" | "Discover" | "Downloads" | "Emulators" | "Settings";
 const pageLabels: Record<Page, string> = {
-  Home: "Início",
-  Library: "Biblioteca",
-  Discover: "Catálogo",
+  Home: t("Início"),
+  Library: t("Biblioteca"),
+  Discover: t("Catálogo"),
   Downloads: "Downloads",
-  Emulators: "Emuladores",
-  Settings: "Configurações",
+  Emulators: t("Emuladores"),
+  Settings: t("Configurações"),
 };
 // A phone browses, downloads and plays; emulators and settings stay on the PC.
 const navItems = isRemote
@@ -186,7 +188,7 @@ export function App() {
         await refresh();
         setDownloadArrival(payload);
         setPage("Library");
-        notify("Download finished and was added to your library.");
+        notify(t("Download finished and was added to your library."));
       },
     );
     return () => {
@@ -230,6 +232,10 @@ export function App() {
     document.documentElement.dataset.animations = String(settings.animations);
   }, [settings]);
   useEffect(() => {
+    // The game covers this window; its animations would only take CPU from it.
+    document.documentElement.dataset.playing = String(Boolean(playing));
+  }, [playing]);
+  useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
@@ -249,7 +255,7 @@ export function App() {
   const openImport = (g?: GameMetadata) => {
     if (isRemote)
       return notify(
-        "Adicione arquivos pelo computador, ou baixe pelo catálogo daqui.",
+        t("Adicione arquivos pelo computador, ou baixe pelo catálogo daqui."),
       );
     setImportCandidate(undefined);
     setImportGame(g);
@@ -268,7 +274,7 @@ export function App() {
     if (!isDesktop) return;
     // The first PS3 game installs its emulator and the console's system.
     const unlisten = listen<string>("ps3-setup", ({ payload }) =>
-      setPs3Setup(payload),
+      setPs3Setup(payload && t(payload)),
     );
     return () => {
       void unlisten.then((fn) => fn());
@@ -279,16 +285,20 @@ export function App() {
       <div className="update-overlay" role="status">
         <Download size={28} />
         <strong>
-          Atualizando o OpenRetro{updates.version && ` para ${updates.version}`}
+          {updates.version
+            ? t("Atualizando o OpenRetro para {version}", {
+                version: updates.version,
+              })
+            : t("Atualizando o OpenRetro")}
         </strong>
-        <span>O app reabre sozinho em alguns segundos.</span>
+        <span>{t("O app reabre sozinho em alguns segundos.")}</span>
       </div>
     ) : (
       ps3Setup && (
         <div className="update-overlay" role="status">
           <LoaderCircle className="spin" size={28} />
           <strong>{ps3Setup}</strong>
-          <span>Isso só acontece no primeiro jogo de PS3.</span>
+          <span>{t("Isso só acontece no primeiro jogo de PS3.")}</span>
         </div>
       )
     );
@@ -301,7 +311,7 @@ export function App() {
         <Suspense
           fallback={
             <div className="console-loading" role="status">
-              Abrindo modo console…
+              {t("Abrindo modo console…")}
             </div>
           }
         >
@@ -336,17 +346,19 @@ export function App() {
         <button
           className="sidebar-profile"
           onClick={() => setPlayersOpen(true)}
-          title="Trocar jogador"
+          title={t("Trocar jogador")}
         >
           <PlayerAvatar player={activePlayer} size={36} />
           <span>
-            <strong>{activePlayer?.name ?? "Jogador 1"}</strong>
+            <strong>{activePlayer?.name ?? t("Jogador 1")}</strong>
             <small>
-              {playing ? `Jogando ${playing.game.title}` : "Trocar jogador"}
+              {playing
+                ? t("Jogando {title}", { title: playing.game.title })
+                : t("Trocar jogador")}
             </small>
           </span>
         </button>
-        <nav className="sidebar-nav" aria-label="Navegação">
+        <nav className="sidebar-nav" aria-label={t("Navegação")}>
           {navItems.map((n) => (
             <button
               key={n.page}
@@ -362,18 +374,18 @@ export function App() {
             </button>
           ))}
         </nav>
-        <section className="sidebar-library" aria-label="Minha biblioteca">
+        <section className="sidebar-library" aria-label={t("Minha biblioteca")}>
           <div className="sidebar-library-heading">
             <button
               className={page === "Library" && !selected ? "active" : ""}
               onClick={() => navigate("Library")}
             >
-              Minha biblioteca
+              {t("Minha biblioteca")}
             </button>
             <button
               className="icon-button"
-              aria-label="Adicionar jogo"
-              title="Adicionar jogo"
+              aria-label={t("Adicionar jogo")}
+              title={t("Adicionar jogo")}
               onClick={() => openImport()}
             >
               <Plus size={16} />
@@ -382,8 +394,8 @@ export function App() {
           {library.length > 0 && (
             <input
               className="sidebar-filter"
-              aria-label="Filtrar biblioteca"
-              placeholder="Filtrar biblioteca"
+              aria-label={t("Filtrar biblioteca")}
+              placeholder={t("Filtrar biblioteca")}
               value={libraryFilter}
               onChange={(e) => setLibraryFilter(e.target.value)}
             />
@@ -408,7 +420,7 @@ export function App() {
                   )}
                   <span>{game.title}</span>
                   {playing?.item.id === item.id && (
-                    <small className="sidebar-playing">jogando</small>
+                    <small className="sidebar-playing">{t("jogando")}</small>
                   )}
                 </button>
               </li>
@@ -416,7 +428,7 @@ export function App() {
           </ul>
           {library.length === 0 && (
             <p className="sidebar-empty">
-              Os jogos que você adicionar aparecem aqui.
+              {t("Os jogos que você adicionar aparecem aqui.")}
             </p>
           )}
         </section>
@@ -426,7 +438,7 @@ export function App() {
           {selected && (
             <button
               className="icon-button header-back"
-              aria-label="Voltar"
+              aria-label={t("Voltar")}
               onClick={() => setSelected(undefined)}
             >
               <ArrowLeft size={18} />
@@ -436,7 +448,7 @@ export function App() {
             !selected &&
             page === "Home" ? (
             <span className="header-brand">
-              <BrandMark /> OpenRetro
+              <BrandMark /> {t("OpenRetro")}
             </span>
           ) : (
             <h1>{selected ? selected.title : pageLabels[page]}</h1>
@@ -450,24 +462,28 @@ export function App() {
               >
                 <Download size={16} />
                 {updates.phase === "downloading"
-                  ? `Baixando ${updateVersion}…`
+                  ? t("Baixando {version}…", { version: updateVersion })
                   : updates.phase === "installing"
                     ? "Atualizando…"
                     : updates.phase === "ready"
-                      ? `Reiniciar e atualizar para ${updateVersion}`
-                      : `Atualizar para ${updateVersion}`}
+                      ? t("Reiniciar e atualizar para {version}", {
+                          version: updateVersion,
+                        })
+                      : t("Atualizar para {version}", {
+                          version: updateVersion,
+                        })}
               </button>
             )}
             {isRemote ? (
               <>
                 {playing && (
                   <a className="button primary" href="/play">
-                    <Play size={15} fill="currentColor" /> Voltar ao jogo
+                    <Play size={15} fill="currentColor" /> {t("Voltar ao jogo")}
                   </a>
                 )}
                 <button
                   className="header-player"
-                  aria-label="Trocar jogador"
+                  aria-label={t("Trocar jogador")}
                   onClick={() => setPlayersOpen(true)}
                 >
                   <PlayerAvatar player={activePlayer} size={32} />
@@ -479,20 +495,20 @@ export function App() {
                   className="button secondary"
                   onClick={() => setPhoneOpen(true)}
                 >
-                  <Smartphone size={16} /> Celular
+                  <Smartphone size={16} /> {t("Celular")}
                 </button>
                 <button
                   className="button secondary"
                   onClick={() => setBigPicture(true)}
                 >
-                  <Gamepad2 size={16} /> Big Picture
+                  <Gamepad2 size={16} /> {t("Big Picture")}
                 </button>
               </>
             )}
             {isRemote && !searchOpen && (
               <button
                 className="icon-button header-search-open"
-                aria-label="Buscar"
+                aria-label={t("Buscar")}
                 onClick={() => setSearchOpen(true)}
               >
                 <Search size={20} />
@@ -505,9 +521,11 @@ export function App() {
               <input
                 id="global-search"
                 autoFocus={isRemote && searchOpen}
-                aria-label="Buscar jogos"
+                aria-label={t("Buscar jogos")}
                 placeholder={
-                  page === "Library" ? "Buscar na biblioteca" : "Buscar jogos"
+                  page === "Library"
+                    ? t("Buscar na biblioteca")
+                    : t("Buscar jogos")
                 }
                 value={query}
                 onChange={(e) => {
@@ -519,7 +537,7 @@ export function App() {
               {query && (
                 <button
                   className="icon-button"
-                  aria-label="Limpar busca"
+                  aria-label={t("Limpar busca")}
                   onClick={() => setQuery("")}
                 >
                   <X size={14} />
@@ -534,16 +552,16 @@ export function App() {
                   setQuery("");
                 }}
               >
-                Cancelar
+                {t("Cancelar")}
               </button>
             )}
           </div>
         </header>
         {error && (
           <div className="error-message" role="alert">
-            Could not load your library: {String(error)}{" "}
+            {t("Could not load your library:")} {String(error)}{" "}
             <button className="text-button" onClick={() => void refresh()}>
-              Retry
+              {t("Retry")}
             </button>
           </div>
         )}
@@ -630,13 +648,17 @@ export function App() {
       <footer className="bottom-panel">
         <button onClick={() => navigate("Downloads")}>
           {playing
-            ? `Jogando ${playing.game.title}`
+            ? t("Jogando {title}", { title: playing.game.title })
             : downloading
-              ? `Baixando ${downloading.game?.title ?? downloading.name} (${downloading.progress.toFixed(0)}%)`
-              : "Nenhum download em andamento"}
+              ? t("Baixando {title} ({percent}%)", {
+                  title: downloading.game?.title ?? downloading.name,
+                  percent: downloading.progress.toFixed(0),
+                })
+              : t("Nenhum download em andamento")}
         </button>
         <button onClick={() => setHelp(true)}>
-          OpenRetro v0.4.2{isDesktop ? "" : " · prévia no navegador"}
+          OpenRetro v{appVersion}
+          {isDesktop ? "" : t(" · prévia no navegador")}
         </button>
       </footer>
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
@@ -647,7 +669,7 @@ export function App() {
         <Suspense
           fallback={
             <div className="toast" role="status">
-              Abrindo…
+              {t("Abrindo…")}
             </div>
           }
         >
@@ -660,27 +682,29 @@ export function App() {
               setImporting(false);
               setPage("Library");
               setSelected(game);
-              notify("Game added to your library.");
+              notify(t("Game added to your library."));
             }}
           />
         </Suspense>
       )}
       {help && (
-        <Modal title="Sobre o OpenRetro" onClose={() => setHelp(false)}>
+        <Modal title={t("Sobre o OpenRetro")} onClose={() => setHelp(false)}>
           <p>
-            Organize sua biblioteca, descubra jogos e gerencie seus emuladores.
-            O runtime integrado configura os consoles compatíveis ao jogar.
-            Jogos e BIOS não estão incluídos.
+            {t(
+              "Organize sua biblioteca, descubra jogos e gerencie seus emuladores. O runtime integrado configura os consoles compatíveis ao jogar. Jogos e BIOS não estão incluídos.",
+            )}
           </p>
           <p className="notice">
             {isDesktop
-              ? "Aplicativo desktop · dados salvos neste dispositivo"
-              : "Prévia no navegador · abra o aplicativo para jogar e baixar arquivos."}
+              ? t("Aplicativo desktop · dados salvos neste dispositivo")
+              : t(
+                  "Prévia no navegador · abra o aplicativo para jogar e baixar arquivos.",
+                )}
           </p>
           <p className="hint">
-            Adicione suas fontes em Configurações → Downloads. Use Ctrl K para
-            buscar ou entre no Big Picture para navegar pelo controle.
-            Informações e imagens dos jogos vêm do LaunchBox Games Database.
+            {t(
+              "Adicione suas fontes em Configurações → Downloads. Use Ctrl K para buscar ou entre no Big Picture para navegar pelo controle. Informações e imagens dos jogos vêm do LaunchBox Games Database.",
+            )}
           </p>
         </Modal>
       )}
@@ -690,7 +714,7 @@ export function App() {
           <span>{toast}</span>
           <button
             className="icon-button"
-            aria-label="Dismiss notification"
+            aria-label={t("Dismiss notification")}
             onClick={() => setToast("")}
           >
             <X size={16} />

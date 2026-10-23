@@ -5,6 +5,7 @@ import { bridge } from "../services/bridge";
 import type { PlayerProfile } from "../types";
 import { Modal } from "./Modal";
 import { PLAYER_AVATARS, PLAYER_COLORS, PlayerAvatar } from "./PlayerAvatar";
+import { t } from "../i18n";
 
 export function PlayerPicker({
   onClose,
@@ -47,7 +48,9 @@ export function PlayerPicker({
     setBusy(true);
     setError("");
     try {
-      await bridge.createProfile(`Jogador ${data.players.length + 1}`);
+      await bridge.createProfile(
+        t("Jogador {number}", { number: data.players.length + 1 }),
+      );
       await client.invalidateQueries({ queryKey: ["players"] });
     } catch (e) {
       setError(String(e));
@@ -155,7 +158,7 @@ export function PlayerPicker({
   return (
     <div className="tv-player-dialog">
       <Modal
-        title={editing ? "Personalizar jogador" : "Quem vai jogar?"}
+        title={editing ? t("Personalizar jogador") : t("Quem vai jogar?")}
         onClose={() => {
           if (busy) return;
           if (editing) setEditing(null);
@@ -167,7 +170,7 @@ export function PlayerPicker({
             <div className="player-editor-preview">
               <PlayerAvatar player={editing} size={72} />
               <label>
-                Nome
+                {t("Nome")}
                 <input
                   value={editing.name}
                   maxLength={32}
@@ -177,7 +180,7 @@ export function PlayerPicker({
                 />
               </label>
             </div>
-            <h3>Avatar</h3>
+            <h3>{t("Avatar")}</h3>
             <div className="player-avatar-grid">
               {Object.entries(PLAYER_AVATARS).map(
                 ([id, { icon: Icon, label }]) => (
@@ -193,12 +196,12 @@ export function PlayerPicker({
                 ),
               )}
             </div>
-            <h3>Cor</h3>
+            <h3>{t("Cor")}</h3>
             <div className="player-color-grid">
               {PLAYER_COLORS.map((color) => (
                 <button
                   key={color}
-                  aria-label={`Cor ${color}`}
+                  aria-label={t("Cor {color}", { color })}
                   aria-pressed={editing.color === color}
                   disabled={busy}
                   style={{ background: color }}
@@ -214,24 +217,23 @@ export function PlayerPicker({
                 disabled={busy}
                 onClick={() => setEditing(null)}
               >
-                Cancelar
+                {t("Cancelar")}
               </button>
               <button
                 className="button primary"
                 disabled={busy || !editing.name.trim()}
                 onClick={() => void save()}
               >
-                Salvar
+                {t("Salvar")}
               </button>
             </div>
           </div>
         ) : (
           <>
             <p>
-              Jogos compartilhados. Saves, favoritos e histórico de cada jogador
-              ficam separados no runtime integrado. O Jogador 1 mantém seus
-              saves existentes. Emuladores externos usam suas próprias
-              configurações de saves.
+              {t(
+                "Jogos compartilhados. Saves, favoritos e histórico de cada jogador ficam separados no runtime integrado. O Jogador 1 mantém seus saves existentes. Emuladores externos usam suas próprias configurações de saves.",
+              )}
             </p>
             <div className="player-picker" ref={buttons}>
               {data?.players.map((player, i) => (
@@ -250,7 +252,7 @@ export function PlayerPicker({
                   </button>
                   <button
                     className="button secondary player-edit"
-                    aria-label={`Personalizar ${player.name}`}
+                    aria-label={t("Personalizar {name}", { name: player.name })}
                     disabled={busy}
                     onFocus={() => {
                       index.current = i * 2 + 1;
@@ -273,12 +275,13 @@ export function PlayerPicker({
                 onClick={() => void create()}
               >
                 <Plus size={20} />
-                Adicionar jogador
+                {t("Adicionar jogador")}
               </button>
             </div>
             <p>
-              Durante o jogo, abra o menu do OpenRetro e encerre a sessão antes
-              de trocar de jogador.
+              {t(
+                "Durante o jogo, abra o menu do OpenRetro e encerre a sessão antes de trocar de jogador.",
+              )}
             </p>
           </>
         )}

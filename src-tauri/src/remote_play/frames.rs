@@ -15,10 +15,16 @@ use std::{
 const MAGIC: u32 = 0x3246_524f;
 const HEADER: usize = 32;
 const MAX_BYTES: usize = 16 * 1024 * 1024;
-const QUALITY: u8 = 88;
-/// GPU readbacks are window-sized; they are scaled down to this.
-const MAX_WIDTH: usize = 960;
-const MAX_HEIGHT: usize = 540;
+/// Core frames are small pixel art and keep a high quality. Readbacks are
+/// already smooth after scaling, so a lower one looks the same at a third of
+/// the size.
+const CORE_QUALITY: u8 = 88;
+const READBACK_QUALITY: u8 = 75;
+/// GPU readbacks are window-sized; they are scaled down to about a PS2's own
+/// resolution. At 960x540 a frame took longer to encode than to play (~30 ms)
+/// and more Wi-Fi than phones keep up with.
+const MAX_WIDTH: usize = 640;
+const MAX_HEIGHT: usize = 480;
 const FILE_MAP_WRITE: u32 = 2;
 const FILE_MAP_READ: u32 = 4;
 /// Header fields, in u32 units.
@@ -203,6 +209,18 @@ impl SharedFrames {
     ) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
+        // Encoding runs beside reading, so the next frame is converted while
+        // the previous one encodes. One frame waits at most; when the encoder
+        // falls behind, newer frames are dropped instead of queueing up.
+        let (encode, encoded) = std::sync::mpsc::sync_channel::<(Vec<u8>, u32, u32, u8)>(1);
+        let sender = frames.clone();
+        std::thread::spawn(move || {
+            for (rgb, w, h, quality) in encoded {
+                if sender.publish(&rgb, w, h, quality).is_ok() {
+                    last_frame.store(now_ms(), Ordering::Release);
+                }
+            }
+        });
         std::thread::spawn(move || {
             let (mut mapping, mut pid) = (None::<Mapping>, 0u32);
             let (mut sequence, mut raw, mut rgb) = (0u32, Vec::new(), Vec::new());
@@ -230,8 +248,11 @@ impl SharedFrames {
                     continue;
                 }
                 let (w, h) = to_rgb(&raw, width, height, pitch, format, &mut rgb);
-                if frames.publish(&rgb, w as u32, h as u32, QUALITY).is_ok() {
-                    last_frame.store(now_ms(), Ordering::Release);
+                let quality = if format == Format::BgraFlipped { READBACK_QUALITY } else { CORE_QUALITY };
+                match encode.try_send((std::mem::take(&mut rgb), w as u32, h as u32, quality)) {
+                    Ok(()) => {}
+                    Err(std::sync::mpsc::TrySendError::Full((back, ..))) => rgb = back,
+                    Err(std::sync::mpsc::TrySendError::Disconnected(_)) => break,
                 }
             }
         });
@@ -272,7 +293,9 @@ mod tests {
         let bgra = [1, 2, 3, 255, 7, 8, 9, 255];
         assert_eq!(to_rgb(&bgra, 1, 2, 4, Format::BgraFlipped, &mut out), (1, 2));
         assert_eq!(out, [9, 8, 7, 3, 2, 1]);
-        assert_eq!(output_size(1920, 1080, Format::BgraFlipped), (960, 540));
+        assert_eq!(output_size(1920, 1080, Format::BgraFlipped), (640, 360));
+        assert_eq!(output_size(1440, 1080, Format::BgraFlipped), (640, 480));
+        assert_eq!(output_size(640, 448, Format::BgraFlipped), (640, 448));
         assert_eq!(output_size(1920, 1080, Format::Xrgb8888), (1920, 1080));
     }
 }

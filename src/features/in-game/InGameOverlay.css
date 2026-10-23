@@ -35,7 +35,7 @@ html.in-game-overlay #root {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 26px;
-  color: #e7a15c;
+  color: #12ace2;
 }
 .game-menu-panel header span {
   display: flex;
@@ -51,7 +51,7 @@ html.in-game-overlay #root {
   cursor: pointer;
 }
 .game-menu-panel button:focus-visible {
-  outline: 2px solid #e7a15c;
+  outline: 2px solid #12ace2;
   outline-offset: 3px;
 }
 .game-menu-panel button:disabled {
@@ -116,8 +116,8 @@ html.in-game-overlay #root {
     color 120ms ease;
 }
 .game-menu-panel nav button.selected {
-  background: #e7a15c;
-  color: #17100a;
+  background: #12ace2;
+  color: #04131a;
 }
 .game-menu-panel nav button.danger:not(.selected) {
   color: #d69d92;
@@ -190,8 +190,8 @@ html.in-game-overlay #root {
   border-radius: 6px;
 }
 .game-menu-confirm button.selected {
-  background: #e7a15c;
-  color: #17100a;
+  background: #12ace2;
+  color: #04131a;
 }
 @keyframes game-menu-fade {
   from {

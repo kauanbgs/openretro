@@ -8,6 +8,7 @@ import {
 import { BrandMark } from "../../components/Brand";
 import { GameArtwork } from "../../components/GameArtwork";
 import type { GameMetadata } from "../../types";
+import { locale, t } from "../../i18n";
 
 /** Heavy decorative layers are skipped when motion is off. */
 export const motionEnabled = () =>
@@ -219,7 +220,7 @@ export function ConsoleClock() {
   }, []);
   return (
     <time className="fx-clock" dateTime={now.toISOString()}>
-      {now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+      {now.toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" })}
     </time>
   );
 }
@@ -252,9 +253,11 @@ export function LaunchSequence({ game }: { game?: GameMetadata }) {
           <BrandMark />
         </span>
       </div>
-      <p className="fx-launch-kicker">Preparando o jogo</p>
-      <h2>{game?.title ?? "Iniciando"}</h2>
-      <p>Verificando o emulador e o core. O jogo abrirá automaticamente.</p>
+      <p className="fx-launch-kicker">{t("Preparando o jogo")}</p>
+      <h2>{game?.title ?? t("Iniciando")}</h2>
+      <p>
+        {t("Verificando o emulador e o core. O jogo abrirá automaticamente.")}
+      </p>
       <div className="fx-launch-progress" aria-hidden="true">
         <i />
       </div>

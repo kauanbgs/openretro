@@ -13,6 +13,7 @@ import { LibraryManager } from "../../services/LibraryManager";
 import { platforms } from "../../db/platforms";
 import { metadataProvider } from "../../providers/metadata/LaunchboxMetadataProvider";
 import type { GameMetadata, ImportCandidate } from "../../types";
+import { t } from "../../i18n";
 export function ImportDialog({
   initial,
   initialCandidate,
@@ -70,7 +71,9 @@ export function ImportDialog({
       .catch(() => {
         if (!cancelled)
           setMetadataError(
-            "O catálogo está indisponível. Você pode importar usando seu próprio título.",
+            t(
+              "O catálogo está indisponível. Você pode importar usando seu próprio título.",
+            ),
           );
       });
     return () => {
@@ -106,7 +109,9 @@ export function ImportDialog({
         ) {
           setSelected("custom");
           setMetadataError(
-            "The chosen file does not match this game's console. Choose the correct file or use your own title.",
+            t(
+              "The chosen file does not match this game's console. Choose the correct file or use your own title.",
+            ),
           );
         }
       }
@@ -128,7 +133,7 @@ export function ImportDialog({
           : matches.find((g) => g.id === selected);
       if (!candidate.platformIds.includes(platform)) {
         throw new Error(
-          "Choose a platform detected from the selected game file.",
+          t("Choose a platform detected from the selected game file."),
         );
       }
       if (
@@ -137,7 +142,9 @@ export function ImportDialog({
         !match.platformIds?.includes(platform)
       )
         throw new Error(
-          "The metadata and file must belong to the same console. Choose matching metadata or use your own title.",
+          t(
+            "The metadata and file must belong to the same console. Choose matching metadata or use your own title.",
+          ),
         );
       const game: GameMetadata = match
         ? {
@@ -150,14 +157,15 @@ export function ImportDialog({
             title: title.trim(),
             platformId: platform,
             year: new Date().getFullYear(),
-            developer: "Unknown developer",
-            description:
+            developer: t("Unknown developer"),
+            description: t(
               "A game from your personal collection. Imported from a local file; your original file stays exactly where it is.",
-            genre: "Local game",
+            ),
+            genre: t("Local game"),
             artwork: "neutral",
             color: "#c0a3f5",
           };
-      if (!game.title) throw new Error("Enter a title for your game.");
+      if (!game.title) throw new Error(t("Enter a title for your game."));
       await new LibraryManager().import(game, candidate);
       const [next, ...remaining] = folderQueue;
       if (next) {
@@ -198,14 +206,14 @@ export function ImportDialog({
     }
   }
   return (
-    <Modal title="Adicionar jogo" onClose={onClose}>
+    <Modal title={t("Adicionar jogo")} onClose={onClose}>
       <div className="steps">
         <span className="active">
-          1 <b>Escolher arquivo</b>
+          1 <b>{t("Escolher arquivo")}</b>
         </span>
         <ArrowRight size={14} />
         <span className={candidate ? "active" : ""}>
-          2 <b>Confirmar dados</b>
+          2 <b>{t("Confirmar dados")}</b>
         </span>
       </div>
       {!candidate ? (
@@ -213,10 +221,11 @@ export function ImportDialog({
           <div className="large-icon">
             <FolderOpen size={30} />
           </div>
-          <h3>Choose your game file</h3>
+          <h3>{t("Choose your game file")}</h3>
           <p>
-            OpenRetro detects the console and helps match the game’s details.
-            Your original file stays where it is.
+            {t(
+              "OpenRetro detects the console and helps match the game’s details. Your original file stays where it is.",
+            )}
           </p>
           <button
             className="button primary"
@@ -228,16 +237,16 @@ export function ImportDialog({
             ) : (
               <FolderOpen size={17} />
             )}{" "}
-            {busy ? "Reading and hashing…" : "Choose game file"}
+            {busy ? t("Reading and hashing…") : t("Choose game file")}
           </button>
           <button
             className="button secondary"
             disabled={busy || !isDesktop}
             onClick={() => void pickFolder()}
           >
-            <FolderTree size={17} /> Import a folder
+            <FolderTree size={17} /> {t("Import a folder")}
           </button>
-          <small>NES, SNES, Game Boy, PlayStation, and more</small>
+          <small>{t("NES, SNES, Game Boy, PlayStation, and more")}</small>
         </div>
       ) : (
         <div className="form-stack">
@@ -245,9 +254,11 @@ export function ImportDialog({
             <FileCheck2 size={24} />
             <div>
               <strong>{candidate.filename}</strong>
-              <small>SHA-256 calculated · Original file preserved</small>
+              <small>{t("SHA-256 calculated · Original file preserved")}</small>
               {folderQueue.length > 0 && (
-                <small>{folderQueue.length} more games in this folder</small>
+                <small>
+                  {folderQueue.length} {t("more games in this folder")}
+                </small>
               )}
             </div>
             <button
@@ -255,11 +266,11 @@ export function ImportDialog({
               disabled={busy}
               className="text-button"
             >
-              Change
+              {t("Change")}
             </button>
           </div>
           <label>
-            Platform
+            {t("Platform")}
             <select
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
@@ -275,18 +286,19 @@ export function ImportDialog({
           </label>
           {candidate.platformIds.length > 1 && (
             <p className="hint">
-              This extension is shared by several systems. Confirm the correct
-              platform.
+              {t(
+                "This extension is shared by several systems. Confirm the correct platform.",
+              )}
             </p>
           )}
           <label>
-            Buscar no LaunchBox
+            {t("Buscar no LaunchBox")}
             <div className="input-action">
               <input
                 maxLength={120}
                 value={metadataSearch}
                 onChange={(e) => setMetadataSearch(e.target.value)}
-                placeholder="Buscar informações do jogo"
+                placeholder={t("Buscar informações do jogo")}
               />
               <button
                 className="button secondary"
@@ -301,31 +313,35 @@ export function ImportDialog({
                       setSelected(result.games[0]?.id ?? "custom");
                       if (!result.games.length)
                         setMetadataError(
-                          "No matches found for this title and console. Try another name or use your own title.",
+                          t(
+                            "No matches found for this title and console. Try another name or use your own title.",
+                          ),
                         );
                     })
                     .catch(() =>
                       setMetadataError(
-                        "O catálogo está indisponível. Você pode importar usando seu próprio título.",
+                        t(
+                          "O catálogo está indisponível. Você pode importar usando seu próprio título.",
+                        ),
                       ),
                     )
                     .finally(() => setBusy(false));
                 }}
               >
-                Search
+                {t("Search")}
               </button>
             </div>
           </label>
           {metadataError && <p className="hint">{metadataError}</p>}
           <label>
-            Metadata
+            {t("Metadata")}
             <select
               value={selected}
               onChange={(e) => {
                 setSelected(e.target.value);
               }}
             >
-              <option value="custom">Usar meu próprio título</option>
+              <option value="custom">{t("Usar meu próprio título")}</option>
               {matches
                 .filter(
                   (g) =>
@@ -334,14 +350,14 @@ export function ImportDialog({
                 )
                 .map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.title} · {g.year || "Year unknown"} · LaunchBox
+                    {g.title} · {g.year || t("Year unknown")} {t("· LaunchBox")}
                   </option>
                 ))}
             </select>
           </label>
           {selected === "custom" && (
             <label>
-              Game title
+              {t("Game title")}
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -350,13 +366,14 @@ export function ImportDialog({
             </label>
           )}
           <details>
-            <summary>Identificação do arquivo</summary>
+            <summary>{t("Identificação do arquivo")}</summary>
             <code className="hash">{candidate.sha256}</code>
           </details>
           {!isDesktop && (
             <p className="notice">
-              Browser preview: saved in this browser. Import again in the
-              desktop app to keep the real file path and launch games.
+              {t(
+                "Browser preview: saved in this browser. Import again in the desktop app to keep the real file path and launch games.",
+              )}
             </p>
           )}
           <button
@@ -369,7 +386,7 @@ export function ImportDialog({
             ) : (
               <Check size={17} />
             )}{" "}
-            {busy ? "Adding to your library…" : "Adicionar à biblioteca"}
+            {busy ? t("Adding to your library…") : t("Adicionar à biblioteca")}
           </button>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { Database, RefreshCw } from "lucide-react";
 import type { CatalogStatus } from "../../providers/metadata/LaunchboxMetadataProvider";
+import { t } from "../../i18n";
 export function CatalogConnection({
   status,
   error,
@@ -18,22 +19,26 @@ export function CatalogConnection({
       </div>
       <h2>
         {unavailable
-          ? "Catálogo disponível no app desktop"
+          ? t("Catálogo disponível no app desktop")
           : preparing
-            ? "Preparando o catálogo"
-            : "Não foi possível preparar o catálogo"}
+            ? t("Preparando o catálogo")
+            : t("Não foi possível preparar o catálogo")}
       </h2>
       <p>
         {unavailable
-          ? "Abra o OpenRetro no desktop para explorar o LaunchBox Games Database."
+          ? t(
+              "Abra o OpenRetro no desktop para explorar o LaunchBox Games Database.",
+            )
           : preparing
-            ? "Na primeira abertura, baixamos e organizamos a base de jogos. Isso pode levar alguns minutos."
-            : "Verifique sua conexão e tente novamente."}
+            ? t(
+                "Na primeira abertura, baixamos e organizamos a base de jogos. Isso pode levar alguns minutos.",
+              )
+            : t("Verifique sua conexão e tente novamente.")}
       </p>
       {preparing && (
         <>
           <progress
-            aria-label="Progresso do catálogo"
+            aria-label={t("Progresso do catálogo")}
             max={100}
             value={status?.progress ?? 0}
           />
@@ -51,7 +56,7 @@ export function CatalogConnection({
             </p>
           )}
           <button className="button primary" onClick={onRetry}>
-            <RefreshCw size={16} /> Tentar de novo
+            <RefreshCw size={16} /> {t("Tentar de novo")}
           </button>
         </>
       )}

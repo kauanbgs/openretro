@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { t } from "../i18n";
 const openModals: HTMLElement[] = [];
 let previousOverflow = "";
 export function Modal({
@@ -100,7 +101,7 @@ export function Modal({
           </div>
           <button
             className="icon-button"
-            aria-label="Fechar janela"
+            aria-label={t("Fechar janela")}
             onClick={onClose}
           >
             <X size={20} />

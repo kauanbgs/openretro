@@ -23,6 +23,7 @@ import type {
 import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
 import { sourceStore, type PreviewSource } from "./sourceStore";
 import { DEFAULT_AVATAR, PLAYER_COLORS } from "./playerAppearance";
+import { t } from "../i18n";
 export interface FilePickerRequest {
   title: string;
   directory: boolean;
@@ -39,7 +40,7 @@ export function registerFilePicker(
 }
 function pickPath(request: FilePickerRequest): Promise<string | null> {
   if (isRemote)
-    return Promise.reject("Escolher arquivos só é possível no computador.");
+    return Promise.reject(t("Escolher arquivos só é possível no computador."));
   return consoleFilePicker
     ? consoleFilePicker(request)
     : open({ ...request, multiple: false });
@@ -61,7 +62,10 @@ export interface GameCapture {
 function readPlayerProfiles(): PlayerProfiles {
   const stored: PlayerProfiles = JSON.parse(
     localStorage.getItem("openretro-players") ?? "null",
-  ) ?? { activeId: "default", players: [{ id: "default", name: "Jogador 1" }] };
+  ) ?? {
+    activeId: "default",
+    players: [{ id: "default", name: t("Jogador 1") }],
+  };
   // Profiles saved before avatars existed get the same defaults as the database.
   stored.players = stored.players.map((player) => ({
     ...player,
@@ -104,14 +108,14 @@ export const bridge = {
   }> {
     if (!isDesktop)
       throw new Error(
-        "Abra o aplicativo OpenRetro para acessar seus arquivos.",
+        t("Abra o aplicativo OpenRetro para acessar seus arquivos."),
       );
     return invoke("browse_files", { path, query, directoriesOnly });
   },
   async pickSourceJson(): Promise<string | null> {
     if (!isDesktop) return null;
     const path = await pickPath({
-      title: "Selecionar fonte JSON",
+      title: t("Selecionar fonte JSON"),
       directory: false,
     });
     return path ? invoke("read_source_json", { path }) : null;
@@ -124,7 +128,7 @@ export const bridge = {
     if (isDesktop) return invoke("create_profile", { name });
     const profiles = readPlayerProfiles();
     if (!name.trim() || name.trim().length > 32)
-      throw new Error("Use um nome entre 1 e 32 caracteres.");
+      throw new Error(t("Use um nome entre 1 e 32 caracteres."));
     profiles.players.push({
       id: crypto.randomUUID(),
       name: name.trim(),
@@ -142,9 +146,9 @@ export const bridge = {
     if (isDesktop) return invoke("update_profile", { id, name, avatar, color });
     const profiles = readPlayerProfiles();
     const player = profiles.players.find((p) => p.id === id);
-    if (!player) throw new Error("Jogador não encontrado.");
+    if (!player) throw new Error(t("Jogador não encontrado."));
     if (!name.trim() || name.trim().length > 32)
-      throw new Error("Use um nome entre 1 e 32 caracteres.");
+      throw new Error(t("Use um nome entre 1 e 32 caracteres."));
     Object.assign(player, { name: name.trim(), avatar, color });
     localStorage.setItem("openretro-players", JSON.stringify(profiles));
   },
@@ -152,7 +156,7 @@ export const bridge = {
     if (isDesktop) return invoke("select_profile", { id });
     const profiles = readPlayerProfiles();
     if (!profiles.players.some((p) => p.id === id))
-      throw new Error("Jogador não encontrado.");
+      throw new Error(t("Jogador não encontrado."));
     // Preview uses the same projection behavior as the native library.
     const progress = JSON.parse(
       localStorage.getItem("openretro-player-progress") ?? "{}",
@@ -200,20 +204,24 @@ export const bridge = {
     if (isDesktop) return invoke("save_download_source", { text, url, id });
     if (!text) {
       if (!url || new URL(url).protocol !== "https:")
-        throw new Error("Enter an HTTPS source URL.");
+        throw new Error(t("Enter an HTTPS source URL."));
       const response = await fetch(url, {
         signal: AbortSignal.timeout(45000),
       }).catch(() => {
         throw new Error(
-          "This source cannot be fetched by the browser. Paste/import its JSON, or use the desktop app.",
+          t(
+            "This source cannot be fetched by the browser. Paste/import its JSON, or use the desktop app.",
+          ),
         );
       });
       if (!response.ok)
-        throw new Error(`Source returned HTTP ${response.status}.`);
+        throw new Error(
+          t("Source returned HTTP {status}.", { status: response.status }),
+        );
       if (Number(response.headers.get("content-length")) > MAX_SOURCE_BYTES)
-        throw new Error("Source exceeds the 16 MB limit.");
+        throw new Error(t("Source exceeds the 16 MB limit."));
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("Empty source response.");
+      if (!reader) throw new Error(t("Empty source response."));
       const decoder = new TextDecoder();
       let size = 0;
       text = "";
@@ -223,7 +231,7 @@ export const bridge = {
           if (done) break;
           size += value.byteLength;
           if (size > MAX_SOURCE_BYTES)
-            throw new Error("Source exceeds the 16 MB limit.");
+            throw new Error(t("Source exceeds the 16 MB limit."));
           text += decoder.decode(value, { stream: true });
         }
         text += decoder.decode();
@@ -234,7 +242,7 @@ export const bridge = {
     const document = parseDownloadSource(text);
     const sources = await sourceStore.list();
     if (url && sources.some((s) => s.url === url && s.id !== id))
-      throw new Error("This source URL is already registered.");
+      throw new Error(t("This source URL is already registered."));
     const previous = sources.find((s) => s.id === id);
     const source: PreviewSource = {
       id: id ?? crypto.randomUUID(),
@@ -273,7 +281,9 @@ export const bridge = {
   ): Promise<string> {
     if (!isDesktop)
       throw new Error(
-        "Use the OpenRetro desktop app to download files. Source management is available in this preview.",
+        t(
+          "Use the OpenRetro desktop app to download files. Source management is available in this preview.",
+        ),
       );
     return invoke("start_source_download", {
       sourceId: match.sourceId,
@@ -301,7 +311,7 @@ export const bridge = {
   /** Runs the import in the background; progress appears on the job. */
   async addDownloadToLibrary(id: string, path?: string): Promise<void> {
     if (!isDesktop)
-      throw new Error("Use o aplicativo desktop para adicionar downloads.");
+      throw new Error(t("Use o aplicativo desktop para adicionar downloads."));
     return invoke("add_download_to_library", { id, path: path ?? null });
   },
   async downloadFiles(id: string): Promise<DownloadedFile[]> {
@@ -309,14 +319,15 @@ export const bridge = {
   },
   async inspect(path: string): Promise<ImportCandidate> {
     if (!isDesktop)
-      throw new Error("Inspect downloaded files in the desktop app.");
+      throw new Error(t("Inspect downloaded files in the desktop app."));
     return invoke("inspect_game", { path });
   },
   async pickDownloadDirectory(): Promise<string | null> {
-    if (!isDesktop) throw new Error("Choose the directory in the desktop app.");
+    if (!isDesktop)
+      throw new Error(t("Choose the directory in the desktop app."));
     return pickPath({
       directory: true,
-      title: "Choose download directory",
+      title: t("Choose download directory"),
     });
   },
   library: (): Promise<LibraryGame[]> =>
@@ -327,7 +338,7 @@ export const bridge = {
     isDesktop ? invoke("emulator_install_options") : Promise.resolve([]),
   async installEmulator(id: string): Promise<string> {
     if (!isDesktop)
-      throw new Error("Install emulators in the OpenRetro desktop app.");
+      throw new Error(t("Install emulators in the OpenRetro desktop app."));
     return invoke("install_emulator", { id });
   },
   settings: (): Promise<AppSettings> =>
@@ -336,7 +347,7 @@ export const bridge = {
     if (isDesktop) {
       const path = await pickPath({
         directory: false,
-        title: "Locate your game file",
+        title: t("Locate your game file"),
       });
       return path ? invoke("inspect_game", { path }) : null;
     }
@@ -365,48 +376,50 @@ export const bridge = {
   },
   async pickGameFolder(): Promise<string | null> {
     if (!isDesktop)
-      throw new Error("Folder import requires the OpenRetro desktop app.");
+      throw new Error(t("Folder import requires the OpenRetro desktop app."));
     return pickPath({
       directory: true,
-      title: "Choose a folder with game files",
+      title: t("Choose a folder with game files"),
     });
   },
   async inspectGameFolder(path: string): Promise<ImportCandidate[]> {
     if (!isDesktop)
-      throw new Error("Folder import requires the OpenRetro desktop app.");
+      throw new Error(t("Folder import requires the OpenRetro desktop app."));
     return invoke("inspect_game_folder", { path });
   },
   async pickExecutable(): Promise<string | null> {
     if (!isDesktop)
       throw new Error(
-        "Emulator executables can be configured in the desktop app. Run npm run tauri dev.",
+        t(
+          "Emulator executables can be configured in the desktop app. Run npm run tauri dev.",
+        ),
       );
     return pickPath({
       directory: false,
-      title: "Select emulator executable",
+      title: t("Select emulator executable"),
     });
   },
   async pickModPatch(): Promise<string | null> {
     if (!isDesktop)
-      throw new Error("Importe patches pelo aplicativo OpenRetro.");
+      throw new Error(t("Importe patches pelo aplicativo OpenRetro."));
     return pickPath({
       directory: false,
-      title: "Selecione o patch (.ips, .bps, .ups, .xdelta) ou um .zip/.7z",
+      title: t("Selecione o patch (.ips, .bps, .ups, .xdelta) ou um .zip/.7z"),
     });
   },
   async pickBios(): Promise<string | null> {
     if (!isDesktop)
-      throw new Error("BIOS configuration requires the desktop app.");
+      throw new Error(t("BIOS configuration requires the desktop app."));
     return pickPath({
       directory: false,
-      title: "Select your legally obtained BIOS file",
+      title: t("Select your legally obtained BIOS file"),
     });
   },
   async addGame(game: GameMetadata, candidate: ImportCandidate): Promise<void> {
     if (isDesktop) return invoke("add_game", { game, candidate });
     const data = read();
     if (data.library.some((l) => l.item.sha256 === candidate.sha256))
-      throw new Error("This file is already in your library.");
+      throw new Error(t("This file is already in your library."));
     data.library.unshift({
       game,
       item: {
@@ -455,7 +468,7 @@ export const bridge = {
         biosPath,
         runtimeArgs,
       });
-    throw new Error("Launch configuration requires the desktop app.");
+    throw new Error(t("Launch configuration requires the desktop app."));
   },
   async relocate(id: string, candidate: ImportCandidate) {
     if (isDesktop) return invoke("relocate_game", { id, candidate });
@@ -470,7 +483,9 @@ export const bridge = {
   async verify(id: string): Promise<boolean> {
     if (isDesktop) return invoke("verify_game", { id });
     throw new Error(
-      "File verification requires the desktop app, which can access the original path.",
+      t(
+        "File verification requires the desktop app, which can access the original path.",
+      ),
     );
   },
   async exists(path: string): Promise<boolean> {
@@ -479,7 +494,7 @@ export const bridge = {
   },
   async saveEmulator(emulator: Emulator) {
     if (isDesktop) return invoke("save_emulator", { emulator });
-    throw new Error("Emulator configuration requires the desktop app.");
+    throw new Error(t("Emulator configuration requires the desktop app."));
   },
   async removeEmulator(id: string) {
     if (isDesktop) return invoke("remove_emulator", { id });
@@ -489,7 +504,7 @@ export const bridge = {
   },
   async testEmulator(id: string): Promise<string> {
     if (isDesktop) return invoke("test_emulator", { id });
-    throw new Error("Testing executables requires the desktop app.");
+    throw new Error(t("Testing executables requires the desktop app."));
   },
   /** `slot` starts from a saved state: -1 is the automatic resume state. */
   async launch(
@@ -504,7 +519,7 @@ export const bridge = {
         netplay: netplay ?? null,
       });
     throw new Error(
-      "Open the desktop app to launch a game with your configured emulator.",
+      t("Open the desktop app to launch a game with your configured emulator."),
     );
   },
   /** Phone play: the pairing page phones open from the QR code. */
@@ -515,7 +530,7 @@ export const bridge = {
   },
   async remotePlayStart(): Promise<RemotePlayStatus> {
     if (!isDesktop)
-      throw new Error("Abra o aplicativo desktop para jogar no celular.");
+      throw new Error(t("Abra o aplicativo desktop para jogar no celular."));
     return invoke("remote_play_start");
   },
   async remotePlayStop(): Promise<void> {
@@ -530,7 +545,9 @@ export const bridge = {
   },
   async deleteSaveState(id: string, slot: number): Promise<void> {
     if (!isDesktop)
-      throw new Error("Abra o aplicativo desktop para gerenciar seus saves.");
+      throw new Error(
+        t("Abra o aplicativo desktop para gerenciar seus saves."),
+      );
     return invoke("delete_save_state", { id, slot });
   },
   async runtimeBiosStatus(platformId: string): Promise<boolean> {
@@ -541,10 +558,10 @@ export const bridge = {
   /** Asks for a BIOS file or ZIP and copies it; resolves null when cancelled. */
   async installRuntimeBios(platformId: string): Promise<number | null> {
     if (!isDesktop)
-      throw new Error("Abra o aplicativo desktop para adicionar a BIOS.");
+      throw new Error(t("Abra o aplicativo desktop para adicionar a BIOS."));
     const path = await pickPath({
       directory: false,
-      title: "Selecione a BIOS (.bin) ou um .zip com ela",
+      title: t("Selecione a BIOS (.bin) ou um .zip com ela"),
     });
     return path
       ? invoke("install_runtime_bios", { platform: platformId, path })
@@ -562,7 +579,7 @@ export const bridge = {
   },
   async openGameScreenshots(id: string): Promise<void> {
     if (!isDesktop)
-      throw new Error("Abra o aplicativo desktop para ver suas capturas.");
+      throw new Error(t("Abra o aplicativo desktop para ver suas capturas."));
     return invoke("open_game_screenshots", { id });
   },
   async saveSettings(settings: AppSettings) {
@@ -575,9 +592,9 @@ export const bridge = {
     return isDesktop
       ? invoke("app_paths")
       : {
-          database: "Browser preview · localStorage",
-          cache: "Browser cache",
-          logs: "Browser developer console",
+          database: t("Browser preview · localStorage"),
+          cache: t("Browser cache"),
+          logs: t("Browser developer console"),
         };
   },
 };

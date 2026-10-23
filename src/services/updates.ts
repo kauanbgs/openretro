@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { t } from "../i18n";
 
 export type UpdatePhase =
   "idle" | "available" | "downloading" | "ready" | "installing";
@@ -55,13 +56,19 @@ export function useUpdates({
         if (!alive) return;
         setPhase("ready");
         notify(
-          `OpenRetro ${update.version} foi baixado. Reinicie para atualizar.`,
+          t("OpenRetro {version} foi baixado. Reinicie para atualizar.", {
+            version: update.version,
+          }),
         );
       } catch (error) {
-        console.error("Automatic update failed:", error);
+        console.error(t("Automatic update failed:"), error);
         if (alive) {
           setPhase(found.current ? "available" : "idle");
-          notify(`Não foi possível atualizar o OpenRetro: ${String(error)}`);
+          notify(
+            t("Não foi possível atualizar o OpenRetro: {reason}", {
+              reason: String(error),
+            }),
+          );
         }
       }
     };
@@ -87,14 +94,18 @@ export function useUpdates({
       const update = found.current ?? (await check());
       if (!update) {
         setPhase("idle");
-        notify("OpenRetro já está atualizado.");
+        notify(t("OpenRetro já está atualizado."));
         return;
       }
       if (downloaded.current) await update.install();
       else await update.downloadAndInstall();
       await relaunch();
     } catch (error) {
-      notify(`Não foi possível instalar a atualização: ${String(error)}`);
+      notify(
+        t("Não foi possível instalar a atualização: {reason}", {
+          reason: String(error),
+        }),
+      );
       setPhase(found.current ? "available" : "idle");
     }
   }, [notify]);

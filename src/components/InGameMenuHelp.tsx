@@ -3,6 +3,7 @@ import type { Emulator, LibraryGame } from "../types";
 import { EmulatorManager } from "../services/EmulatorManager";
 import { bridge } from "../services/bridge";
 import { KeyboardMap } from "./KeyboardMap";
+import { t } from "../i18n";
 
 export function hasRuntimeMenu(
   entry: LibraryGame | undefined,
@@ -31,21 +32,26 @@ export function InGameMenuHelp({
 }) {
   if (!hasRuntimeMenu(entry, emulators)) return null;
   return (
-    <section className="runtime-menu-help" aria-label="Menu durante o jogo">
+    <section
+      className="runtime-menu-help"
+      aria-label={t("Menu durante o jogo")}
+    >
       <Gamepad2 size={24} />
       <div>
-        <h2>Menu durante o jogo</h2>
+        <h2>{t("Menu durante o jogo")}</h2>
         <p>
-          Aperte <strong>PS</strong> para pausar e abrir o menu do OpenRetro.
-          Alternativas: <strong>Share + Options</strong> (Select + Start) ou{" "}
+          {t("Aperte")} <strong>{t("PS")}</strong>{" "}
+          {t("para pausar e abrir o menu do OpenRetro. Alternativas:")}{" "}
+          <strong>{t("Share + Options")}</strong> {t("(Select + Start) ou")}{" "}
           <strong>F1</strong>.
         </p>
         <p>
-          Salve e carregue estados, escolha o slot, tire prints, reinicie ou
-          encerre o jogo. Estados dependem do suporte do core.
+          {t(
+            "Salve e carregue estados, escolha o slot, tire prints, reinicie ou encerre o jogo. Estados dependem do suporte do core.",
+          )}
         </p>
         <details className="keyboard-help">
-          <summary>Jogar no teclado</summary>
+          <summary>{t("Jogar no teclado")}</summary>
           <KeyboardMap />
         </details>
       </div>
@@ -57,7 +63,7 @@ export function InGameMenuHelp({
             .catch((error) => notify(String(error)))
         }
       >
-        <Camera size={17} /> Minhas capturas
+        <Camera size={17} /> {t("Minhas capturas")}
       </button>
     </section>
   );

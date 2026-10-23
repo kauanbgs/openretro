@@ -36,6 +36,7 @@ import {
   mods,
   PATCH_FORMATS,
 } from "../../services/mods";
+import { t } from "../../i18n";
 
 /** Requests by job, so a job that stops to ask a question can continue after a remount. */
 const requests = new Map<string, ModInstallRequest>();
@@ -50,8 +51,8 @@ function CompatibilityBadge({
       <span className="mod-badge" data-status="unknown">
         <CircleHelp size={13} />{" "}
         {isDesktop
-          ? "Adicione o jogo para verificar"
-          : "Verificado no aplicativo"}
+          ? t("Adicione o jogo para verificar")
+          : t("Verificado no aplicativo")}
       </span>
     );
   const Icon =
@@ -73,8 +74,8 @@ function CompatibilityBadge({
 
 function variantLabel(variants: GameVariant[], id: string | null) {
   return id === null
-    ? "Jogo original"
-    : (variants.find((v) => v.id === id)?.name ?? "Versão instalada");
+    ? t("Jogo original")
+    : (variants.find((v) => v.id === id)?.name ?? t("Versão instalada"));
 }
 
 export function ModsTab({
@@ -192,16 +193,16 @@ export function ModsTab({
     <div className="mods-tab">
       {!entry && (
         <p className="hint">
-          Você ainda não tem este jogo na biblioteca. Dá para pesquisar e ver os
-          detalhes de cada tradução ou mod; para instalar, adicione o jogo (a
-          compatibilidade é conferida pelo arquivo).
+          {t(
+            "Você ainda não tem este jogo na biblioteca. Dá para pesquisar e ver os detalhes de cada tradução ou mod; para instalar, adicione o jogo (a compatibilidade é conferida pelo arquivo).",
+          )}
         </p>
       )}
       {entry && (
         <section className="mods-section">
           <div className="mods-heading">
-            <h2>Versão para jogar</h2>
-            <small>Jogar e Jogar online usam a versão escolhida.</small>
+            <h2>{t("Versão para jogar")}</h2>
+            <small>{t("Jogar e Jogar online usam a versão escolhida.")}</small>
           </div>
           <div className="variant-list">
             <div
@@ -209,9 +210,9 @@ export function ModsTab({
               data-active={activeId === null || undefined}
             >
               <div>
-                <strong>Jogo original</strong>
+                <strong>{t("Jogo original")}</strong>
                 <small>
-                  Seu arquivo, nunca alterado · SHA-256{" "}
+                  {t("Seu arquivo, nunca alterado · SHA-256")}{" "}
                   {entry.item.sha256.slice(0, 12)}…
                 </small>
               </div>
@@ -221,11 +222,11 @@ export function ModsTab({
                 onClick={() =>
                   void act(
                     () => mods.select(entry.item.id, null),
-                    "O jogo original será usado ao jogar.",
+                    t("O jogo original será usado ao jogar."),
                   )
                 }
               >
-                {activeId === null ? "Em uso" : "Usar o original"}
+                {activeId === null ? t("Em uso") : t("Usar o original")}
               </button>
             </div>
             {variants.map((variant) => (
@@ -244,10 +245,14 @@ export function ModsTab({
                       kindLabels[variant.kind],
                       variant.language && languageLabel(variant.language),
                       variant.authors.length
-                        ? `por ${variant.authors.join(", ")}`
+                        ? t("por {authors}", {
+                            authors: variant.authors.join(", "),
+                          })
                         : null,
                       variant.parentId
-                        ? `sobre ${variantLabel(variants, variant.parentId)}`
+                        ? t("sobre {base}", {
+                            base: variantLabel(variants, variant.parentId),
+                          })
                         : null,
                       variant.format,
                     ]
@@ -256,10 +261,12 @@ export function ModsTab({
                   </small>
                   <small>
                     {variant.saves === "shared"
-                      ? "Usa os saves do original (o autor confirmou que são compatíveis); estados salvos ficam separados."
-                      : "Saves e estados salvos separados do original."}
+                      ? t(
+                          "Usa os saves do original (o autor confirmou que são compatíveis); estados salvos ficam separados.",
+                        )
+                      : t("Saves e estados salvos separados do original.")}
                     {variant.compatibility === "unknown"
-                      ? " Instalada sem compatibilidade confirmada."
+                      ? t(" Instalada sem compatibilidade confirmada.")
                       : ""}
                   </small>
                   {variant.sourceUrl && (
@@ -280,16 +287,20 @@ export function ModsTab({
                     onClick={() =>
                       void act(
                         () => mods.select(entry.item.id, variant.id),
-                        `"${variant.name}" será usada ao jogar.`,
+                        t("“{name}” será usada ao jogar.", {
+                          name: variant.name,
+                        }),
                       )
                     }
                   >
-                    {activeId === variant.id ? "Em uso" : "Usar esta versão"}
+                    {activeId === variant.id
+                      ? t("Em uso")
+                      : t("Usar esta versão")}
                   </button>
                   <button
                     className="icon-button"
-                    aria-label={`Remover ${variant.name}`}
-                    title="Remover esta versão"
+                    aria-label={t("Remover {name}", { name: variant.name })}
+                    title={t("Remover esta versão")}
                     disabled={busy || running}
                     onClick={() => setRemoving(variant)}
                   >
@@ -319,7 +330,7 @@ export function ModsTab({
             const request = requests.get(job.id);
             if (!request)
               return notify(
-                "Abra a modificação de novo na lista para tentar outra vez.",
+                t("Abra a modificação de novo na lista para tentar outra vez."),
               );
             void start({ ...request, ...change }, job.id);
           }}
@@ -333,47 +344,53 @@ export function ModsTab({
             disabled={busy || installing || Boolean(data?.unpatchable)}
             onClick={() => setLocal(true)}
           >
-            <FileUp size={16} /> Importar patch local
+            <FileUp size={16} /> {t("Importar patch local")}
           </button>
         )}
 
         {isDesktop && (
           <button className="text-button" onClick={() => setSources(true)}>
-            <Settings2 size={14} /> Fontes
+            <Settings2 size={14} /> {t("Fontes")}
           </button>
         )}
       </div>
       {data?.unpatchable && (
         <p className="hint">
-          {data.unpatchable} OpenRetro aplica patches {PATCH_FORMATS.join(", ")}{" "}
-          em jogos de um único arquivo; outros tipos de mod precisam de suporte
-          específico.
+          {data.unpatchable} {t("OpenRetro aplica patches")}{" "}
+          {PATCH_FORMATS.join(", ")}{" "}
+          {t(
+            "em jogos de um único arquivo; outros tipos de mod precisam de suporte específico.",
+          )}
         </p>
       )}
       {!isDesktop && (
         <p className="hint">
-          Instalar modificações exige o aplicativo OpenRetro no computador.
+          {t(
+            "Instalar modificações exige o aplicativo OpenRetro no computador.",
+          )}
         </p>
       )}
 
       {overview.isLoading ? (
         <div className="catalog-loading">
           <LoaderCircle className="spin" size={22} />
-          <p>Conferindo seu arquivo e o catálogo…</p>
+          <p>{t("Conferindo seu arquivo e o catálogo…")}</p>
         </div>
       ) : overview.error ? (
         <p className="error-message">{String(overview.error)}</p>
       ) : (
         <ListingSection
-          title="Do catálogo"
+          title={t("Do catálogo")}
           listings={data?.listings ?? []}
           variants={variants}
           canInstall={Boolean(entry) && isDesktop && !installing && !busy}
           hasGame={Boolean(entry)}
           empty={
             entry
-              ? "Nenhuma tradução ou mod deste jogo nas suas fontes. Você pode importar um patch que já tenha."
-              : "Nenhuma tradução ou mod deste jogo nas suas fontes."
+              ? t(
+                  "Nenhuma tradução ou mod deste jogo nas suas fontes. Você pode importar um patch que já tenha.",
+                )
+              : t("Nenhuma tradução ou mod deste jogo nas suas fontes.")
           }
           onInstall={install}
         />
@@ -389,11 +406,11 @@ export function ModsTab({
           <div className="download-option-search">
             <Search size={17} />
             <input
-              aria-label="Pesquisar no Romhack Plaza"
+              aria-label={t("Pesquisar no Romhack Plaza")}
               value={plazaInput}
               maxLength={200}
               onChange={(event) => setPlazaInput(event.target.value)}
-              placeholder="Nome do jogo, da tradução ou do romhack"
+              placeholder={t("Nome do jogo, da tradução ou do romhack")}
             />
           </div>
           <button
@@ -401,7 +418,7 @@ export function ModsTab({
             type="submit"
             disabled={plaza.isFetching}
           >
-            Buscar no Romhack Plaza
+            {t("Buscar no Romhack Plaza")}
           </button>
         </form>
       )}
@@ -409,7 +426,7 @@ export function ModsTab({
         (plaza.isFetching ? (
           <div className="catalog-loading">
             <LoaderCircle className="spin" size={22} />
-            <p>Buscando no Romhack Plaza…</p>
+            <p>{t("Buscando no Romhack Plaza…")}</p>
           </div>
         ) : plaza.error ? (
           <p className="error-message">{String(plaza.error)}</p>
@@ -427,21 +444,21 @@ export function ModsTab({
 
       {confirm && (
         <Modal
-          title="Compatibilidade desconhecida"
+          title={t("Compatibilidade desconhecida")}
           onClose={() => setConfirm(undefined)}
         >
           <p className="muted">{confirm.listing.compatibility?.reason}</p>
           <p className="muted">
-            A instalação cria uma cópia; seu arquivo original e seus saves não
-            mudam. Se o patch não servir, a cópia não é registrada e nada fica
-            para trás. A nova versão terá saves separados.
+            {t(
+              "A instalação cria uma cópia; seu arquivo original e seus saves não mudam. Se o patch não servir, a cópia não é registrada e nada fica para trás. A nova versão terá saves separados.",
+            )}
           </p>
           <div className="modal-footer">
             <button
               className="button secondary"
               onClick={() => setConfirm(undefined)}
             >
-              Cancelar
+              {t("Cancelar")}
             </button>
             <button
               className="button primary"
@@ -450,21 +467,23 @@ export function ModsTab({
                 setConfirm(undefined);
               }}
             >
-              Instalar assim mesmo
+              {t("Instalar assim mesmo")}
             </button>
           </div>
         </Modal>
       )}
       {removing && entry && (
         <Modal
-          title="Remover esta versão?"
+          title={t("Remover esta versão?")}
           onClose={() => setRemoving(undefined)}
         >
           <p className="muted">
-            A cópia modificada de {removing.name} e os saves dela serão
-            apagados. O jogo original e os saves dele continuam como estão.
+            {t("A cópia modificada de")} {removing.name}{" "}
+            {t(
+              "e os saves dela serão apagados. O jogo original e os saves dele continuam como estão.",
+            )}
             {variants.some((v) => v.parentId === removing.id)
-              ? " Versões instaladas sobre esta também serão removidas."
+              ? t(" Versões instaladas sobre esta também serão removidas.")
               : ""}
           </p>
           <div className="modal-footer">
@@ -472,7 +491,7 @@ export function ModsTab({
               className="button secondary"
               onClick={() => setRemoving(undefined)}
             >
-              Manter
+              {t("Manter")}
             </button>
             <button
               className="button danger"
@@ -481,10 +500,10 @@ export function ModsTab({
                 void act(async () => {
                   await mods.remove(removing.id);
                   setRemoving(undefined);
-                }, "Versão removida. O jogo original continua intacto.")
+                }, t("Versão removida. O jogo original continua intacto."))
               }
             >
-              Remover versão
+              {t("Remover versão")}
             </button>
           </div>
         </Modal>
@@ -541,7 +560,7 @@ function JobCard({
       </div>
       {jobRunning(job) && (
         <progress
-          aria-label={`Progresso de ${job.name}`}
+          aria-label={t("Progresso de {name}", { name: job.name })}
           value={job.progress}
           max={100}
         />
@@ -550,10 +569,12 @@ function JobCard({
       {job.state === "NEEDS_CHOICE" && (
         <label>
           {job.choiceKind === "file"
-            ? "Este item tem vários arquivos. Qual baixar?"
-            : "O pacote tem vários patches. Qual instalar? Não combine patches sem as instruções do autor."}
+            ? t("Este item tem vários arquivos. Qual baixar?")
+            : t(
+                "O pacote tem vários patches. Qual instalar? Não combine patches sem as instruções do autor.",
+              )}
           <select value={choice} onChange={(e) => setChoice(e.target.value)}>
-            <option value="">Escolha…</option>
+            <option value="">{t("Escolha…")}</option>
             {job.choices.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -569,7 +590,7 @@ function JobCard({
             disabled={busy}
             onClick={onCancel}
           >
-            Cancelar
+            {t("Cancelar")}
           </button>
         ) : (
           <>
@@ -585,7 +606,7 @@ function JobCard({
                   )
                 }
               >
-                Continuar
+                {t("Continuar")}
               </button>
             )}
             {job.state === "FAILED" && (
@@ -594,12 +615,12 @@ function JobCard({
                 disabled={busy}
                 onClick={() => onRetry({})}
               >
-                Tentar de novo
+                {t("Tentar de novo")}
               </button>
             )}
             {done && (
               <button className="text-button" onClick={onDismiss}>
-                Fechar
+                {t("Fechar")}
               </button>
             )}
           </>
@@ -678,7 +699,7 @@ function ModCard({
         <div className="mod-images">
           <img
             src={entry.images[image]}
-            alt={`Imagem de ${entry.title}`}
+            alt={t("Imagem de {title}", { title: entry.title })}
             loading="lazy"
             referrerPolicy="no-referrer"
           />
@@ -687,7 +708,7 @@ function ModCard({
               {entry.images.map((src, i) => (
                 <button
                   key={src}
-                  aria-label={`Imagem ${i + 1}`}
+                  aria-label={t("Imagem {number}", { number: i + 1 })}
                   data-selected={i === image || undefined}
                   onClick={() => setImage(i)}
                 />
@@ -711,13 +732,19 @@ function ModCard({
             {kindLabels[entry.kind]}
           </span>
           <span>{languageLabel(entry.language)}</span>
-          <span>Versão {entry.version}</span>
-          <span>por {entry.authors.join(", ")}</span>
+          <span>
+            {t("Versão")} {entry.version}
+          </span>
+          <span>
+            {t("por")} {entry.authors.join(", ")}
+          </span>
           {entry.patch.format && (
             <span>{entry.patch.format.toUpperCase()}</span>
           )}
           {entry.patch.size ? (
-            <span>Download de {formatBytes(entry.patch.size)}</span>
+            <span>
+              {t("Download de")} {formatBytes(entry.patch.size)}
+            </span>
           ) : null}
         </p>
         {entry.description && (
@@ -731,16 +758,16 @@ function ModCard({
           <p className="mod-reason">{listing.compatibility.reason}</p>
         )}
         <details className="mod-details">
-          <summary>Requisitos e créditos</summary>
+          <summary>{t("Requisitos e créditos")}</summary>
           <dl>
-            <dt>Jogo</dt>
+            <dt>{t("Jogo")}</dt>
             <dd>
               {entry.game.title}
               {edition ? ` (${edition})` : ""}
             </dd>
             {entry.requirements.length > 0 && (
               <>
-                <dt>Requisitos</dt>
+                <dt>{t("Requisitos")}</dt>
                 <dd>
                   <ul>
                     {entry.requirements.map((r) => (
@@ -752,7 +779,7 @@ function ModCard({
             )}
             {entry.credits.length > 0 && (
               <>
-                <dt>Créditos</dt>
+                <dt>{t("Créditos")}</dt>
                 <dd>
                   <ul>
                     {entry.credits.map((c) => (
@@ -764,17 +791,19 @@ function ModCard({
             )}
             {entry.license && (
               <>
-                <dt>Licença</dt>
+                <dt>{t("Licença")}</dt>
                 <dd>{entry.license}</dd>
               </>
             )}
-            <dt>Saves</dt>
+            <dt>{t("Saves")}</dt>
             <dd>
               {entry.saves === "shared"
-                ? "O autor confirma que os saves do original funcionam."
-                : "Separados do original: compatibilidade não confirmada pelo autor."}
+                ? t("O autor confirma que os saves do original funcionam.")
+                : t(
+                    "Separados do original: compatibilidade não confirmada pelo autor.",
+                  )}
             </dd>
-            <dt>Fonte</dt>
+            <dt>{t("Fonte")}</dt>
             <dd>{listing.sourceName}</dd>
           </dl>
         </details>
@@ -785,32 +814,33 @@ function ModCard({
             target="_blank"
             rel="noreferrer"
           >
-            <ExternalLink size={15} /> Página do autor
+            <ExternalLink size={15} /> {t("Página do autor")}
           </a>
           {installed ? (
             <span className="mod-badge" data-status="confirmed">
-              <CheckCircle2 size={13} /> Instalada
+              <CheckCircle2 size={13} /> {t("Instalada")}
             </span>
           ) : entry.distribution === "link" ? (
             <span className="hint">
-              O autor distribui só pela página dele: baixe lá e use "Importar
-              patch local".
+              {t(
+                'O autor distribui só pela página dele: baixe lá e use "Importar patch local".',
+              )}
             </span>
           ) : !hasGame ? (
             <span className="hint">
-              Adicione o jogo à biblioteca para instalar.
+              {t("Adicione o jogo à biblioteca para instalar.")}
             </span>
           ) : canInstall && targets.length ? (
             <>
               {targets.length > 1 && (
                 <select
-                  aria-label="Instalar sobre"
+                  aria-label={t("Instalar sobre")}
                   value={target ?? ""}
                   onChange={(e) => setTarget(e.target.value || null)}
                 >
-                  {targets.map((t) => (
-                    <option key={t ?? "original"} value={t ?? ""}>
-                      Sobre: {variantLabel(variants, t)}
+                  {targets.map((option) => (
+                    <option key={option ?? "original"} value={option ?? ""}>
+                      {t("Sobre:")} {variantLabel(variants, option)}
                     </option>
                   ))}
                 </select>
@@ -819,7 +849,7 @@ function ModCard({
                 className="button primary"
                 onClick={() => onInstall(listing, target)}
               >
-                <Download size={15} /> Instalar
+                <Download size={15} /> {t("Instalar")}
               </button>
             </>
           ) : null}
@@ -875,12 +905,13 @@ function LocalImport({
     (status !== "unknown" || acceptUnknown) &&
     (parent === null || acceptStack);
   return (
-    <Modal title="Importar patch local" onClose={onClose}>
+    <Modal title={t("Importar patch local")} onClose={onClose}>
       <div className="form-stack">
         <p className="muted">
-          Escolha um patch {PATCH_FORMATS.join(", ")}, ou um .zip/.7z que o
-          contenha. Só o patch é lido do pacote; nada dele é executado. O
-          OpenRetro aplica em uma cópia e mantém seu arquivo original.
+          {t("Escolha um patch")} {PATCH_FORMATS.join(", ")}
+          {t(
+            ", ou um .zip/.7z que o contenha. Só o patch é lido do pacote; nada dele é executado. O OpenRetro aplica em uma cópia e mantém seu arquivo original.",
+          )}
         </p>
         <button
           className="button secondary"
@@ -900,18 +931,18 @@ function LocalImport({
           }
         >
           <FileUp size={16} />{" "}
-          {path ? "Escolher outro arquivo" : "Escolher arquivo"}
+          {path ? t("Escolher outro arquivo") : t("Escolher arquivo")}
         </button>
         {path && <code className="hash">{path}</code>}
         {checking && (
           <p className="muted">
-            <LoaderCircle className="spin" size={14} /> Lendo o patch e
-            conferindo seu jogo…
+            <LoaderCircle className="spin" size={14} />{" "}
+            {t("Lendo o patch e conferindo seu jogo…")}
           </p>
         )}
         {info?.choices.length ? (
           <label>
-            O pacote tem vários patches. Escolha um:
+            {t("O pacote tem vários patches. Escolha um:")}
             <select
               value={archivePath ?? ""}
               onChange={(e) => {
@@ -920,7 +951,7 @@ function LocalImport({
                   void inspect(path, e.target.value, parent);
               }}
             >
-              <option value="">Escolha…</option>
+              <option value="">{t("Escolha…")}</option>
               {info.choices.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -931,7 +962,7 @@ function LocalImport({
         ) : null}
         {variants.length > 0 && (
           <label>
-            Aplicar sobre
+            {t("Aplicar sobre")}
             <select
               value={parent ?? ""}
               onChange={(e) => {
@@ -941,7 +972,7 @@ function LocalImport({
                 if (path) void inspect(path, archivePath, value);
               }}
             >
-              <option value="">Jogo original</option>
+              <option value="">{t("Jogo original")}</option>
               {variants.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -969,8 +1000,9 @@ function LocalImport({
               checked={acceptUnknown}
               onChange={(e) => setAcceptUnknown(e.target.checked)}
             />{" "}
-            Entendo que a compatibilidade não pôde ser confirmada. A versão terá
-            saves separados.
+            {t(
+              "Entendo que a compatibilidade não pôde ser confirmada. A versão terá saves separados.",
+            )}
           </label>
         )}
         {parent !== null && (
@@ -980,17 +1012,17 @@ function LocalImport({
               checked={acceptStack}
               onChange={(e) => setAcceptStack(e.target.checked)}
             />{" "}
-            O autor indica que este patch funciona sobre "
+            {t('O autor indica que este patch funciona sobre "')}
             {variantLabel(variants, parent)}".
           </label>
         )}
         <label>
-          Nome da versão
+          {t("Nome da versão")}
           <input
             value={name}
             maxLength={120}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ex.: Tradução PT-BR"
+            placeholder={t("Ex.: Tradução PT-BR")}
           />
         </label>
         <button
@@ -1009,7 +1041,7 @@ function LocalImport({
             })
           }
         >
-          Instalar como nova versão
+          {t("Instalar como nova versão")}
         </button>
       </div>
     </Modal>
@@ -1050,20 +1082,20 @@ function SourcesDialog({
     }
   }
   return (
-    <Modal title="Fontes de traduções e mods" onClose={onClose}>
+    <Modal title={t("Fontes de traduções e mods")} onClose={onClose}>
       <div className="form-stack">
         <section>
-          <h3>Catálogos</h3>
+          <h3>{t("Catálogos")}</h3>
           <div className="mod-sources">
             {(sources.data ?? []).map((source) => (
               <div className="variant-row" key={source.id}>
                 <div>
                   <strong>{source.name}</strong>
                   <small>
-                    {source.entries} itens
+                    {source.entries} {t("itens")}
                     {source.url
                       ? ` · ${source.url}`
-                      : " · incluído no OpenRetro"}
+                      : t(" · incluído no OpenRetro")}
                   </small>
                 </div>
                 {source.url && (
@@ -1077,21 +1109,21 @@ function SourcesDialog({
                           void act(
                             () => mods.setSource(source.id, e.target.checked),
                             e.target.checked
-                              ? "Fonte ativada."
-                              : "Fonte desativada.",
+                              ? t("Fonte ativada.")
+                              : t("Fonte desativada."),
                           )
                         }
                       />{" "}
-                      Ativa
+                      {t("Ativa")}
                     </label>
                     <button
                       className="icon-button"
-                      aria-label={`Remover ${source.name}`}
+                      aria-label={t("Remover {name}", { name: source.name })}
                       disabled={busy}
                       onClick={() =>
                         void act(
                           () => mods.removeSource(source.id),
-                          "Fonte removida.",
+                          t("Fonte removida."),
                         )
                       }
                     >
@@ -1103,12 +1135,12 @@ function SourcesDialog({
             ))}
           </div>
           <label>
-            Adicionar catálogo (URL HTTPS de um JSON openretro-mods/1)
+            {t("Adicionar catálogo (URL HTTPS de um JSON openretro-mods/1)")}
             <div className="input-action">
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://exemplo.org/mods.json"
+                placeholder={t("https://exemplo.org/mods.json")}
               />
               <button
                 className="button secondary"
@@ -1117,27 +1149,25 @@ function SourcesDialog({
                   void act(async () => {
                     await mods.addSource(url.trim());
                     setUrl("");
-                  }, "Catálogo adicionado.")
+                  }, t("Catálogo adicionado."))
                 }
               >
-                Adicionar
+                {t("Adicionar")}
               </button>
             </div>
           </label>
         </section>
         <section>
-          <h3>Romhack Plaza</h3>
+          <h3>{t("Romhack Plaza")}</h3>
           <p className="muted">
-            A API do Romhack Plaza exige a chave da sua própria conta (crie em
-            Settings → API Keys no site, com os escopos entries:read e
-            entries:download). O OpenRetro respeita os limites de consultas e
-            downloads por minuto e não copia o acervo do site. A chave fica só
-            neste computador.
+            {t(
+              "A API do Romhack Plaza exige a chave da sua própria conta (crie em Settings → API Keys no site, com os escopos entries:read e entries:download). O OpenRetro respeita os limites de consultas e downloads por minuto e não copia o acervo do site. A chave fica só neste computador.",
+            )}
           </p>
           {hasKey ? (
             <div className="variant-row">
               <div>
-                <strong>Chave configurada</strong>
+                <strong>{t("Chave configurada")}</strong>
               </div>
               <button
                 className="button secondary"
@@ -1146,10 +1176,10 @@ function SourcesDialog({
                   void act(async () => {
                     await mods.setPlazaKey(null);
                     setHasKey(false);
-                  }, "Chave removida.")
+                  }, t("Chave removida."))
                 }
               >
-                Remover chave
+                {t("Remover chave")}
               </button>
             </div>
           ) : (
@@ -1159,8 +1189,8 @@ function SourcesDialog({
                 autoComplete="off"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                placeholder="Chave de API"
-                aria-label="Chave de API do Romhack Plaza"
+                placeholder={t("Chave de API")}
+                aria-label={t("Chave de API do Romhack Plaza")}
               />
               <button
                 className="button secondary"
@@ -1170,10 +1200,10 @@ function SourcesDialog({
                     await mods.setPlazaKey(key.trim());
                     setKey("");
                     setHasKey(true);
-                  }, "Chave salva.")
+                  }, t("Chave salva."))
                 }
               >
-                Salvar
+                {t("Salvar")}
               </button>
             </div>
           )}
@@ -1183,7 +1213,7 @@ function SourcesDialog({
             target="_blank"
             rel="noreferrer"
           >
-            Regras de uso da API <ExternalLink size={12} />
+            {t("Regras de uso da API")} <ExternalLink size={12} />
           </a>
         </section>
       </div>

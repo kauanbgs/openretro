@@ -10,6 +10,7 @@ import {
   validNetplayHost,
 } from "../../services/netplayInvites";
 import { NETPLAY_DEFAULT_PORT, type NetplaySession } from "../../types";
+import { t } from "../../i18n";
 
 /** VPN invitations wrap the existing direct-IP transport; no room server is needed. */
 export function NetplayDialog({
@@ -86,19 +87,19 @@ export function NetplayDialog({
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(hostCode);
-      notify("Convite copiado. Inicie a partida antes de seu amigo entrar.");
+      notify(t("Convite copiado. Inicie a partida antes de seu amigo entrar."));
     } catch {
-      notify("Selecione e copie o código no campo Convite.");
+      notify(t("Selecione e copie o código no campo Convite."));
     }
   }
 
   return (
-    <Modal title="Jogar online" onClose={onClose}>
-      <div className="tabs" role="tablist" aria-label="Modo de conexão">
+    <Modal title={t("Jogar online")} onClose={onClose}>
+      <div className="tabs" role="tablist" aria-label={t("Modo de conexão")}>
         {(
           [
-            ["host", "Hospedar partida"],
-            ["join", "Entrar em uma partida"],
+            ["host", t("Hospedar partida")],
+            ["join", t("Entrar em uma partida")],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -114,38 +115,40 @@ export function NetplayDialog({
       </div>
       <div className="form-stack">
         <p className="hint">
-          Em redes diferentes, conectem os dispositivos à mesma rede do
-          Tailscale ou Radmin VPN antes de jogar. Cada PC precisa do mesmo jogo
-          e core compatível.
+          {t(
+            "Em redes diferentes, conectem os dispositivos à mesma rede do Tailscale ou Radmin VPN antes de jogar. Cada PC precisa do mesmo jogo e core compatível.",
+          )}
         </p>
         {role === "host" ? (
           <>
             <p className="hint">
-              Você hospeda {title}. Gere o convite e depois escolha Hospedar e
-              jogar.
+              {t("Você hospeda")} {title}
+              {t(". Gere o convite e depois escolha Hospedar e jogar.")}
             </p>
             <label>
-              Seu endereço na VPN (sem porta)
+              {t("Seu endereço na VPN (sem porta)")}
               <input
                 value={hostAddress}
                 maxLength={253}
                 onChange={(e) => setHostAddress(e.target.value)}
-                placeholder="Ex.: 100.64.0.2 — copie do aplicativo da VPN"
+                placeholder={t("Ex.: 100.64.0.2 — copie do aplicativo da VPN")}
               />
             </label>
             <p className="hint">
-              Endereço local detectado: {localAddress.data ?? "indisponível"}.
-              Para jogar pela VPN, use o endereço mostrado nela. Na mesma rede
-              Wi-Fi, você pode usar o endereço local.
+              {t("Endereço local detectado:")}{" "}
+              {localAddress.data ?? t("indisponível")}
+              {t(
+                ". Para jogar pela VPN, use o endereço mostrado nela. Na mesma rede Wi-Fi, você pode usar o endereço local.",
+              )}
             </p>
             {hostAddress.trim() && !validNetplayHost(hostAddress.trim()) && (
               <p className="error-message" role="alert">
-                Digite somente o IP ou nome do computador, sem porta.
+                {t("Digite somente o IP ou nome do computador, sem porta.")}
               </p>
             )}
             {hostCode && (
               <label>
-                Convite
+                {t("Convite")}
                 <div className="input-action">
                   <input
                     readOnly
@@ -154,7 +157,7 @@ export function NetplayDialog({
                   />
                   <button
                     className="icon-button"
-                    aria-label="Copiar convite"
+                    aria-label={t("Copiar convite")}
                     onClick={() => void copyInvite()}
                   >
                     <Copy size={17} />
@@ -167,38 +170,40 @@ export function NetplayDialog({
               validNetplayHost(hostAddress.trim()) &&
               !hostCode && (
                 <p className="hint">
-                  Não foi possível gerar um convite com os dados deste jogo. Use
-                  a conexão por endereço.
+                  {t(
+                    "Não foi possível gerar um convite com os dados deste jogo. Use a conexão por endereço.",
+                  )}
                 </p>
               )}
             <p className="hint">
-              O convite contém o endereço e os dados do jogo, sem a senha. Ele
-              não cria uma VPN nem abre portas. Pela internet sem VPN, use seu
-              IP público e permita a porta {portNumber} no roteador.
+              {t(
+                "O convite contém o endereço e os dados do jogo, sem a senha. Ele não cria uma VPN nem abre portas. Pela internet sem VPN, use seu IP público e permita a porta",
+              )}{" "}
+              {portNumber} {t("no roteador.")}
             </p>
           </>
         ) : (
           <>
             <label>
-              Entrar usando
+              {t("Entrar usando")}
               <select
                 value={joinMode}
                 onChange={(e) => setJoinMode(e.target.value)}
               >
-                <option value="invite">Convite do OpenRetro</option>
-                <option value="address">Endereço e porta</option>
+                <option value="invite">{t("Convite do OpenRetro")}</option>
+                <option value="address">{t("Endereço e porta")}</option>
               </select>
             </label>
             {usingInvite ? (
               <>
                 <label>
-                  Código de convite
+                  {t("Código de convite")}
                   <input
                     autoFocus
                     value={code}
                     maxLength={4096}
                     onChange={(e) => setCode(e.target.value)}
-                    placeholder="Cole o código OPENRETRO1.…"
+                    placeholder={t("Cole o código OPENRETRO1.…")}
                     spellCheck={false}
                   />
                 </label>
@@ -209,21 +214,23 @@ export function NetplayDialog({
                 )}
                 {invite && (
                   <p className="hint" role="status">
-                    Arquivo e console conferidos: {invite.title}. Conexão com{" "}
-                    {invite.address}, porta {invite.port}. O runtime verifica a
-                    compatibilidade do core ao conectar. Aguarde o anfitrião
-                    iniciar.
+                    {t("Arquivo e console conferidos:")} {invite.title}
+                    {t(". Conexão com")} {invite.address}
+                    {t(", porta")} {invite.port}
+                    {t(
+                      ". O runtime verifica a compatibilidade do core ao conectar. Aguarde o anfitrião iniciar.",
+                    )}
                   </p>
                 )}
               </>
             ) : (
               <label>
-                Endereço de quem está hospedando
+                {t("Endereço de quem está hospedando")}
                 <input
                   autoFocus
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="192.168.0.10 ou 100.64.0.2:55435"
+                  placeholder={t("192.168.0.10 ou 100.64.0.2:55435")}
                 />
               </label>
             )}
@@ -231,7 +238,7 @@ export function NetplayDialog({
         )}
         {!usingInvite && (
           <label>
-            Porta
+            {t("Porta")}
             <input
               inputMode="numeric"
               value={port}
@@ -240,21 +247,21 @@ export function NetplayDialog({
           </label>
         )}
         <label>
-          Senha da partida (opcional)
+          {t("Senha da partida (opcional)")}
           <input
             value={password}
             maxLength={64}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={
               role === "host"
-                ? "Compartilhe separadamente do convite"
-                : "Digite a senha informada pelo anfitrião"
+                ? t("Compartilhe separadamente do convite")
+                : t("Digite a senha informada pelo anfitrião")
             }
           />
         </label>
         {!usingInvite && !validPort && (
           <p className="error-message" role="alert">
-            Use uma porta entre 1024 e 65535.
+            {t("Use uma porta entre 1024 e 65535.")}
           </p>
         )}
         <button
@@ -275,7 +282,7 @@ export function NetplayDialog({
           }
         >
           {role === "host" ? <Globe2 size={17} /> : <LogIn size={17} />}{" "}
-          {role === "host" ? "Hospedar e jogar" : "Entrar e jogar"}
+          {role === "host" ? t("Hospedar e jogar") : t("Entrar e jogar")}
         </button>
       </div>
     </Modal>

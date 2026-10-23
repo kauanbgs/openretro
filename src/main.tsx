@@ -6,6 +6,9 @@ import "./fonts.css";
 import "./styles.css";
 import "./hydra.css";
 import { isRemote } from "./services/transport";
+import { bridge } from "./services/bridge";
+import { adoptLanguage } from "./i18n";
+import { t } from "./i18n";
 // A paired phone gets the touch layout in hydra.css.
 document.documentElement.classList.toggle("remote", isRemote);
 const InGameOverlay = lazy(() =>
@@ -34,7 +37,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         fallback={
           inGameWindow ? null : (
             <div className="app-boot" role="status">
-              Iniciando OpenRetro…
+              {t("Iniciando OpenRetro…")}
             </div>
           )
         }
@@ -43,4 +46,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       </Suspense>
     </QueryClientProvider>
   </React.StrictMode>,
+);
+// The window starts in the cached language; the saved choice wins, reloading
+// once when they differ (first start, another device, or a changed setting).
+bridge.settings().then(
+  (settings) => adoptLanguage(settings.interfaceLanguage),
+  () => undefined,
 );

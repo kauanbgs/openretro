@@ -8,6 +8,8 @@ import {
   parseDownloadSource,
 } from "../../services/downloadSources";
 import type { DownloadSource } from "../../types";
+import { locale, t } from "../../i18n";
+
 export function SourceManager() {
   const client = useQueryClient();
   const sources = useQuery({
@@ -49,14 +51,15 @@ export function SourceManager() {
     <section className="source-manager">
       <div className="section-heading">
         <div>
-          <h2>Fontes de download</h2>
+          <h2>{t("Fontes de download")}</h2>
           <p className="muted">
-            Add a Hydra-compatible JSON file or URL containing HTTPS links and
-            magnet links.
+            {t(
+              "Add a Hydra-compatible JSON file or URL containing HTTPS links and magnet links.",
+            )}
           </p>
         </div>
         <button className="button secondary" onClick={() => edit(null)}>
-          <Plus size={16} /> Add source
+          <Plus size={16} /> {t("Add source")}
         </button>
       </div>
       {sources.error && (
@@ -71,8 +74,9 @@ export function SourceManager() {
       )}
       {!sources.isPending && !sources.data?.length && (
         <p className="notice">
-          Nenhuma fonte adicionada. Importe um JSON ou uma URL para encontrar
-          jogos.
+          {t(
+            "Nenhuma fonte adicionada. Importe um JSON ou uma URL para encontrar jogos.",
+          )}
         </p>
       )}
       <div className="source-list">
@@ -82,20 +86,20 @@ export function SourceManager() {
             <div className="source-info">
               <strong>{s.name}</strong>
               <p>
-                {s.gameCount.toLocaleString()} downloads{" "}
+                {s.gameCount.toLocaleString(locale())} {t("downloads")}{" "}
                 <span className="muted">
-                  / {s.enabled ? "Enabled" : "Disabled"}
+                  / {s.enabled ? t("Enabled") : t("Disabled")}
                 </span>
               </p>
               <small>
-                {s.url ? "Remote JSON" : "Imported JSON"} / Updated{" "}
-                {new Date(s.updatedAt).toLocaleDateString()}
+                {s.url ? t("Remote JSON") : t("Imported JSON")} {t("/ Updated")}{" "}
+                {new Date(s.updatedAt).toLocaleDateString(locale())}
               </small>
             </div>
             <button
               className={`switch ${s.enabled ? "on" : ""}`}
               role="switch"
-              aria-label={`Enable ${s.name}`}
+              aria-label={t("Enable {name}", { name: s.name })}
               aria-checked={s.enabled}
               disabled={busy}
               onClick={() =>
@@ -106,8 +110,8 @@ export function SourceManager() {
             </button>
             <button
               className="icon-button"
-              title={s.url ? "Refresh source" : "Replace JSON"}
-              aria-label={`Update ${s.name}`}
+              title={s.url ? t("Refresh source") : t("Replace JSON")}
+              aria-label={t("Update {name}", { name: s.name })}
               disabled={busy}
               onClick={() =>
                 s.url
@@ -119,7 +123,7 @@ export function SourceManager() {
             </button>
             <button
               className="icon-button"
-              aria-label={`Remove ${s.name}`}
+              aria-label={t("Remove {name}", { name: s.name })}
               disabled={busy}
               onClick={() => void run(() => bridge.removeDownloadSource(s.id))}
             >
@@ -130,7 +134,7 @@ export function SourceManager() {
       </div>
       {editing !== undefined && (
         <Modal
-          title={editing ? "Atualizar fonte" : "Adicionar fonte"}
+          title={editing ? t("Atualizar fonte") : t("Adicionar fonte")}
           onClose={() => {
             if (!busy) setEditing(undefined);
           }}
@@ -156,30 +160,31 @@ export function SourceManager() {
                 className={mode === "url" ? "selected" : ""}
                 onClick={() => setMode("url")}
               >
-                <Link size={15} /> URL
+                <Link size={15} /> {t("URL")}
               </button>
               <button
                 type="button"
                 className={mode === "json" ? "selected" : ""}
                 onClick={() => setMode("json")}
               >
-                <FileJson size={15} /> Arquivo ou texto JSON
+                <FileJson size={15} /> {t("Arquivo ou texto JSON")}
               </button>
             </div>
             {mode === "url" ? (
               <label>
-                URL da fonte
+                {t("URL da fonte")}
                 <input
-                  aria-label="URL da fonte"
+                  aria-label={t("URL da fonte")}
                   type="url"
                   required
-                  placeholder="https://example.com/source.json"
+                  placeholder={t("https://example.com/source.json")}
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                 />
                 <small>
-                  HTTPS. Refresh imports the latest version without losing the
-                  saved source.
+                  {t(
+                    "HTTPS. Refresh imports the latest version without losing the saved source.",
+                  )}
                 </small>
               </label>
             ) : (
@@ -193,7 +198,7 @@ export function SourceManager() {
                     const f = e.target.files?.[0];
                     if (!f) return;
                     if (f.size > MAX_SOURCE_BYTES) {
-                      setError("Source exceeds the 16 MB limit.");
+                      setError(t("Source exceeds the 16 MB limit."));
                       return;
                     }
                     void f
@@ -202,7 +207,9 @@ export function SourceManager() {
                         setText(t);
                         setError("");
                       })
-                      .catch(() => setError("Could not read this JSON file."));
+                      .catch(() =>
+                        setError(t("Could not read this JSON file.")),
+                      );
                     e.target.value = "";
                   }}
                 />
@@ -217,12 +224,12 @@ export function SourceManager() {
                     });
                   }}
                 >
-                  <Upload size={16} /> Escolher arquivo JSON
+                  <Upload size={16} /> {t("Escolher arquivo JSON")}
                 </button>
                 <label>
-                  Conteúdo JSON
+                  {t("Conteúdo JSON")}
                   <textarea
-                    aria-label="Conteúdo JSON"
+                    aria-label={t("Conteúdo JSON")}
                     rows={10}
                     value={text}
                     required
@@ -235,8 +242,9 @@ export function SourceManager() {
               </>
             )}
             <p className="hint">
-              HTTPS links and magnet entries are imported. Sources are stored on
-              this device; no account is required.
+              {t(
+                "HTTPS links and magnet entries are imported. Sources are stored on this device; no account is required.",
+              )}
             </p>
             {error && (
               <p className="error-message" role="alert">
@@ -247,8 +255,8 @@ export function SourceManager() {
               {busy
                 ? "Importing…"
                 : editing
-                  ? "Update source"
-                  : "Importar fonte"}
+                  ? t("Update source")
+                  : t("Importar fonte")}
             </button>
           </form>
         </Modal>

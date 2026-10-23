@@ -1,5 +1,6 @@
-const decimal = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
-const integer = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+import { locale, t } from "../i18n";
+const decimal = new Intl.NumberFormat(locale(), { maximumFractionDigits: 1 });
+const integer = new Intl.NumberFormat(locale(), { maximumFractionDigits: 0 });
 export function formatBytes(value = 0) {
   const bytes = Number.isFinite(value) ? Math.max(0, value) : 0;
   const index = bytes
@@ -8,13 +9,18 @@ export function formatBytes(value = 0) {
   return `${(index ? decimal : integer).format(bytes / 1024 ** index)} ${["B", "KB", "MB", "GB"][index]}`;
 }
 export function formatRemaining(seconds: number) {
-  if (seconds <= 0) return "Finalizando";
-  if (seconds < 60) return `${Math.ceil(seconds)} s restantes`;
-  if (seconds < 3600) return `${Math.ceil(seconds / 60)} min restantes`;
+  if (seconds <= 0) return t("Finalizando");
+  if (seconds < 60)
+    return t("{count} s restantes", { count: Math.ceil(seconds) });
+  if (seconds < 3600)
+    return t("{count} min restantes", { count: Math.ceil(seconds / 60) });
   const minutes = Math.ceil(seconds / 60);
-  return `${Math.floor(minutes / 60)} h ${minutes % 60} min restantes`;
+  return t("{hours} h {minutes} min restantes", {
+    hours: Math.floor(minutes / 60),
+    minutes: minutes % 60,
+  });
 }
-const relative = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
+const relative = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
 export function formatRelative(date: Date, now = new Date()) {
   const seconds = (date.getTime() - now.getTime()) / 1000;
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -25,5 +31,5 @@ export function formatRelative(date: Date, now = new Date()) {
   for (const [unit, size] of units)
     if (Math.abs(seconds) >= size)
       return relative.format(Math.round(seconds / size), unit);
-  return "agora mesmo";
+  return t("agora mesmo");
 }

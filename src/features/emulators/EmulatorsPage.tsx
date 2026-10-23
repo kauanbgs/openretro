@@ -24,6 +24,7 @@ import {
 } from "../../services/GameResolver";
 import { listen } from "../../services/transport";
 import type { Emulator, EmulatorInstall } from "../../types";
+import { t } from "../../i18n";
 
 /** Windows extended-length paths are an implementation detail; hide the prefix. */
 export function displayPath(path: string) {
@@ -80,7 +81,9 @@ export function EmulatorsPage({
       name: string;
       progress: number;
       stage: string;
-    }>("emulator-install-progress", ({ payload }) => setInstalling(payload));
+    }>("emulator-install-progress", ({ payload }) =>
+      setInstalling({ ...payload, stage: t(payload.stage) }),
+    );
     return () => {
       void unlisten.then((fn) => fn());
     };
@@ -108,11 +111,13 @@ export function EmulatorsPage({
   return (
     <div className="page-content">
       <PageHeader
-        title="Emuladores"
+        title={t("Emuladores")}
         description={
           runtimeInstalled
-            ? "Todos os consoles já rodam no OpenRetro, que instala e atualiza o que precisa sozinho. Emuladores externos são opcionais."
-            : "Instale, configure e escolha o emulador de cada console."
+            ? t(
+                "Todos os consoles já rodam no OpenRetro, que instala e atualiza o que precisa sozinho. Emuladores externos são opcionais.",
+              )
+            : t("Instale, configure e escolha o emulador de cada console.")
         }
         actions={
           <>
@@ -125,13 +130,13 @@ export function EmulatorsPage({
                 )
               }
             >
-              <Search size={17} /> Detectar instalados
+              <Search size={17} /> {t("Detectar instalados")}
             </button>
             <button
               className="button primary"
               onClick={() => setEditing(blank())}
             >
-              <Plus size={18} /> Adicionar emulador
+              <Plus size={18} /> {t("Adicionar emulador")}
             </button>
           </>
         }
@@ -140,10 +145,10 @@ export function EmulatorsPage({
         <section className="emu-section" aria-labelledby="emu-installed">
           {own.length > 0 && (
             <header className="emu-section-heading">
-              <h2 id="emu-installed">Seus emuladores</h2>
+              <h2 id="emu-installed">{t("Seus emuladores")}</h2>
               <p>
-                <Star size={12} fill="currentColor" /> marca o emulador padrão
-                de cada console.
+                <Star size={12} fill="currentColor" />{" "}
+                {t("marca o emulador padrão de cada console.")}
               </p>
             </header>
           )}
@@ -168,7 +173,9 @@ export function EmulatorsPage({
                       }
                       title={
                         e.defaultPlatforms.includes(p)
-                          ? `Padrão para ${shortName(p)}`
+                          ? t("Padrão para {console}", {
+                              console: shortName(p),
+                            })
                           : undefined
                       }
                     >
@@ -189,12 +196,12 @@ export function EmulatorsPage({
                       )
                     }
                   >
-                    <Check size={15} /> Testar
+                    <Check size={15} /> {t("Testar")}
                   </button>
                   <button
                     className="icon-button"
-                    aria-label={`Configurar ${e.name}`}
-                    title="Configurar"
+                    aria-label={t("Configurar {name}", { name: e.name })}
+                    title={t("Configurar")}
                     onClick={() => setEditing(e)}
                   >
                     <Settings2 size={17} />
@@ -202,8 +209,8 @@ export function EmulatorsPage({
                   <button
                     disabled={busy}
                     className="icon-button"
-                    aria-label={`Remover ${e.name}`}
-                    title="Remover"
+                    aria-label={t("Remover {name}", { name: e.name })}
+                    title={t("Remover")}
                     onClick={() => void run(() => bridge.removeEmulator(e.id))}
                   >
                     <Trash2 size={17} />
@@ -218,16 +225,20 @@ export function EmulatorsPage({
                 <KeyRound size={20} />
               </div>
               <div>
-                <h3>BIOS do PlayStation 2</h3>
+                <h3>{t("BIOS do PlayStation 2")}</h3>
                 <p>
                   {ps2Bios.data
-                    ? "Instalada. Os jogos de PS2 rodam no OpenRetro Runtime."
-                    : "Necessária para jogos de PS2. Use o .bin do seu console ou um .zip com ele."}
+                    ? t(
+                        "Instalada. Os jogos de PS2 rodam no OpenRetro Runtime.",
+                      )
+                    : t(
+                        "Necessária para jogos de PS2. Use o .bin do seu console ou um .zip com ele.",
+                      )}
                 </p>
               </div>
               {ps2Bios.data && (
                 <span className="emu-bios-ok">
-                  <Check size={14} /> Pronta
+                  <Check size={14} /> {t("Pronta")}
                 </span>
               )}
               <button
@@ -240,13 +251,15 @@ export function EmulatorsPage({
                     await ps2Bios.refetch();
                     notify(
                       images === 1
-                        ? "BIOS do PS2 adicionada."
-                        : `${images} BIOS do PS2 disponíveis.`,
+                        ? t("BIOS do PS2 adicionada.")
+                        : t("{count} BIOS do PS2 disponíveis.", {
+                            count: images,
+                          }),
                     );
                   })
                 }
               >
-                {ps2Bios.data ? "Adicionar outra" : "Selecionar BIOS"}
+                {ps2Bios.data ? t("Adicionar outra") : t("Selecionar BIOS")}
               </button>
             </div>
           )}
@@ -256,27 +269,30 @@ export function EmulatorsPage({
           <div className="large-icon">
             <Cpu size={32} />
           </div>
-          <h2>Adicione um emulador para jogar</h2>
+          <h2>{t("Adicione um emulador para jogar")}</h2>
           <p>
-            Instale um emulador abaixo ou selecione um que já está no seu
-            computador.
-            <br />O OpenRetro usa ele ao abrir um jogo compatível.
+            {t(
+              "Instale um emulador abaixo ou selecione um que já está no seu computador.",
+            )}
+            <br />
+            {t("O OpenRetro usa ele ao abrir um jogo compatível.")}
           </p>
           <button
             className="button primary"
             onClick={() => setEditing(blank())}
           >
-            <Plus size={17} /> Adicionar emulador
+            <Plus size={17} /> {t("Adicionar emulador")}
           </button>
         </div>
       )}
       {installers.data?.length ? (
         <section className="emu-section" aria-labelledby="emu-catalog">
           <header className="emu-section-heading">
-            <h2 id="emu-catalog">Instalar emuladores</h2>
+            <h2 id="emu-catalog">{t("Instalar emuladores")}</h2>
             <p>
-              Usa o pacote oficial para Windows e configura tudo
-              automaticamente.
+              {t(
+                "Usa o pacote oficial para Windows e configura tudo automaticamente.",
+              )}
             </p>
           </header>
           <div className="emu-catalog">
@@ -296,11 +312,13 @@ export function EmulatorsPage({
                       <h3>{installer.name}</h3>
                       <div className="emu-offer-badges">
                         {installer.isBase && (
-                          <span className="recommended">Recomendado</span>
+                          <span className="recommended">
+                            {t("Recomendado")}
+                          </span>
                         )}
                         {installed && (
                           <span className="installed">
-                            <Check size={11} /> Instalado
+                            <Check size={11} /> {t("Instalado")}
                           </span>
                         )}
                       </div>
@@ -330,7 +348,7 @@ export function EmulatorsPage({
                         rel="noreferrer"
                         title={installer.sourceName}
                       >
-                        Site oficial <ExternalLink size={11} />
+                        {t("Site oficial")} <ExternalLink size={11} />
                       </a>
                       <button
                         className={`button ${installed ? "secondary" : "primary"}`}
@@ -341,7 +359,7 @@ export function EmulatorsPage({
                               id: installer.id,
                               name: installer.name,
                               progress: 4,
-                              stage: "Iniciando instalação",
+                              stage: t("Iniciando instalação"),
                             });
                             try {
                               notify(
@@ -355,11 +373,11 @@ export function EmulatorsPage({
                       >
                         {installed ? (
                           <>
-                            <Wrench size={15} /> Reparar
+                            <Wrench size={15} /> {t("Reparar")}
                           </>
                         ) : (
                           <>
-                            <Download size={15} /> Instalar
+                            <Download size={15} /> {t("Instalar")}
                           </>
                         )}
                       </button>
@@ -373,7 +391,7 @@ export function EmulatorsPage({
       ) : null}
       {detected && (
         <div className="detected-panel">
-          <h3>Encontrados no seu computador</h3>
+          <h3>{t("Encontrados no seu computador")}</h3>
           {detected.length ? (
             detected.map((e) => (
               <div className="detected-item" key={e.id}>
@@ -388,14 +406,15 @@ export function EmulatorsPage({
                     setDetected(undefined);
                   }}
                 >
-                  Revisar e adicionar
+                  {t("Revisar e adicionar")}
                 </button>
               </div>
             ))
           ) : (
             <p className="muted">
-              Nenhum emulador compatível foi encontrado. Você pode adicionar um
-              executável manualmente.
+              {t(
+                "Nenhum emulador compatível foi encontrado. Você pode adicionar um executável manualmente.",
+              )}
             </p>
           )}
         </div>
@@ -404,35 +423,35 @@ export function EmulatorsPage({
         <Modal
           title={
             emulators.some((e) => e.id === editing.id)
-              ? "Configurar emulador"
-              : "Adicionar emulador"
+              ? t("Configurar emulador")
+              : t("Adicionar emulador")
           }
           onClose={() => setEditing(undefined)}
         >
           <div className="form-stack">
             <label>
-              Nome
+              {t("Nome")}
               <input
                 value={editing.name}
                 onChange={(e) =>
                   setEditing({ ...editing, name: e.target.value })
                 }
-                placeholder="ex.: mGBA"
+                placeholder={t("ex.: mGBA")}
               />
             </label>
             <label>
-              Executável
+              {t("Executável")}
               <div className="input-action">
                 <input
                   value={editing.executablePath}
-                  placeholder="Selecione um emulador instalado"
+                  placeholder={t("Selecione um emulador instalado")}
                   onChange={(e) =>
                     setEditing({ ...editing, executablePath: e.target.value })
                   }
                 />
                 <button
                   className="icon-button"
-                  aria-label="Procurar executável"
+                  aria-label={t("Procurar executável")}
                   onClick={() =>
                     void run(async () => {
                       const p = await bridge.pickExecutable();
@@ -445,7 +464,7 @@ export function EmulatorsPage({
               </div>
             </label>
             <fieldset>
-              <legend>Consoles compatíveis</legend>
+              <legend>{t("Consoles compatíveis")}</legend>
               <div className="platform-checkboxes">
                 {platforms.map((p) => (
                   <label key={p.id}>
@@ -489,11 +508,12 @@ export function EmulatorsPage({
                   })
                 }
               />{" "}
-              Padrão para estes consoles
+              {t("Padrão para estes consoles")}
             </label>
             <p className="hint">
-              Adicionar um executável não o executa. O teste confere se o
-              arquivo existe e pode ser executado.
+              {t(
+                "Adicionar um executável não o executa. O teste confere se o arquivo existe e pode ser executado.",
+              )}
             </p>
             {error && (
               <p className="error-message" role="alert">
@@ -512,11 +532,11 @@ export function EmulatorsPage({
                 void run(async () => {
                   await bridge.saveEmulator(editing);
                   setEditing(undefined);
-                  notify("Emulador salvo. Pronto para o próximo jogo.");
+                  notify(t("Emulador salvo. Pronto para o próximo jogo."));
                 })
               }
             >
-              Salvar emulador
+              {t("Salvar emulador")}
             </button>
           </div>
         </Modal>

@@ -13,7 +13,7 @@ pub struct PlayerProfile {
 
 /// New players cycle through the same palette the editor offers.
 const COLORS: &[&str] = &[
-    "#ff8a3d", "#38bdf8", "#4ade80", "#f472b6", "#a78bfa", "#ffd23f", "#f87171", "#2dd4bf",
+    "#12ace2", "#4ade80", "#f472b6", "#a78bfa", "#ffd23f", "#ff8a3d", "#f87171", "#2dd4bf",
 ];
 
 fn validate(name: &str, avatar: &str, color: &str) -> Result<()> {

@@ -4,6 +4,7 @@ import { History, ImageOff, LoaderCircle, Play, Trash2 } from "lucide-react";
 import type { LibraryGame, SaveState } from "../../types";
 import { bridge, isDesktop } from "../../services/bridge";
 import { formatBytes, formatRelative } from "../../utils/format";
+import { locale, t } from "../../i18n";
 
 export const saveStatesKey = (id: string) => ["save-states", id];
 /** Mirrors boots_without_states in src-tauri/src/launcher/mod.rs. */
@@ -13,9 +14,9 @@ function dayLabel(date: Date, now = new Date()) {
   const day = (d: Date) =>
     new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const diff = Math.round((day(now) - day(date)) / 86400000);
-  if (diff === 0) return "Hoje";
-  if (diff === 1) return "Ontem";
-  return date.toLocaleDateString("pt-BR", {
+  if (diff === 0) return t("Hoje");
+  if (diff === 1) return t("Ontem");
+  return date.toLocaleDateString(locale(), {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -23,7 +24,9 @@ function dayLabel(date: Date, now = new Date()) {
 }
 
 export function slotLabel(slot: number) {
-  return slot < 0 ? "Retomada automática" : `Slot ${slot}`;
+  return slot < 0
+    ? t("Retomada automática")
+    : t("Slot {number}", { number: slot });
 }
 
 /** Groups states by calendar day, keeping the newest-first order. */
@@ -65,7 +68,7 @@ export function SaveTimeline({
       await client.invalidateQueries({
         queryKey: saveStatesKey(entry.item.id),
       });
-      notify(`${slotLabel(slot)} apagado.`);
+      notify(t("{slot} apagado.", { slot: slotLabel(slot) }));
     } catch (e) {
       notify(String(e));
     } finally {
@@ -76,14 +79,18 @@ export function SaveTimeline({
   if (!isDesktop)
     return (
       <div className="empty-inline">
-        <p>A linha do tempo de saves está disponível no aplicativo desktop.</p>
+        <p>
+          {t(
+            "A linha do tempo de saves está disponível no aplicativo desktop.",
+          )}
+        </p>
       </div>
     );
   if (states.isLoading)
     return (
       <div className="catalog-loading">
         <LoaderCircle className="spin" size={22} />
-        <p>Procurando seus saves…</p>
+        <p>{t("Procurando seus saves…")}</p>
       </div>
     );
   if (states.error)
@@ -96,11 +103,11 @@ export function SaveTimeline({
     return (
       <div className="empty-inline save-timeline-empty">
         <History size={28} />
-        <p>Nenhum estado salvo ainda.</p>
+        <p>{t("Nenhum estado salvo ainda.")}</p>
         <small>
-          Durante o jogo, abra o menu do OpenRetro e escolha “Salvar estado” (ou
-          pressione F2). Ao encerrar o jogo, a retomada automática também
-          aparece aqui.
+          {t(
+            "Durante o jogo, abra o menu do OpenRetro e escolha “Salvar estado” (ou pressione F2). Ao encerrar o jogo, a retomada automática também aparece aqui.",
+          )}
         </small>
       </div>
     );
@@ -109,8 +116,9 @@ export function SaveTimeline({
     <div className="save-timeline">
       {!loadsAtBoot && (
         <p className="library-status manual">
-          No PS2, os estados não abrem junto com o jogo. Abra o jogo, escolha o
-          slot no menu (botão PS) e use “Carregar estado”.
+          {t(
+            "No PS2, os estados não abrem junto com o jogo. Abra o jogo, escolha o slot no menu (botão PS) e use “Carregar estado”.",
+          )}
         </p>
       )}
       {groupByDay(states.data).map((group) => (
@@ -127,13 +135,13 @@ export function SaveTimeline({
                     ) : (
                       <ImageOff size={22} />
                     )}
-                    {state === newest && <span>Mais recente</span>}
+                    {state === newest && <span>{t("Mais recente")}</span>}
                   </div>
                   <div className="save-state-copy">
                     <strong>{slotLabel(state.slot)}</strong>
                     <span>
                       {formatRelative(date)} ·{" "}
-                      {date.toLocaleTimeString("pt-BR", {
+                      {date.toLocaleTimeString(locale(), {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}{" "}
@@ -147,14 +155,14 @@ export function SaveTimeline({
                         disabled={deleting}
                         onClick={() => setConfirmDelete(undefined)}
                       >
-                        Manter
+                        {t("Manter")}
                       </button>
                       <button
                         className="button danger"
                         disabled={deleting}
                         onClick={() => void remove(state.slot)}
                       >
-                        Apagar de vez
+                        {t("Apagar de vez")}
                       </button>
                     </div>
                   ) : (
@@ -165,12 +173,15 @@ export function SaveTimeline({
                           disabled={running}
                           onClick={() => onPlay(state.slot)}
                         >
-                          <Play size={16} fill="currentColor" /> Jogar daqui
+                          <Play size={16} fill="currentColor" />{" "}
+                          {t("Jogar daqui")}
                         </button>
                       )}
                       <button
                         className="icon-button"
-                        aria-label={`Apagar ${slotLabel(state.slot)}`}
+                        aria-label={t("Apagar {slot}", {
+                          slot: slotLabel(state.slot),
+                        })}
                         disabled={running}
                         onClick={() => setConfirmDelete(state.slot)}
                       >

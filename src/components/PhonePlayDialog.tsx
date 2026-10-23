@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, LoaderCircle, Smartphone } from "lucide-react";
 import { Modal } from "./Modal";
 import { bridge } from "../services/bridge";
+import { t } from "../i18n";
 
 /** Pairs a phone on the same network to watch, hear and play the PC's game. */
 export function PhonePlayDialog({
@@ -48,29 +49,30 @@ export function PhonePlayDialog({
     };
   });
   return (
-    <Modal title="Jogar no celular" onClose={onClose}>
+    <Modal title={t("Jogar no celular")} onClose={onClose}>
       <div className="phone-play">
         {running && status.data?.qr ? (
           <>
             <div
               className="phone-play-qr"
               role="img"
-              aria-label="QR code para abrir o OpenRetro no celular"
+              aria-label={t("QR code para abrir o OpenRetro no celular")}
               dangerouslySetInnerHTML={{ __html: status.data.qr }}
             />
             <p>
-              Aponte a câmera do celular para o código. O celular precisa estar
-              na mesma rede Wi-Fi deste computador.
+              {t(
+                "Aponte a câmera do celular para o código. O celular precisa estar na mesma rede Wi-Fi deste computador.",
+              )}
             </p>
             <div className="input-action">
               <input readOnly value={status.data.url ?? ""} />
               <button
                 className="icon-button"
-                aria-label="Copiar endereço"
+                aria-label={t("Copiar endereço")}
                 onClick={() =>
                   void navigator.clipboard
                     .writeText(status.data?.url ?? "")
-                    .then(() => notify("Endereço copiado."))
+                    .then(() => notify(t("Endereço copiado.")))
                 }
               >
                 <Copy size={16} />
@@ -78,56 +80,63 @@ export function PhonePlayDialog({
             </div>
             <p className="phone-play-devices">
               {status.data.devices
-                ? `${status.data.devices} ${status.data.devices === 1 ? "celular conectado" : "celulares conectados"}`
-                : "Nenhum celular conectado ainda"}
+                ? status.data.devices === 1
+                  ? t("1 celular conectado")
+                  : t("{count} celulares conectados", {
+                      count: status.data.devices,
+                    })
+                : t("Nenhum celular conectado ainda")}
               {status.data.players.length > 0 &&
-                ` · celular como ${status.data.players.map((p) => `J${p}`).join(", ")}`}
+                t(" · celular como {players}", {
+                  players: status.data.players.map((p) => `J${p}`).join(", "),
+                })}
               {status.data.players.length > 0 &&
                 !status.data.players.includes(1) &&
-                " · o computador joga como J1"}
+                t(" · o computador joga como J1")}
             </p>
             <p className="hint">
-              Ao abrir a página, cada celular escolhe o jogador. O J1 fica com o
-              controle ou teclado deste computador, então dá para jogar um aqui
-              e outro no celular. O jogo continua aparecendo neste computador, e
-              até quatro pessoas podem jogar usando um único PC.
+              {t(
+                "Ao abrir a página, cada celular escolhe o jogador. O J1 fica com o controle ou teclado deste computador, então dá para jogar um aqui e outro no celular. O jogo continua aparecendo neste computador, e até quatro pessoas podem jogar usando um único PC.",
+              )}
             </p>
             <p className="hint">
-              Para amigos fora do Wi-Fi, conectem o PC e os celulares na mesma
-              VPN de jogos ou encaminhem a porta 47820 do roteador para este
-              computador; depois compartilhe o endereço copiado. Para netplay
-              entre PCs, abra o jogo no celular e use Jogar online.
+              {t(
+                "Para amigos fora do Wi-Fi, conectem o PC e os celulares na mesma VPN de jogos ou encaminhem a porta 47820 do roteador para este computador; depois compartilhe o endereço copiado. Para netplay entre PCs, abra o jogo no celular e use Jogar online.",
+              )}
             </p>
             <button
               className="button outline full"
               disabled={busy}
               onClick={() => void toggle(false)}
             >
-              Desativar
+              {t("Desativar")}
             </button>
           </>
         ) : (
           <>
             <Smartphone size={36} />
             <p>
-              Jogue no navegador do celular, com imagem, som e controle na tela,
-              enquanto o jogo roda neste computador. Funciona na mesma rede
-              Wi-Fi; prefira a rede de 5 GHz.
+              {t(
+                "Jogue no navegador do celular, com imagem, som e controle na tela, enquanto o jogo roda neste computador. Funciona na mesma rede Wi-Fi; prefira a rede de 5 GHz.",
+              )}
             </p>
             <p className="hint">
-              Na primeira vez, o Windows pergunta se o OpenRetro pode usar a
-              rede. Permita em redes privadas.
+              {t(
+                "Na primeira vez, o Windows pergunta se o OpenRetro pode usar a rede. Permita em redes privadas.",
+              )}
             </p>
             <p className="hint">
-              Amigos podem entrar com seus próprios celulares e escolher J1 a
-              J4. Todos assistem e controlam a mesma partida que roda neste PC.
+              {t(
+                "Amigos podem entrar com seus próprios celulares e escolher J1 a J4. Todos assistem e controlam a mesma partida que roda neste PC.",
+              )}
             </p>
             <button
               className="button primary full"
               disabled={busy || status.isPending}
               onClick={() => void toggle(true)}
             >
-              {busy && <LoaderCircle className="spin" size={16} />} Ativar
+              {busy && <LoaderCircle className="spin" size={16} />}{" "}
+              {t("Ativar")}
             </button>
           </>
         )}

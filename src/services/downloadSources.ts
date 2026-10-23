@@ -1,4 +1,5 @@
 import type { DownloadSourceDocument, DownloadSourceEntry } from "../types";
+import { t } from "../i18n";
 export const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 export function validMagnet(uri: unknown): uri is string {
   if (typeof uri !== "string" || uri.length > 16384) return false;
@@ -30,12 +31,12 @@ export function validDirectUrl(uri: unknown): uri is string {
 }
 export function parseDownloadSource(text: string): DownloadSourceDocument {
   if (new TextEncoder().encode(text).length > MAX_SOURCE_BYTES)
-    throw new Error("Source exceeds the 16 MB limit.");
+    throw new Error(t("Source exceeds the 16 MB limit."));
   let raw: unknown;
   try {
     raw = JSON.parse(text.replace(/^\uFEFF/, ""));
   } catch {
-    throw new Error("Invalid JSON. Expected name and a downloads array.");
+    throw new Error(t("Invalid JSON. Expected name and a downloads array."));
   }
   if (
     !raw ||
@@ -48,7 +49,7 @@ export function parseDownloadSource(text: string): DownloadSourceDocument {
     !Array.isArray(raw.downloads) ||
     raw.downloads.length > 100000
   )
-    throw new Error("Expected a source name and a downloads array.");
+    throw new Error(t("Expected a source name and a downloads array."));
   const entries: DownloadSourceEntry[] = [];
   const seen = new Set<string>();
   for (const item of raw.downloads) {
@@ -85,7 +86,9 @@ export function parseDownloadSource(text: string): DownloadSourceDocument {
   }
   if (!entries.length)
     throw new Error(
-      "No supported downloads found. Use HTTPS links or BitTorrent v1 magnets.",
+      t(
+        "No supported downloads found. Use HTTPS links or BitTorrent v1 magnets.",
+      ),
     );
   return { name: raw.name.trim(), downloads: entries };
 }

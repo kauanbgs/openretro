@@ -45,13 +45,14 @@ import { NetplayDialog } from "./NetplayDialog";
 import { ModsTab } from "./ModsTab";
 import { playedSha256 } from "../../services/mods";
 import { formatRelative } from "../../utils/format";
+import { t } from "../../i18n";
 
 const tabLabels: Record<string, string> = {
-  Overview: "Visão geral",
+  Overview: t("Visão geral"),
   Saves: "Saves",
-  Mods: "Traduções e mods",
-  Screenshots: "Imagens",
-  Details: "Detalhes",
+  Mods: t("Traduções e mods"),
+  Screenshots: t("Imagens"),
+  Details: t("Detalhes"),
 };
 const multiplayer = /co-?op|multiplayer|split/i;
 export function GamePage({
@@ -120,12 +121,17 @@ export function GamePage({
   const gallery = [
     ...(captures.data ?? []).map((c) => ({
       src: c.data,
-      caption: `Sua captura · ${formatRelative(new Date(c.takenAt))}`,
+      caption: t("Sua captura · {when}", {
+        when: formatRelative(new Date(c.takenAt)),
+      }),
       referrer: undefined,
     })),
     ...(game.screenshots ?? []).map((src, i) => ({
       src,
-      caption: `${game.title} · imagem ${i + 1}`,
+      caption: t("{title} · imagem {number}", {
+        title: game.title,
+        number: i + 1,
+      }),
       referrer: "no-referrer" as const,
     })),
   ];
@@ -170,8 +176,10 @@ export function GamePage({
       if (images === null) return;
       notify(
         images === 1
-          ? "BIOS adicionada. Pronto para jogar."
-          : `${images} BIOS adicionadas. Pronto para jogar.`,
+          ? t("BIOS adicionada. Pronto para jogar.")
+          : t("{count} BIOS adicionadas. Pronto para jogar.", {
+              count: images,
+            }),
       );
       setBiosVersion((value) => value + 1);
     });
@@ -204,7 +212,9 @@ export function GamePage({
       // On a phone the game runs on the PC; switch to its game screen.
       if (isRemote) return void window.location.assign("/play");
       notify(
-        `Session saved · ${Math.max(1, Math.round(seconds / 60))} min played`,
+        t("Session saved · {minutes} min played", {
+          minutes: Math.max(1, Math.round(seconds / 60)),
+        }),
       );
     } catch (e) {
       notify(String(e));
@@ -234,16 +244,18 @@ export function GamePage({
             {entry?.item.activeVariant && (
               <button
                 className="detail-badge accent"
-                title="Esta versão é usada ao jogar"
+                title={t("Esta versão é usada ao jogar")}
                 onClick={() => setTab("Mods")}
               >
-                Versão: {entry.item.activeVariant.name}
+                {t("Versão:")} {entry.item.activeVariant.name}
               </button>
             )}
             {game.rating !== undefined && (
               <span
                 className="detail-badge"
-                title={`${game.ratingCount ?? 0} avaliações no LaunchBox`}
+                title={t("{count} avaliações no LaunchBox", {
+                  count: game.ratingCount ?? 0,
+                })}
               >
                 <Star size={13} fill="currentColor" /> {game.rating}
               </span>
@@ -262,20 +274,29 @@ export function GamePage({
             <>
               <p>
                 {entry.item.lastPlayedAt
-                  ? `Jogou pela última vez ${formatRelative(new Date(entry.item.lastPlayedAt))}`
-                  : "Você ainda não jogou"}
+                  ? t("Jogou pela última vez {when}", {
+                      when: formatRelative(new Date(entry.item.lastPlayedAt)),
+                    })
+                  : t("Você ainda não jogou")}
               </p>
               <p>
                 {entry.item.playtime
-                  ? `${Math.floor(entry.item.playtime / 3600)}h ${Math.floor((entry.item.playtime % 3600) / 60)}min de jogo`
-                  : "Na sua biblioteca"}
+                  ? t("{hours}h {minutes}min de jogo", {
+                      hours: Math.floor(entry.item.playtime / 3600),
+                      minutes: Math.floor((entry.item.playtime % 3600) / 60),
+                    })
+                  : t("Na sua biblioteca")}
               </p>
             </>
           ) : (
             <p>
               {isRemote
-                ? "Escolha uma versão nas suas fontes para baixar no computador."
-                : "Escolha uma versão nas suas fontes ou adicione um arquivo."}
+                ? t(
+                    "Escolha uma versão nas suas fontes para baixar no computador.",
+                  )
+                : t(
+                    "Escolha uma versão nas suas fontes ou adicione um arquivo.",
+                  )}
             </p>
           )}
         </div>
@@ -301,12 +322,12 @@ export function GamePage({
               <Download size={16} />
             )}
             {running
-              ? "Jogo em execução"
+              ? t("Jogo em execução")
               : entry
                 ? resolution?.state === "MISSING_EMULATOR"
-                  ? "Configurar emulador"
-                  : "Jogar"
-                : "Opções de download"}
+                  ? t("Configurar emulador")
+                  : t("Jogar")
+                : t("Opções de download")}
           </button>
           {entry &&
             resolution?.state === "READY" &&
@@ -317,19 +338,19 @@ export function GamePage({
                 disabled={running || busy}
                 onClick={() => setNetplay(true)}
               >
-                <Users size={16} /> Jogar online
+                <Users size={16} /> {t("Jogar online")}
               </button>
             )}
           {!entry && !isRemote && (
             <button className="button outline" onClick={() => onImport(game)}>
-              <FolderOpen size={16} /> Adicionar arquivo
+              <FolderOpen size={16} /> {t("Adicionar arquivo")}
             </button>
           )}
           {game.trailers?.length ? (
             <button
               className="button outline"
-              aria-label="Assistir trailer"
-              title="Assistir trailer"
+              aria-label={t("Assistir trailer")}
+              title={t("Assistir trailer")}
               onClick={() => setTrailer(game.trailers![0].id)}
             >
               <Clapperboard size={16} />
@@ -341,13 +362,13 @@ export function GamePage({
                 className={`button outline ${entry.item.favorite ? "favorited" : ""}`}
                 aria-label={
                   entry.item.favorite
-                    ? "Remover dos favoritos"
-                    : "Favoritar jogo"
+                    ? t("Remover dos favoritos")
+                    : t("Favoritar jogo")
                 }
                 title={
                   entry.item.favorite
-                    ? "Remover dos favoritos"
-                    : "Favoritar jogo"
+                    ? t("Remover dos favoritos")
+                    : t("Favoritar jogo")
                 }
                 onClick={() =>
                   void action(() =>
@@ -363,8 +384,8 @@ export function GamePage({
               {!isRemote && (
                 <button
                   className="button outline"
-                  aria-label="Configurar"
-                  title="Configurar"
+                  aria-label={t("Configurar")}
+                  title={t("Configurar")}
                   onClick={() => setConfig(true)}
                 >
                   <Settings2 size={16} />
@@ -380,16 +401,18 @@ export function GamePage({
             <div>
               <strong>
                 {resolution.state === "MISSING_EMULATOR"
-                  ? "Emulator required"
+                  ? t("Emulator required")
                   : resolution.state === "MISSING_GAME"
-                    ? "Game file not found"
+                    ? t("Game file not found")
                     : needsRuntimeBios
-                      ? "BIOS necessária"
-                      : "Configuration required"}
+                      ? t("BIOS necessária")
+                      : t("Configuration required")}
               </strong>
               <p>
                 {!isDesktop
-                  ? "Launch games in the desktop app. The browser preview cannot access installed emulators or original file paths."
+                  ? t(
+                      "Launch games in the desktop app. The browser preview cannot access installed emulators or original file paths.",
+                    )
                   : resolution.message}
               </p>
             </div>
@@ -409,12 +432,12 @@ export function GamePage({
               }
             >
               {resolution.state === "MISSING_EMULATOR"
-                ? "Configurar emulador"
+                ? t("Configurar emulador")
                 : resolution.state === "MISSING_GAME"
-                  ? "Locate file"
+                  ? t("Locate file")
                   : needsRuntimeBios
-                    ? "Selecionar BIOS"
-                    : "Configurar"}
+                    ? t("Selecionar BIOS")
+                    : t("Configurar")}
             </button>
           </div>
         )}
@@ -447,18 +470,19 @@ export function GamePage({
             {tab === "Overview" ? (
               <div className="overview">
                 <div>
-                  <h2>Sobre o jogo</h2>
+                  <h2>{t("Sobre o jogo")}</h2>
                   <p>{game.description}</p>
                   {game.storyline && (
                     <details className="detail-storyline">
-                      <summary>História</summary>
+                      <summary>{t("História")}</summary>
                       <p>{game.storyline}</p>
                     </details>
                   )}
                   {details.error && (
                     <p className="hint">
-                      Additional metadata is unavailable. Showing the saved
-                      catalog information.
+                      {t(
+                        "Additional metadata is unavailable. Showing the saved catalog information.",
+                      )}
                     </p>
                   )}
                   {game.metadataProvider === "launchbox" && game.sourceUrl && (
@@ -468,7 +492,7 @@ export function GamePage({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Ver no LaunchBox <ExternalLink size={14} />
+                      {t("Ver no LaunchBox")} <ExternalLink size={14} />
                     </a>
                   )}
                 </div>
@@ -492,7 +516,7 @@ export function GamePage({
               details.isFetching || captures.isLoading ? (
                 <div className="catalog-loading">
                   <LoaderCircle className="spin" size={22} />
-                  <p>Loading screenshots…</p>
+                  <p>{t("Loading screenshots…")}</p>
                 </div>
               ) : gallery.length ? (
                 <>
@@ -501,8 +525,10 @@ export function GamePage({
                       <span>
                         <Camera size={16} />{" "}
                         {captures.data?.length
-                          ? `${captures.data.length} capturas suas`
-                          : "Capture momentos no menu do jogo (F8)"}
+                          ? t("{count} capturas suas", {
+                              count: captures.data.length,
+                            })
+                          : t("Capture momentos no menu do jogo (F8)")}
                       </span>
                       {isDesktop && (
                         <button
@@ -513,7 +539,7 @@ export function GamePage({
                               .catch((e) => notify(String(e)))
                           }
                         >
-                          Abrir pasta
+                          {t("Abrir pasta")}
                         </button>
                       )}
                     </div>
@@ -526,7 +552,9 @@ export function GamePage({
                           i < (captures.data?.length ?? 0) ? "own-capture" : ""
                         }
                         onClick={() => setLightbox(i)}
-                        aria-label={`Ampliar ${image.caption}`}
+                        aria-label={t("Ampliar {caption}", {
+                          caption: image.caption,
+                        })}
                       >
                         <CatalogScreenshot
                           src={image.src}
@@ -541,26 +569,31 @@ export function GamePage({
                 <div className="empty-inline">
                   <p>
                     {details.error
-                      ? "Screenshots could not be loaded. Check your connection."
-                      : "No gameplay screenshots are available for this game."}
+                      ? t(
+                          "Screenshots could not be loaded. Check your connection.",
+                        )
+                      : t(
+                          "No gameplay screenshots are available for this game.",
+                        )}
                   </p>
                   <small>
-                    Imagens e metadados fornecidos pelo LaunchBox Games
-                    Database.
+                    {t(
+                      "Imagens e metadados fornecidos pelo LaunchBox Games Database.",
+                    )}
                   </small>
                 </div>
               )
             ) : (
               <div className="form-stack details-info">
                 <p>
-                  <strong>File</strong>
+                  <strong>{t("File")}</strong>
                   <br />
-                  {entry?.item.sourcePath ?? "No local file associated"}
+                  {entry?.item.sourcePath ?? t("No local file associated")}
                 </p>
                 {entry && !isRemote && (
                   <>
                     <p>
-                      <strong>SHA-256</strong>
+                      <strong>{t("SHA-256")}</strong>
                       <code className="hash">{entry.item.sha256}</code>
                     </p>
                     <div className="hero-actions">
@@ -572,13 +605,17 @@ export function GamePage({
                             const valid = await bridge.verify(entry.item.id);
                             notify(
                               valid
-                                ? "Checksum matches. Your game file is unchanged."
-                                : "The checksum changed. Locate the file again if you replaced it intentionally.",
+                                ? t(
+                                    "Checksum matches. Your game file is unchanged.",
+                                  )
+                                : t(
+                                    "The checksum changed. Locate the file again if you replaced it intentionally.",
+                                  ),
                             );
                           })
                         }
                       >
-                        <ShieldCheck size={16} /> Verificar arquivo
+                        <ShieldCheck size={16} /> {t("Verificar arquivo")}
                       </button>
                       <button
                         disabled={busy}
@@ -590,7 +627,7 @@ export function GamePage({
                           })
                         }
                       >
-                        <FolderOpen size={16} /> Locate file
+                        <FolderOpen size={16} /> {t("Locate file")}
                       </button>
                       <button
                         className="button danger"
@@ -599,7 +636,7 @@ export function GamePage({
                           setRemove(true);
                         }}
                       >
-                        <Trash2 size={16} /> Remover da biblioteca
+                        <Trash2 size={16} /> {t("Remover da biblioteca")}
                       </button>
                     </div>
                   </>
@@ -609,37 +646,37 @@ export function GamePage({
           </div>
           <aside className="detail-aside">
             <section className="detail-aside-card">
-              <h2>Informações do jogo</h2>
+              <h2>{t("Informações do jogo")}</h2>
               <dl>
-                <dt>Plataforma</dt>
+                <dt>{t("Plataforma")}</dt>
                 <dd>{platform?.name ?? game.platformId}</dd>
-                <dt>Lançamento</dt>
-                <dd>{game.year || "Desconhecido"}</dd>
-                <dt>Gênero</dt>
-                <dd>{game.genre || "Desconhecido"}</dd>
-                <dt>Desenvolvedora</dt>
-                <dd>{game.developer || "Desconhecida"}</dd>
+                <dt>{t("Lançamento")}</dt>
+                <dd>{game.year || t("Desconhecido")}</dd>
+                <dt>{t("Gênero")}</dt>
+                <dd>{game.genre || t("Desconhecido")}</dd>
+                <dt>{t("Desenvolvedora")}</dt>
+                <dd>{game.developer || t("Desconhecida")}</dd>
                 {game.publisher && (
                   <>
-                    <dt>Publicadora</dt>
+                    <dt>{t("Publicadora")}</dt>
                     <dd>{game.publisher}</dd>
                   </>
                 )}
                 {game.franchise && (
                   <>
-                    <dt>Franquia</dt>
+                    <dt>{t("Franquia")}</dt>
                     <dd>{game.franchise}</dd>
                   </>
                 )}
                 {game.perspectives?.length ? (
                   <>
-                    <dt>Perspectiva</dt>
+                    <dt>{t("Perspectiva")}</dt>
                     <dd>{game.perspectives.join(", ")}</dd>
                   </>
                 ) : null}
                 {game.themes?.length ? (
                   <>
-                    <dt>Temas</dt>
+                    <dt>{t("Temas")}</dt>
                     <dd>{game.themes.join(", ")}</dd>
                   </>
                 ) : null}
@@ -647,7 +684,7 @@ export function GamePage({
             </section>
             {game.trailers?.length ? (
               <section className="detail-aside-card trailer-list">
-                <h2>Vídeos</h2>
+                <h2>{t("Vídeos")}</h2>
                 {game.trailers.map((video) => (
                   <button key={video.id} onClick={() => setTrailer(video.id)}>
                     <img
@@ -667,22 +704,25 @@ export function GamePage({
               <section className="detail-aside-card source-note">
                 <Download size={18} />
                 <div>
-                  <strong>Downloads nas suas fontes</strong>
+                  <strong>{t("Downloads nas suas fontes")}</strong>
                   <p>
-                    OpenRetro shows HTTPS links and magnet links from the JSON
-                    sources you add.
+                    {t(
+                      "OpenRetro shows HTTPS links and magnet links from the JSON sources you add.",
+                    )}
                   </p>
                 </div>
               </section>
             )}
             {game.screenshots?.length ? (
               <section className="detail-aside-card gallery-strip">
-                <h2>Imagens</h2>
+                <h2>{t("Imagens")}</h2>
                 {game.screenshots.slice(0, 3).map((url, i) => (
                   <button
                     key={url}
                     onClick={() => setTab("Screenshots")}
-                    aria-label={`View screenshot ${i + 1}`}
+                    aria-label={t("View screenshot {number}", {
+                      number: i + 1,
+                    })}
                   >
                     <img
                       src={url}
@@ -698,7 +738,7 @@ export function GamePage({
         </div>
         {game.similar?.length ? (
           <section className="similar-games">
-            <h2>Se você gosta deste jogo</h2>
+            <h2>{t("Se você gosta deste jogo")}</h2>
             <div className="similar-row">
               {game.similar.map((similar) => (
                 <GameCard
@@ -712,11 +752,11 @@ export function GamePage({
         ) : null}
       </div>
       {trailer && (
-        <Modal title="Trailer" wide onClose={() => setTrailer(undefined)}>
+        <Modal title={t("Trailer")} wide onClose={() => setTrailer(undefined)}>
           <div className="trailer-frame">
             <iframe
               src={`https://www.youtube-nocookie.com/embed/${trailer}?autoplay=1&rel=0`}
-              title={`Trailer de ${game.title}`}
+              title={t("Trailer de {title}", { title: game.title })}
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
               referrerPolicy="strict-origin-when-cross-origin"
@@ -728,7 +768,7 @@ export function GamePage({
             target="_blank"
             rel="noreferrer"
           >
-            Não carregou? Abrir no YouTube <ExternalLink size={14} />
+            {t("Não carregou? Abrir no YouTube")} <ExternalLink size={14} />
           </a>
         </Modal>
       )}
@@ -760,7 +800,7 @@ export function GamePage({
             <>
               <button
                 className="lightbox-nav previous"
-                aria-label="Imagem anterior"
+                aria-label={t("Imagem anterior")}
                 onClick={(event) => {
                   event.stopPropagation();
                   step(-1);
@@ -770,7 +810,7 @@ export function GamePage({
               </button>
               <button
                 className="lightbox-nav next"
-                aria-label="Próxima imagem"
+                aria-label={t("Próxima imagem")}
                 onClick={(event) => {
                   event.stopPropagation();
                   step(1);
@@ -784,30 +824,32 @@ export function GamePage({
       )}
       {downloadOptions && (
         <Modal
-          title="Opções de download"
+          title={t("Opções de download")}
           onClose={() => {
             if (!busy) setDownloadOptions(false);
           }}
         >
           <div className="download-options-modal">
-            <p>Escolha uma versão de {game.title}</p>
+            <p>
+              {t("Escolha uma versão de")} {game.title}
+            </p>
             <div className="download-option-filters">
               <div className="download-option-search">
                 <Search size={17} />
                 <input
                   autoFocus
-                  aria-label="Filter download releases"
+                  aria-label={t("Filter download releases")}
                   value={downloadQuery}
                   onChange={(event) => setDownloadQuery(event.target.value)}
-                  placeholder="Filtrar versões"
+                  placeholder={t("Filtrar versões")}
                 />
               </div>
               <select
-                aria-label="Filter download source"
+                aria-label={t("Filter download source")}
                 value={downloadSource}
                 onChange={(event) => setDownloadSource(event.target.value)}
               >
-                <option value="all">Todas as fontes</option>
+                <option value="all">{t("Todas as fontes")}</option>
                 {[
                   ...new Map(
                     (sourceMatches.data ?? []).map((match) => [
@@ -823,7 +865,7 @@ export function GamePage({
               </select>
             </div>
             {sourceMatches.isFetching ? (
-              <p className="muted">Buscando nas suas fontes…</p>
+              <p className="muted">{t("Buscando nas suas fontes…")}</p>
             ) : sourceMatches.error ? (
               <p className="error-message">{String(sourceMatches.error)}</p>
             ) : visibleMatches.length ? (
@@ -841,7 +883,7 @@ export function GamePage({
                         });
                         setDownloadOptions(false);
                         notify(
-                          "Download iniciado. Ele aparecerá em Downloads.",
+                          t("Download iniciado. Ele aparecerá em Downloads."),
                         );
                       })
                     }
@@ -851,8 +893,8 @@ export function GamePage({
                       <small>
                         {match.confirmed
                           ? platform?.shortName
-                          : "Console não informado"}{" "}
-                        · {match.fileSize || "Tamanho não informado"} ·{" "}
+                          : t("Console não informado")}{" "}
+                        · {match.fileSize || t("Tamanho não informado")} ·{" "}
                         {match.sourceName}
                       </small>
                     </span>
@@ -862,22 +904,24 @@ export function GamePage({
               </div>
             ) : (
               <p className="download-options-empty">
-                Nenhuma versão deste jogo foi encontrada nas fontes ativas.
+                {t(
+                  "Nenhuma versão deste jogo foi encontrada nas fontes ativas.",
+                )}
               </p>
             )}
           </div>
         </Modal>
       )}
       {config && entry && (
-        <Modal title="Configurar jogo" onClose={() => setConfig(false)}>
+        <Modal title={t("Configurar jogo")} onClose={() => setConfig(false)}>
           <div className="form-stack">
             <label>
-              Emulator
+              {t("Emulator")}
               <select
                 value={emulatorId}
                 onChange={(e) => setEmulatorId(e.target.value)}
               >
-                <option value="">Use platform default</option>
+                <option value="">{t("Use platform default")}</option>
                 {emulators
                   .filter((e) => e.supportedPlatforms.includes(game.platformId))
                   .map((e) => (
@@ -888,16 +932,16 @@ export function GamePage({
               </select>
             </label>
             <label>
-              BIOS path (if required)
+              {t("BIOS path (if required)")}
               <div className="input-action">
                 <input
                   value={bios}
                   onChange={(e) => setBios(e.target.value)}
-                  placeholder="Nenhuma BIOS selecionada"
+                  placeholder={t("Nenhuma BIOS selecionada")}
                 />
                 <button
                   className="icon-button"
-                  aria-label="Selecionar BIOS"
+                  aria-label={t("Selecionar BIOS")}
                   onClick={() =>
                     void action(async () => {
                       const p = await bridge.pickBios();
@@ -910,7 +954,7 @@ export function GamePage({
               </div>
             </label>
             <label>
-              Arguments · one argument per line
+              {t("Arguments · one argument per line")}
               <textarea
                 rows={4}
                 value={args}
@@ -919,9 +963,10 @@ export function GamePage({
               />
             </label>
             <p className="hint">
-              Use {"{game}"} and {"{bios}"} for file paths. Each line is passed
-              as one argument, without shell evaluation. If omitted, the game
-              path is appended. Use the flags documented by your emulator.
+              {t("Use")} {"{game}"} {t("and")} {"{bios}"}{" "}
+              {t(
+                "for file paths. Each line is passed as one argument, without shell evaluation. If omitted, the game path is appended. Use the flags documented by your emulator.",
+              )}
             </p>
             <button
               disabled={busy}
@@ -935,11 +980,11 @@ export function GamePage({
                     args.split("\n").filter(Boolean),
                   );
                   setConfig(false);
-                  notify("Configurar jogo saved.");
+                  notify(t("Configurar jogo saved."));
                 })
               }
             >
-              Salvar configuração
+              {t("Salvar configuração")}
             </button>
           </div>
         </Modal>
@@ -959,9 +1004,10 @@ export function GamePage({
         />
       )}
       {remove && entry && (
-        <Modal title="Remover este jogo?" onClose={() => setRemove(false)}>
+        <Modal title={t("Remover este jogo?")} onClose={() => setRemove(false)}>
           <p className="muted">
-            {game.title} and its play history will be removed from OpenRetro.
+            {game.title}{" "}
+            {t("and its play history will be removed from OpenRetro.")}
           </p>
           <label className="checkbox-line">
             <input
@@ -969,14 +1015,14 @@ export function GamePage({
               checked={deleteFile}
               onChange={(e) => setDeleteFile(e.target.checked)}
             />{" "}
-            Also delete the downloaded game file from this computer
+            {t("Also delete the downloaded game file from this computer")}
           </label>
           <div className="modal-footer">
             <button
               className="button secondary"
               onClick={() => setRemove(false)}
             >
-              Keep game
+              {t("Keep game")}
             </button>
             <button
               className="button danger"
@@ -988,7 +1034,7 @@ export function GamePage({
                 })
               }
             >
-              Remover da biblioteca
+              {t("Remover da biblioteca")}
             </button>
           </div>
         </Modal>

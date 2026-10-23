@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { File, Folder, FolderUp, HardDrive, X } from "lucide-react";
 import { bridge, type FilePickerRequest } from "../../services/bridge";
+import { t } from "../../i18n";
 
 export function ConsoleFilePicker({
   request,
@@ -39,14 +40,14 @@ export function ConsoleFilePicker({
       >
         <header>
           <h2>{request.title}</h2>
-          <button aria-label="Close dialog" onClick={() => onClose(null)}>
+          <button aria-label={t("Close dialog")} onClick={() => onClose(null)}>
             <X size={22} />
           </button>
         </header>
         <div className="tv-file-actions">
           <button className="button secondary" onClick={() => navigate("")}>
             <HardDrive size={18} />
-            Locais
+            {t("Locais")}
           </button>
           <button
             className="button secondary"
@@ -54,7 +55,7 @@ export function ConsoleFilePicker({
             onClick={() => navigate(listing.data?.parent ?? "")}
           >
             <FolderUp size={18} />
-            Pasta acima
+            {t("Pasta acima")}
           </button>
           {request.directory && (
             <button
@@ -62,22 +63,22 @@ export function ConsoleFilePicker({
               disabled={!listing.data?.path || listing.isFetching}
               onClick={() => onClose(listing.data!.path)}
             >
-              Escolher esta pasta
+              {t("Escolher esta pasta")}
             </button>
           )}
         </div>
         <p className="path-text">
-          {listing.data?.path || "Selecione um local"}
+          {listing.data?.path || t("Selecione um local")}
         </p>
         {path && (
           <input
-            aria-label="Filtrar arquivos nesta pasta"
-            placeholder="Filtrar pelo nome"
+            aria-label={t("Filtrar arquivos nesta pasta")}
+            placeholder={t("Filtrar pelo nome")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         )}
-        {listing.isFetching && <p role="status">Carregando arquivos…</p>}
+        {listing.isFetching && <p role="status">{t("Carregando arquivos…")}</p>}
         {listing.error && (
           <p role="alert" className="error-message">
             {String(listing.error)}
@@ -100,10 +101,14 @@ export function ConsoleFilePicker({
         </div>
         {!listing.isFetching &&
           listing.data &&
-          !listing.data.entries.length && <p>Nenhum arquivo encontrado.</p>}
+          !listing.data.entries.length && (
+            <p>{t("Nenhum arquivo encontrado.")}</p>
+          )}
         {listing.data?.truncated && (
           <p>
-            Mostrando até 500 itens. Filtre pelo nome para encontrar os demais.
+            {t(
+              "Mostrando até 500 itens. Filtre pelo nome para encontrar os demais.",
+            )}
           </p>
         )}
       </section>

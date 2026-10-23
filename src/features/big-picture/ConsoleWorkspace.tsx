@@ -27,6 +27,7 @@ import {
 } from "../../services/bridge";
 import { ConsoleFilePicker } from "./ConsoleFilePicker";
 import "./ConsoleWorkspace.css";
+import { t } from "../../i18n";
 
 const SettingsPage = lazy(() =>
   import("../settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
@@ -62,12 +63,12 @@ export interface WorkspaceRoute {
   online?: boolean;
 }
 const titles: Record<WorkspacePage, string> = {
-  settings: "Configurações",
-  emulators: "Emuladores",
+  settings: t("Configurações"),
+  emulators: t("Emuladores"),
   downloads: "Downloads",
-  sources: "Fontes de download",
-  game: "Gerenciar jogo",
-  import: "Adicionar jogos",
+  sources: t("Fontes de download"),
+  game: t("Gerenciar jogo"),
+  import: t("Adicionar jogos"),
 };
 
 export function ConsoleWorkspace({
@@ -405,7 +406,7 @@ export function ConsoleWorkspace({
     await refresh();
     setImporting(undefined);
     onImported(game);
-    notify("Jogo adicionado à biblioteca.");
+    notify(t("Jogo adicionado à biblioteca."));
   };
   const entry = library.find(
     (item) =>
@@ -442,13 +443,13 @@ export function ConsoleWorkspace({
       <header className="tv-workspace-header">
         <button onClick={back}>
           <ChevronLeft size={20} />
-          Voltar
+          {t("Voltar")}
         </button>
         <strong>{titles[route.page]}</strong>
         <div>
           {route.page === "downloads" && (
             <button onClick={() => navigate({ page: "sources" })}>
-              Gerenciar fontes
+              {t("Gerenciar fontes")}
             </button>
           )}
           {route.page === "settings" && onUpdate && (
@@ -457,13 +458,13 @@ export function ConsoleWorkspace({
               {updating
                 ? "Atualizando…"
                 : updateVersion
-                  ? `Atualizar · ${updateVersion}`
-                  : "Verificar atualizações"}
+                  ? t("Atualizar · {version}", { version: updateVersion })
+                  : t("Verificar atualizações")}
             </button>
           )}
           <button onClick={() => setImporting({})}>
             <Plus size={18} />
-            Adicionar jogo
+            {t("Adicionar jogo")}
           </button>
         </div>
       </header>
@@ -474,7 +475,7 @@ export function ConsoleWorkspace({
         <Suspense
           fallback={
             <p className="tv-workspace-loading" role="status">
-              Carregando…
+              {t("Carregando…")}
             </p>
           }
         >
@@ -524,13 +525,13 @@ export function ConsoleWorkspace({
           {route.page === "import" && (
             <>
               <p className="tv-workspace-loading">
-                Importe um arquivo ou uma pasta para sua biblioteca.
+                {t("Importe um arquivo ou uma pasta para sua biblioteca.")}
               </p>
               <button
                 className="button primary"
                 onClick={() => setImporting({})}
               >
-                Selecionar jogos
+                {t("Selecionar jogos")}
               </button>
             </>
           )}
@@ -561,24 +562,24 @@ export function ConsoleWorkspace({
             role="dialog"
             aria-modal="true"
             aria-label={
-              select.field.getAttribute("aria-label") ?? "Escolher opção"
+              select.field.getAttribute("aria-label") ?? t("Escolher opção")
             }
           >
             <header>
               <h2>
-                {select.field.getAttribute("aria-label") ?? "Escolher opção"}
+                {select.field.getAttribute("aria-label") ?? t("Escolher opção")}
               </h2>
               <button
-                aria-label="Close dialog"
+                aria-label={t("Close dialog")}
                 onClick={() => {
                   focus(select.field);
                   setSelect(undefined);
                 }}
               >
-                Voltar
+                {t("Voltar")}
               </button>
             </header>
-            <div role="listbox" aria-label="Opções">
+            <div role="listbox" aria-label={t("Opções")}>
               {select.options.map((option, index) => (
                 <button
                   key={index}
@@ -608,7 +609,7 @@ export function ConsoleWorkspace({
                 </button>
               ))}
             </div>
-            <p>A confirma · B cancela</p>
+            <p>{t("A confirma · B cancela")}</p>
           </section>
         </div>
       )}
@@ -619,7 +620,7 @@ export function ConsoleWorkspace({
           title={
             editing.field.getAttribute("aria-label") ??
             editing.field.labels?.[0]?.textContent?.trim().slice(0, 80) ??
-            "Editar texto"
+            t("Editar texto")
           }
           maxLength={
             editing.field.maxLength > 0

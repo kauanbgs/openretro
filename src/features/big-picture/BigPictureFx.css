@@ -19,9 +19,9 @@
 }
 
 .console-mode {
-  --fx-a: #f0a35e;
-  --fx-a-hot: #ff7a45;
-  --fx-a-soft: #ffd08f;
+  --fx-a: #12ace2;
+  --fx-a-hot: #2ec3ff;
+  --fx-a-soft: #8fdcf7;
   --fx-b: #7c5cff;
   --fx-c: #ff5c8a;
   --fx-base: #07060a;
@@ -42,8 +42,8 @@
   --fx-c: #7c5cff;
 }
 .console-mode[data-section="library"] {
-  --fx-b: #ff6b3d;
-  --fx-c: #ffb347;
+  --fx-b: #12ace2;
+  --fx-c: #5b4fd6;
 }
 .console-mode[data-section="downloads"] {
   --fx-b: #34d399;
@@ -321,7 +321,7 @@
 .console-mode.menu-open .tv-side-rail {
   box-shadow:
     40px 0 140px rgba(0, 0, 0, 0.75),
-    inset -1px 0 0 rgba(240, 163, 94, 0.25);
+    inset -1px 0 0 rgba(18, 172, 226, 0.25);
 }
 .console-mode .tv-menu-scrim {
   background: radial-gradient(
@@ -365,12 +365,12 @@
 .console-mode .tv-nav-cursor {
   background: linear-gradient(
     90deg,
-    rgba(240, 163, 94, 0.24),
-    rgba(240, 163, 94, 0.02)
+    rgba(18, 172, 226, 0.24),
+    rgba(18, 172, 226, 0.02)
   );
   box-shadow:
     inset 3px 0 0 var(--fx-a),
-    0 0 26px -6px rgba(240, 163, 94, 0.6);
+    0 0 26px -6px rgba(18, 172, 226, 0.6);
   transition:
     transform 480ms var(--fx-spring),
     opacity 200ms ease;
@@ -388,7 +388,7 @@
 }
 .console-mode .tv-nav button.active svg {
   color: var(--fx-a);
-  filter: drop-shadow(0 0 8px rgba(240, 163, 94, 0.8));
+  filter: drop-shadow(0 0 8px rgba(18, 172, 226, 0.8));
 }
 .console-mode .tv-nav button.nav-focus,
 .console-mode .tv-rail-bottom button.nav-focus {
@@ -590,7 +590,7 @@
     var(--fx-a-hot) 100%
   );
   box-shadow:
-    0 12px 36px -10px rgba(255, 122, 69, 0.85),
+    0 12px 36px -10px rgba(46, 195, 255, 0.85),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
   animation:
     fx-pop 650ms var(--fx-spring) 300ms backwards,
@@ -621,8 +621,8 @@
   );
   box-shadow:
     0 0 0 3px #fff,
-    0 0 50px rgba(255, 140, 70, 0.75),
-    0 18px 44px -10px rgba(255, 122, 69, 0.9);
+    0 0 50px rgba(46, 195, 255, 0.75),
+    0 18px 44px -10px rgba(46, 195, 255, 0.9);
 }
 .console-mode .tv-hero-stat {
   border: 1px solid var(--fx-line-strong);
@@ -786,7 +786,7 @@
 .console-mode .tv-game-grid > button.focused > span,
 .console-mode .tv-catalog-grid > button.focused > strong {
   color: #fff;
-  text-shadow: 0 0 20px rgba(240, 163, 94, 0.7);
+  text-shadow: 0 0 20px rgba(18, 172, 226, 0.7);
 }
 .console-mode .tv-game-grid .tv-card-play {
   inset: auto 14px 72px;
@@ -801,7 +801,7 @@
     var(--fx-a) 50%,
     var(--fx-a-hot)
   );
-  box-shadow: 0 10px 30px -6px rgba(255, 122, 69, 0.9);
+  box-shadow: 0 10px 30px -6px rgba(46, 195, 255, 0.9);
   transform: translateY(14px) scale(0.85);
   transition:
     opacity 260ms ease,
@@ -818,8 +818,8 @@
 }
 .console-mode .tv-catalog-badges small.available {
   color: var(--fx-a-soft);
-  border-color: rgba(240, 163, 94, 0.4);
-  background: rgba(240, 163, 94, 0.1);
+  border-color: rgba(18, 172, 226, 0.4);
+  background: rgba(18, 172, 226, 0.1);
 }
 /* list view: slide instead of tilt */
 .console-mode .tv-library .tv-library-list > button {
@@ -830,7 +830,7 @@
 }
 .console-mode .tv-library .tv-library-list > button.focused {
   transform: translateX(10px);
-  border-color: rgba(240, 163, 94, 0.6);
+  border-color: rgba(18, 172, 226, 0.6);
   box-shadow: 0 0 40px -12px var(--fx-a);
 }
 .console-mode .tv-library .tv-library-list .artwork {
@@ -882,7 +882,7 @@
   outline: none;
   border-color: var(--fx-a) !important;
   box-shadow:
-    0 0 0 3px rgba(240, 163, 94, 0.2),
+    0 0 0 3px rgba(18, 172, 226, 0.2),
     0 0 30px -6px var(--fx-a);
   transform: translateY(-1px);
 }
@@ -930,7 +930,7 @@
 .console-mode .tv-home-recent button:focus-visible {
   outline: none;
   transform: translateY(-4px) scale(1.02);
-  border-color: rgba(240, 163, 94, 0.6) !important;
+  border-color: rgba(18, 172, 226, 0.6) !important;
   box-shadow: 0 20px 50px -18px var(--fx-a);
 }
 .console-mode .tv-home-recent button > svg {
@@ -1019,7 +1019,7 @@
     transform 400ms var(--fx-spring);
 }
 .console-mode .tv-list article.focused {
-  border-color: rgba(240, 163, 94, 0.6);
+  border-color: rgba(18, 172, 226, 0.6);
   transform: translateX(6px);
 }
 .console-mode .tv-dialog-backdrop {
@@ -1155,8 +1155,8 @@
   outline: none;
   background: linear-gradient(
     90deg,
-    rgba(240, 163, 94, 0.25),
-    rgba(240, 163, 94, 0.04)
+    rgba(18, 172, 226, 0.25),
+    rgba(18, 172, 226, 0.04)
   );
   box-shadow: inset 3px 0 0 var(--fx-a);
   transform: translateX(4px);
@@ -1190,7 +1190,7 @@
   background: linear-gradient(
     100deg,
     rgba(255, 255, 255, 0.04) 20%,
-    rgba(240, 163, 94, 0.14) 45%,
+    rgba(18, 172, 226, 0.14) 45%,
     rgba(255, 255, 255, 0.04) 70%
   );
   background-size: 240% 100%;
@@ -1543,8 +1543,8 @@
 @keyframes fx-glow {
   50% {
     box-shadow:
-      0 14px 50px -6px rgba(255, 122, 69, 1),
-      0 0 0 6px rgba(240, 163, 94, 0.14),
+      0 14px 50px -6px rgba(46, 195, 255, 1),
+      0 0 0 6px rgba(18, 172, 226, 0.14),
       inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
 }

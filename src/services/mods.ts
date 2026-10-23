@@ -15,28 +15,29 @@ import type {
   ModsOverview,
   ModSource,
 } from "../types";
+import { locale, t } from "../i18n";
 
 export const PATCH_FORMATS = ["IPS", "BPS", "UPS", "xdelta"];
 
 export const compatibilityLabels: Record<ModCompatibilityStatus, string> = {
-  confirmed: "Compatibilidade confirmada",
-  unknown: "Compatibilidade desconhecida",
-  incompatible: "Incompatível",
+  confirmed: t("Compatibilidade confirmada"),
+  unknown: t("Compatibilidade desconhecida"),
+  incompatible: t("Incompatível"),
 };
 
 export const kindLabels: Record<string, string> = {
-  translation: "Tradução",
-  romhack: "Romhack",
-  local: "Patch local",
+  translation: t("Tradução"),
+  romhack: t("Romhack"),
+  local: t("Patch local"),
 };
 
 /** "pt-BR" → "português (Brasil)"; names that are not codes stay as given. */
 export function languageLabel(language: string | null | undefined): string {
-  if (!language) return "Idioma não informado";
+  if (!language) return t("Idioma não informado");
   try {
     if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(language))
       return (
-        new Intl.DisplayNames(["pt-BR"], { type: "language" }).of(language) ??
+        new Intl.DisplayNames([locale()], { type: "language" }).of(language) ??
         language
       );
   } catch {
@@ -166,7 +167,7 @@ export const mods = {
   install(request: ModInstallRequest, retryOf?: string): Promise<string> {
     if (!isDesktop)
       throw new Error(
-        "Abra o aplicativo OpenRetro para instalar modificações.",
+        t("Abra o aplicativo OpenRetro para instalar modificações."),
       );
     return invoke("mods_install", { request, retryOf: retryOf ?? null });
   },

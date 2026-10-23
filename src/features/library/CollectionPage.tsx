@@ -22,6 +22,7 @@ import {
 } from "../../providers/metadata/LaunchboxMetadataProvider";
 import type { PlayersFilter } from "../../providers/metadata/types";
 import type { GameMetadata, LibraryGame } from "../../types";
+import { t } from "../../i18n";
 interface Props {
   library: LibraryGame[];
   isPending: boolean;
@@ -83,15 +84,15 @@ export function CollectionPage({
   return (
     <div className="page-content">
       <PageHeader
-        title="Biblioteca"
+        title={t("Biblioteca")}
         description={
           library.length
-            ? `${library.length} ${library.length === 1 ? "jogo na sua coleção" : "jogos na sua coleção"}.`
-            : "Sua próxima partida começa aqui."
+            ? `${library.length} ${library.length === 1 ? t("jogo na sua coleção") : t("jogos na sua coleção")}.`
+            : t("Sua próxima partida começa aqui.")
         }
         actions={
           <button className="button primary" onClick={onImport}>
-            <Plus size={18} /> Adicionar jogo
+            <Plus size={18} /> {t("Adicionar jogo")}
           </button>
         }
       />
@@ -101,36 +102,36 @@ export function CollectionPage({
             className={filter === "all" ? "selected" : ""}
             onClick={() => setFilter("all")}
           >
-            Todos os jogos <span>{library.length}</span>
+            {t("Todos os jogos")} <span>{library.length}</span>
           </button>
           <button
             className={filter === "favorites" ? "selected" : ""}
             onClick={() => setFilter("favorites")}
           >
-            <Heart size={14} /> Favoritos
+            <Heart size={14} /> {t("Favoritos")}
           </button>
           <button
             className={filter === "recent" ? "selected" : ""}
             onClick={() => setFilter("recent")}
           >
-            Jogados recentemente
+            {t("Jogados recentemente")}
           </button>
           <button
             className={filter === "unplayed" ? "selected" : ""}
             onClick={() => setFilter("unplayed")}
           >
-            Nunca jogados{" "}
+            {t("Nunca jogados")}{" "}
             <span>{library.filter((x) => !x.item.lastPlayedAt).length}</span>
           </button>
         </div>
         <div className="toolbar-right">
           <SlidersHorizontal size={15} />
           <select
-            aria-label="Filter by platform"
+            aria-label={t("Filter by platform")}
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
           >
-            <option value="all">Todos os consoles</option>
+            <option value="all">{t("Todos os consoles")}</option>
             {platforms.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -138,13 +139,13 @@ export function CollectionPage({
             ))}
           </select>
           <select
-            aria-label="Filtrar por número de jogadores"
+            aria-label={t("Filtrar por número de jogadores")}
             value={players}
             onChange={(e) =>
               setPlayers(e.target.value as PlayersFilter | "all")
             }
           >
-            <option value="all">Qualquer número de jogadores</option>
+            <option value="all">{t("Qualquer número de jogadores")}</option>
             {playersFilters.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -152,26 +153,26 @@ export function CollectionPage({
             ))}
           </select>
           <select
-            aria-label="Sort games"
+            aria-label={t("Sort games")}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
-            <option value="recent">Adicionados recentemente</option>
-            <option value="lastPlayed">Última partida</option>
-            <option value="title">Título A–Z</option>
-            <option value="played">Mais jogados</option>
+            <option value="recent">{t("Adicionados recentemente")}</option>
+            <option value="lastPlayed">{t("Última partida")}</option>
+            <option value="title">{t("Título A–Z")}</option>
+            <option value="played">{t("Mais jogados")}</option>
           </select>
           <div className="view-toggle">
             <button
               className={layout === "grid" ? "selected" : ""}
-              aria-label="Grid view"
+              aria-label={t("Grid view")}
               onClick={() => setLayout("grid")}
             >
               <LayoutGrid size={16} />
             </button>
             <button
               className={layout === "list" ? "selected" : ""}
-              aria-label="List view"
+              aria-label={t("List view")}
               onClick={() => setLayout("list")}
             >
               <List size={17} />
@@ -180,7 +181,7 @@ export function CollectionPage({
         </div>
       </div>
       {isPending || (players !== "all" && counts.isPending) ? (
-        <PageLoading embedded label="Abrindo sua coleção…" />
+        <PageLoading embedded label={t("Abrindo sua coleção…")} />
       ) : visible.length && isRemote ? (
         <div className="cover-grid">
           {visible.map((x) => (
@@ -217,13 +218,15 @@ export function CollectionPage({
           </div>
           <h2>
             {library.length
-              ? "Nenhum jogo nesta seleção."
-              : "Sua biblioteca está vazia"}
+              ? t("Nenhum jogo nesta seleção.")
+              : t("Sua biblioteca está vazia")}
           </h2>
           <p>
             {library.length
-              ? "Tente outro nome ou remova os filtros."
-              : "Encontre jogos no catálogo ou importe seus arquivos para começar."}
+              ? t("Tente outro nome ou remova os filtros.")
+              : t(
+                  "Encontre jogos no catálogo ou importe seus arquivos para começar.",
+                )}
           </p>
           <button
             className="button primary"
@@ -237,10 +240,10 @@ export function CollectionPage({
             }}
           >
             {library.length ? (
-              "Limpar filtros"
+              t("Limpar filtros")
             ) : (
               <>
-                <FolderOpen size={17} /> Adicionar jogo
+                <FolderOpen size={17} /> {t("Adicionar jogo")}
               </>
             )}
           </button>

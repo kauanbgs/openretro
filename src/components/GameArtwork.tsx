@@ -3,6 +3,7 @@ import { memo, useState } from "react";
 import type { GameMetadata } from "../types";
 import { Artwork } from "./Artwork";
 import { ImageOff } from "lucide-react";
+import { t } from "../i18n";
 export const GameArtwork = memo(
   function GameArtwork({
     game,
@@ -20,7 +21,7 @@ export const GameArtwork = memo(
         <div className={`artwork remote-artwork ${hero ? "remote-hero" : ""}`}>
           <img
             src={url}
-            alt={hero ? "" : `Capa de ${game.title}`}
+            alt={hero ? "" : t("Capa de {title}", { title: game.title })}
             loading={loading ?? (hero ? "eager" : "lazy")}
             decoding="async"
             referrerPolicy="no-referrer"
@@ -36,7 +37,7 @@ export const GameArtwork = memo(
       <div className="artwork missing-artwork">
         <ImageOff size={hero ? 54 : 32} />
         <span>{hero ? "" : game.title}</span>
-        <small>Imagem indisponível</small>
+        <small>{t("Imagem indisponível")}</small>
       </div>
     );
   },

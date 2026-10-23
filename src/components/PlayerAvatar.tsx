@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { PlayerProfile } from "../types";
 import { PLAYER_COLORS } from "../services/playerAppearance";
+import { t } from "../i18n";
 
 export { PLAYER_COLORS };
 
@@ -23,18 +24,18 @@ export const PLAYER_AVATARS: Record<
   string,
   { icon: LucideIcon; label: string }
 > = {
-  gamepad: { icon: Gamepad2, label: "Controle" },
-  ghost: { icon: Ghost, label: "Fantasma" },
-  rocket: { icon: Rocket, label: "Foguete" },
-  cat: { icon: Cat, label: "Gato" },
-  swords: { icon: Swords, label: "Espadas" },
-  crown: { icon: Crown, label: "Coroa" },
-  star: { icon: Star, label: "Estrela" },
-  skull: { icon: Skull, label: "Caveira" },
-  zap: { icon: Zap, label: "Raio" },
-  heart: { icon: Heart, label: "Coração" },
-  bot: { icon: Bot, label: "Robô" },
-  flame: { icon: Flame, label: "Chama" },
+  gamepad: { icon: Gamepad2, label: t("Controle") },
+  ghost: { icon: Ghost, label: t("Fantasma") },
+  rocket: { icon: Rocket, label: t("Foguete") },
+  cat: { icon: Cat, label: t("Gato") },
+  swords: { icon: Swords, label: t("Espadas") },
+  crown: { icon: Crown, label: t("Coroa") },
+  star: { icon: Star, label: t("Estrela") },
+  skull: { icon: Skull, label: t("Caveira") },
+  zap: { icon: Zap, label: t("Raio") },
+  heart: { icon: Heart, label: t("Coração") },
+  bot: { icon: Bot, label: t("Robô") },
+  flame: { icon: Flame, label: t("Chama") },
 };
 
 export function PlayerAvatar({

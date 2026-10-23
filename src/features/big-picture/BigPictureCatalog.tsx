@@ -39,6 +39,7 @@ import { ControllerKeyboard } from "./ControllerKeyboard";
 import { ControllerSelect } from "./ControllerSelect";
 import { HeroArtwork } from "./HeroArtwork";
 import { createPortal } from "react-dom";
+import { t } from "../../i18n";
 export interface CatalogViewState {
   query: string;
   platform: string;
@@ -454,15 +455,16 @@ export function BigPictureCatalog({
           <HeroArtwork game={games[0]} />
           <div className="tv-hero-shade" />
           <div className="tv-home-feature-copy">
-            <p className="tv-kicker fx-feature-kicker">Em destaque</p>
+            <p className="tv-kicker fx-feature-kicker">{t("Em destaque")}</p>
             <h1>{games[0].title}</h1>
             <p>{games[0].description || games[0].genre}</p>
             <div className="tv-hero-actions">
               <button className="tv-play" onClick={() => openGame(games[0], 0)}>
-                Ver detalhes
+                {t("Ver detalhes")}
               </button>
               <button className="tv-secondary" onClick={onLibrary}>
-                Minha biblioteca ({library.length})
+                {t("Minha biblioteca (")}
+                {library.length})
               </button>
             </div>
           </div>
@@ -473,8 +475,16 @@ export function BigPictureCatalog({
           <div className="tv-catalog-order-label">
             <strong>
               {debounced
-                ? `Resultados para “${debounced}”`
-                : `Ordenado por: ${{ popular: "Popularidade", rating: "Melhor avaliação", title: "Nome", newest: "Mais recentes", oldest: "Mais antigos" }[sort]}`}
+                ? t("Resultados para “{query}”", { query: debounced })
+                : t("Ordenado por: {order}", {
+                    order: {
+                      popular: t("Popularidade"),
+                      rating: t("Melhor avaliação"),
+                      title: t("Nome"),
+                      newest: t("Mais recentes"),
+                      oldest: t("Mais antigos"),
+                    }[sort],
+                  })}
             </strong>
             {(platform !== "all" || genre !== undefined) && (
               <small>
@@ -489,25 +499,25 @@ export function BigPictureCatalog({
               aria-expanded={filtersOpen}
               onClick={() => setFiltersOpen((value) => !value)}
             >
-              <SlidersHorizontal size={18} /> Filtros
+              <SlidersHorizontal size={18} /> {t("Filtros")}
             </button>
             <label className="tv-filter-control">
-              <span>Ordenar</span>
+              <span>{t("Ordenar")}</span>
               <ControllerSelect
                 input={selectInput}
-                label="Ordenar catálogo"
+                label={t("Ordenar catálogo")}
                 value={sort}
                 disabled={Boolean(debounced)}
                 onChange={(value) => setSort(value as typeof sort)}
                 options={[
                   {
                     value: "popular",
-                    label: debounced ? "Relevância" : "Popularidade",
+                    label: debounced ? t("Relevância") : t("Popularidade"),
                   },
-                  { value: "rating", label: "Melhor avaliação" },
-                  { value: "title", label: "Nome" },
-                  { value: "newest", label: "Mais recentes" },
-                  { value: "oldest", label: "Mais antigos" },
+                  { value: "rating", label: t("Melhor avaliação") },
+                  { value: "title", label: t("Nome") },
+                  { value: "newest", label: t("Mais recentes") },
+                  { value: "oldest", label: t("Mais antigos") },
                 ]}
               />
             </label>
@@ -517,30 +527,30 @@ export function BigPictureCatalog({
               <label className="tv-search">
                 <Search size={19} />
                 <input
-                  aria-label="Pesquisar catálogo"
-                  placeholder="Pesquisar jogos"
+                  aria-label={t("Pesquisar catálogo")}
+                  placeholder={t("Pesquisar jogos")}
                   maxLength={120}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                 />
                 <button
                   className="tv-open-keyboard"
-                  aria-label="Buscar catálogo com controle"
-                  title="Teclado na tela"
+                  aria-label={t("Buscar catálogo com controle")}
+                  title={t("Teclado na tela")}
                   onClick={() => setKeyboardOpen(true)}
                 >
                   <Keyboard size={20} />
                 </button>
               </label>
               <label className="tv-filter-control">
-                <span>Console</span>
+                <span>{t("Console")}</span>
                 <ControllerSelect
                   input={selectInput}
-                  label="Console"
+                  label={t("Console")}
                   value={platform}
                   onChange={setPlatform}
                   options={[
-                    { value: "all", label: "Todos os consoles" },
+                    { value: "all", label: t("Todos os consoles") },
                     ...(taxonomy.data?.platforms ?? []).map((item) => ({
                       value: item.localId,
                       label: platformById(item.localId)?.name ?? item.name,
@@ -549,16 +559,16 @@ export function BigPictureCatalog({
                 />
               </label>
               <label className="tv-filter-control">
-                <span>Gênero</span>
+                <span>{t("Gênero")}</span>
                 <ControllerSelect
                   input={selectInput}
-                  label="Gênero"
+                  label={t("Gênero")}
                   value={genre === undefined ? "all" : String(genre)}
                   onChange={(value) =>
                     setGenre(value === "all" ? undefined : Number(value))
                   }
                   options={[
-                    { value: "all", label: "Todos os gêneros" },
+                    { value: "all", label: t("Todos os gêneros") },
                     ...(taxonomy.data?.genres ?? []).map((item) => ({
                       value: String(item.id),
                       label: item.name,
@@ -567,7 +577,7 @@ export function BigPictureCatalog({
                 />
               </label>
               <div className="tv-filter-summary">
-                <span>Filtros por console e gênero</span>
+                <span>{t("Filtros por console e gênero")}</span>
                 {(platform !== "all" || genre !== undefined || query) && (
                   <button
                     onClick={() => {
@@ -576,7 +586,7 @@ export function BigPictureCatalog({
                       setQuery("");
                     }}
                   >
-                    Limpar filtros
+                    {t("Limpar filtros")}
                   </button>
                 )}
               </div>
@@ -587,7 +597,7 @@ export function BigPictureCatalog({
         <>
           {library.length > 0 && (
             <section className="tv-home-recent">
-              <h2>Continue jogando</h2>
+              <h2>{t("Continue jogando")}</h2>
               <div>
                 {[...library]
                   .sort((a, b) =>
@@ -616,8 +626,8 @@ export function BigPictureCatalog({
             </section>
           )}
           <div className="tv-home-shelf-title">
-            <h2>Descubra seu próximo jogo</h2>
-            <span>Clássicos populares no LaunchBox</span>
+            <h2>{t("Descubra seu próximo jogo")}</h2>
+            <span>{t("Clássicos populares no LaunchBox")}</span>
           </div>
         </>
       )}
@@ -637,7 +647,7 @@ export function BigPictureCatalog({
         <div
           className="tv-catalog-skeleton"
           role="status"
-          aria-label="Carregando catálogo"
+          aria-label={t("Carregando catálogo")}
         >
           {Array.from({ length: 8 }, (_, index) => (
             <div key={index} aria-hidden="true">
@@ -649,10 +659,10 @@ export function BigPictureCatalog({
         </div>
       ) : browse.error && !games.length ? (
         <div className="tv-catalog-message" role="alert">
-          <h2>Não foi possível carregar o catálogo</h2>
+          <h2>{t("Não foi possível carregar o catálogo")}</h2>
           <p>{String(browse.error)}</p>
           <button onClick={() => void browse.refetch()}>
-            <RefreshCw size={17} /> Tentar novamente
+            <RefreshCw size={17} /> {t("Tentar novamente")}
           </button>
         </div>
       ) : (
@@ -663,7 +673,7 @@ export function BigPictureCatalog({
                 key={item.id}
                 style={{ "--i": index % 20 } as CSSProperties}
                 className={`${index === selected ? "focused" : ""} ${item.backgroundUrl || item.screenshots?.length ? "" : "portrait-source"}`}
-                aria-label={`Ver ${item.title}`}
+                aria-label={t("Ver {title}", { title: item.title })}
                 onFocus={() => setSelected(index)}
                 onMouseEnter={() => setSelected(index)}
                 onClick={() => openGame(item, index)}
@@ -687,11 +697,11 @@ export function BigPictureCatalog({
                   </small>
                   {downloads.has(item.title) && (
                     <small className="available">
-                      <Download size={12} /> Download disponível
+                      <Download size={12} /> {t("Download disponível")}
                     </small>
                   )}
                   {libraryKeys.has(`${item.id}:${item.platformId}`) && (
-                    <small>Na biblioteca</small>
+                    <small>{t("Na biblioteca")}</small>
                   )}
                 </div>
               </button>
@@ -700,8 +710,8 @@ export function BigPictureCatalog({
           {!games.length && (
             <div className="tv-catalog-message">
               <Search size={28} />
-              <h2>Nenhum jogo encontrado</h2>
-              <p>Tente outro nome, console ou gênero.</p>
+              <h2>{t("Nenhum jogo encontrado")}</h2>
+              <p>{t("Tente outro nome, console ou gênero.")}</p>
               <button
                 onClick={() => {
                   setQuery("");
@@ -709,7 +719,7 @@ export function BigPictureCatalog({
                   setGenre(undefined);
                 }}
               >
-                Limpar filtros
+                {t("Limpar filtros")}
               </button>
             </div>
           )}
@@ -722,7 +732,7 @@ export function BigPictureCatalog({
               >
                 {browse.isFetchingNextPage
                   ? "Carregando…"
-                  : "Carregar mais jogos"}
+                  : t("Carregar mais jogos")}
               </button>
             </div>
           )}
@@ -730,7 +740,7 @@ export function BigPictureCatalog({
             <p role="alert">{String(browse.error)}</p>
           )}
           <p className="tv-catalog-credit">
-            Dados e imagens do LaunchBox Games Database
+            {t("Dados e imagens do LaunchBox Games Database")}
           </p>
         </>
       )}
@@ -759,7 +769,7 @@ export function BigPictureCatalog({
             >
               <button
                 className="tv-dialog-close"
-                aria-label="Fechar detalhes"
+                aria-label={t("Fechar detalhes")}
                 disabled={busy}
                 onClick={closeGame}
               >
@@ -778,19 +788,19 @@ export function BigPictureCatalog({
                 <h1>{game.title}</h1>
                 <p className="tv-catalog-detail-meta">
                   {platformById(game.platformId)?.name} ·{" "}
-                  {game.year || "Ano não informado"}
+                  {game.year || t("Ano não informado")}
                 </p>
                 <p>{game.description}</p>
                 <div className="tv-catalog-detail-actions">
                   <button onClick={() => onManage(game)}>
-                    Detalhes e gerenciamento
+                    {t("Detalhes e gerenciamento")}
                   </button>
                   {entry && (
                     <button
                       className="tv-catalog-primary"
                       onClick={() => onPlay(entry)}
                     >
-                      <Play size={18} fill="currentColor" /> Jogar
+                      <Play size={18} fill="currentColor" /> {t("Jogar")}
                     </button>
                   )}
                   <button
@@ -799,15 +809,15 @@ export function BigPictureCatalog({
                   >
                     <Download size={18} />
                     {releasesOpen
-                      ? "Ocultar versões"
-                      : "Ver opções de download"}
+                      ? t("Ocultar versões")
+                      : t("Ver opções de download")}
                   </button>
                 </div>
                 {releasesOpen && (
                   <section className="tv-catalog-releases">
-                    <h2>Opções de download</h2>
+                    <h2>{t("Opções de download")}</h2>
                     {releases.isPending ? (
-                      <p>Buscando nas suas fontes…</p>
+                      <p>{t("Buscando nas suas fontes…")}</p>
                     ) : releases.error ? (
                       <p role="alert">{String(releases.error)}</p>
                     ) : releases.data?.length ? (
@@ -823,7 +833,7 @@ export function BigPictureCatalog({
                               void queryClient.invalidateQueries({
                                 queryKey: ["download-jobs"],
                               });
-                              notify("Download iniciado.");
+                              notify(t("Download iniciado."));
                               onDownloads();
                             } catch (error) {
                               setDownloadError(String(error));
@@ -837,9 +847,9 @@ export function BigPictureCatalog({
                             <small>
                               {match.confirmed
                                 ? platformById(game.platformId)?.shortName
-                                : "Console não informado"}{" "}
+                                : t("Console não informado")}{" "}
                               · {match.sourceName} ·{" "}
-                              {match.fileSize || "Tamanho não informado"}
+                              {match.fileSize || t("Tamanho não informado")}
                             </small>
                           </span>
                           <Download size={18} />
@@ -847,8 +857,9 @@ export function BigPictureCatalog({
                       ))
                     ) : (
                       <p>
-                        Nenhuma versão encontrada nas fontes ativas. Adicione
-                        fontes nas configurações.
+                        {t(
+                          "Nenhuma versão encontrada nas fontes ativas. Adicione fontes nas configurações.",
+                        )}
                       </p>
                     )}
                     {downloadError && <p role="alert">{downloadError}</p>}

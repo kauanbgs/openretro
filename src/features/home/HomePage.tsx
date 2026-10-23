@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Dices, Flame, History, Star } from "lucide-react";
+import { Dices } from "lucide-react";
 import { GameArtwork } from "../../components/GameArtwork";
 import { GameCard } from "../../components/GameCard";
 import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
@@ -10,10 +10,11 @@ import {
   isCatalogGame,
   catalogStatus,
 } from "../../providers/metadata/LaunchboxMetadataProvider";
-import type { CatalogRequest } from "../../providers/metadata/types";
+import type { PlayersFilter } from "../../providers/metadata/types";
 import { platformById } from "../../db/platforms";
 import { enrichGameMetadata } from "../../utils/metadata";
 import type { GameMetadata, LibraryGame } from "../../types";
+import { t } from "../../i18n";
 interface Props {
   library: LibraryGame[];
   onSelect: (game: GameMetadata) => void;
@@ -22,14 +23,19 @@ interface Props {
   onDiscover: () => void;
   onDownloads: () => void;
 }
-type Sort = NonNullable<CatalogRequest["sort"]>;
-const categories: { sort: Sort; label: string; icon: typeof Flame }[] = [
-  { sort: "popular", label: "Em alta", icon: Flame },
-  { sort: "rating", label: "Melhor avaliados", icon: Star },
-  { sort: "oldest", label: "Clássicos", icon: History },
+type Category = "popular" | "multiplayer";
+const categories: {
+  id: Category;
+  label: string;
+  emoji: string;
+  players?: PlayersFilter;
+}[] = [
+  { id: "popular", label: t("Em alta"), emoji: "🔥" },
+  { id: "multiplayer", label: t("Multiplayer"), emoji: "🎮", players: "multi" },
 ];
 export function HomePage({ library, onSelect, onDiscover }: Props) {
-  const [sort, setSort] = useState<Sort>("popular");
+  const [category, setCategory] = useState<Category>("popular");
+  const current = categories.find((c) => c.id === category)!;
   const [surprising, setSurprising] = useState(false);
   const played = useMemo(
     () =>
@@ -51,14 +57,30 @@ export function HomePage({ library, onSelect, onDiscover }: Props) {
   });
   const ready = status.data?.configured === true;
   const shelf = useQuery({
-    queryKey: ["catalog-home", sort],
-    queryFn: () => metadataProvider.browse("", "all", 1, undefined, sort),
+    queryKey: ["catalog-home", "popular", current.players ?? null],
+    queryFn: () =>
+      metadataProvider.browse(
+        "",
+        "all",
+        1,
+        undefined,
+        "popular",
+        current.players,
+      ),
     enabled: ready,
     retry: false,
     staleTime: 86400000,
   });
   const games = shelf.data?.games ?? [];
-  const primary = played[0]?.game ?? games[0];
+  // The banner stays put while switching categories.
+  const popular = useQuery({
+    queryKey: ["catalog-home", "popular", null],
+    queryFn: () => metadataProvider.browse("", "all", 1, undefined, "popular"),
+    enabled: ready,
+    retry: false,
+    staleTime: 86400000,
+  });
+  const primary = played[0]?.game ?? popular.data?.games[0];
   const details = useQuery({
     queryKey: [
       "game-detail",
@@ -98,7 +120,9 @@ export function HomePage({ library, onSelect, onDiscover }: Props) {
           <div className="hero-backdrop">
             <div className="hero-content">
               <small>
-                {played.length ? "Continue jogando" : "Destaque do catálogo"}
+                {played.length
+                  ? t("Continue jogando")
+                  : t("Destaque do catálogo")}
               </small>
               <h2>{featured.title}</h2>
               <p>{featured.description}</p>
@@ -114,30 +138,34 @@ export function HomePage({ library, onSelect, onDiscover }: Props) {
           <div className="hero-content">
             <h2>
               {status.data?.state === "building"
-                ? "Preparando o catálogo"
-                : "Seus clássicos começam aqui"}
+                ? t("Preparando o catálogo")
+                : t("Seus clássicos começam aqui")}
             </h2>
             <p>
               {status.data?.state === "building"
-                ? "O OpenRetro está baixando a base de jogos do LaunchBox. Isso leva alguns minutos na primeira vez."
+                ? t(
+                    "O OpenRetro está baixando a base de jogos do LaunchBox. Isso leva alguns minutos na primeira vez.",
+                  )
                 : status.data?.state === "unavailable"
-                  ? "O catálogo de jogos funciona no aplicativo desktop."
-                  : "Adicione um jogo do seu computador ou explore o catálogo."}
+                  ? t("O catálogo de jogos funciona no aplicativo desktop.")
+                  : t(
+                      "Adicione um jogo do seu computador ou explore o catálogo.",
+                    )}
             </p>
           </div>
         </div>
       )}
       <div className="home-categories">
-        <div role="tablist" aria-label="Categorias">
-          {categories.map((category) => (
+        <div role="tablist" aria-label={t("Categorias")}>
+          {categories.map((c) => (
             <button
-              key={category.sort}
+              key={c.id}
               role="tab"
-              aria-selected={sort === category.sort}
-              className={`button ${sort === category.sort ? "primary" : "outline"}`}
-              onClick={() => setSort(category.sort)}
+              aria-selected={category === c.id}
+              className={`button ${category === c.id ? "primary" : "outline"}`}
+              onClick={() => setCategory(c.id)}
             >
-              <category.icon size={15} /> {category.label}
+              <span aria-hidden="true">{c.emoji}</span> {c.label}
             </button>
           ))}
         </div>
@@ -146,9 +174,14 @@ export function HomePage({ library, onSelect, onDiscover }: Props) {
           disabled={!ready || surprising}
           onClick={() => void surprise()}
         >
-          <Dices size={15} /> Me surpreenda
+          <Dices size={15} /> {t("Me surpreenda")}
         </button>
       </div>
+      {ready && (
+        <h2 className="home-section-title">
+          <span aria-hidden="true">{current.emoji}</span> {current.label}
+        </h2>
+      )}
       {ready ? (
         <div className="cards-grid">
           {shelf.isPending
@@ -167,9 +200,9 @@ export function HomePage({ library, onSelect, onDiscover }: Props) {
         </div>
       ) : (
         <div className="empty-panel">
-          <p>O catálogo aparece aqui quando estiver pronto.</p>
+          <p>{t("O catálogo aparece aqui quando estiver pronto.")}</p>
           <button className="button outline" onClick={onDiscover}>
-            Abrir catálogo
+            {t("Abrir catálogo")}
           </button>
         </div>
       )}

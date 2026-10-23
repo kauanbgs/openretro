@@ -22,6 +22,7 @@ import type {
 } from "../../providers/metadata/types";
 import type { GameMetadata } from "../../types";
 import { useCatalogPagination } from "../../hooks/useCatalogPagination";
+import { t } from "../../i18n";
 interface Props {
   query: string;
   setQuery: (s: string) => void;
@@ -121,7 +122,7 @@ export function DiscoverPage({
   return (
     <div className="page-content catalogue">
       {status.isPending ? (
-        <PageLoading embedded label="Consultando o catálogo…" />
+        <PageLoading embedded label={t("Consultando o catálogo…")} />
       ) : !status.data?.configured || status.error ? (
         <CatalogConnection
           status={status.data}
@@ -134,11 +135,11 @@ export function DiscoverPage({
             <div className="catalogue-summary">
               <p>
                 {browse.isFetching && !games.length
-                  ? "Carregando jogos…"
+                  ? t("Carregando jogos…")
                   : debounced
-                    ? `Resultados para “${debounced}”`
+                    ? t("Resultados para “{query}”", { query: debounced })
                     : platform === "all"
-                      ? "Todos os consoles"
+                      ? t("Todos os consoles")
                       : platforms.find((p) => p.id === platform)?.name}
                 {selectedGenre && `, ${selectedGenre}`}
                 {selectedPlayers && `, ${selectedPlayers}`}
@@ -156,7 +157,7 @@ export function DiscoverPage({
                     setPlatform("all");
                   }}
                 >
-                  Limpar filtros
+                  {t("Limpar filtros")}
                 </button>
               )}
             </div>
@@ -166,7 +167,7 @@ export function DiscoverPage({
               </p>
             )}
             {browse.isPending ? (
-              <PageLoading embedded label="Carregando jogos…" />
+              <PageLoading embedded label={t("Carregando jogos…")} />
             ) : browse.error && games.length === 0 ? (
               <div className="empty-panel">
                 <p role="alert">{String(browse.error)}</p>
@@ -174,7 +175,7 @@ export function DiscoverPage({
                   className="button outline"
                   onClick={() => void browse.refetch()}
                 >
-                  <RefreshCw size={15} /> Tentar novamente
+                  <RefreshCw size={15} /> {t("Tentar novamente")}
                 </button>
               </div>
             ) : games.length ? (
@@ -193,7 +194,7 @@ export function DiscoverPage({
                       </div>
                       {availableDownloads.has(game.title) && (
                         <em>
-                          <Download size={13} /> Download disponível
+                          <Download size={13} /> {t("Download disponível")}
                         </em>
                       )}
                     </button>
@@ -204,8 +205,9 @@ export function DiscoverPage({
               <div className="empty-panel">
                 <Search size={28} />
                 <p>
-                  Nenhum jogo encontrado. Tente outro nome, console, gênero ou
-                  número de jogadores.
+                  {t(
+                    "Nenhum jogo encontrado. Tente outro nome, console, gênero ou número de jogadores.",
+                  )}
                 </p>
               </div>
             )}
@@ -226,27 +228,27 @@ export function DiscoverPage({
                   )}{" "}
                   {browse.isFetchingNextPage
                     ? "Carregando…"
-                    : "Carregar mais jogos"}
+                    : t("Carregar mais jogos")}
                 </button>
               </div>
             )}
             <p className="catalogue-credit">
-              Dados e imagens do{" "}
+              {t("Dados e imagens do")}{" "}
               <a
                 href="https://gamesdb.launchbox-app.com/"
                 target="_blank"
                 rel="noreferrer"
               >
-                LaunchBox Games Database
+                {t("LaunchBox Games Database")}
               </a>
               .
             </p>
           </div>
-          <aside className="catalogue-filters" aria-label="Filtros">
+          <aside className="catalogue-filters" aria-label={t("Filtros")}>
             <section>
-              <h3>Ordenar por</h3>
+              <h3>{t("Ordenar por")}</h3>
               <select
-                aria-label="Ordenar jogos"
+                aria-label={t("Ordenar jogos")}
                 disabled={Boolean(debounced)}
                 value={sort}
                 onChange={(e) =>
@@ -254,18 +256,18 @@ export function DiscoverPage({
                 }
               >
                 <option value="popular">
-                  {debounced ? "Relevância" : "Mais avaliados"}
+                  {debounced ? t("Relevância") : t("Mais avaliados")}
                 </option>
-                <option value="rating">Melhor avaliados</option>
-                <option value="title">Título</option>
-                <option value="newest">Mais recentes</option>
-                <option value="oldest">Mais antigos</option>
+                <option value="rating">{t("Melhor avaliados")}</option>
+                <option value="title">{t("Título")}</option>
+                <option value="newest">{t("Mais recentes")}</option>
+                <option value="oldest">{t("Mais antigos")}</option>
               </select>
             </section>
             <section>
-              <h3>Consoles</h3>
+              <h3>{t("Consoles")}</h3>
               <ul className="filter-list">
-                {[{ id: "all", name: "Todos os consoles" }, ...consoles].map(
+                {[{ id: "all", name: t("Todos os consoles") }, ...consoles].map(
                   (p) => (
                     <li key={p.id}>
                       <label>
@@ -283,30 +285,31 @@ export function DiscoverPage({
               </ul>
             </section>
             <section>
-              <h3>Jogadores</h3>
+              <h3>{t("Jogadores")}</h3>
               <ul className="filter-list">
-                {[{ id: null, name: "Qualquer número" }, ...playersFilters].map(
-                  (p) => (
-                    <li key={p.id ?? "all"}>
-                      <label>
-                        <input
-                          type="radio"
-                          name="catalogue-players"
-                          checked={players === p.id}
-                          onChange={() => setPlayers(p.id)}
-                        />
-                        {p.name}
-                      </label>
-                    </li>
-                  ),
-                )}
+                {[
+                  { id: null, name: t("Qualquer número") },
+                  ...playersFilters,
+                ].map((p) => (
+                  <li key={p.id ?? "all"}>
+                    <label>
+                      <input
+                        type="radio"
+                        name="catalogue-players"
+                        checked={players === p.id}
+                        onChange={() => setPlayers(p.id)}
+                      />
+                      {p.name}
+                    </label>
+                  </li>
+                ))}
               </ul>
             </section>
             <section>
-              <h3>Gêneros</h3>
+              <h3>{t("Gêneros")}</h3>
               <ul className="filter-list">
                 {[
-                  { id: null, name: "Todos os gêneros" },
+                  { id: null, name: t("Todos os gêneros") },
                   ...(taxonomy.data?.genres ?? []),
                 ].map((g) => (
                   <li key={g.id ?? "all"}>

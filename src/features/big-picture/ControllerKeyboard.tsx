@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Delete, Search, X } from "lucide-react";
 import { createPortal } from "react-dom";
+import { t } from "../../i18n";
 
 const letters = "1234567890qwertyuiopasdfghjklçzxcvbnm.,-".split("");
 const symbols = Array.from(
@@ -11,7 +12,7 @@ export function ControllerKeyboard({
   onChange,
   onClose,
   input,
-  title = "Pesquisar jogos",
+  title = t("Pesquisar jogos"),
   maxLength = 120,
 }: {
   value: string;
@@ -91,7 +92,7 @@ export function ControllerKeyboard({
       >
         <div className="tv-keyboard-heading">
           <h2>{title}</h2>
-          <button aria-label="Fechar teclado" onClick={onClose}>
+          <button aria-label={t("Fechar teclado")} onClick={onClose}>
             <X size={22} />
           </button>
         </div>
@@ -99,10 +100,10 @@ export function ControllerKeyboard({
           <Search size={19} />
           <input
             ref={field}
-            aria-label="Texto da busca"
+            aria-label={t("Texto da busca")}
             value={value}
             maxLength={maxLength}
-            placeholder="Digite aqui"
+            placeholder={t("Digite aqui")}
             onChange={(event) => onChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape" || event.key === "Enter") {
@@ -131,10 +132,10 @@ export function ControllerKeyboard({
         <div className="tv-keyboard-actions">
           {[
             symbolMode ? "abc" : uppercase ? "#+=" : "ABC",
-            "Espaço",
-            "Apagar",
-            "Limpar",
-            "Concluir",
+            t("Espaço"),
+            t("Apagar"),
+            t("Limpar"),
+            t("Concluir"),
           ].map((label, index) => (
             <button
               key={label}
@@ -147,7 +148,7 @@ export function ControllerKeyboard({
           ))}
         </div>
         <p className="tv-keyboard-help">
-          A confirma · B volta · X apaga · Y alterna letras e símbolos
+          {t("A confirma · B volta · X apaga · Y alterna letras e símbolos")}
         </p>
       </section>
     </div>,

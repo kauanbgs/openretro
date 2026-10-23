@@ -324,7 +324,7 @@
 }
 .tv-hero-actions .tv-play {
   min-width: 152px;
-  color: #17100a;
+  color: #04131a;
   background: var(--tv-accent);
   border-color: var(--tv-accent);
 }
@@ -716,7 +716,7 @@
 .tv-catalog-detail-actions .tv-catalog-primary {
   border-color: var(--tv-accent);
   background: var(--tv-accent);
-  color: #17100a;
+  color: #04131a;
 }
 .tv-catalog-releases {
   display: grid;
@@ -1530,7 +1530,7 @@
 }
 .tv-keyboard-keys button.focused,
 .tv-keyboard-actions button.focused {
-  color: #17100a;
+  color: #04131a;
   background: var(--tv-accent);
   border-color: var(--tv-accent);
   transform: translateY(-2px);
@@ -1540,7 +1540,7 @@
   border-color: color-mix(in srgb, var(--tv-accent) 38%, transparent);
 }
 .tv-keyboard-actions button.primary.focused {
-  color: #17100a;
+  color: #04131a;
 }
 .tv-keyboard .tv-keyboard-help {
   margin-top: 20px;

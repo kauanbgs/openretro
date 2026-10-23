@@ -244,7 +244,13 @@ pub async fn launch_game(
  }
  let timer=Instant::now();
  // Command passes each argument directly to the executable. No shell interprets paths or arguments.
- let child=managed_process::ManagedChild::spawn(Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?));
+ let mut command=Command::new(&executable);
+ command.args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?);
+ // RPCS3 keeps every core busy, so it gets the CPU before OpenRetro and other
+ // apps. Above normal, not high: audio and input elsewhere keep their turn.
+ #[cfg(windows)]
+ if ps3 { use std::os::windows::process::CommandExt; command.creation_flags(0x00008000); } // ABOVE_NORMAL_PRIORITY_CLASS
+ let child=managed_process::ManagedChild::spawn(&mut command);
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {
     // Both play inside OpenRetro's window; only the runtime takes commands.

@@ -34,6 +34,8 @@ pub fn initialize(path: &Path) -> Result<Database> {
     }
     tx.execute_batch(include_str!("006_game_variants.sql"))
         .map_err(error)?;
+    tx.execute_batch(include_str!("007_logo_blue_player.sql"))
+        .map_err(error)?;
     // Restart requires explicit resume, which rechecks the partial files.
     tx.execute("UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')", []).map_err(error)?;
     let platforms: serde_json::Value =

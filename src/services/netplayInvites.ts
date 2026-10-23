@@ -1,4 +1,5 @@
 import { NETPLAY_PLATFORMS } from "../types";
+import { t } from "../i18n";
 
 const PREFIX = "OPENRETRO1.";
 const MAX_LENGTH = 4096;
@@ -29,7 +30,8 @@ export function validNetplayHost(address: string): boolean {
 }
 
 function validate(value: unknown): NetplayInvite {
-  if (!value || typeof value !== "object") throw new Error("Convite inválido.");
+  if (!value || typeof value !== "object")
+    throw new Error(t("Convite inválido."));
   const invite = value as NetplayInvite;
   if (
     typeof invite.address !== "string" ||
@@ -46,7 +48,7 @@ function validate(value: unknown): NetplayInvite {
     (invite.variant !== undefined &&
       (typeof invite.variant !== "string" || invite.variant.length > 120))
   )
-    throw new Error("Convite inválido. Peça um novo código ao anfitrião.");
+    throw new Error(t("Convite inválido. Peça um novo código ao anfitrião."));
   return {
     address: invite.address,
     port: invite.port,
@@ -70,7 +72,7 @@ export function createNetplayInvite(value: NetplayInvite): string {
 export function parseNetplayInvite(code: string): NetplayInvite {
   const text = code.trim();
   if (text.length > MAX_LENGTH || !text.startsWith(PREFIX))
-    throw new Error("Cole um código de convite do OpenRetro válido.");
+    throw new Error(t("Cole um código de convite do OpenRetro válido."));
   try {
     const payload = text.slice(PREFIX.length);
     if (!/^[A-Za-z0-9_-]+$/.test(payload)) throw new Error();
@@ -83,7 +85,7 @@ export function parseNetplayInvite(code: string): NetplayInvite {
       ),
     );
   } catch {
-    throw new Error("Convite inválido. Peça um novo código ao anfitrião.");
+    throw new Error(t("Convite inválido. Peça um novo código ao anfitrião."));
   }
 }
 
@@ -98,7 +100,13 @@ export function checkInviteGame(
   )
     throw new Error(
       invite.variant
-        ? `Este convite é para ${invite.title} com "${invite.variant}". Instale e escolha essa mesma versão em Traduções e mods para entrar.`
-        : `Este convite é para ${invite.title}. Abra a mesma versão e o mesmo arquivo do jogo para entrar; se você escolheu uma tradução ou mod, volte para o jogo original.`,
+        ? t(
+            "Este convite é para {title} com “{variant}”. Instale e escolha essa mesma versão em Traduções e mods para entrar.",
+            { title: invite.title, variant: invite.variant },
+          )
+        : t(
+            "Este convite é para {title}. Abra a mesma versão e o mesmo arquivo do jogo para entrar; se você escolheu uma tradução ou mod, volte para o jogo original.",
+            { title: invite.title },
+          ),
     );
 }

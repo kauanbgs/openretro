@@ -21,18 +21,19 @@ import type {
   GameMetadata,
   ImportCandidate,
 } from "../../types";
+import { t } from "../../i18n";
 const active = (state: string) =>
   ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING"].includes(state);
 const labels: Record<string, string> = {
-  RESOLVING: "Buscando conexões e metadados",
-  QUEUED: "Na fila",
-  DOWNLOADING: "Baixando",
-  VERIFYING: "Verificando arquivos",
-  INSTALLING: "Preparando para jogar",
-  PAUSED: "Pausado",
-  COMPLETED: "Concluído",
-  CANCELLED: "Cancelado",
-  FAILED: "Falhou",
+  RESOLVING: t("Buscando conexões e metadados"),
+  QUEUED: t("Na fila"),
+  DOWNLOADING: t("Baixando"),
+  VERIFYING: t("Verificando arquivos"),
+  INSTALLING: t("Preparando para jogar"),
+  PAUSED: t("Pausado"),
+  COMPLETED: t("Concluído"),
+  CANCELLED: t("Cancelado"),
+  FAILED: t("Falhou"),
 };
 export function DownloadsPage({
   jobs,
@@ -91,33 +92,35 @@ export function DownloadsPage({
   return (
     <div className="page-content downloads-page">
       <PageHeader
-        title="Downloads"
-        description="Acompanhe seus jogos, da transferência até a biblioteca."
+        title={t("Downloads")}
+        description={t(
+          "Acompanhe seus jogos, da transferência até a biblioteca.",
+        )}
       />
       <div className="transfer-overview">
         <div>
           <strong>{summary.active}</strong>
-          <span>Em andamento</span>
+          <span>{t("Em andamento")}</span>
         </div>
         <div>
           <strong>{bytes(summary.speed)}/s</strong>
-          <span>Velocidade total</span>
+          <span>{t("Velocidade total")}</span>
         </div>
         <div>
           <strong>{summary.completed}</strong>
-          <span>Concluídos</span>
+          <span>{t("Concluídos")}</span>
         </div>
       </div>
       <div
         className="filter-tabs transfer-filters"
-        aria-label="Filtrar downloads"
+        aria-label={t("Filtrar downloads")}
       >
         {[
-          ["all", "Todos"],
-          ["active", "Em andamento"],
-          ["PAUSED", "Pausados"],
-          ["COMPLETED", "Concluídos"],
-          ["FAILED", "Com erro"],
+          ["all", t("Todos")],
+          ["active", t("Em andamento")],
+          ["PAUSED", t("Pausados")],
+          ["COMPLETED", t("Concluídos")],
+          ["FAILED", t("Com erro")],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -131,7 +134,7 @@ export function DownloadsPage({
       </div>
       <section className="transfer-section">
         <div className="section-heading">
-          <h2>Seus downloads</h2>
+          <h2>{t("Seus downloads")}</h2>
           <span className="muted">
             {visible.length} {visible.length === 1 ? "item" : "itens"}
           </span>
@@ -143,8 +146,9 @@ export function DownloadsPage({
         )}
         {!isDesktop && (
           <p className="notice">
-            As transferências de arquivos estão disponíveis no aplicativo
-            OpenRetro.
+            {t(
+              "As transferências de arquivos estão disponíveis no aplicativo OpenRetro.",
+            )}
           </p>
         )}
         {visible.length ? (
@@ -164,7 +168,9 @@ export function DownloadsPage({
                 )}
                 <div className="download-job-body">
                   <h3>{j.game?.title ?? j.name}</h3>
-                  {j.game && <small className="download-job-file">{j.name}</small>}
+                  {j.game && (
+                    <small className="download-job-file">{j.name}</small>
+                  )}
                   <p>{j.sourceName}</p>
                   <span className="transfer-state" data-state={j.state}>
                     {j.state === "INSTALLING" && (
@@ -175,14 +181,16 @@ export function DownloadsPage({
                       : (labels[j.state] ?? j.state)}
                   </span>
                   <progress
-                    aria-label={`Progresso de ${j.name}`}
+                    aria-label={t("Progresso de {name}", { name: j.name })}
                     value={j.progress}
                     max={100}
                   />
                   {j.state === "INSTALLING" ? (
                     <p>
-                      {j.progress.toFixed(0)}% · o jogo já foi baixado, falta
-                      prepará-lo para a biblioteca
+                      {j.progress.toFixed(0)}
+                      {t(
+                        "% · o jogo já foi baixado, falta prepará-lo para a biblioteca",
+                      )}
                     </p>
                   ) : (
                     <p>
@@ -203,7 +211,7 @@ export function DownloadsPage({
                   {j.state === "COMPLETED" && j.libraryStatus === "added" && (
                     <p className="library-status added">
                       <CheckCircle2 size={15} />{" "}
-                      {j.libraryMessage ?? "Adicionado à sua biblioteca."}
+                      {j.libraryMessage ?? t("Adicionado à sua biblioteca.")}
                     </p>
                   )}
                   {j.state === "COMPLETED" &&
@@ -213,10 +221,10 @@ export function DownloadsPage({
                         {j.libraryMessage}
                       </p>
                     )}
-                  {j.error && <p className="error-message">{j.error}</p>}
+                  {j.error && <p className="error-message">{t(j.error)}</p>}
                   {j.directory && (
                     <details>
-                      <summary>Pasta de destino</summary>
+                      <summary>{t("Pasta de destino")}</summary>
                       <small className="path-text">{j.directory}</small>
                     </details>
                   )}
@@ -229,7 +237,7 @@ export function DownloadsPage({
                           void run(() => bridge.controlDownload(j.id, "pause"))
                         }
                       >
-                        <Pause size={15} /> Pausar
+                        <Pause size={15} /> {t("Pausar")}
                       </button>
                     ) : ["PAUSED", "FAILED", "CANCELLED"].includes(j.state) ? (
                       <button
@@ -239,7 +247,7 @@ export function DownloadsPage({
                           void run(() => bridge.controlDownload(j.id, "resume"))
                         }
                       >
-                        <Play size={15} /> Retomar
+                        <Play size={15} /> {t("Retomar")}
                       </button>
                     ) : null}
                     {j.state === "COMPLETED" &&
@@ -263,7 +271,7 @@ export function DownloadsPage({
                                 j.game,
                               );
                               notify(
-                                "Confirme os dados para adicionar o jogo.",
+                                t("Confirme os dados para adicionar o jogo."),
                               );
                               return;
                             }
@@ -277,8 +285,8 @@ export function DownloadsPage({
                           <FolderOpen size={15} />
                         )}{" "}
                         {busy
-                          ? "Verificando o arquivo…"
-                          : "Adicionar à biblioteca"}
+                          ? t("Verificando o arquivo…")
+                          : t("Adicionar à biblioteca")}
                       </button>
                     ) : j.state !== "CANCELLED" && j.state !== "INSTALLING" ? (
                       <button
@@ -288,14 +296,16 @@ export function DownloadsPage({
                           void run(() => bridge.controlDownload(j.id, "cancel"))
                         }
                       >
-                        Cancelar
+                        {t("Cancelar")}
                       </button>
                     ) : null}
                     <button
                       disabled={busy}
                       className="icon-button"
-                      aria-label={`Remove ${j.name} from downloads`}
-                      title="Remover da lista de downloads"
+                      aria-label={t("Remove {name} from downloads", {
+                        name: j.name,
+                      })}
+                      title={t("Remover da lista de downloads")}
                       onClick={() =>
                         void run(() => bridge.removeDownload(j.id))
                       }
@@ -310,14 +320,16 @@ export function DownloadsPage({
         ) : (
           <p className="notice">
             {jobs.length
-              ? "Nenhum download nesta categoria."
-              : "Nenhum download ainda. Escolha um jogo no catálogo para começar."}
+              ? t("Nenhum download nesta categoria.")
+              : t(
+                  "Nenhum download ainda. Escolha um jogo no catálogo para começar.",
+                )}
           </p>
         )}
       </section>
       {files && (
         <Modal
-          title="Escolher arquivo do jogo"
+          title={t("Escolher arquivo do jogo")}
           onClose={() => {
             setFiles(undefined);
             setError("");
@@ -350,10 +362,9 @@ export function DownloadsPage({
               ))
             ) : (
               <p className="notice">
-                Nenhum arquivo de console foi encontrado. Se o download está
-                compactado, use a extração automática ao baixar ou importe o
-                arquivo já extraído. Instaladores de PC não são executados
-                automaticamente.
+                {t(
+                  "Nenhum arquivo de console foi encontrado. Se o download está compactado, use a extração automática ao baixar ou importe o arquivo já extraído. Instaladores de PC não são executados automaticamente.",
+                )}
               </p>
             )}
             {error && (
@@ -368,7 +379,7 @@ export function DownloadsPage({
                 onImport();
               }}
             >
-              Adicionar jogo local
+              {t("Adicionar jogo local")}
             </button>
           </div>
         </Modal>
