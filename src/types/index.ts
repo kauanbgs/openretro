@@ -183,6 +183,8 @@ export interface AppSettings {
   gameScreenMode?: "original" | "stretch";
   /** Frames per second of phone play's WebRTC video. */
   phoneFrameRate?: 30 | 60;
+  /** Show the running game in Discord; off unless the player turns it on. */
+  discordPresence?: boolean;
 }
 export const defaultSettings: AppSettings = {
   autoResume: true,

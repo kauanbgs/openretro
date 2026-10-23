@@ -62,6 +62,14 @@ skippable in **Settings → Emuladores**) and keeps RPCS3's recommended settings
 database (<https://api.rpcs3.net/config/?api=v1>) on disk, so RPCS3 applies the
 community's settings for each game as its own interface would.
 
+## Discord
+
+**Settings → General → Mostrar o jogo no Discord** (off by default) shows
+the running game on Discord: its title in the short status ("Playing Super
+Mario World"), the console, the cover and the time played. OpenRetro talks to
+the Discord app on the same PC through its local pipe; no server or sign-in
+is involved, and nothing happens while Discord is closed.
+
 ## Players, resume and local co-op
 
 Use **Settings → General → Trocar jogador**, or **Big Picture → Sistema →

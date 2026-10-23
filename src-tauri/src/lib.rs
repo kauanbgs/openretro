@@ -1,5 +1,6 @@
 mod commands;
 mod database;
+mod discord;
 mod downloads;
 mod file_browser;
 mod filesystem;
@@ -46,6 +47,7 @@ pub fn run() {
             app.manage(downloads::sources::SourceIndex::default());
             app.manage(in_game::InGameService::default());
             app.manage(remote_play::RemotePlay::default());
+            app.manage(discord::Presence::default());
             app.manage(mods::ModService::default());
             mods::recover(app.handle());
             in_game::setup(app.handle())?;
@@ -120,6 +122,7 @@ pub fn run() {
             remote_play::remote_play_start,
             remote_play::remote_play_stop,
             remote_play::remote_play_network_settings,
+            discord::discord_presence_sync,
             launcher::runtime_menu::open_game_screenshots,
             launcher::runtime_menu::list_game_screenshots,
             launcher::save_states::list_save_states,

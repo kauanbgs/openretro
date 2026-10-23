@@ -309,6 +309,26 @@ export function SettingsPage({
                     <option value="60">{t("60 quadros/s · mais suave")}</option>
                   </select>
                 </div>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Mostrar o jogo no Discord")}</strong>
+                    <p>
+                      {t(
+                        "Seus amigos no Discord veem o jogo, o console e a capa enquanto você joga. Precisa do Discord aberto neste computador.",
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Mostrar o jogo no Discord")}
+                    on={settings.discordPresence === true}
+                    disabled={saving}
+                    onToggle={() =>
+                      void save({
+                        discordPresence: settings.discordPresence !== true,
+                      }).then(() => bridge.discordPresenceSync())
+                    }
+                  />
+                </div>
               </Group>
               <Group title={t("Sistema")}>
                 <div className="setting-row">

@@ -547,6 +547,10 @@ export const bridge = {
   async remotePlayNetworkSettings(): Promise<void> {
     if (isDesktop) return invoke("remote_play_network_settings");
   },
+  /** Applies the Discord setting at once, during a game too. */
+  async discordPresenceSync(): Promise<void> {
+    if (isDesktop) return invoke("discord_presence_sync");
+  },
   /** This computer's local network address, shared by the netplay host. */
   async netplayLocalAddress(): Promise<string | null> {
     return isDesktop ? invoke("netplay_local_address") : null;

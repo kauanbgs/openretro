@@ -675,6 +675,8 @@ export const en: Record<string, string> = {
   "O Windows está bloqueando os celulares": "Windows is blocking phones",
   "A rede {name} deste computador está marcada como Pública, e o Windows não deixa celulares se conectarem ao OpenRetro nela. Na sua casa, mude o perfil de rede para Privada. Este aviso some sozinho quando a rede mudar.": "This computer's {name} network is marked as Public, and Windows doesn't let phones connect to OpenRetro on it. At home, change the network profile to Private. This warning goes away on its own once the network changes.",
   "Abrir configurações de rede": "Open network settings",
+  "Mostrar o jogo no Discord": "Show the game on Discord",
+  "Seus amigos no Discord veem o jogo, o console e a capa enquanto você joga. Precisa do Discord aberto neste computador.": "Your Discord friends see the game, its console and cover while you play. Needs Discord open on this computer.",
   "Fluidez no celular": "Phone smoothness",
   "Quadros por segundo do vídeo enviado ao celular. 60 deixa o movimento mais suave, mas pesa mais no PC e no Wi-Fi.": "Frames per second of the video sent to phones. 60 makes motion smoother but costs more on the PC and the Wi-Fi.",
   "30 quadros/s · recomendado": "30 frames/s · recommended",

@@ -268,6 +268,7 @@ pub async fn launch_game(
  else { conn.execute("INSERT INTO player_progress(profile_id,library_item_id,last_played_at) VALUES(?1,?2,?3) ON CONFLICT(profile_id,library_item_id) DO UPDATE SET last_played_at=excluded.last_played_at",params![player,id,started]).map_err(error)?; }
  }
  let _=app.emit("game-started",&id); log::info!("Started game session {session}");
+ crate::discord::game_started(&app,crate::discord::activity(&entry.game.title,&entry.item.platform_id,entry.game.cover_url.as_deref(),chrono::Utc::now().timestamp()));
  // A GUI emulator can leave its process alive after its embedded game window
  // closes. Give it time to finish saves, then reap the managed child.
  let mut closed_since=None;
@@ -285,7 +286,7 @@ pub async fn launch_game(
        }
     } else { closed_since=None; }
     std::thread::sleep(Duration::from_millis(100));
- }; let elapsed=timer.elapsed().as_secs() as i64;
+ }; let elapsed=timer.elapsed().as_secs() as i64; crate::discord::game_finished(&app);
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;
  tx.execute("UPDATE play_sessions SET finished_at=?1,duration=?2,exit_code=?3 WHERE id=?4",params![chrono::Utc::now().to_rfc3339(),elapsed,status.as_ref().ok().and_then(|s|s.code()),session]).map_err(error)?;
  if player=="default" { tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?; }
