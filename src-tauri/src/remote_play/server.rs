@@ -116,6 +116,8 @@ struct Media {
 
 pub struct Running {
     pub url: String,
+    /// The network phones reach this server on, for the public-network warning.
+    pub network: super::network::Watch,
     devices: Arc<AtomicUsize>,
     players: Arc<Mutex<HashMap<u64, u8>>>,
     shutdown: oneshot::Sender<()>,
@@ -211,6 +213,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
     });
     Ok(Running {
         url: format!("http://{address}:{SERVER_PORT}/?t={token}"),
+        network: super::network::Watch::new(address),
         devices,
         players,
         shutdown,

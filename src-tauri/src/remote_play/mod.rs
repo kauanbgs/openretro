@@ -17,6 +17,7 @@ mod capture;
 mod frames;
 mod api;
 mod input;
+mod network;
 mod server;
 mod video;
 
@@ -46,11 +47,13 @@ pub struct RemotePlayStatus {
     devices: usize,
     /// The player each connected phone chose, one entry per phone.
     players: Vec<u8>,
+    /// The network phones connect on, once checked; Windows blocks a public one.
+    network: Option<network::NetworkProfile>,
 }
 
 fn status_of(running: Option<&server::Running>) -> RemotePlayStatus {
     let Some(running) = running else {
-        return RemotePlayStatus { running: false, url: None, qr: None, devices: 0, players: vec![] };
+        return RemotePlayStatus { running: false, url: None, qr: None, devices: 0, players: vec![], network: None };
     };
     let qr = qrcode::QrCode::new(running.url.as_bytes()).ok().map(|code| {
         code.render::<qrcode::render::svg::Color>()
@@ -64,7 +67,29 @@ fn status_of(running: Option<&server::Running>) -> RemotePlayStatus {
         qr,
         devices: running.devices(),
         players: running.players(),
+        network: running.network.current(),
     }
+}
+
+/// Opens the Windows page where the phone play network's profile is chosen.
+#[tauri::command]
+pub fn remote_play_network_settings(app: tauri::AppHandle) -> Result<()> {
+    let page = app
+        .state::<RemotePlay>()
+        .0
+        .lock()
+        .map_err(error)?
+        .as_ref()
+        .and_then(|running| running.network.current())
+        .map_or("ms-settings:network-status", |network| network.settings);
+    #[cfg(windows)]
+    std::process::Command::new("explorer.exe")
+        .arg(page)
+        .spawn()
+        .map_err(error)?;
+    #[cfg(not(windows))]
+    let _ = page;
+    Ok(())
 }
 
 #[tauri::command]

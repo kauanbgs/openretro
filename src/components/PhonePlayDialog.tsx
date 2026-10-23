@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, LoaderCircle, Smartphone } from "lucide-react";
+import { Copy, LoaderCircle, ShieldAlert, Smartphone } from "lucide-react";
 import { Modal } from "./Modal";
 import { bridge } from "../services/bridge";
 import { t } from "../i18n";
@@ -53,6 +53,30 @@ export function PhonePlayDialog({
       <div className="phone-play">
         {running && status.data?.qr ? (
           <>
+            {status.data.network?.public && (
+              <div className="phone-play-blocked" role="alert">
+                <strong>
+                  <ShieldAlert size={16} />{" "}
+                  {t("O Windows está bloqueando os celulares")}
+                </strong>
+                <p>
+                  {t(
+                    "A rede {name} deste computador está marcada como Pública, e o Windows não deixa celulares se conectarem ao OpenRetro nela. Na sua casa, mude o perfil de rede para Privada. Este aviso some sozinho quando a rede mudar.",
+                    { name: status.data.network.name },
+                  )}
+                </p>
+                <button
+                  className="button outline"
+                  onClick={() =>
+                    void bridge
+                      .remotePlayNetworkSettings()
+                      .catch((error) => notify(String(error)))
+                  }
+                >
+                  {t("Abrir configurações de rede")}
+                </button>
+              </div>
+            )}
             <div
               className="phone-play-qr"
               role="img"

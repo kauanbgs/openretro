@@ -76,6 +76,8 @@ export interface RemotePlayStatus {
   devices: number;
   /** The player each connected phone chose, one entry per phone. */
   players: number[];
+  /** The network phones connect on, once checked; Windows blocks a public one. */
+  network: { public: boolean; name: string } | null;
 }
 export interface PlayerProfile {
   id: string;

@@ -1396,6 +1396,27 @@ html[data-theme="light"] .titlebar-controls button:hover {
   min-width: 0;
   font-size: 12px;
 }
+.phone-play-blocked {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-left: 2px solid var(--danger);
+  border-radius: 0 5px 5px 0;
+  background: var(--panel);
+  text-align: left;
+}
+.phone-play-blocked strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+.phone-play-blocked strong svg {
+  color: var(--danger);
+}
 .phone-play p.phone-play-devices {
   color: var(--muted);
   font-weight: 600;

@@ -202,7 +202,9 @@ games (N64, PSP, PS2) read back only while a phone watches. Screen capture
 shows OpenRetro itself when no game runs. Sound is the PC's output. Phone
 buttons reach the runtime's remote gamepad, which listens on loopback only.
 Windows asks once whether OpenRetro may use the network; allow private
-networks.
+networks. Phones cannot connect while the PC's network is marked as Public:
+the phone dialog then warns about it and opens the Windows page where the
+network profile is changed to Private, and the warning clears on its own.
 
 ## Big Picture tools
 

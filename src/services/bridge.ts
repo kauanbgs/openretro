@@ -526,7 +526,14 @@ export const bridge = {
   async remotePlayStatus(): Promise<RemotePlayStatus> {
     return isDesktop
       ? invoke("remote_play_status")
-      : { running: false, url: null, qr: null, devices: 0, players: [] };
+      : {
+          running: false,
+          url: null,
+          qr: null,
+          devices: 0,
+          players: [],
+          network: null,
+        };
   },
   async remotePlayStart(): Promise<RemotePlayStatus> {
     if (!isDesktop)
@@ -535,6 +542,10 @@ export const bridge = {
   },
   async remotePlayStop(): Promise<void> {
     if (isDesktop) return invoke("remote_play_stop");
+  },
+  /** Windows' page for the phone play network's profile. */
+  async remotePlayNetworkSettings(): Promise<void> {
+    if (isDesktop) return invoke("remote_play_network_settings");
   },
   /** This computer's local network address, shared by the netplay host. */
   async netplayLocalAddress(): Promise<string | null> {
