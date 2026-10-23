@@ -31,6 +31,8 @@ export interface GameMetadata {
   ratingCount?: number;
   trailers?: { id: string; name: string }[];
   gameModes?: string[];
+  /** Most players at once, from the catalog; null when not listed. */
+  maxPlayers?: number | null;
   perspectives?: string[];
   themes?: string[];
   franchise?: string;

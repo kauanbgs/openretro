@@ -10,6 +10,13 @@ export interface CatalogRequest {
   page?: number;
   genreId?: number;
   sort?: "popular" | "rating" | "title" | "newest" | "oldest";
+  players?: PlayersFilter;
+}
+/** Games played together: 2+ players, co-op, or 3+ at once. */
+export type PlayersFilter = "multi" | "coop" | "party";
+export interface GamePlayers {
+  maxPlayers: number | null;
+  cooperative: boolean;
 }
 export interface CatalogReply {
   data: Record<string, unknown>;

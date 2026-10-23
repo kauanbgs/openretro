@@ -79,6 +79,7 @@ pub fn run() {
             metadata::catalog_browse,
             metadata::catalog_game,
             metadata::catalog_match,
+            metadata::catalog_players,
             metadata::catalog_thumbnail,
             downloads::sources::list_download_sources,
             downloads::sources::save_download_source,

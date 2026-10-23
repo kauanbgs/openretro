@@ -10,12 +10,16 @@ import {
   metadataProvider,
   catalogStatus,
   catalogRefresh,
+  playersFilters,
 } from "../../providers/metadata/LaunchboxMetadataProvider";
 import { platformById, platforms } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import { PageLoading } from "../../components/PageLoading";
 import { CatalogConnection } from "./CatalogConnection";
-import type { CatalogRequest } from "../../providers/metadata/types";
+import type {
+  CatalogRequest,
+  PlayersFilter,
+} from "../../providers/metadata/types";
 import type { GameMetadata } from "../../types";
 import { useCatalogPagination } from "../../hooks/useCatalogPagination";
 interface Props {
@@ -34,6 +38,7 @@ export function DiscoverPage({
 }: Props) {
   const [debounced, setDebounced] = useState(query),
     [genre, setGenre] = useState<number | null>(null),
+    [players, setPlayers] = useState<PlayersFilter | null>(null),
     [sort, setSort] = useState<NonNullable<CatalogRequest["sort"]>>("popular");
   const client = useQueryClient();
   useEffect(() => {
@@ -57,7 +62,15 @@ export function DiscoverPage({
     staleTime: 86400000,
   });
   const browse = useInfiniteQuery({
-    queryKey: ["catalog", "artwork-v2", debounced, platform, genre, sort],
+    queryKey: [
+      "catalog",
+      "artwork-v2",
+      debounced,
+      platform,
+      genre,
+      sort,
+      players,
+    ],
     queryFn: ({ pageParam }) =>
       metadataProvider.browse(
         debounced,
@@ -65,6 +78,7 @@ export function DiscoverPage({
         pageParam,
         genre ?? undefined,
         sort,
+        players ?? undefined,
       ),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasNext ? last.page + 1 : undefined),
@@ -92,6 +106,7 @@ export function DiscoverPage({
     available.some((r) => r.localId === p.id),
   );
   const selectedGenre = taxonomy.data?.genres.find((g) => g.id === genre)?.name;
+  const selectedPlayers = playersFilters.find((p) => p.id === players)?.name;
   const availableDownloads = useDownloadAvailability(games);
   async function retry() {
     try {
@@ -126,12 +141,17 @@ export function DiscoverPage({
                       ? "Todos os consoles"
                       : platforms.find((p) => p.id === platform)?.name}
                 {selectedGenre && `, ${selectedGenre}`}
+                {selectedPlayers && `, ${selectedPlayers}`}
               </p>
-              {(debounced || genre !== null || platform !== "all") && (
+              {(debounced ||
+                genre !== null ||
+                players !== null ||
+                platform !== "all") && (
                 <button
                   className="text-button"
                   onClick={() => {
                     setGenre(null);
+                    setPlayers(null);
                     setQuery("");
                     setPlatform("all");
                   }}
@@ -184,7 +204,8 @@ export function DiscoverPage({
               <div className="empty-panel">
                 <Search size={28} />
                 <p>
-                  Nenhum jogo encontrado. Tente outro nome, console ou gênero.
+                  Nenhum jogo encontrado. Tente outro nome, console, gênero ou
+                  número de jogadores.
                 </p>
               </div>
             )}
@@ -253,6 +274,26 @@ export function DiscoverPage({
                           name="catalogue-console"
                           checked={platform === p.id}
                           onChange={() => setPlatform(p.id)}
+                        />
+                        {p.name}
+                      </label>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </section>
+            <section>
+              <h3>Jogadores</h3>
+              <ul className="filter-list">
+                {[{ id: null, name: "Qualquer número" }, ...playersFilters].map(
+                  (p) => (
+                    <li key={p.id ?? "all"}>
+                      <label>
+                        <input
+                          type="radio"
+                          name="catalogue-players"
+                          checked={players === p.id}
+                          onChange={() => setPlayers(p.id)}
                         />
                         {p.name}
                       </label>

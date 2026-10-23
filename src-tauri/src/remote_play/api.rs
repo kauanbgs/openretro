@@ -41,9 +41,11 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
                 take(&args, "page")?,
                 take(&args, "genreId")?,
                 take(&args, "sort")?,
+                take(&args, "players")?,
             )
             .await?,
         ),
+        "catalog_players" => to_json(crate::metadata::catalog_players(app.clone(), take(&args, "games")?).await?),
         "catalog_game" => to_json(crate::metadata::catalog_game(app.clone(), take(&args, "id")?).await?),
         "catalog_thumbnail" => {
             to_json(crate::metadata::catalog_thumbnail(app.clone(), take(&args, "url")?).await?)

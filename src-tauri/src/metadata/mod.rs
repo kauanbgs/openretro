@@ -713,6 +713,7 @@ fn game_json(row: &rusqlite::Row) -> rusqlite::Result<Value> {
         "rating": rating.filter(|_| rating_count > 0).map(|r| (r * 20.0).round()),
         "ratingCount": rating_count,
         "gameModes": modes,
+        "maxPlayers": players.filter(|p| *p >= 1),
         "trailers": video.as_deref().and_then(youtube_id).map(|v| vec![json!({"id": v, "name": "Trailer"})]),
     }))
 }
@@ -759,6 +760,7 @@ pub async fn catalog_browse(
     page: Option<i64>,
     genre_id: Option<i64>,
     sort: Option<String>,
+    players: Option<String>,
 ) -> Result<Value> {
     tauri::async_runtime::spawn_blocking(move || {
         let page = page.unwrap_or(1).clamp(1, 10000);
@@ -776,6 +778,9 @@ pub async fn catalog_browse(
         if let Some(genre) = genre_id {
             conditions.push("g.id IN (SELECT game_id FROM game_genres WHERE genre_id=?)".into());
             values.push(genre.into());
+        }
+        if let Some(players) = players.as_deref() {
+            conditions.push(players_condition(players)?.into());
         }
         let order = if query.is_empty() {
             // Browsing shows only games with box art; a search still finds the rest.
@@ -825,6 +830,69 @@ pub async fn catalog_browse(
             let has_next = games.len() as i64 > PAGE_SIZE;
             games.truncate(PAGE_SIZE as usize);
             Ok(json!({"games": games, "hasNext": has_next, "page": page}))
+        })
+    })
+    .await
+    .map_err(error)?
+}
+
+/// Catalog filter for games played together: 2+ players, co-op, or 3+.
+fn players_condition(filter: &str) -> Result<&'static str> {
+    match filter {
+        "multi" => Ok("g.players > 1"),
+        "coop" => Ok("g.cooperative = 1"),
+        "party" => Ok("g.players >= 3"),
+        _ => Err("Filtro de jogadores inválido.".into()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct PlayersQuery {
+    id: String,
+    title: String,
+    platform: String,
+}
+
+/// How many can play each library game, from the catalog: by LaunchBox id,
+/// or by title and console for games added from elsewhere.
+#[tauri::command]
+pub async fn catalog_players(
+    app: tauri::AppHandle,
+    games: Vec<PlayersQuery>,
+) -> Result<std::collections::HashMap<String, Value>> {
+    if games.len() > 5000 {
+        return Err("Jogos demais para consultar de uma vez.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        with_index(&app, |conn| {
+            let mut found = std::collections::HashMap::new();
+            for game in games {
+                let entry = match game.id.strip_prefix("lb-").and_then(|n| n.parse::<i64>().ok()) {
+                    Some(id) => conn
+                        .query_row(
+                            "SELECT players, cooperative FROM games WHERE id=?1",
+                            [id],
+                            |r| Ok((r.get::<_, Option<i64>>(0)?, r.get::<_, bool>(1)?)),
+                        )
+                        .optional()
+                        .map_err(error)?,
+                    None => best_match(conn, &game.platform, &game.title)?.map(|g| {
+                        (
+                            g["maxPlayers"].as_i64(),
+                            g["gameModes"]
+                                .as_array()
+                                .is_some_and(|m| m.iter().any(|v| v == "Cooperativo")),
+                        )
+                    }),
+                };
+                if let Some((players, cooperative)) = entry {
+                    found.insert(
+                        game.id,
+                        json!({ "maxPlayers": players.filter(|p| *p >= 1), "cooperative": cooperative }),
+                    );
+                }
+            }
+            Ok(found)
         })
     })
     .await
@@ -1001,6 +1069,27 @@ pub async fn catalog_thumbnail(app: tauri::AppHandle, url: String) -> Result<Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn players_filter_keeps_only_games_played_together() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(INDEX_SCHEMA).unwrap();
+        conn.execute_batch(
+            "INSERT INTO games(id, platform, name, players, cooperative) VALUES
+               (1, 'snes', 'Solo', 1, 0), (2, 'snes', 'Versus', 2, 0),
+               (3, 'snes', 'Co-op', 2, 1), (4, 'snes', 'Party', 4, 0), (5, 'snes', 'Unknown', NULL, 0);",
+        )
+        .unwrap();
+        let names = |filter| -> Vec<String> {
+            let sql = format!("SELECT name FROM games g WHERE {} ORDER BY id", players_condition(filter).unwrap());
+            let mut stmt = conn.prepare(&sql).unwrap();
+            stmt.query_map([], |r| r.get(0)).unwrap().map(|r| r.unwrap()).collect()
+        };
+        assert_eq!(names("multi"), ["Versus", "Co-op", "Party"]);
+        assert_eq!(names("coop"), ["Co-op"]);
+        assert_eq!(names("party"), ["Party"]);
+        assert!(players_condition("1; DROP TABLE games").is_err());
+    }
 
     #[test]
     fn thumbnails_bound_image_dimensions_and_reject_invalid_data() {

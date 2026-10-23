@@ -1,6 +1,7 @@
 import { PageHeader } from "../../components/PageHeader";
 import { PageLoading } from "../../components/PageLoading";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Plus,
   Heart,
@@ -14,6 +15,12 @@ import { GameCard } from "../../components/GameCard";
 import { Capsule } from "../../components/Capsule";
 import { isRemote } from "../../services/transport";
 import { platforms } from "../../db/platforms";
+import {
+  catalogPlayers,
+  matchesPlayers,
+  playersFilters,
+} from "../../providers/metadata/LaunchboxMetadataProvider";
+import type { PlayersFilter } from "../../providers/metadata/types";
 import type { GameMetadata, LibraryGame } from "../../types";
 interface Props {
   library: LibraryGame[];
@@ -37,7 +44,16 @@ export function CollectionPage({
 }: Props) {
   const [filter, setFilter] = useState("all"),
     [layout, setLayout] = useState("grid"),
-    [sort, setSort] = useState("recent");
+    [sort, setSort] = useState("recent"),
+    [players, setPlayers] = useState<PlayersFilter | "all">("all");
+  // Looked up only once the filter is used; the catalog knows player counts.
+  const counts = useQuery({
+    queryKey: ["library-players", library.map((x) => x.game.id).join(",")],
+    queryFn: () => catalogPlayers(library.map((x) => x.game)),
+    enabled: players !== "all",
+    staleTime: Infinity,
+    retry: false,
+  });
   const visible = useMemo(
     () =>
       library
@@ -47,6 +63,8 @@ export function CollectionPage({
             (filter !== "unplayed" || !x.item.lastPlayedAt) &&
             (filter !== "recent" || Boolean(x.item.lastPlayedAt)) &&
             (platform === "all" || x.game.platformId === platform) &&
+            (players === "all" ||
+              matchesPlayers(counts.data?.[x.game.id], players)) &&
             x.game.title.toLowerCase().includes(query.toLowerCase()),
         )
         .sort((a, b) =>
@@ -60,7 +78,7 @@ export function CollectionPage({
                   )
                 : b.item.addedAt.localeCompare(a.item.addedAt),
         ),
-    [library, filter, platform, query, sort],
+    [library, filter, platform, players, counts.data, query, sort],
   );
   return (
     <div className="page-content">
@@ -120,6 +138,20 @@ export function CollectionPage({
             ))}
           </select>
           <select
+            aria-label="Filtrar por número de jogadores"
+            value={players}
+            onChange={(e) =>
+              setPlayers(e.target.value as PlayersFilter | "all")
+            }
+          >
+            <option value="all">Qualquer número de jogadores</option>
+            {playersFilters.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <select
             aria-label="Sort games"
             value={sort}
             onChange={(e) => setSort(e.target.value)}
@@ -147,7 +179,7 @@ export function CollectionPage({
           </div>
         </div>
       </div>
-      {isPending ? (
+      {isPending || (players !== "all" && counts.isPending) ? (
         <PageLoading embedded label="Abrindo sua coleção…" />
       ) : visible.length && isRemote ? (
         <div className="cover-grid">
@@ -200,6 +232,7 @@ export function CollectionPage({
                 setQuery("");
                 setPlatform("all");
                 setFilter("all");
+                setPlayers("all");
               } else onImport();
             }}
           >

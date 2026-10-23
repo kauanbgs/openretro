@@ -144,7 +144,8 @@ export function App() {
   const [help, setHelp] = useState(false);
   const [bigPicture, setBigPicture] = useState(false);
   // The desktop window has no system title bar; Big Picture covers the screen.
-  const titleBar = isDesktop && !bigPicture;
+  // A paired phone has a backend but no Tauri window to drag or close.
+  const titleBar = isTauri && !bigPicture;
   useEffect(() => {
     document.documentElement.classList.toggle("custom-titlebar", titleBar);
   }, [titleBar]);

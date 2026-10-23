@@ -6,10 +6,10 @@
 :root {
   font-family: "Noto Sans Variable", "Segoe UI", sans-serif;
   --display: "Noto Sans Variable", "Segoe UI", sans-serif;
-  --bg: #1c1c1c;
-  --sidebar: #151515;
-  --panel: #151515;
-  --panel2: #252525;
+  --bg: #121212;
+  --sidebar: #0c0c0c;
+  --panel: #0c0c0c;
+  --panel2: #1c1c1c;
   --border: #ffffff1f;
   --border-strong: #ffffff3d;
   --text: #e9eaee;
@@ -17,11 +17,11 @@
   --body: #8e919b;
   --quiet: #6f727b;
   --accent: #c0c1c7;
-  --accentText: #1c1c1c;
+  --accentText: #121212;
   --success: #1c9749;
   --danger: #e06c6e;
   --danger-bg: #801d1e;
-  --brand-cutout: #151515;
+  --brand-cutout: #0c0c0c;
   --sidebar-width: 250px;
   --header-height: 68px;
   --bottom-height: 30px;
@@ -617,7 +617,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   display: grid;
   gap: 4px;
   padding: 28px 12px 10px;
-  background: linear-gradient(0deg, #151515 45%, #15151500);
+  background: linear-gradient(0deg, #0c0c0c 45%, #0c0c0c00);
 }
 .game-card-title {
   display: flex;
@@ -654,7 +654,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
 }
 .game-card.skeleton {
   pointer-events: none;
-  background: linear-gradient(90deg, #151515 0%, #222 50%, #151515 100%);
+  background: linear-gradient(90deg, #0c0c0c 0%, #1a1a1a 50%, #0c0c0c 100%);
   background-size: 200% 100%;
   animation: hydra-shimmer 1.4s linear infinite;
 }

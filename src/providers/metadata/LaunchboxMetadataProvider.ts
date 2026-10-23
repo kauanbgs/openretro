@@ -6,7 +6,9 @@ import type {
   CatalogPage,
   CatalogPlatform,
   CatalogRequest,
+  GamePlayers,
   MetadataProvider,
+  PlayersFilter,
 } from "./types";
 export interface CatalogStatus {
   configured: boolean;
@@ -51,10 +53,18 @@ export class LaunchboxMetadataProvider implements MetadataProvider {
     page = 1,
     genreId?: number,
     sort: CatalogRequest["sort"] = "popular",
+    players?: PlayersFilter,
   ): Promise<CatalogPage> {
     const result = await invoke<Omit<CatalogPage, "remainingAllowance">>(
       "catalog_browse",
-      { query, platform: platformId, page, genreId: genreId ?? null, sort },
+      {
+        query,
+        platform: platformId,
+        page,
+        genreId: genreId ?? null,
+        sort,
+        players: players ?? null,
+      },
     );
     return { ...result, remainingAllowance: null };
   }
@@ -79,6 +89,34 @@ export class LaunchboxMetadataProvider implements MetadataProvider {
   }
 }
 export const metadataProvider = new LaunchboxMetadataProvider();
+/** Player counts for library games, keyed by game id; empty without a catalog. */
+export async function catalogPlayers(
+  games: GameMetadata[],
+): Promise<Record<string, GamePlayers>> {
+  if (!desktop() || !games.length) return {};
+  return invoke("catalog_players", {
+    games: games.map((g) => ({
+      id: g.id,
+      title: g.title,
+      platform: g.platformId,
+    })),
+  });
+}
+/** Whether a game fits the players filter; unknown counts never match. */
+export function matchesPlayers(
+  players: GamePlayers | undefined,
+  filter: PlayersFilter,
+) {
+  if (!players) return false;
+  if (filter === "coop") return players.cooperative;
+  return (players.maxPlayers ?? 0) >= (filter === "party" ? 3 : 2);
+}
+/** Labels shown wherever the players filter appears. */
+export const playersFilters: { id: PlayersFilter; name: string }[] = [
+  { id: "multi", name: "Multijogador (2+)" },
+  { id: "coop", name: "Cooperativo" },
+  { id: "party", name: "3 jogadores ou mais" },
+];
 export async function catalogGameDetails(game: GameMetadata) {
   if (game.metadataProvider === "launchbox")
     return metadataProvider.getGame(

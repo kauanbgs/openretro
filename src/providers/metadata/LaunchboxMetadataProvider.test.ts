@@ -3,9 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   LaunchboxMetadataProvider,
   catalogGameDetails,
+  catalogPlayers,
   catalogRefresh,
   catalogStatus,
   isCatalogGame,
+  matchesPlayers,
 } from "./LaunchboxMetadataProvider";
 import { enrichGameMetadata } from "../../utils/metadata";
 import type { GameMetadata } from "../../types";
@@ -54,11 +56,11 @@ describe("LaunchBox catalog", () => {
     await catalogRefresh();
     expect(ipc).toHaveBeenLastCalledWith("catalog_refresh");
   });
-  it("sends console, genre, pagination and sorting through native arguments", async () => {
+  it("sends console, genre, players, pagination and sorting through native arguments", async () => {
     ipc.mockResolvedValue({ games: [game], page: 2, hasNext: true });
     const provider = new LaunchboxMetadataProvider();
     expect(
-      await provider.browse("metroid", "snes", 2, 7, "rating"),
+      await provider.browse("metroid", "snes", 2, 7, "rating", "coop"),
     ).toMatchObject({
       games: [game],
       page: 2,
@@ -71,12 +73,38 @@ describe("LaunchBox catalog", () => {
       page: 2,
       genreId: 7,
       sort: "rating",
+      players: "coop",
     });
     await provider.search("metroid", "snes");
     expect(ipc).toHaveBeenLastCalledWith(
       "catalog_browse",
-      expect.objectContaining({ platform: "snes", query: "metroid" }),
+      expect.objectContaining({
+        platform: "snes",
+        query: "metroid",
+        players: null,
+      }),
     );
+  });
+  it("looks up library player counts and treats unknown counts as no match", async () => {
+    ipc.mockResolvedValue({ "lb-299": { maxPlayers: 1, cooperative: false } });
+    expect(await catalogPlayers([game])).toEqual({
+      "lb-299": { maxPlayers: 1, cooperative: false },
+    });
+    expect(ipc).toHaveBeenLastCalledWith("catalog_players", {
+      games: [{ id: "lb-299", title: "Super Metroid", platform: "snes" }],
+    });
+    const versus = { maxPlayers: 2, cooperative: false };
+    const coop = { maxPlayers: 2, cooperative: true };
+    const party = { maxPlayers: 4, cooperative: false };
+    expect(matchesPlayers(versus, "multi")).toBe(true);
+    expect(matchesPlayers(versus, "coop")).toBe(false);
+    expect(matchesPlayers(coop, "coop")).toBe(true);
+    expect(matchesPlayers(versus, "party")).toBe(false);
+    expect(matchesPlayers(party, "party")).toBe(true);
+    expect(
+      matchesPlayers({ maxPlayers: null, cooperative: false }, "multi"),
+    ).toBe(false);
+    expect(matchesPlayers(undefined, "multi")).toBe(false);
   });
   it("keeps every supported platform and retries failed taxonomy loads", async () => {
     const provider = new LaunchboxMetadataProvider();
