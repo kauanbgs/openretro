@@ -10,6 +10,10 @@ const BLOCK_BYTES: u64 = 8 * 1024 * 1024;
 const CONNECTIONS: usize = 16;
 const ATTEMPTS: u32 = 4;
 const REPORT_INTERVAL: Duration = Duration::from_millis(750);
+// Bound bookkeeping, not game size. Very large files use larger byte ranges;
+// each connection still streams through a fixed 1 MiB writer buffer.
+const MAX_RESUME_BLOCKS: u64 = 16_384;
+const MAX_RESUME_BYTES: u64 = 256 * 1024;
 
 pub fn client() -> Result<Client> {
     Client::builder()
@@ -33,9 +37,14 @@ struct Resume {
     done: Vec<bool>,
 }
 impl Resume {
+    fn new(source: String, total: u64, validator: String, block_bytes: u64) -> Self {
+        let block_bytes = block_bytes.max(1).max(total.div_ceil(MAX_RESUME_BLOCKS));
+        Self { version: 1, source, total, validator, block_bytes,
+            done: vec![false; total.div_ceil(block_bytes) as usize] }
+    }
     fn span(&self, index: usize) -> (u64, u64) {
         let start = index as u64 * self.block_bytes;
-        (start, (start + self.block_bytes).min(self.total))
+        (start, start.saturating_add(self.block_bytes).min(self.total))
     }
     fn completed_bytes(&self) -> u64 {
         self.done.iter().enumerate().filter(|(_, done)| **done).map(|(i, _)| { let (start, end) = self.span(i); end - start }).sum()
@@ -68,7 +77,7 @@ async fn checkpoint(part: &Path, state_path: &Path, state: &Resume) -> Result<()
 }
 async fn restore(part: &Path, state_path: &Path, expected: Resume) -> Result<Resume> {
     if tokio::fs::metadata(part).await.is_ok_and(|m| m.len() == expected.total)
-        && tokio::fs::metadata(state_path).await.is_ok_and(|m| m.len() < 64 * 1024) {
+        && tokio::fs::metadata(state_path).await.is_ok_and(|m| m.len() < MAX_RESUME_BYTES) {
         if let Ok(bytes) = tokio::fs::read(state_path).await {
             if let Ok(saved) = serde_json::from_slice::<Resume>(&bytes) {
                 if saved.compatible(&expected) { return Ok(saved); }
@@ -107,8 +116,6 @@ async fn download_with_options(
         (StatusCode::OK, _) => None,
         _ => return Err(format!("O servidor recusou o download ({}).", response.status())),
     };
-    let total = range_total.unwrap_or_else(|| response.content_length().unwrap_or(0));
-    if total > super::MAX_DIRECT_DOWNLOAD_BYTES { return Err("O arquivo é maior que o limite permitido.".into()); }
     let requested = super::direct_filename(url);
     let is_archive = requested.rsplit_once('.').is_some_and(|(_, ext)| matches!(ext.to_ascii_lowercase().as_str(), "zip" | "7z" | "rar"));
     let name = if is_archive { requested } else { super::response_filename(response.headers()).unwrap_or(requested) };
@@ -120,7 +127,7 @@ async fn download_with_options(
         let final_url = response.url().clone();
         drop(response);
         drop(permit);
-        let state = Resume { version: 1, source: super::sources::download_key(url.as_str()), total, validator: tag, block_bytes, done: vec![false; total.div_ceil(block_bytes) as usize] };
+        let state = Resume::new(super::sources::download_key(url.as_str()), total, tag, block_bytes);
         let state = restore(&part, &state_path, state).await?;
         if !ranges(client, &final_url, &part, &state_path, state, slots, cancel, connections, &mut report).await? { return Ok(None); }
     } else {
@@ -139,16 +146,14 @@ async fn download_with_options(
 }
 async fn sequential(mut response: Response, part: &Path, cancel: &CancellationToken, report: &mut impl FnMut(u64, u64) -> Result<()>) -> Result<bool> {
     let total = response.content_length().unwrap_or(0);
-    if total > super::MAX_DIRECT_DOWNLOAD_BYTES { return Err("O arquivo é maior que o limite permitido.".into()); }
     let mut output = BufWriter::with_capacity(1024 * 1024, File::create(part).await.map_err(error)?);
-    let mut downloaded = 0;
+    let mut downloaded = 0u64;
     let mut saved = Instant::now();
     report(0, total)?;
     loop {
         let chunk = tokio::select! { _ = cancel.cancelled() => { output.flush().await.map_err(error)?; report(downloaded, total)?; return Ok(false); }, r = response.chunk() => r.map_err(|_| "O download foi interrompido pela conexão.")? };
         let Some(chunk) = chunk else { break };
-        downloaded += chunk.len() as u64;
-        if downloaded > super::MAX_DIRECT_DOWNLOAD_BYTES { return Err("O arquivo é maior que o limite permitido.".into()); }
+        downloaded = downloaded.checked_add(chunk.len() as u64).ok_or("O tamanho informado pelo servidor é inválido.")?;
         output.write_all(&chunk).await.map_err(error)?;
         if saved.elapsed() >= REPORT_INTERVAL { report(downloaded, total)?; saved = Instant::now(); }
     }

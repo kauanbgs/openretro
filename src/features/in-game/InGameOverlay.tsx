@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Gamepad2,
+  Monitor,
   Play,
   RotateCcw,
   Save,
@@ -25,8 +26,14 @@ interface Session {
   title: string;
   open: boolean;
   slot: number;
+  viewAvailable: boolean;
+  screenView: {
+    layout: "full" | "sideBySide" | "stacked" | "grid";
+    region: number;
+    full: boolean;
+  };
 }
-const actions = [
+const baseActions = [
   { id: "resume", label: "Continuar jogando", icon: Play },
   { id: "save", label: "Salvar estado", icon: Save },
   { id: "load", label: "Carregar estado", icon: Upload },
@@ -37,6 +44,9 @@ const actions = [
 ];
 export function InGameOverlay() {
   const [session, setSession] = useState<Session | null>(null);
+  const latestSession = useRef(session);
+  latestSession.current = session;
+  const nav = useRef<HTMLElement>(null);
   const [selected, setSelected] = useState(0);
   const [busy, setBusy] = useState(false);
   const [keyboard, setKeyboard] = useState(false);
@@ -44,6 +54,55 @@ export function InGameOverlay() {
   const [confirmation, setConfirmation] = useState<"load" | "reset" | "quit">();
   const [confirmed, setConfirmed] = useState(false);
   const [states, setStates] = useState<SaveState[]>([]);
+  const view = session?.screenView;
+  const layoutLabels = {
+    full: "Tela inteira",
+    sideBySide: "Esquerda / direita",
+    stacked: "Cima / baixo",
+    grid: "4 quadrantes",
+  };
+  const regionLabels =
+    view?.layout === "stacked"
+      ? ["Cima", "Baixo"]
+      : view?.layout === "sideBySide"
+        ? ["Esquerda", "Direita"]
+        : [
+            "Superior esquerda",
+            "Superior direita",
+            "Inferior esquerda",
+            "Inferior direita",
+          ];
+  const actions = [...baseActions];
+  if (session?.viewAvailable && view) {
+    actions.splice(
+      1,
+      0,
+      {
+        id: "view_layout",
+        label: `Tela dividida: ${layoutLabels[view.layout]}`,
+        icon: Monitor,
+      },
+      ...(view.layout !== "full"
+        ? [
+            {
+              id: "view_region",
+              label: `Minha região: ${regionLabels[view.region - 1]}`,
+              icon: Monitor,
+            },
+            {
+              id: "view_toggle",
+              label: view.full ? "Ver minha tela" : "Ver tela inteira",
+              icon: Monitor,
+            },
+          ]
+        : []),
+    );
+  }
+  useEffect(() => {
+    nav.current
+      ?.querySelector(".selected")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selected, session?.open, view?.layout]);
   const sessionId = session?.open ? session.id : undefined;
   useEffect(() => {
     if (!sessionId) return;
@@ -69,8 +128,10 @@ export function InGameOverlay() {
     document.documentElement.classList.add("in-game-overlay");
     void invoke<Session | null>("in_game_status").then(setSession);
     const state = listen<Session | null>("in-game-state", ({ payload }) => {
+      const previous = latestSession.current;
       setSession(payload);
-      setSelected(0);
+      if (!payload?.open || !previous?.open || previous.id !== payload.id)
+        setSelected(0);
       setMessage("");
       setConfirmation(undefined);
     });
@@ -148,8 +209,13 @@ export function InGameOverlay() {
     if (key === "down")
       setSelected((value) => Math.min(actions.length - 1, value + 1));
     if (key === "a") void run(actions[selected].id);
-    if (key === "left" && session.slot > 0) void run("slot_previous");
-    if (key === "right" && session.slot < 99) void run("slot_next");
+    const action = actions[selected]?.id;
+    if (["left", "right"].includes(key) && action?.startsWith("view_"))
+      void run(action);
+    else {
+      if (key === "left" && session.slot > 0) void run("slot_previous");
+      if (key === "right" && session.slot < 99) void run("slot_next");
+    }
   };
   if (!session?.open) return null;
   return (
@@ -228,7 +294,7 @@ export function InGameOverlay() {
             </button>
           </div>
         ) : (
-          <nav>
+          <nav ref={nav}>
             {actions.map((action, index) => (
               <button
                 key={action.id}
@@ -243,6 +309,14 @@ export function InGameOverlay() {
               </button>
             ))}
           </nav>
+        )}
+        {session.viewAvailable && (
+          <p className="game-menu-view-hint">
+            Tela dividida alterna entre esquerda/direita, cima/baixo e
+            quadrantes. Escolha sua região e volte à tela inteira para ver menus
+            e resultados. O recorte muda apenas a imagem neste PC e não troca
+            seu jogador.
+          </p>
         )}
         <p className="game-menu-message" role="status">
           {busy

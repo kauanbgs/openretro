@@ -31,36 +31,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: desktop-release-v1-${{ runner.os }}
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev
       - run: npm ci
       - run: npm run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: cargo check --manifest-path src-tauri/Cargo.toml
+      # Release tags can restore caches from main, but not from other tags.
+      # Warm the optimized, custom-protocol dependency build before publishing.
+      - name: Warm Windows release dependencies
+        if: runner.os == 'Windows' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cargo build --release --features tauri/custom-protocol --manifest-path src-tauri/Cargo.toml
   runtime:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            git
-            make
-            base-devel
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-SDL2
-            mingw-w64-x86_64-vulkan-headers
-            mingw-w64-x86_64-vulkan-loader
-            mingw-w64-x86_64-ntldd
-      - name: Build minimal OpenRetro Runtime
-        shell: msys2 {0}
-        run: bash ./runtime/retroarch/build-mingw64.sh
-      - name: Verify runtime package
-        shell: pwsh
-        run: |
-          $manifest = Get-Content src-tauri/resources/runtime/retroarch/runtime-manifest.json -Raw | ConvertFrom-Json
-          if ($manifest.kind -ne "openretro-minimal" -or $manifest.menuIncluded -ne $false) { exit 1 }
-          if (-not (Test-Path dist-runtime/openretro-runtime-windows-x86_64.zip)) { exit 1 }
-          if (-not (Get-ChildItem dist-runtime/openretro-runtime-source-*.tar.gz)) { exit 1 }
+      - name: Prepare and verify minimal OpenRetro Runtime
+        uses: ./.github/actions/runtime

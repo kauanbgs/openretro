@@ -291,7 +291,6 @@ fn spawn_transfer(app: &tauri::AppHandle, mut job: DownloadJob) -> Result<()> {
         .insert(id, ActiveTask { cancel, task });
     Ok(())
 }
-const MAX_DIRECT_DOWNLOAD_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 fn safe_download_filename(candidate: &str) -> Option<String> {
     let name: String = candidate
         .chars()
@@ -416,11 +415,8 @@ fn extract_playable_zip(
         if !entry.is_dir() && playable_extension(&enclosed) {
             total = total
                 .checked_add(entry.size())
-                .ok_or("Downloaded ZIP is too large.")?;
+                .ok_or("Downloaded ZIP declares an invalid total size.")?;
         }
-    }
-    if total > MAX_DIRECT_DOWNLOAD_BYTES {
-        return Err("Downloaded ZIP is too large.".into());
     }
     let mut done = 0u64;
     let mut buffer = vec![0u8; 1024 * 1024];

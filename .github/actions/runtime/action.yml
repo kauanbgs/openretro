@@ -1,0 +1,48 @@
+name: Prepare OpenRetro Runtime
+description: Reuse an exactly matching runtime and its source archive, or build them cleanly.
+outputs:
+  cache-hit:
+    description: Whether this exact runtime recipe was already built.
+    value: ${{ steps.cache.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    # No restore-keys: a different recipe must never restore an older runtime.
+    # Main-branch validation populates this cache for subsequent release tags.
+    - name: Restore matching runtime package
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          src-tauri/resources/runtime/retroarch
+          dist-runtime
+        key: runtime-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('runtime/retroarch/**', '.github/actions/runtime/action.yml', 'scripts/verify-runtime-package.ps1') }}
+    - name: Set up runtime compiler on cache miss
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          git
+          make
+          base-devel
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-SDL2
+          mingw-w64-x86_64-vulkan-headers
+          mingw-w64-x86_64-vulkan-loader
+          mingw-w64-x86_64-ntldd
+    - name: Build minimal OpenRetro Runtime on cache miss
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: msys2 {0}
+      run: bash ./runtime/retroarch/build-mingw64.sh
+    - name: Verify runtime binary and release packages
+      shell: pwsh
+      run: ./scripts/verify-runtime-package.ps1
+    - name: Report runtime reuse
+      shell: pwsh
+      env:
+        RUNTIME_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: |
+        $result = if ($env:RUNTIME_CACHE_HIT -eq 'true') { 'Reused the exact runtime package; MSYS2 setup and compilation were skipped.' } else { 'Built a clean runtime package; later runs can reuse it once the main-branch cache is populated.' }
+        "### OpenRetro Runtime`n$result" >> $env:GITHUB_STEP_SUMMARY

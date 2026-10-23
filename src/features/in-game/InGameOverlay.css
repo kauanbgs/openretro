@@ -137,6 +137,12 @@ html.in-game-overlay #root {
   font-size: 11px;
   line-height: 1.6;
 }
+.game-menu-view-hint {
+  margin: 14px 0 0;
+  color: #a6a6a6;
+  font-size: 11px;
+  line-height: 1.6;
+}
 .game-menu-panel .keyboard-map {
   margin: 0 0 16px;
   --muted: #a9a9a9;

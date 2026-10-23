@@ -36,8 +36,8 @@ build into application data, installs Sony's official system software from
 Sony's update server and fetches Redump's disc keys. Nothing is installed or
 configured by hand, and RPCS3's own interface never appears; games start inside
 the OpenRetro window from the command line. Each connected controller becomes a player
-(DualShock 4, DualSense and Xbox controllers through RPCS3's own drivers, others
-through SDL), or the keyboard when none is connected. RPCS3's source is at
+(Xbox controllers through XInput, other controllers including DualShock 4 and
+DualSense through SDL using the detected device name), or the keyboard when none is connected. RPCS3's source is at
 <https://github.com/RPCS3/rpcs3>.
 
 Games are disc folders, imported through `PS3_GAME/USRDIR/EBOOT.BIN`, or
@@ -47,6 +47,14 @@ can take a few minutes; later launches are fast. PS3 emulation needs a recent
 multi-core CPU and a Vulkan GPU, and compatibility varies per game (see
 <https://rpcs3.net/compatibility>). Save states, online play and phone play are
 not available for PS3.
+
+The managed emulator exits when the game ends. On Windows it also belongs to
+an OpenRetro-owned process job, so closing or crashing the launcher does not
+leave the emulator running. If the embedded game window disappears but its
+process stays alive, OpenRetro gives it five seconds to finish before stopping
+it. A new launch checks `RPCS3.buf`: a live instance is reported in OpenRetro;
+only an abandoned, exclusively accessible lock is removed. Saves and installed
+game data are not removed during this recovery.
 
 Before a PS3 game starts, OpenRetro installs its official updates from Sony's
 update server (checked at most once a day per game, SHA-1 verified, and
@@ -87,6 +95,46 @@ such as Tailscale, ZeroTier or Radmin VPN. Players who join start from the
 host's state and never load or overwrite their own resume state. NES, SNES,
 Game Boy, GBA, Master System, Genesis, Game Gear, PlayStation and Arcade games
 are supported.
+
+## VPN invitations for a demo
+
+On Windows, each PC running a game in the integrated runtime can choose its own
+screen region from the in-game menu (**F1**, PS, or Share + Options). Activate
+**Tela dividida** to cycle through left/right, top/bottom and four quadrants,
+then choose **Minha região**. **Ver tela inteira / Ver minha tela** switches
+between the selected region and the complete picture for menus and results.
+These actions work with the mouse or the menu's controller navigation.
+
+This is a local crop of the rendered game window, preserving its proportions
+and any existing letterboxing. It does not change the player's controller port,
+send video over netplay, or create independent cameras. Each PC chooses its
+region manually, and the preference lasts for the running session. The game
+must already support split-screen. Phone streaming keeps its own view settings.
+
+To use netplay between different networks without running an OpenRetro server:
+
+1. Install Tailscale or Radmin VPN on both PCs and connect them to the same
+   private VPN network. Both PCs need the same game file and compatible cores.
+2. On the host, open the library game, choose **Jogar online → Hospedar partida**,
+   and paste the host PC's IP from the VPN application into **Seu endereço na VPN**.
+   The detected local address is only a reference; it may be a Wi-Fi address,
+   so do not assume it is the VPN address.
+3. Copy the generated **Convite**, share it with the other player, and select
+   **Hospedar e jogar**. Share the optional session password separately.
+4. On the other PC, open the same library game, choose **Jogar online → Entrar em
+   uma partida**, and paste the invitation. OpenRetro checks the console and
+   stored SHA-256 fingerprint before enabling **Entrar e jogar**. Enter the
+   separate password if required. The runtime checks core compatibility during
+   its connection handshake.
+
+Invitations are portable connection details, not short server-backed room codes.
+They contain the host address, port, title, console and game fingerprint, but no
+password or local game path. They do not create a VPN, expire, verify that the
+host is online, or bypass a firewall. Recreate the invitation if the host address
+or port changes. Allow OpenRetro/runtime traffic through the host firewall when
+needed. **Endereço e porta** remains available for manual connections and older
+imports without fingerprints. The same invitation flow also works over LAN with
+the host's local address. It does not add video/audio streaming or a lobby.
 
 ## Play on your phone
 

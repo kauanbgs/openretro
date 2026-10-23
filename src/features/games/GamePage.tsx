@@ -926,6 +926,8 @@ export function GamePage({
       {netplay && entry && (
         <NetplayDialog
           title={game.title}
+          platformId={entry.item.platformId}
+          sha256={entry.item.sha256}
           notify={notify}
           onClose={() => setNetplay(false)}
           onStart={(session) => {

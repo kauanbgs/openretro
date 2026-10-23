@@ -46,7 +46,9 @@ pub fn executable(directory: &Path) -> PathBuf {
 }
 
 fn firmware_installed(directory: &Path) -> bool {
-    directory.join("dev_flash/sys/external/liblv2.sprx").is_file()
+    directory
+        .join("dev_flash/sys/external/liblv2.sprx")
+        .is_file()
 }
 
 fn report(app: &tauri::AppHandle, message: &str) {
@@ -74,18 +76,21 @@ fn download(
         .get(url)
         .send()
         .and_then(|response| response.error_for_status())
-        .map_err(|_| format!("Não foi possível baixar {label}. Confira sua conexão e tente de novo."))?;
+        .map_err(|_| {
+            format!("Não foi possível baixar {label}. Confira sua conexão e tente de novo.")
+        })?;
     let total = response.content_length().filter(|size| *size > 0);
     if total.is_some_and(|size| size > limit) {
         return Err(format!("O download de {label} é maior que o esperado."));
     }
     let partial = target.with_extension("partial");
     let mut file = std::fs::File::create(&partial).map_err(error)?;
-    let (mut hasher, mut buffer, mut done, mut shown) = (Sha256::new(), vec![0u8; 1 << 20], 0u64, 101);
+    let (mut hasher, mut buffer, mut done, mut shown) =
+        (Sha256::new(), vec![0u8; 1 << 20], 0u64, 101);
     loop {
-        let count = response.read(&mut buffer).map_err(|_| {
-            format!("O download de {label} foi interrompido. Tente de novo.")
-        })?;
+        let count = response
+            .read(&mut buffer)
+            .map_err(|_| format!("O download de {label} foi interrompido. Tente de novo."))?;
         if count == 0 {
             break;
         }
@@ -101,7 +106,10 @@ fn download(
             let percent = done * 100 / total;
             if percent != shown {
                 shown = percent;
-                report(app, &format!("Preparando o PS3: baixando {label} ({percent}%)"));
+                report(
+                    app,
+                    &format!("Preparando o PS3: baixando {label} ({percent}%)"),
+                );
             }
         }
     }
@@ -116,6 +124,7 @@ fn download(
 pub fn prepare(app: &tauri::AppHandle) -> Result<PathBuf> {
     let directory = directory(app)?;
     std::fs::create_dir_all(&directory).map_err(error)?;
+    recover_instance_lock(&directory)?;
     let marker = directory.join("openretro-build.txt");
     if std::fs::read_to_string(&marker).ok().as_deref() != Some(BUILD)
         || !executable(&directory).is_file()
@@ -146,6 +155,25 @@ pub fn prepare(app: &tauri::AppHandle) -> Result<PathBuf> {
         log::warn!("RPCS3 config database unavailable: {message}");
     }
     Ok(executable(&directory))
+}
+
+/// Remove only an abandoned lock. An exclusive delete-on-close handle fails
+/// while RPCS3 holds the file, so a live instance is never unlocked/deleted.
+fn recover_instance_lock(directory: &Path) -> Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    let path = directory.join("RPCS3.buf");
+    match std::fs::OpenOptions::new()
+        .access_mode(0x00010000) // DELETE
+        .share_mode(0)
+        .custom_flags(0x04000000) // FILE_FLAG_DELETE_ON_CLOSE
+        .open(&path)
+    {
+        Ok(file) => { drop(file); Ok(()) }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) if error.raw_os_error() == Some(32) || error.raw_os_error() == Some(33) =>
+            Err("O RPCS3 ainda está em execução. Encerre a partida anterior antes de abrir outro jogo de PS3.".into()),
+        Err(error) => Err(format!("Não foi possível verificar o bloqueio do RPCS3: {error}")),
+    }
 }
 
 fn recent(path: &Path, age: Duration) -> bool {
@@ -185,7 +213,10 @@ fn refresh_config_database(directory: &Path) -> Result<()> {
 
 /// A text value of a PARAM.SFO, such as TITLE_ID or APP_VER.
 fn sfo_string(sfo: &[u8], key: &str) -> Option<String> {
-    let u16_at = |at: usize| sfo.get(at..at + 2).map(|b| u16::from_le_bytes([b[0], b[1]]) as usize);
+    let u16_at = |at: usize| {
+        sfo.get(at..at + 2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]) as usize)
+    };
     let u32_at = |at: usize| {
         sfo.get(at..at + 4)
             .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
@@ -196,11 +227,18 @@ fn sfo_string(sfo: &[u8], key: &str) -> Option<String> {
     let (keys, data, count) = (u32_at(8)?, u32_at(12)?, u32_at(16)?);
     for index in 0..count.min(256) {
         let entry = 20 + index * 16;
-        let name = sfo.get(keys + u16_at(entry)?..)?.split(|b| *b == 0).next()?;
+        let name = sfo
+            .get(keys + u16_at(entry)?..)?
+            .split(|b| *b == 0)
+            .next()?;
         if name == key.as_bytes() {
             let start = data + u32_at(entry + 12)?;
             let value = sfo.get(start..start + u32_at(entry + 4)?)?;
-            return Some(String::from_utf8_lossy(value).trim_end_matches('\0').to_string());
+            return Some(
+                String::from_utf8_lossy(value)
+                    .trim_end_matches('\0')
+                    .to_string(),
+            );
         }
     }
     None
@@ -214,7 +252,10 @@ pub fn serial(game: &Path) -> Option<String> {
         .is_some_and(|extension| extension.eq_ignore_ascii_case("iso"))
     {
         let mut header = [0u8; 0x81a];
-        std::fs::File::open(game).ok()?.read_exact(&mut header).ok()?;
+        std::fs::File::open(game)
+            .ok()?
+            .read_exact(&mut header)
+            .ok()?;
         String::from_utf8_lossy(&header[0x810..]).into_owned()
     } else {
         let sfo = std::fs::read(game.parent()?.parent()?.join("PARAM.SFO")).ok()?;
@@ -226,7 +267,13 @@ pub fn serial(game: &Path) -> Option<String> {
 
 /// The version of the game RPCS3 has installed to its hard drive, if any.
 fn installed_version(directory: &Path, serial: &str) -> Option<String> {
-    let sfo = std::fs::read(directory.join("dev_hdd0/game").join(serial).join("PARAM.SFO")).ok()?;
+    let sfo = std::fs::read(
+        directory
+            .join("dev_hdd0/game")
+            .join(serial)
+            .join("PARAM.SFO"),
+    )
+    .ok()?;
     sfo_string(&sfo, "APP_VER")
 }
 
@@ -251,9 +298,11 @@ fn update_packages(xml: &str) -> Vec<Package> {
                         .and_then(|attribute| attribute.unescape_value().ok())
                         .map(|value| value.into_owned())
                 };
-                if let (Some(version), Some(sha1), Some(url)) =
-                    (attribute(b"version"), attribute(b"sha1sum"), attribute(b"url"))
-                {
+                if let (Some(version), Some(sha1), Some(url)) = (
+                    attribute(b"version"),
+                    attribute(b"sha1sum"),
+                    attribute(b"url"),
+                ) {
                     packages.push(Package { version, sha1, url });
                 }
             }
@@ -277,7 +326,9 @@ pub fn install_updates(app: &tauri::AppHandle, game: &Path) -> Result<()> {
         return Ok(());
     };
     let directory = directory(app)?;
-    let checked = directory.join("openretro-updates").join(format!("{serial}.checked"));
+    let checked = directory
+        .join("openretro-updates")
+        .join(format!("{serial}.checked"));
     if recent(&checked, UPDATE_CHECK_AGE) {
         return Ok(());
     }
@@ -294,7 +345,10 @@ pub fn install_updates(app: &tauri::AppHandle, game: &Path) -> Result<()> {
     // Games without updates are simply not on the list.
     let xml = match response.status() {
         reqwest::StatusCode::NOT_FOUND => String::new(),
-        _ => response.error_for_status().and_then(|r| r.text()).map_err(error)?,
+        _ => response
+            .error_for_status()
+            .and_then(|r| r.text())
+            .map_err(error)?,
     };
     let installed = installed_version(&directory, &serial).unwrap_or_default();
     for package in update_packages(&xml)
@@ -306,24 +360,38 @@ pub fn install_updates(app: &tauri::AppHandle, game: &Path) -> Result<()> {
         }
         let version = version_label(&package.version);
         let file = directory.join("update.pkg");
-        download(app, &package.url, &file, 16 << 30, &format!("a atualização {version} do jogo"))?;
+        download(
+            app,
+            &package.url,
+            &file,
+            16 << 30,
+            &format!("a atualização {version} do jogo"),
+        )?;
         // Sony's digest covers all but the package's last 32 bytes, which
         // hold that same digest.
         let package_file = std::fs::File::open(&file).map_err(error)?;
         let length = package_file.metadata().map_err(error)?.len();
         let mut hasher = sha1::Sha1::new();
-        std::io::copy(&mut package_file.take(length.saturating_sub(32)), &mut hasher)
-            .map_err(error)?;
+        std::io::copy(
+            &mut package_file.take(length.saturating_sub(32)),
+            &mut hasher,
+        )
+        .map_err(error)?;
         if format!("{:x}", hasher.finalize()) != package.sha1.to_ascii_lowercase() {
             let _ = std::fs::remove_file(&file);
             return Err(format!("Update {version} of {serial} arrived damaged."));
         }
-        report(app, &format!("Preparando o PS3: instalando a atualização {version} do jogo"));
-        let status = Command::new(executable(&directory))
-            .args(["--headless", "--installpkg"])
-            .arg(&file)
-            .current_dir(&directory)
-            .status();
+        report(
+            app,
+            &format!("Preparando o PS3: instalando a atualização {version} do jogo"),
+        );
+        let status = super::managed_process::ManagedChild::spawn(
+            Command::new(executable(&directory))
+                .args(["--headless", "--installpkg"])
+                .arg(&file)
+                .current_dir(&directory),
+        )
+        .and_then(|mut child| child.wait());
         let _ = std::fs::remove_file(&file);
         log::info!("PS3 update {version} of {serial} install finished: {status:?}");
         if installed_version(&directory, &serial).as_deref() != Some(package.version.as_str()) {
@@ -341,7 +409,10 @@ fn install_firmware(app: &tauri::AppHandle, directory: &Path) -> Result<()> {
         .send()
         .and_then(|response| response.error_for_status())
         .and_then(|response| response.text())
-        .map_err(|_| "Não foi possível falar com o servidor da Sony. Confira sua conexão e tente de novo.".to_string())?;
+        .map_err(|_| {
+            "Não foi possível falar com o servidor da Sony. Confira sua conexão e tente de novo."
+                .to_string()
+        })?;
     let url = list
         .split(';')
         .filter_map(|field| field.trim().strip_prefix("CDN="))
@@ -358,11 +429,13 @@ fn install_firmware(app: &tauri::AppHandle, directory: &Path) -> Result<()> {
         report(app, "Preparando o PS3: instalando o sistema do console");
         // RPCS3 verifies the package itself. It can exit with an error while
         // tearing down after a successful install, so the files decide.
-        let status = Command::new(executable(directory))
-            .args(["--headless", "--installfw"])
-            .arg(&package)
-            .current_dir(directory)
-            .status();
+        let status = super::managed_process::ManagedChild::spawn(
+            Command::new(executable(directory))
+                .args(["--headless", "--installfw"])
+                .arg(&package)
+                .current_dir(directory),
+        )
+        .and_then(|mut child| child.wait());
         log::info!("PS3 system software install finished: {status:?}");
     }
     let _ = std::fs::remove_file(&package);
@@ -437,7 +510,11 @@ pub fn ensure_disc_key(app: &tauri::AppHandle, game: &Path) -> Result<()> {
     complete_iso(game)?;
     let directory = directory(app)?;
     let stem = game.file_stem().unwrap_or_default().to_string_lossy();
-    let known = |directory: &Path| keys_directory(directory).join(format!("{stem}.dkey")).is_file();
+    let known = |directory: &Path| {
+        keys_directory(directory)
+            .join(format!("{stem}.dkey"))
+            .is_file()
+    };
     if game.with_extension("dkey").is_file() || known(&directory) || adopt_key(&directory, &stem) {
         return Ok(());
     }
@@ -446,15 +523,19 @@ pub fn ensure_disc_key(app: &tauri::AppHandle, game: &Path) -> Result<()> {
     if known(&directory) || adopt_key(&directory, &stem) {
         return Ok(());
     }
-    Err("A chave deste disco de PS3 não foi encontrada, então ele não pode ser aberto. \
+    Err(
+        "A chave deste disco de PS3 não foi encontrada, então ele não pode ser aberto. \
          Tente outra versão do jogo."
-        .into())
+            .into(),
+    )
 }
 
 /// Title and the parenthesized groups of a Redump name, as in
 /// "Skate 3 (USA) (En,Fr,Es)": ("skate 3", ["usa", "en,fr,es"]).
 fn redump_name(name: &str) -> (String, Vec<String>) {
-    let (title, rest) = name.split_once(" (").map_or((name, ""), |(title, rest)| (title, rest));
+    let (title, rest) = name
+        .split_once(" (")
+        .map_or((name, ""), |(title, rest)| (title, rest));
     let groups = rest
         .split('(')
         .map(|group| group.trim().trim_end_matches(')').trim().to_lowercase())
@@ -498,7 +579,11 @@ fn adopt_key(directory: &Path, stem: &str) -> bool {
         return false;
     };
     log::info!("Using the disc key {key} for {stem}");
-    std::fs::copy(keys_folder.join(&key), keys_folder.join(format!("{stem}.dkey"))).is_ok()
+    std::fs::copy(
+        keys_folder.join(&key),
+        keys_folder.join(format!("{stem}.dkey")),
+    )
+    .is_ok()
 }
 
 /// Rejects an ISO shorter than its own volume size, such as one whose
@@ -522,18 +607,18 @@ fn complete_iso(game: &Path) -> Result<()> {
     Ok(())
 }
 
-/// RPCS3's own handler for each SDL controller type, as (handler, device prefix).
+/// Xbox uses XInput. Other pads use the detected SDL name, avoiding guessed
+/// native HID indexes (and a native handler that may not open the same device).
 fn handler(kind: i32) -> Option<(&'static str, &'static str)> {
     match kind {
         1 | 2 => Some(("XInput", "XInput Pad #")),
-        4 => Some(("DualShock 4", "DS4 Pad #")),
-        7 => Some(("DualSense", "DualSense Pad #")),
         _ => None,
     }
 }
 
 /// One player per connected controller, the keyboard when there is none.
-/// RPCS3 fills in each handler's default buttons.
+/// RPCS3 fills in each handler's default buttons; Cross is explicit so the
+/// first native confirmation dialog has a known binding.
 pub fn input_config(controllers: &[(i32, String)]) -> String {
     let mut config = String::new();
     let mut counts = std::collections::HashMap::<&str, usize>::new();
@@ -551,13 +636,60 @@ pub fn input_config(controllers: &[(i32, String)]) -> String {
             }
         };
         config.push_str(&format!(
-            "Player {} Input:\n  Handler: {handler}\n  Device: {}\n",
+            "Player {} Input:\n  Handler: {handler}\n  Device: {}\n  Config:\n    Cross: {}\n",
             player + 1,
-            serde_json::to_string(&device).unwrap_or_default()
+            serde_json::to_string(&device).unwrap_or_default(),
+            if handler == "XInput" { "A" } else { "South" },
         ));
     }
     if config.is_empty() {
         config.push_str("Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n");
+    }
+    config
+}
+
+/// Update a scalar in one YAML section without replacing the user's other
+/// settings or RPCS3's per-game CPU/GPU recommendations.
+fn set_yaml_scalar(text: &str, section: &str, key: &str, value: &str) -> String {
+    let mut lines: Vec<String> = text.lines().map(String::from).collect();
+    let header = format!("{section}:");
+    if let Some(start) = lines.iter().position(|line| line.trim_end() == header) {
+        let end = lines[start + 1..]
+            .iter()
+            .position(|line| {
+                !line.trim().is_empty()
+                    && !line.starts_with(char::is_whitespace)
+                    && !line.starts_with('#')
+            })
+            .map_or(lines.len(), |offset| start + 1 + offset);
+        let prefix = format!("  {key}:");
+        if let Some(offset) = lines[start + 1..end]
+            .iter()
+            .position(|line| line.starts_with(&prefix))
+        {
+            lines[start + 1 + offset] = format!("{prefix} {value}");
+        } else {
+            lines.insert(end, format!("{prefix} {value}"));
+        }
+    } else {
+        lines.extend([header, format!("  {key}: {value}")]);
+    }
+    lines.join("\n") + "\n"
+}
+
+fn embedded_config(text: &str) -> String {
+    let mut config = text.to_string();
+    for (section, key, value) in [
+        ("Input/Output", "Background input enabled", "true"),
+        ("Miscellaneous", "Exit RPCS3 when process finishes", "true"),
+        (
+            "Miscellaneous",
+            "Pause emulation on RPCS3 focus loss",
+            "false",
+        ),
+        ("Miscellaneous", "Start games in fullscreen mode", "false"),
+    ] {
+        config = set_yaml_scalar(&config, section, key, value);
     }
     config
 }
@@ -575,7 +707,10 @@ fn set_ini(text: &str, section: &str, key: &str, value: &str) -> String {
         .position(|line| line.starts_with('['))
         .map_or(lines.len(), |offset| start + 1 + offset);
     let prefix = format!("{key}=");
-    match lines[start + 1..end].iter().position(|line| line.starts_with(&prefix)) {
+    match lines[start + 1..end]
+        .iter()
+        .position(|line| line.starts_with(&prefix))
+    {
         Some(offset) => lines[start + 1 + offset] = format!("{prefix}{value}"),
         None => lines.insert(end, format!("{prefix}{value}")),
     }
@@ -595,8 +730,14 @@ pub fn launch_args(
         .unwrap_or_default();
     let inputs = directory.join("config/input_configs/global");
     std::fs::create_dir_all(&inputs).map_err(error)?;
-    std::fs::write(inputs.join(format!("{INPUT_CONFIG}.yml")), input_config(&controllers))
-        .map_err(error)?;
+    std::fs::write(
+        inputs.join(format!("{INPUT_CONFIG}.yml")),
+        input_config(&controllers),
+    )
+    .map_err(error)?;
+    let config_path = directory.join("config/config.yml");
+    let config = std::fs::read_to_string(&config_path).unwrap_or_default();
+    std::fs::write(&config_path, embedded_config(&config)).map_err(error)?;
     let settings = directory.join("GuiConfigs/CurrentSettings.ini");
     let mut text = std::fs::read_to_string(&settings).unwrap_or_default();
     for key in ["infoBoxEnabledWelcome", "confirmationBoxExitGame"] {
@@ -622,7 +763,10 @@ mod tests {
 <titlepatch status="alive" titleid="BLUS30464"><tag name="T"><package version="01.05" size="3" sha1sum="AB" url="http://b0.ww.np.dl.playstation.net/tppkg/np/b.pkg" ps3_system_ver="03.0000"><paramsfo><TITLE>x</TITLE></paramsfo></package><package version="01.02" size="2" sha1sum="cd" url="http://b0.ww.np.dl.playstation.net/tppkg/np/a.pkg"/></tag></titlepatch>"#;
         let packages = update_packages(xml);
         assert_eq!(
-            packages.iter().map(|p| p.version.as_str()).collect::<Vec<_>>(),
+            packages
+                .iter()
+                .map(|p| p.version.as_str())
+                .collect::<Vec<_>>(),
             ["01.02", "01.05"]
         );
         assert_eq!(packages[1].sha1, "AB");
@@ -658,7 +802,10 @@ mod tests {
         let usrdir = game.join("PS3_GAME/USRDIR");
         std::fs::create_dir_all(&usrdir).unwrap();
         std::fs::write(game.join("PS3_GAME/PARAM.SFO"), &sfo).unwrap();
-        assert_eq!(serial(&usrdir.join("EBOOT.BIN")).as_deref(), Some("BLUS30464"));
+        assert_eq!(
+            serial(&usrdir.join("EBOOT.BIN")).as_deref(),
+            Some("BLUS30464")
+        );
         let iso = game.join("game.iso");
         let mut image = vec![0u8; 0x900];
         image[0x800..0x80b].copy_from_slice(b"PlayStation");
@@ -688,7 +835,10 @@ mod tests {
         );
         // Other languages or revisions are other discs, with other keys.
         assert_eq!(similar_key(&keys, "Skate 3 (USA) (En,Fr)"), None);
-        assert_eq!(similar_key(&keys, "Skate 3 (USA, Asia) (En,Fr,Es) (Rev 1)"), None);
+        assert_eq!(
+            similar_key(&keys, "Skate 3 (USA, Asia) (En,Fr,Es) (Rev 1)"),
+            None
+        );
         assert_eq!(similar_key(&keys, "Skate 3"), None);
     }
 
@@ -729,14 +879,53 @@ mod tests {
         ]);
         assert_eq!(
             config,
-            "Player 1 Input:\n  Handler: DualShock 4\n  Device: \"DS4 Pad #1\"\n\
-             Player 2 Input:\n  Handler: XInput\n  Device: \"XInput Pad #1\"\n\
-             Player 3 Input:\n  Handler: DualShock 4\n  Device: \"DS4 Pad #2\"\n\
-             Player 4 Input:\n  Handler: SDL\n  Device: \"Nintendo Switch Pro Controller 1\"\n"
+            "Player 1 Input:\n  Handler: SDL\n  Device: \"PS4 Controller 1\"\n  Config:\n    Cross: South\n\
+             Player 2 Input:\n  Handler: XInput\n  Device: \"XInput Pad #1\"\n  Config:\n    Cross: A\n\
+             Player 3 Input:\n  Handler: SDL\n  Device: \"PS4 Controller 2\"\n  Config:\n    Cross: South\n\
+             Player 4 Input:\n  Handler: SDL\n  Device: \"Nintendo Switch Pro Controller 1\"\n  Config:\n    Cross: South\n"
         );
         assert_eq!(
             input_config(&[]),
             "Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n"
         );
+    }
+
+    #[test]
+    fn embedded_settings_exit_after_the_game_and_keep_performance_settings() {
+        let original = "Core:\n  PPU Threads: 3\nInput/Output:\n  Background input enabled: false\nMiscellaneous:\n  Exit RPCS3 when process finishes: false\n  Start games in fullscreen mode: true\n  Pause emulation on RPCS3 focus loss: true\nVideo:\n  Renderer: Vulkan\n";
+        let config = embedded_config(original);
+        assert!(config.contains("PPU Threads: 3"));
+        assert!(config.contains("Renderer: Vulkan"));
+        assert!(config.contains("Exit RPCS3 when process finishes: true"));
+        assert!(config.contains("Start games in fullscreen mode: false"));
+        assert!(config.contains("Pause emulation on RPCS3 focus loss: false"));
+        assert!(config.contains("Background input enabled: true"));
+        assert_eq!(embedded_config(&config), config);
+        assert!(embedded_config("").contains("Exit RPCS3 when process finishes: true"));
+    }
+
+    #[test]
+    fn instance_recovery_never_removes_a_live_lock() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let directory =
+            std::env::temp_dir().join(format!("openretro-lock-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("RPCS3.buf");
+        recover_instance_lock(&directory).unwrap();
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .share_mode(0)
+            .open(&path)
+            .unwrap();
+        assert!(recover_instance_lock(&directory)
+            .unwrap_err()
+            .contains("ainda está em execução"));
+        assert!(path.exists());
+        drop(file);
+        recover_instance_lock(&directory).unwrap();
+        assert!(!path.exists());
+        std::fs::remove_dir(directory).unwrap();
     }
 }

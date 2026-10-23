@@ -1,6 +1,7 @@
 //! Hosts the managed RetroArch window inside OpenRetro's main HWND.
 //! The emulator stays a separate process for crash isolation, but Windows treats
 //! its render surface as a child of the launcher instead of another application.
+use super::screen_view::ScreenView;
 use crate::database::{error, Result};
 use std::{
     ffi::c_void,
@@ -58,6 +59,33 @@ extern "system" {
     fn SetForegroundWindow(window: *mut c_void) -> i32;
     fn SetFocus(window: *mut c_void) -> *mut c_void;
     fn BringWindowToTop(window: *mut c_void) -> i32;
+    fn SetWindowRgn(window: *mut c_void, region: *mut c_void, redraw: i32) -> i32;
+    fn InvalidateRect(window: *mut c_void, rect: *const Rect, erase: i32) -> i32;
+}
+
+#[link(name = "kernel32")]
+extern "system" {
+    fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut c_void;
+    fn WaitForSingleObject(handle: *mut c_void, millis: u32) -> u32;
+    fn CloseHandle(handle: *mut c_void) -> i32;
+}
+
+fn process_exited(pid: u32) -> bool {
+    unsafe {
+        let handle = OpenProcess(0x00100000, 0, pid); // SYNCHRONIZE
+        if handle.is_null() {
+            return std::io::Error::last_os_error().raw_os_error() == Some(87);
+        }
+        let exited = WaitForSingleObject(handle, 0) == 0;
+        CloseHandle(handle);
+        exited
+    }
+}
+
+#[link(name = "gdi32")]
+extern "system" {
+    fn CreateRectRgn(left: i32, top: i32, right: i32, bottom: i32) -> *mut c_void;
+    fn DeleteObject(object: *mut c_void) -> i32;
 }
 
 const GW_OWNER: u32 = 4;
@@ -115,9 +143,7 @@ struct Siblings {
 
 unsafe extern "system" fn find_sibling(window: *mut c_void, data: isize) -> i32 {
     let search = &mut *(data as *mut Siblings);
-    if window != search.except
-        && GetParent(window) == search.parent
-        && IsWindowVisible(window) != 0
+    if window != search.except && GetParent(window) == search.parent && IsWindowVisible(window) != 0
     {
         search.found.push(window as isize);
     }
@@ -171,6 +197,12 @@ pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<Embedded> {
     // RPCS3 opens its window after loading the system software.
     let deadline = Instant::now() + Duration::from_secs(30);
     let child = loop {
+        if process_exited(pid) {
+            return Err(
+                "O emulador encerrou antes de abrir a janela do jogo. Tente iniciar novamente."
+                    .into(),
+            );
+        }
         if let Some(window) = process_window(pid) {
             break window;
         }
@@ -230,9 +262,136 @@ pub fn focus(window: isize) -> bool {
     true
 }
 
+pub fn is_open(window: isize) -> bool {
+    window != 0 && unsafe { IsWindow(window as *mut c_void) } != 0
+}
+
+/// Clip the renderer itself, without capturing frames or affecting game input.
+pub fn apply_view(window: isize, view: ScreenView) -> Result<()> {
+    let child = window as *mut c_void;
+    unsafe {
+        if IsWindow(child) == 0 {
+            return Err("A janela do jogo foi encerrada.".into());
+        }
+        let parent = GetParent(child);
+        let mut bounds = Rect::default();
+        if parent.is_null() || GetClientRect(parent, &mut bounds) == 0 {
+            return Err("Não foi possível medir a tela do jogo.".into());
+        }
+        let p = view.placement(bounds.right - bounds.left, bounds.bottom - bounds.top);
+        let (left, top, right, bottom) = p.clip;
+        let region = CreateRectRgn(left, top, right, bottom);
+        if region.is_null() {
+            return Err("Não foi possível criar o recorte da tela.".into());
+        }
+        // Windows owns a region after a successful SetWindowRgn.
+        if SetWindowRgn(child, region, 1) == 0 {
+            DeleteObject(region);
+            return Err("Não foi possível aplicar o recorte da tela.".into());
+        }
+        if SetWindowPos(
+            child,
+            std::ptr::null_mut(),
+            p.x,
+            p.y,
+            p.width,
+            p.height,
+            SWP_FRAMECHANGED | SWP_SHOWWINDOW,
+        ) == 0
+        {
+            return Err("Não foi possível ajustar a imagem do jogo.".into());
+        }
+        // Erase pixels left behind by the previous position/region.
+        InvalidateRect(parent, std::ptr::null(), 1);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[link(name = "user32")]
+    extern "system" {
+        fn CreateWindowExW(
+            ex: u32,
+            class: *const u16,
+            name: *const u16,
+            style: u32,
+            x: i32,
+            y: i32,
+            width: i32,
+            height: i32,
+            parent: *mut c_void,
+            menu: *mut c_void,
+            instance: *mut c_void,
+            param: *mut c_void,
+        ) -> *mut c_void;
+        fn DestroyWindow(window: *mut c_void) -> i32;
+        fn GetWindowRgn(window: *mut c_void, region: *mut c_void) -> i32;
+    }
+    #[link(name = "gdi32")]
+    extern "system" {
+        fn GetRgnBox(region: *mut c_void, rect: *mut Rect) -> i32;
+    }
+    struct TestWindow(*mut c_void);
+    impl Drop for TestWindow {
+        fn drop(&mut self) {
+            unsafe {
+                DestroyWindow(self.0);
+            }
+        }
+    }
+    fn test_window(parent: *mut c_void, style: isize) -> TestWindow {
+        let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
+        let window = unsafe {
+            CreateWindowExW(
+                0,
+                class.as_ptr(),
+                std::ptr::null(),
+                style as u32,
+                0,
+                0,
+                1920,
+                1080,
+                parent,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        assert!(!window.is_null());
+        TestWindow(window)
+    }
+    #[test]
+    fn native_window_region_hides_other_players_and_restores_full_screen() {
+        // The parent stays hidden; this tests the real Windows API without
+        // opening a visible application or needing a game/graphics driver.
+        let parent = test_window(std::ptr::null_mut(), WS_POPUP);
+        let child = test_window(parent.0, WS_CHILD);
+        let selected = ScreenView {
+            layout: super::super::screen_view::Layout::Grid,
+            region: 4,
+            full: false,
+        };
+        for view in [selected, ScreenView::default()] {
+            apply_view(child.0 as isize, view).unwrap();
+            let expected = view.placement(1920, 1080);
+            unsafe {
+                let mut rect = Rect::default();
+                assert_ne!(GetWindowRect(child.0, &mut rect), 0);
+                assert_eq!(rect.right - rect.left, expected.width);
+                assert_eq!(rect.bottom - rect.top, expected.height);
+                let region = CreateRectRgn(0, 0, 0, 0);
+                assert_ne!(GetWindowRgn(child.0, region), 0);
+                assert_ne!(GetRgnBox(region, &mut rect), 0);
+                DeleteObject(region);
+                assert_eq!(
+                    (rect.left, rect.top, rect.right, rect.bottom),
+                    expected.clip
+                );
+            }
+        }
+    }
     #[test]
     fn embedded_style_is_child_without_top_level_chrome() {
         let style = child_style(WS_POPUP | WS_CAPTION | WS_THICKFRAME);

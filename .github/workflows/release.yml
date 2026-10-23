@@ -17,23 +17,14 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
-      - uses: msys2/setup-msys2@v2
+      - name: Restore compiled Rust dependencies
+        uses: Swatinem/rust-cache@v2
         with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            git
-            make
-            base-devel
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-SDL2
-            mingw-w64-x86_64-vulkan-headers
-            mingw-w64-x86_64-vulkan-loader
-            mingw-w64-x86_64-ntldd
+          workspaces: src-tauri
+          shared-key: desktop-release-v1-${{ runner.os }}
       - run: npm ci
-      - name: Build minimal OpenRetro Runtime
-        shell: msys2 {0}
-        run: bash ./runtime/retroarch/build-mingw64.sh
+      - name: Prepare minimal OpenRetro Runtime
+        uses: ./.github/actions/runtime
       - run: npm run prepare:runtime
       - uses: tauri-apps/tauri-action@v1
         env:

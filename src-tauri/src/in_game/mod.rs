@@ -6,8 +6,10 @@ use tauri::{Emitter, Manager};
 mod controller;
 #[cfg(target_os = "windows")]
 mod host;
+mod screen_view;
 #[cfg(target_os = "windows")]
 pub(crate) mod sdl;
+use screen_view::ScreenView;
 
 #[derive(Default)]
 pub struct InGameService(Mutex<Option<Session>>);
@@ -28,6 +30,8 @@ pub struct SessionInfo {
     title: String,
     open: bool,
     slot: i32,
+    screen_view: ScreenView,
+    view_available: bool,
 }
 impl SessionInfo {
     pub fn id(&self) -> &str {
@@ -43,6 +47,25 @@ pub struct SessionGuard {
     id: String,
 }
 impl SessionGuard {
+    pub fn window_closed(&self) -> bool {
+        #[cfg(windows)]
+        {
+            let service = self.app.state::<InGameService>();
+            return service
+                .0
+                .lock()
+                .ok()
+                .and_then(|guard| {
+                    guard
+                        .as_ref()
+                        .filter(|session| session.info.id == self.id)
+                        .and_then(|session| session.embedded_window)
+                })
+                .is_some_and(|window| !host::is_open(window));
+        }
+        #[cfg(not(windows))]
+        false
+    }
     pub fn attach(&self, stdin: ChildStdin, pid: u32, executable: &std::path::Path) -> Result<()> {
         let service = self.app.state::<InGameService>();
         let mut guard = service.0.lock().map_err(error)?;
@@ -66,15 +89,13 @@ impl SessionGuard {
             let service = self.app.state::<InGameService>();
             let embedded = host::embed(&self.app, pid)?;
             let mut guard = service.0.lock().map_err(error)?;
-            let Some(session) = guard
-                .as_mut()
-                .filter(|session| session.info.id == self.id)
-            else {
+            let Some(session) = guard.as_mut().filter(|session| session.info.id == self.id) else {
                 host::reveal(&embedded.covered);
                 return Err("A sessão do jogo foi encerrada.".into());
             };
             session.embedded_window = Some(embedded.window);
             session.covered_views = embedded.covered;
+            session.info.view_available = session.stdin.is_some();
         }
         Ok(())
     }
@@ -123,6 +144,8 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Resu
             title: title.into(),
             open: false,
             slot,
+            screen_view: ScreenView::default(),
+            view_available: false,
         },
         stdin: None,
         pid: 0,
@@ -212,19 +235,53 @@ pub fn in_game_action(app: tauri::AppHandle, action: String) -> Result<SessionIn
         if !session.info.open {
             return Err("Abra o menu do jogo antes de usar esta ação.".into());
         }
-        let command = command_for(&action, session.info.slot)?;
-        write_command(session, command)?;
-        if action == "slot_next" {
-            session.info.slot += 1;
-        }
-        if action == "slot_previous" {
-            session.info.slot -= 1;
+        if action.starts_with("view_") {
+            let mut view = session.info.screen_view;
+            if !view.change(&action) {
+                return Err("Ação de tela inválida.".into());
+            }
+            if !session.info.view_available {
+                return Err("O recorte está disponível no runtime integrado do Windows.".into());
+            }
+            #[cfg(windows)]
+            host::apply_view(
+                session
+                    .embedded_window
+                    .ok_or("A janela do jogo não está disponível.")?,
+                view,
+            )?;
+            session.info.screen_view = view;
+        } else {
+            let command = command_for(&action, session.info.slot)?;
+            write_command(session, command)?;
+            if action == "slot_next" {
+                session.info.slot += 1;
+            }
+            if action == "slot_previous" {
+                session.info.slot -= 1;
+            }
         }
         session.info.clone()
     };
     app.emit("in-game-state", Some(info.clone()))
         .map_err(error)?;
     Ok(info)
+}
+
+/// Keep the local crop aligned after a resolution or window-size change.
+pub fn resize_view(app: &tauri::AppHandle) {
+    #[cfg(windows)]
+    if let Ok(guard) = app.state::<InGameService>().0.lock() {
+        if let Some(session) = guard.as_ref() {
+            if let Some(window) = session.embedded_window {
+                if let Err(message) = host::apply_view(window, session.info.screen_view) {
+                    log::warn!("Could not resize the game view: {message}");
+                }
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = app;
 }
 
 /// The running runtime's process id, once it has started.
@@ -335,6 +392,8 @@ mod tests {
                 title: "Test".into(),
                 open: false,
                 slot: 0,
+                screen_view: super::ScreenView::default(),
+                view_available: false,
             },
             stdin: None,
             pid: 0,

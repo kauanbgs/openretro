@@ -11,6 +11,7 @@ use std::{
 use tauri::{Emitter, Manager};
 pub mod bios;
 pub mod netplay;
+mod managed_process;
 #[cfg(windows)]
 pub mod rpcs3;
 pub mod runtime_menu;
@@ -170,6 +171,10 @@ pub async fn launch_game(
  let game_path=filesystem::canonical_file(&entry.item.source_path)?;
  // PS3 games install their emulator, system software and disc keys on first use.
  let ps3=emulator.id=="openretro-rpcs3";
+ let managed_retroarch=is_managed_runtime(&emulator,&entry);
+ // Reserve before setup/installations so two launch requests cannot prepare
+ // or boot the same managed emulator at the same time.
+ let runtime_session=if managed_retroarch || ps3 { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
  #[cfg(windows)]
  if ps3 {
     let ready=rpcs3::prepare(&app).and_then(|_|rpcs3::ensure_disc_key(&app,&game_path));
@@ -186,7 +191,6 @@ pub async fn launch_game(
  if ps3 { return Err("Jogos de PS3 só rodam no Windows por enquanto.".into()); }
  let executable=filesystem::executable(&emulator.executable_path)?;
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
- let managed_retroarch=is_managed_runtime(&emulator,&entry);
  if slot.is_some() && !managed_retroarch { return Err("Estados salvos só podem ser abertos pelo OpenRetro Runtime.".into()); }
  if let Some(netplay)=&netplay {
     if !managed_retroarch { return Err("O jogo online só funciona no OpenRetro Runtime.".into()); }
@@ -201,7 +205,6 @@ pub async fn launch_game(
  let boot_states=!boots_without_states(&entry.item.platform_id);
  if slot.is_some() && !boot_states { return Err("No PS2, carregue o estado pelo menu do jogo depois que ele abrir.".into()); }
  if managed_retroarch && bios::required(&entry.item.platform_id) && !bios::installed(&bios::system_dir(&app.path().app_data_dir().map_err(error)?), &entry.item.platform_id) { return Err("Este console precisa da BIOS. Selecione o arquivo da BIOS na página do jogo ou em Emuladores.".into()); }
- let runtime_session=if managed_retroarch || ps3 { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
  // An app update can ship a newer runtime; copy it before launching so the in-game menu matches it.
  #[cfg(windows)]
  if emulator.id=="openretro-retroarch" { if let Err(message)=crate::commands::install_bundled_retroarch(&app) { log::warn!("Keeping the installed runtime: {message}"); } }
@@ -236,7 +239,7 @@ pub async fn launch_game(
  }
  let timer=Instant::now();
  // Command passes each argument directly to the executable. No shell interprets paths or arguments.
- let child=Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?).spawn();
+ let child=managed_process::ManagedChild::spawn(Command::new(&executable).args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?));
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {
     // Both play inside OpenRetro's window; only the runtime takes commands.
@@ -254,7 +257,24 @@ pub async fn launch_game(
  else { conn.execute("INSERT INTO player_progress(profile_id,library_item_id,last_played_at) VALUES(?1,?2,?3) ON CONFLICT(profile_id,library_item_id) DO UPDATE SET last_played_at=excluded.last_played_at",params![player,id,started]).map_err(error)?; }
  }
  let _=app.emit("game-started",&id); log::info!("Started game session {session}");
- let status=child.wait(); let elapsed=timer.elapsed().as_secs() as i64;
+ // A GUI emulator can leave its process alive after its embedded game window
+ // closes. Give it time to finish saves, then reap the managed child.
+ let mut closed_since=None;
+ let status=loop {
+    match child.try_wait() {
+       Ok(Some(status))=>break Ok(status),
+       Err(error)=>break Err(error),
+       Ok(None)=>{}
+    }
+    if runtime_session.as_ref().is_some_and(|session|session.window_closed()) {
+       if closed_since.get_or_insert_with(Instant::now).elapsed()>=Duration::from_secs(5) {
+          log::warn!("Emulator kept running after its game window closed; stopping session {session}");
+          let _=child.kill();
+          break child.wait();
+       }
+    } else { closed_since=None; }
+    std::thread::sleep(Duration::from_millis(100));
+ }; let elapsed=timer.elapsed().as_secs() as i64;
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;
  tx.execute("UPDATE play_sessions SET finished_at=?1,duration=?2,exit_code=?3 WHERE id=?4",params![chrono::Utc::now().to_rfc3339(),elapsed,status.as_ref().ok().and_then(|s|s.code()),session]).map_err(error)?;
  if player=="default" { tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?; }

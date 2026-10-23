@@ -18,12 +18,18 @@ struct Serve {
 /// A minimal HTTP/1.1 server for one file, honouring single byte ranges.
 async fn server(body: Arc<Vec<u8>>, serve: Serve) -> (Url, Arc<AtomicUsize>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let url = Url::parse(&format!("http://{}/game.bin", listener.local_addr().unwrap())).unwrap();
+    let url = Url::parse(&format!(
+        "http://{}/game.bin",
+        listener.local_addr().unwrap()
+    ))
+    .unwrap();
     let requests = Arc::new(AtomicUsize::new(0));
     let counter = requests.clone();
     tokio::spawn(async move {
         loop {
-            let Ok((mut stream, _)) = listener.accept().await else { return };
+            let Ok((mut stream, _)) = listener.accept().await else {
+                return;
+            };
             let (body, counter) = (body.clone(), counter.clone());
             tokio::spawn(async move {
                 let mut request = Vec::new();
@@ -41,10 +47,13 @@ async fn server(body: Arc<Vec<u8>>, serve: Serve) -> (Url, Arc<AtomicUsize>) {
                     _ => "\"v1\"",
                 };
                 let text = String::from_utf8_lossy(&request).to_ascii_lowercase();
-                let range = text.lines().find_map(|line| line.strip_prefix("range: bytes=")).and_then(|span| {
-                    let (start, end) = span.trim().split_once('-')?;
-                    Some((start.parse::<usize>().ok()?, end.parse::<usize>().ok()?))
-                });
+                let range = text
+                    .lines()
+                    .find_map(|line| line.strip_prefix("range: bytes="))
+                    .and_then(|span| {
+                        let (start, end) = span.trim().split_once('-')?;
+                        Some((start.parse::<usize>().ok()?, end.parse::<usize>().ok()?))
+                    });
                 let total = body.len();
                 let (status, slice, extra) = match range.filter(|_| serve.ranges) {
                     Some((start, end)) => {
@@ -79,10 +88,82 @@ fn directory() -> PathBuf {
     dir
 }
 
+#[test]
+fn large_game_ranges_keep_64_bit_offsets_and_bounded_resume_metadata() {
+    for total in [20 * 1024u64.pow(3), 1024u64.pow(4), u64::MAX] {
+        let state = Resume::new("source".into(), total, "\"v1\"".into(), BLOCK_BYTES);
+        assert!(state.done.len() <= MAX_RESUME_BLOCKS as usize);
+        let (start, end) = state.span(state.done.len() - 1);
+        assert!(start > 8 * 1024u64.pow(3));
+        assert_eq!(end, total);
+        assert!((serde_json::to_vec(&state).unwrap().len() as u64) < MAX_RESUME_BYTES);
+    }
+}
+
+#[tokio::test]
+async fn a_20_gib_http_download_is_accepted_and_can_be_paused_before_receiving_the_body() {
+    let total = 20 * 1024u64.pow(3);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = Url::parse(&format!(
+        "http://{}/ps3.iso",
+        listener.local_addr().unwrap()
+    ))
+    .unwrap();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut request = [0u8; 4096];
+        stream.read(&mut request).await.unwrap();
+        stream
+            .write_all(
+                format!("HTTP/1.1 200 OK\r\nContent-Length: {total}\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
+            .await
+            .unwrap();
+        // Keep the body pending until the paused client closes its connection.
+        let _ = stream.read(&mut request).await;
+    });
+    let dir = directory();
+    let cancel = CancellationToken::new();
+    let stop = cancel.clone();
+    let mut reported = None;
+    let result = download(
+        &client().unwrap(),
+        &url,
+        &dir,
+        Arc::new(Semaphore::new(8)),
+        &cancel,
+        |done, expected| {
+            reported = Some((done, expected));
+            stop.cancel();
+            Ok(())
+        },
+    )
+    .await
+    .unwrap();
+    assert!(result.is_none());
+    assert_eq!(reported, Some((0, total)));
+    assert_eq!(
+        std::fs::metadata(dir.join("ps3.iso.part")).unwrap().len(),
+        0
+    );
+    assert!(!dir.join("ps3.iso").exists());
+    server.await.unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn downloads_blocks_in_parallel_and_assembles_the_file() {
     let body = payload(100_000);
-    let (url, _) = server(body.clone(), Serve { ranges: true, change_after: None, delay_ms: 0 }).await;
+    let (url, _) = server(
+        body.clone(),
+        Serve {
+            ranges: true,
+            change_after: None,
+            delay_ms: 0,
+        },
+    )
+    .await;
     let dir = directory();
     let mut last = (0, 0);
     let target = download_with_options(
@@ -103,7 +184,10 @@ async fn downloads_blocks_in_parallel_and_assembles_the_file() {
     .unwrap();
     assert_eq!(std::fs::read(&target).unwrap(), *body);
     assert_eq!(last, (100_000, 100_000));
-    assert!(!dir.join("game.bin.resume.json").exists(), "the resume map is removed");
+    assert!(
+        !dir.join("game.bin.resume.json").exists(),
+        "the resume map is removed"
+    );
     assert!(!dir.join("game.bin.part").exists());
     let _ = std::fs::remove_dir_all(dir);
 }
@@ -111,7 +195,15 @@ async fn downloads_blocks_in_parallel_and_assembles_the_file() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn servers_without_ranges_stream_the_whole_file() {
     let body = payload(50_000);
-    let (url, requests) = server(body.clone(), Serve { ranges: false, change_after: None, delay_ms: 0 }).await;
+    let (url, requests) = server(
+        body.clone(),
+        Serve {
+            ranges: false,
+            change_after: None,
+            delay_ms: 0,
+        },
+    )
+    .await;
     let dir = directory();
     let target = download_with_options(
         &client().unwrap(),
@@ -135,8 +227,15 @@ async fn servers_without_ranges_stream_the_whole_file() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_paused_download_resumes_without_refetching_finished_blocks() {
     let body = payload(80_000);
-    let (url, requests) =
-        server(body.clone(), Serve { ranges: true, change_after: None, delay_ms: 200 }).await;
+    let (url, requests) = server(
+        body.clone(),
+        Serve {
+            ranges: true,
+            change_after: None,
+            delay_ms: 200,
+        },
+    )
+    .await;
     let dir = directory();
     let client = client().unwrap();
     let cancel = CancellationToken::new();
@@ -163,7 +262,10 @@ async fn a_paused_download_resumes_without_refetching_finished_blocks() {
     let saved: Resume =
         serde_json::from_slice(&std::fs::read(dir.join("game.bin.resume.json")).unwrap()).unwrap();
     let finished = saved.done.iter().filter(|done| **done).count();
-    assert!(finished > 0 && finished < saved.done.len(), "{finished} blocks kept");
+    assert!(
+        finished > 0 && finished < saved.done.len(),
+        "{finished} blocks kept"
+    );
     let before = requests.load(Ordering::SeqCst);
 
     let target = download_with_options(
@@ -181,14 +283,25 @@ async fn a_paused_download_resumes_without_refetching_finished_blocks() {
     .unwrap();
     assert_eq!(std::fs::read(&target).unwrap(), *body);
     // One probe, then only the blocks that were missing.
-    assert_eq!(requests.load(Ordering::SeqCst) - before, 1 + saved.done.len() - finished);
+    assert_eq!(
+        requests.load(Ordering::SeqCst) - before,
+        1 + saved.done.len() - finished
+    );
     let _ = std::fs::remove_dir_all(dir);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_file_replaced_mid_download_is_rejected_instead_of_mixed() {
     let body = payload(60_000);
-    let (url, _) = server(body, Serve { ranges: true, change_after: Some(3), delay_ms: 0 }).await;
+    let (url, _) = server(
+        body,
+        Serve {
+            ranges: true,
+            change_after: Some(3),
+            delay_ms: 0,
+        },
+    )
+    .await;
     let dir = directory();
     let result = download_with_options(
         &client().unwrap(),

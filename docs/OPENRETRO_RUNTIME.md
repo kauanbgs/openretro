@@ -91,6 +91,24 @@ manifest whose kind is `openretro-minimal`.
 
 ## Updating upstream
 
+The validation and publication workflows share the local
+`.github/actions/runtime` action. It caches the prepared runtime **together
+with its binary ZIP and corresponding source archive**, keyed by all files
+under `runtime/retroarch`, the composite action and the package verifier.
+An exact hit skips MSYS2 installation and compilation. A changed input builds
+the runtime cleanly; no incremental runtime objects are used for releases.
+`scripts/verify-runtime-package.ps1` checks the pinned manifest, executable
+SHA-256, packaged executable, license and source archive on both paths.
+
+Push validation on `main` populates caches that release tags can restore.
+GitHub isolates caches belonging to different tags, so a cache produced only
+by one tag cannot accelerate another tag. Let main's validation finish before
+publishing a tag to get the full benefit. The Windows desktop validation also
+warms optimized Rust dependencies with the same shared cache key as release.
+The first build, dependency/toolchain changes, cache eviction and changes to
+the runtime recipe still require compilation. To force a fresh runtime build
+without a recipe change, bump the `runtime-v1` cache-key prefix in the action.
+
 1. Choose a released RetroArch revision and record its full commit in
    `upstream.env`.
 2. Update the controller-profile commit separately.
