@@ -1,3 +1,4 @@
+mod account;
 mod commands;
 mod database;
 mod discord;
@@ -48,6 +49,7 @@ pub fn run() {
             app.manage(in_game::InGameService::default());
             app.manage(remote_play::RemotePlay::default());
             app.manage(discord::Presence::default());
+            app.manage(account::AccountGate::default());
             app.manage(mods::ModService::default());
             mods::recover(app.handle());
             in_game::setup(app.handle())?;
@@ -69,6 +71,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            account::account_session,
+            account::account_start,
+            account::account_verify,
+            account::account_profile,
+            account::account_logout,
+            account::account_delete,
+            account::account_export,
+            account::account_privacy,
+            account::account_open_privacy,
+            account::account_forget,
             file_browser::browse_files,
             file_browser::read_source_json,
             profiles::list_profiles,

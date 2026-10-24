@@ -1,3 +1,5 @@
+import { socialResponse } from "./social/router.mjs";
+import { cleanupSocial } from "./social/limits.mjs";
 import { cloudflareTurn } from "./turn.mjs";
 import { DurableObject } from "cloudflare:workers";
 
@@ -41,6 +43,9 @@ function limit(value, fallback) {
 }
 
 export default {
+  async scheduled(_controller, env, ctx) {
+    if (env.SOCIAL_DB) ctx.waitUntil(cleanupSocial(env.SOCIAL_DB));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
@@ -70,6 +75,12 @@ export default {
         headers: { ...headers, "Content-Type": "application/json" },
       });
     try {
+      if (
+        url.pathname.startsWith("/api/auth/") ||
+        url.pathname === "/api/account" ||
+        url.pathname.startsWith("/api/account/")
+      )
+        return socialResponse(request, env, { allowed, headers });
       if (url.pathname === "/api/rooms") {
         if (!allowed) return reply({ error: "Origem não permitida." }, 403);
         if (request.method === "OPTIONS")
@@ -155,8 +166,18 @@ export default {
         url.pathname === "/party" ||
         /^\/party\/[A-Z2-9]{6}$/.test(url.pathname)
           ? "/index.html"
-          : url.pathname;
-      if (!["/index.html", "/guest.js", "/guest.css"].includes(assetPath))
+          : url.pathname === "/privacidade"
+            ? "/privacy.html"
+            : url.pathname;
+      if (
+        ![
+          "/index.html",
+          "/guest.js",
+          "/guest.css",
+          "/privacy.html",
+          "/privacy.css",
+        ].includes(assetPath)
+      )
         return reply({ error: "Página não encontrada." }, 404);
       const asset = await env.ASSETS.fetch(
         new Request(new URL(assetPath, url), { method: request.method }),

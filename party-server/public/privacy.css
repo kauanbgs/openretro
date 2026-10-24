@@ -1,0 +1,43 @@
+.privacy {
+  width: min(100% - 48px, 760px);
+  margin: 48px auto 80px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.privacy h1,
+.privacy h2 {
+  color: var(--text);
+  line-height: 1.2;
+}
+.privacy h1 {
+  font-size: clamp(30px, 6vw, 44px);
+  letter-spacing: -0.035em;
+  margin: 28px 0;
+}
+.privacy h2 {
+  font-size: 22px;
+  margin: 36px 0 14px;
+}
+.privacy .draft {
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 14px;
+}
+.privacy li {
+  margin: 10px 0;
+}
+.privacy-back {
+  color: var(--text);
+  display: inline-block;
+  margin-top: 24px;
+  text-underline-offset: 5px;
+}
+@media (max-width: 480px) {
+  .privacy {
+    width: calc(100% - 32px);
+    margin-top: 28px;
+  }
+}

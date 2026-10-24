@@ -51,6 +51,8 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["util
 [target.'cfg(windows)'.dependencies]
 # Phone play: screen capture. Audio comes directly from the managed game runtime.
 windows-capture = "2"
+# Account sessions stay in the current Windows user's credential vault.
+windows-sys = { version = "0.61", features = ["Win32_Security_Credentials", "Win32_Foundation"] }
 
 [target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
 # Upstream SHA-1 uses AWS-LC. Use its shipped assembly objects on Windows.

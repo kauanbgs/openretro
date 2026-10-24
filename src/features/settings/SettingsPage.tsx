@@ -1,3 +1,4 @@
+import { AccountSettings } from "../account/AccountSettings";
 import { BrandMark } from "../../components/Brand";
 import { PageHeader } from "../../components/PageHeader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +9,7 @@ import {
   ExternalLink,
   Folder,
   Settings,
+  UserRound,
   Library,
   Gamepad2,
   Download,
@@ -29,7 +31,13 @@ import {
   type Language,
 } from "../../i18n";
 type Section =
-  "General" | "Library" | "Emulators" | "Downloads" | "Appearance" | "Advanced";
+  | "General"
+  | "Account"
+  | "Library"
+  | "Emulators"
+  | "Downloads"
+  | "Appearance"
+  | "Advanced";
 const sections: {
   id: Section;
   label: string;
@@ -43,6 +51,12 @@ const sections: {
     description: t(
       "Seu perfil de jogador, como o OpenRetro abre e se atualiza.",
     ),
+  },
+  {
+    id: "Account",
+    label: t("Conta"),
+    icon: UserRound,
+    description: t("Seu acesso online, perfil e privacidade."),
   },
   {
     id: "Library",
@@ -233,7 +247,9 @@ export function SettingsPage({
               <p>{current.description}</p>
             </div>
           </header>
-          {section === "General" ? (
+          {section === "Account" ? (
+            <AccountSettings notify={notify} />
+          ) : section === "General" ? (
             <>
               <Group title={t("Perfil")}>
                 <div className="setting-row">

@@ -1,0 +1,126 @@
+.account-settings {
+  max-width: 880px;
+}
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.account-identity p {
+  overflow-wrap: anywhere;
+}
+.account-initials {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text);
+}
+.account-status {
+  font-size: 12px;
+  color: var(--body);
+  white-space: nowrap;
+}
+.account-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  max-width: 420px;
+  padding: 20px 0 8px;
+}
+.account-form label,
+.account-confirm label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.account-form input,
+.account-friend-code input,
+.account-confirm input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 13px;
+  min-height: 42px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.account-form input:focus-visible,
+.account-friend-code input:focus-visible,
+.account-confirm input:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.account-form input[readonly] {
+  color: var(--body);
+}
+.account-form > .button {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.account-hint,
+.account-offline p,
+.account-confirm p {
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.account-friend-code {
+  display: flex;
+  gap: 8px;
+  width: min(100%, 310px);
+  flex-shrink: 0;
+}
+.account-friend-code input {
+  letter-spacing: 0.02em;
+}
+.account-offline {
+  padding: 18px 0;
+}
+.account-offline .button {
+  margin-top: 12px;
+}
+.account-privacy {
+  display: inline-block;
+  margin-top: 28px;
+  color: var(--body);
+  font-size: 13px;
+  text-underline-offset: 4px;
+}
+.account-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 12px;
+}
+.account-confirm .account-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+@media (max-width: 700px) {
+  .account-friend-code {
+    width: 100%;
+  }
+  .account-settings .setting-row {
+    flex-wrap: wrap;
+  }
+  .account-form {
+    max-width: 100%;
+  }
+}

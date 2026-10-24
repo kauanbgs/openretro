@@ -20,7 +20,18 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["PartyDirectory", "PartyRoom"] },
   ],
+  // Replace this placeholder with the id returned by `wrangler d1 create`.
+  "d1_databases": [
+    {
+      "binding": "SOCIAL_DB",
+      "database_name": "openretro-social",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "triggers": { "crons": ["0 * * * *"] },
   "vars": {
+    "EMAIL_FROM": "OpenRetro <conta@example.com>",
     "MAX_ROOMS": "32",
     "MAX_ROOMS_PER_IP": "2",
     "MAX_CREATES_PER_10_MIN": "12",

@@ -1,46 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { cloudflareTurn } from "./cloudflare/turn.mjs";
+import { runtime } from "./test-support/cloudflare.mjs";
 
-async function runtime(bindings = {}, options = {}) {
-  return new Miniflare(
-    convertV4MiniflareOptions({
-      modules: ["worker.mjs", "turn.mjs"].map((name) => ({
-        type: "ESModule",
-        path: fileURLToPath(new URL(`./cloudflare/${name}`, import.meta.url)),
-      })),
-      compatibilityDate: "2026-10-23",
-      durableObjects: {
-        DIRECTORY: { className: "PartyDirectory", useSQLite: true },
-        ROOMS: { className: "PartyRoom", useSQLite: true },
-      },
-      bindings: { ALLOW_LOCAL_TEST: "true", ...bindings },
-      serviceBindings: {
-        ASSETS: async (request) => {
-          const path = new URL(request.url).pathname;
-          if (!["/index.html", "/guest.js", "/guest.css"].includes(path))
-            return new Response("Not found", { status: 404 });
-          return new Response(
-            await readFile(new URL(`./public${path}`, import.meta.url)),
-            {
-              headers: {
-                "Content-Type": path.endsWith(".html")
-                  ? "text/html"
-                  : path.endsWith(".js")
-                    ? "text/javascript"
-                    : "text/css",
-              },
-            },
-          );
-        },
-      },
-      ...options,
-    }),
-  );
-}
 const create = (mf, ip = "192.0.2.1") =>
   mf.dispatchFetch("http://localhost/api/rooms", {
     method: "POST",

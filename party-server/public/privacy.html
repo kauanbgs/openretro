@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#121212" />
+    <title>Privacidade · OpenRetro</title>
+    <link rel="stylesheet" href="/guest.css" />
+    <link rel="stylesheet" href="/privacy.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/party">OpenRetro <span>Privacidade</span></a>
+    </header>
+    <main class="privacy">
+      <p class="draft">
+        Rascunho para revisão — não é uma política definitiva.
+      </p>
+      <h1>Sua conta, seus dados.</h1>
+      <p>
+        O social é opcional. Você continua jogando offline e usando o Party
+        anônimo sem criar uma conta.
+      </p>
+      <h2>O que é coletado</h2>
+      <p>
+        Ao entrar, armazenamos e-mail, identificador da conta, nome de exibição
+        e código de amigo. As preferências incluem mostrar o jogo aos amigos e
+        aparecer offline. Amigos e presença ainda não estão disponíveis nesta
+        etapa.
+      </p>
+      <p>
+        Quando implementados, pedidos, amizades e bloqueios serão armazenados
+        para conectar apenas as pessoas que você escolher. A presença será
+        compartilhada enquanto você estiver conectado, respeitando suas
+        preferências e bloqueios, sem histórico de jogos no servidor.
+      </p>
+      <h2>Para que serve</h2>
+      <p>
+        O e-mail serve para enviar o código de acesso, sem senha. O Resend
+        processa o endereço e a mensagem para entregar esse e-mail. Não enviamos
+        marketing, imagens remotas nem conteúdo de rastreamento nas mensagens. O
+        operador deve manter o rastreamento desativado no provedor.
+      </p>
+      <p>
+        Cloudflare Workers e D1 processam as requisições e os dados da conta.
+        Para limitar abuso, o endereço IP e o e-mail são transformados em
+        identificadores com HMAC nas cotas; o IP original não é salvo nessas
+        tabelas.
+      </p>
+      <h2>Por quanto tempo</h2>
+      <ul>
+        <li>
+          O código expira em 10 minutos, só pode ser usado uma vez e é guardado
+          apenas como hash. Ele é removido na próxima limpeza, executada a cada
+          hora.
+        </li>
+        <li>
+          Uma sessão expira após 90 dias sem uso. O uso renova esse prazo. Sair
+          revoga a sessão; sair de todos os aparelhos revoga todas.
+        </li>
+        <li>
+          As cotas de autenticação expiram em 15 minutos e são removidas na
+          próxima limpeza horária.
+        </li>
+        <li>
+          A conta e os relacionamentos ficam até você excluí-los. Excluir a
+          conta remove seus dados ativos, sessões, códigos, amizades, pedidos e
+          bloqueios.
+        </li>
+      </ul>
+      <h2>Exportar e excluir</h2>
+      <p>
+        A API autenticada permite exportar seus dados em JSON e excluir a conta
+        de verdade. No aplicativo, use Configurações → Conta para exportar seus
+        dados ou excluir a conta. A exclusão não remove os jogos e saves locais
+        do seu computador.
+      </p>
+      <p>
+        Históricos de entrega do provedor de e-mail e cópias de recuperação da
+        infraestrutura podem seguir prazos próprios. Antes de ativar o serviço,
+        o operador precisa revisar esses prazos, os responsáveis pelo tratamento
+        e um canal de contato, e completar este documento.
+      </p>
+      <h2>Sem credenciais nos logs</h2>
+      <p>
+        Não registramos e-mails, códigos, tokens de sessão ou ingressos em logs
+        de produção. O modo local de desenvolvimento pode mostrar apenas o
+        código no terminal do desenvolvedor; esse modo é recusado em domínios
+        públicos.
+      </p>
+      <a class="privacy-back" href="/party">Voltar ao Party</a>
+    </main>
+  </body>
+</html>

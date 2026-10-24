@@ -5,7 +5,7 @@
   "scripts": {
     "start": "wrangler dev --config cloudflare/wrangler.jsonc",
     "start:standalone": "node --env-file-if-exists=.env server.mjs",
-    "test": "node --test test.mjs deploy.test.mjs cloudflare.test.mjs guest-input.test.mjs",
+    "test": "node --test test.mjs deploy.test.mjs cloudflare.test.mjs guest-input.test.mjs social.test.mjs",
     "deploy": "wrangler deploy --config cloudflare/wrangler.jsonc",
     "deploy:check": "wrangler deploy --dry-run --config cloudflare/wrangler.jsonc",
     "cf:whoami": "wrangler whoami --config cloudflare/wrangler.jsonc",
