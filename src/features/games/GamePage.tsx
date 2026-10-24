@@ -19,7 +19,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Camera,
+  ChevronDown,
+  Clock3,
+  Gamepad2,
 } from "lucide-react";
+import { GameMedia } from "./GameMedia";
+import "./GamePage.css";
 import type {
   Emulator,
   GameMetadata,
@@ -45,7 +50,7 @@ import { NetplayDialog } from "./NetplayDialog";
 import { ModsTab } from "./ModsTab";
 import { playedSha256 } from "../../services/mods";
 import { formatRelative } from "../../utils/format";
-import { t } from "../../i18n";
+import { locale, t } from "../../i18n";
 
 const tabLabels: Record<string, string> = {
   Overview: t("Visão geral"),
@@ -294,13 +299,16 @@ export function GamePage({
                 ? t(
                     "Escolha uma versão nas suas fontes para baixar no computador.",
                   )
-                : t(
-                    "Escolha uma versão nas suas fontes ou adicione um arquivo.",
-                  )}
+                : t("Adicione este jogo à sua biblioteca para começar.")}
             </p>
           )}
         </div>
         <div className="hero-panel-actions">
+          {!entry && !isRemote && (
+            <button className="button outline" onClick={() => onImport(game)}>
+              <FolderOpen size={16} /> {t("Adicionar à biblioteca")}
+            </button>
+          )}
           <button
             className={`button primary ${entry ? "play-button" : ""}`}
             disabled={running || busy}
@@ -341,11 +349,6 @@ export function GamePage({
                 <Users size={16} /> {t("Jogar online")}
               </button>
             )}
-          {!entry && !isRemote && (
-            <button className="button outline" onClick={() => onImport(game)}>
-              <FolderOpen size={16} /> {t("Adicionar arquivo")}
-            </button>
-          )}
           {game.trailers?.length ? (
             <button
               className="button outline"
@@ -443,6 +446,30 @@ export function GamePage({
         )}
         <div className="detail-layout">
           <div className="detail-main">
+            <div className="game-release">
+              <span>
+                {game.year
+                  ? t("Lançado em {year}", { year: game.year })
+                  : t("Lançamento não informado")}
+              </span>
+              {(game.publisher || game.developer) && (
+                <span>
+                  {game.publisher
+                    ? t("Publicado por {publisher}", {
+                        publisher: game.publisher,
+                      })
+                    : game.developer}
+                </span>
+              )}
+            </div>
+            {tab === "Overview" && (
+              <GameMedia
+                game={game}
+                images={gallery}
+                onImage={setLightbox}
+                onTrailer={setTrailer}
+              />
+            )}
             {entry && !isRemote && (
               <InGameMenuHelp
                 entry={entry}
@@ -450,7 +477,7 @@ export function GamePage({
                 notify={notify}
               />
             )}
-            <nav className="tabs">
+            <nav className="tabs" aria-label={t("Seções do jogo")}>
               {[
                 "Overview",
                 ...(entry ? ["Saves"] : []),
@@ -460,6 +487,7 @@ export function GamePage({
               ].map((t) => (
                 <button
                   className={tab === t ? "selected" : ""}
+                  aria-pressed={tab === t}
                   key={t}
                   onClick={() => setTab(t)}
                 >
@@ -645,6 +673,50 @@ export function GamePage({
             )}
           </div>
           <aside className="detail-aside">
+            <details className="game-statistics" open>
+              <summary>
+                <ChevronDown size={16} /> {t("Estatísticas")}
+              </summary>
+              <dl>
+                {game.rating !== undefined && (
+                  <div>
+                    <dt>
+                      <Star size={16} /> {t("Avaliação")}
+                    </dt>
+                    <dd>
+                      <Star size={13} fill="currentColor" /> {game.rating}
+                    </dd>
+                  </div>
+                )}
+                {game.ratingCount !== undefined && (
+                  <div>
+                    <dt>
+                      <Users size={16} /> {t("Avaliações no catálogo")}
+                    </dt>
+                    <dd>{game.ratingCount.toLocaleString(locale())}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt>
+                    <Gamepad2 size={16} /> {t("Jogadores")}
+                  </dt>
+                  <dd>{game.maxPlayers ?? t("Não informado")}</dd>
+                </div>
+                {entry && (
+                  <div>
+                    <dt>
+                      <Clock3 size={16} /> {t("Tempo de jogo")}
+                    </dt>
+                    <dd>
+                      {t("{hours}h {minutes}min de jogo", {
+                        hours: Math.floor(entry.item.playtime / 3600),
+                        minutes: Math.floor((entry.item.playtime % 3600) / 60),
+                      })}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </details>
             <section className="detail-aside-card">
               <h2>{t("Informações do jogo")}</h2>
               <dl>
@@ -682,24 +754,6 @@ export function GamePage({
                 ) : null}
               </dl>
             </section>
-            {game.trailers?.length ? (
-              <section className="detail-aside-card trailer-list">
-                <h2>{t("Vídeos")}</h2>
-                {game.trailers.map((video) => (
-                  <button key={video.id} onClick={() => setTrailer(video.id)}>
-                    <img
-                      src={`https://i.ytimg.com/vi/${video.id}/mqdefault.jpg`}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span>
-                      <Play size={14} fill="currentColor" /> {video.name}
-                    </span>
-                  </button>
-                ))}
-              </section>
-            ) : null}
             {!entry && (
               <section className="detail-aside-card source-note">
                 <Download size={18} />
@@ -713,27 +767,6 @@ export function GamePage({
                 </div>
               </section>
             )}
-            {game.screenshots?.length ? (
-              <section className="detail-aside-card gallery-strip">
-                <h2>{t("Imagens")}</h2>
-                {game.screenshots.slice(0, 3).map((url, i) => (
-                  <button
-                    key={url}
-                    onClick={() => setTab("Screenshots")}
-                    aria-label={t("View screenshot {number}", {
-                      number: i + 1,
-                    })}
-                  >
-                    <img
-                      src={url}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  </button>
-                ))}
-              </section>
-            ) : null}
           </aside>
         </div>
         {game.similar?.length ? (

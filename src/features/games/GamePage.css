@@ -1,0 +1,490 @@
+/* The game artwork leads; controls and metadata follow the reference's quiet,
+   charcoal layout. Scoped to this page so other screens keep their theme. */
+.app .game-page {
+  --game-surface: color-mix(in srgb, var(--panel) 80%, var(--bg));
+  background: var(--game-surface);
+  min-height: 100%;
+}
+.app .game-page .game-hero {
+  height: clamp(330px, 29vw, 430px);
+  background: #080808;
+}
+.app .game-page .game-hero > .artwork {
+  opacity: 0.86;
+}
+.app .game-page .game-hero img {
+  object-position: center 35%;
+}
+.app .game-page .game-hero-content {
+  justify-content: center;
+  padding: 24px 38px 95px;
+  background:
+    linear-gradient(90deg, #000c, #0004 44%, transparent 75%),
+    linear-gradient(0deg, #0008, transparent 45%);
+}
+.app .game-page .game-hero-content h2 {
+  max-width: 420px;
+  font-size: clamp(28px, 3vw, 43px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -1.3px;
+  text-wrap: balance;
+  text-shadow: 0 2px 22px #0006;
+}
+.app .game-page .game-hero-content > p {
+  margin-top: 7px;
+  font-size: 12px;
+}
+.app .game-page .detail-badges {
+  max-width: 440px;
+  margin-top: 10px;
+}
+.app .game-page .detail-badge {
+  padding: 3px 8px;
+  background: #0004;
+  border-color: #ffffff26;
+}
+.app .game-page .hero-panel {
+  position: relative;
+  top: auto;
+  z-index: 2;
+  min-height: 72px;
+  margin: -84px 12px 0;
+  padding: 14px 22px;
+  border: 1px solid #ffffff26;
+  border-radius: 7px;
+  background: #080808d9;
+  backdrop-filter: blur(18px);
+  color: #eee;
+}
+.app .game-page .hero-panel-content p {
+  color: #e2e2e6;
+  font-size: 12px;
+  font-weight: 600;
+}
+.app .game-page .hero-panel-content p + p {
+  margin-top: 5px;
+  color: #a8a8af;
+  font-weight: 400;
+}
+.app .game-page .hero-panel-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.app .game-page .hero-panel .button {
+  min-height: 40px;
+  border-radius: 6px;
+  font-size: 12px;
+  padding-inline: 15px;
+}
+.app .game-page .hero-panel .outline {
+  border-color: #c4c4ca;
+  color: #eee;
+  background: transparent;
+}
+.app .game-page .hero-panel .outline:hover {
+  background: #ffffff15;
+}
+.app .game-page .detail-body {
+  max-width: 1800px;
+  padding: 24px 16px 48px;
+}
+.app .game-page .detail-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 26%);
+  gap: 16px;
+}
+.app .game-page .detail-aside {
+  gap: 14px;
+  padding-top: 0;
+}
+.app .game-page .game-release {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-height: 70px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--game-surface) 96%, var(--text) 2%);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+.app .game-page .game-release span + span {
+  font-weight: 400;
+  color: var(--muted);
+}
+.game-media {
+  width: min(100%, 680px);
+  margin: 24px auto 28px;
+}
+.game-media-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #000;
+}
+.game-media-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+}
+.game-media-open > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.game-media-open-icon {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  background: #0009;
+  color: #fff;
+}
+.game-media-open-icon.is-video {
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #0009;
+  border: 1px solid #ffffff70;
+  backdrop-filter: blur(8px);
+}
+.game-media-open:hover .game-media-open-icon {
+  background: #333c;
+}
+.game-media-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 40px;
+  border: 1px solid #ffffff25;
+  border-radius: 5px;
+  background: #0009;
+  color: white;
+}
+.game-media-arrow:hover {
+  background: #333d;
+}
+.game-media-arrow.previous {
+  left: 12px;
+}
+.game-media-arrow.next {
+  right: 12px;
+}
+.game-media-count {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  pointer-events: none;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #000a;
+  color: #ddd;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.game-media-thumbnails {
+  display: flex;
+  gap: 7px;
+  padding: 9px 2px 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.game-media-thumbnails > button {
+  position: relative;
+  flex: 0 0 92px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  padding: 0;
+  background: #080808;
+  opacity: 0.48;
+}
+.game-media-thumbnails > button.selected {
+  opacity: 1;
+  border-color: #d5d5da;
+}
+.game-media-thumbnails > button:hover {
+  opacity: 1;
+}
+.game-media-thumbnails img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.game-media-thumbnails svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  filter: drop-shadow(0 2px 4px #000);
+}
+.app .game-page .tabs {
+  gap: 22px;
+  overflow-x: auto;
+  margin: 24px 0 22px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+  scrollbar-width: thin;
+}
+.app .game-page .tabs button {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--body);
+  font-size: 12px;
+}
+.app .game-page .tabs button.selected {
+  border-bottom-color: var(--text);
+  background: transparent;
+  color: var(--text);
+}
+.app .game-page .tabs button:hover {
+  color: var(--text);
+  background: transparent;
+}
+.app .game-page .overview {
+  padding: 0 4px 20px;
+}
+.app .game-page .overview h2 {
+  font-size: 17px;
+  margin-bottom: 12px;
+}
+.app .game-page .overview p {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+}
+.app .game-page .runtime-menu-help {
+  margin: 20px 0 0;
+}
+.app .game-page .detail-aside-card,
+.game-statistics {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.app .game-page .detail-aside-card > h2,
+.game-statistics > summary {
+  padding: 18px 17px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 92%, var(--text) 2%);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+.game-statistics > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  border-bottom: 0;
+}
+.game-statistics > summary::-webkit-details-marker {
+  display: none;
+}
+.game-statistics[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.game-statistics[open] > summary svg {
+  transform: rotate(180deg);
+}
+.game-statistics dl {
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px;
+  margin: 0;
+}
+.game-statistics dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.game-statistics dt,
+.game-statistics dd {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+}
+.game-statistics dt {
+  color: var(--muted);
+}
+.game-statistics dt svg {
+  color: var(--body);
+  flex-shrink: 0;
+}
+.game-statistics dd {
+  color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.app .game-page .detail-aside-card dl {
+  grid-template-columns: minmax(80px, auto) minmax(0, 1fr);
+  padding: 18px 16px;
+  gap: 15px 12px;
+  font-size: 12px;
+}
+.app .game-page .detail-aside-card dd {
+  color: var(--text);
+}
+.app .game-page .source-note {
+  padding: 18px 16px;
+}
+@media (max-width: 1180px) {
+  .app .game-page .detail-layout {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+  .app .game-page .hero-panel {
+    padding-inline: 16px;
+  }
+  .app .game-page .hero-panel-content {
+    max-width: 210px;
+  }
+}
+@media (max-width: 860px) {
+  .app .game-page .detail-layout {
+    grid-template-columns: 1fr;
+  }
+  .app .game-page .detail-aside {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app .game-page .hero-panel {
+    flex-wrap: wrap;
+  }
+  .app .game-page .hero-panel-content {
+    max-width: none;
+  }
+  .app .game-page .game-hero-content {
+    padding-left: 24px;
+  }
+  .game-media {
+    max-width: 740px;
+  }
+}
+@media (max-width: 560px) {
+  .app .game-page .game-hero {
+    height: 300px;
+  }
+  .app .game-page .game-hero-content {
+    padding: 22px 20px 85px;
+  }
+  .app .game-page .game-hero-content h2 {
+    max-width: 300px;
+    font-size: 29px;
+  }
+  .app .game-page .hero-panel {
+    margin: -66px 10px 0;
+    padding: 14px;
+    gap: 12px;
+  }
+  .app .game-page .hero-panel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .app .game-page .hero-panel .button {
+    padding-inline: 12px;
+  }
+  .app .game-page .detail-body {
+    padding: 20px 12px 36px;
+  }
+  .app .game-page .detail-aside {
+    grid-template-columns: 1fr;
+  }
+  .game-media {
+    margin-top: 18px;
+  }
+  .game-media-thumbnails > button {
+    flex-basis: 76px;
+  }
+  .app .game-page .tabs {
+    gap: 18px;
+  }
+}
+
+/* Phone play previously placed the heading below the art. Keep this page's
+   banner and action bar together rather than mixing both layout models. */
+html.remote .app .game-page .game-hero {
+  position: relative;
+  height: 360px;
+  overflow: hidden;
+  background: #080808;
+}
+html.remote .app .game-page .game-hero > .artwork {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+}
+html.remote .app .game-page .game-hero-content {
+  position: absolute;
+  inset: 0;
+  padding: 24px 20px 100px;
+  background:
+    linear-gradient(90deg, #000c, #0004),
+    linear-gradient(0deg, #0008, transparent 60%);
+}
+html.remote .app .game-page .game-hero-content h2 {
+  max-width: 340px;
+  color: #fff;
+  font-size: 28px;
+}
+html.remote .app .game-page .game-hero-content > p {
+  color: #c0c1c7;
+}
+html.remote .app .game-page .hero-panel {
+  position: relative;
+  top: auto;
+  margin: -72px 10px 0;
+  padding: 14px;
+  background: #080808e6;
+  border: 1px solid #ffffff26;
+}
+html.remote .app .game-page .hero-panel-content {
+  order: 0;
+  max-width: none;
+}
+html.remote .app .game-page .hero-panel-actions {
+  justify-content: flex-start;
+}
+html.remote .app .game-page .hero-panel-actions .button.primary {
+  height: 42px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+html.remote .app .game-page .detail-body {
+  padding: 20px 12px 36px;
+}
+html.remote .app .game-page .detail-layout {
+  grid-template-columns: 1fr;
+}
+html.remote .app .game-page .detail-aside {
+  grid-template-columns: 1fr;
+}

@@ -1,5 +1,20 @@
 /** Portuguese source text → English. */
 export const en: Record<string, string> = {
+  "Imagens e vídeos": "Images and videos",
+  "Mídia anterior": "Previous media",
+  "Próxima mídia": "Next media",
+  "Selecionar mídia": "Select media",
+  "Adicione este jogo à sua biblioteca para começar.":
+    "Add this game to your library to get started.",
+  "Lançado em {year}": "Released in {year}",
+  "Lançamento não informado": "Release date unavailable",
+  "Publicado por {publisher}": "Published by {publisher}",
+  Estatísticas: "Statistics",
+  "Avaliações no catálogo": "Catalog ratings",
+  "Seções do jogo": "Game sections",
+  "Não informado": "Not specified",
+  "Tempo de jogo": "Play time",
+  Avaliação: "Rating",
   "{minutes} min": "{minutes} min",
   "Aceitar pedido": "Accept request",
   "Recusar pedido": "Decline request",
