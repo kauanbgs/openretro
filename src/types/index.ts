@@ -163,8 +163,8 @@ export interface AppSettings {
   density: "comfortable" | "compact";
   animations: boolean;
   language: string;
-  /** The interface language; unset follows the system's. */
-  interfaceLanguage?: "pt-BR" | "en";
+  /** The interface language; system or unset follows the user's language. */
+  interfaceLanguage?: "system" | "pt-BR" | "en";
   downloadDirectory: string;
   concurrentDownloads: number;
   bandwidthLimit: number;

@@ -21,13 +21,7 @@ import { SourceManager } from "../downloads/SourceManager";
 import { PlayerPicker } from "../../components/PlayerPicker";
 import { PlayerAvatar } from "../../components/PlayerAvatar";
 import { version as appVersion } from "../../../package.json";
-import {
-  adoptLanguage,
-  language,
-  languages,
-  t,
-  type Language,
-} from "../../i18n";
+import { adoptLanguage, languages, t } from "../../i18n";
 type Section =
   "General" | "Library" | "Emulators" | "Downloads" | "Appearance" | "Advanced";
 const sections: {
@@ -342,16 +336,20 @@ export function SettingsPage({
                   </div>
                   <select
                     aria-label={t("Idioma da interface")}
-                    value={language}
+                    value={settings.interfaceLanguage ?? "system"}
                     disabled={saving}
                     onChange={(e) => {
-                      const next = e.target.value as Language;
+                      const next = e.target
+                        .value as AppSettings["interfaceLanguage"];
                       // The window reloads in the new language once saved.
                       void save({ interfaceLanguage: next }).then(() =>
                         adoptLanguage(next),
                       );
                     }}
                   >
+                    <option value="system">
+                      {t("Automático (idioma do sistema)")}
+                    </option>
                     {languages.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.name}

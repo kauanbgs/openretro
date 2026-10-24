@@ -26,6 +26,15 @@ jobs:
       - name: Prepare minimal OpenRetro Runtime
         uses: ./.github/actions/runtime
       - run: npm run prepare:runtime
+      - name: Read release notes
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $notes = Get-Content "docs/RELEASE_$version.md" -Raw
+          $delimiter = "RELEASE_NOTES_$([guid]::NewGuid().ToString('N'))"
+          "OPENRETRO_RELEASE_NOTES<<$delimiter" >> $env:GITHUB_ENV
+          $notes >> $env:GITHUB_ENV
+          $delimiter >> $env:GITHUB_ENV
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -34,7 +43,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: OpenRetro v__VERSION__
-          releaseBody: See the release notes for changes.
+          releaseBody: ${{ env.OPENRETRO_RELEASE_NOTES }}
           releaseDraft: false
           prerelease: false
           updaterJsonKeepRelease: true

@@ -19,7 +19,8 @@ function isLanguage(value: unknown): value is Language {
  * Outside a browser (tests) the source language stays. */
 export function systemLanguage(): Language {
   if (typeof document === "undefined") return "pt-BR";
-  return navigator.language?.toLowerCase().startsWith("pt") ? "pt-BR" : "en";
+  const preferred = navigator.languages?.[0] || navigator.language || "en";
+  return /^pt(?:-|$)/i.test(preferred) ? "pt-BR" : "en";
 }
 
 function cached(): Language | null {
@@ -103,7 +104,10 @@ export function t(
 export function adoptLanguage(saved: unknown): boolean {
   const next = isLanguage(saved) ? saved : systemLanguage();
   try {
-    localStorage.setItem(STORAGE_KEY, next);
+    // Cache only explicit choices. Automatic mode must detect the user's
+    // current language again on the next launch.
+    if (isLanguage(saved)) localStorage.setItem(STORAGE_KEY, saved);
+    else localStorage.removeItem(STORAGE_KEY);
   } catch {
     return false;
   }

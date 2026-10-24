@@ -1,5 +1,6 @@
 /** Portuguese source text → English. */
 export const en: Record<string, string> = {
+  "Automático (idioma do sistema)": "Automatic (system language)",
   "Imagens e vídeos": "Images and videos",
   "Mídia anterior": "Previous media",
   "Próxima mídia": "Next media",
