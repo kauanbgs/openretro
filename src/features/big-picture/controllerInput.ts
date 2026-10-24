@@ -1,3 +1,4 @@
+import { partyOwnsInput } from "../party/partyInput";
 export type ControllerSnapshot = Pick<
   Gamepad,
   "id" | "mapping" | "buttons" | "axes"
@@ -66,6 +67,6 @@ export class ControllerInput {
       }
     }
     this.held = new Set(Object.keys(active).filter((key) => active[key]));
-    return result;
+    return partyOwnsInput() ? [] : result;
   }
 }

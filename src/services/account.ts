@@ -10,6 +10,8 @@ export interface AccountUser {
   avatar: number;
   showPlaying: boolean;
   appearOffline: boolean;
+  discoverable?: boolean;
+  shareHistory?: boolean;
   createdAt: number;
 }
 export interface AccountSession {
@@ -30,6 +32,8 @@ export interface AccountPatch {
   showPlaying?: boolean;
   appearOffline?: boolean;
   avatar?: number;
+  discoverable?: boolean;
+  shareHistory?: boolean;
 }
 export const signedOut: AccountSession = {
   supported: false,

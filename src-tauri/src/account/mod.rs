@@ -1,4 +1,6 @@
 //! Optional accounts. Bearer tokens are held by Rust and the OS vault only.
+pub mod people;
+mod history;
 pub mod social;
 mod vault;
 use reqwest::{Client, Method, Url};
@@ -67,10 +69,17 @@ pub struct User {
     avatar: u8,
     show_playing: bool,
     appear_offline: bool,
+    #[serde(default = "default_discoverable")]
+    discoverable: bool,
+    #[serde(default = "default_discoverable")]
+    share_history: bool,
     created_at: i64,
 }
 /// The preset icons the app draws, numbered from 0.
 pub const AVATARS: u8 = 15;
+fn default_discoverable() -> bool {
+    true
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionView {
@@ -136,6 +145,10 @@ pub struct ProfilePatch {
     appear_offline: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    discoverable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    share_history: Option<bool>,
 }
 impl ProfilePatch {
     fn validate(&mut self) -> AccountResult<()> {
@@ -172,6 +185,8 @@ impl ProfilePatch {
             && self.show_playing.is_none()
             && self.appear_offline.is_none()
             && self.avatar.is_none()
+            && self.discoverable.is_none()
+            && self.share_history.is_none()
         {
             return Err(AccountError::new("invalid", "Dados do perfil inválidos."));
         }

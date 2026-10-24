@@ -13,6 +13,7 @@ pub struct Social(Mutex<State>);
 #[derive(Default)]
 struct State {
     game: Option<Value>,
+    history: Option<super::history::Recording>,
     party: Option<Party>,
     party_revision: u64,
     idle: bool,
@@ -37,7 +38,11 @@ impl State {
 }
 pub fn game(app: &tauri::AppHandle, activity: Option<&Value>) {
     if let Ok(mut state) = app.state::<Social>().0.lock() {
+        if let Some(recording) = state.history.take() {
+            recording.finish();
+        }
         state.game = activity.map(game_view);
+        state.history = state.game.as_ref().and_then(super::history::Recording::start);
         state.publish();
     }
 }
@@ -48,7 +53,7 @@ fn game_view(activity: &Value) -> Value {
     json!({"title":activity["details"],"console":activity["state"],"cover":cover,
         "startedAt":activity["timestamps"]["start"].as_i64().unwrap_or(0)*1000})
 }
-fn safe_cover(value: &str) -> bool {
+pub(super) fn safe_cover(value: &str) -> bool {
     Url::parse(value).is_ok_and(|url| {
         value.len() <= 1024
             && url.scheme() == "https"
@@ -88,13 +93,13 @@ struct Party {
     joinable: bool,
 }
 #[derive(Deserialize, Serialize)]
-struct PresenceView {
+pub(super) struct PresenceView {
     status: String,
     playing: Option<Playing>,
     party: Option<Party>,
 }
 impl PresenceView {
-    fn valid(&self) -> bool {
+    pub(super) fn valid(&self) -> bool {
         ["online", "idle", "offline"].contains(&self.status.as_str())
             && self.playing.as_ref().is_none_or(|g| {
                 !g.title.is_empty()
@@ -151,7 +156,7 @@ pub async fn social_friends(gate: tauri::State<'_, AccountGate>) -> AccountResul
             .await?,
     )
 }
-fn valid_action(action: &str, target: &str) -> bool {
+pub(super) fn valid_action(action: &str, target: &str) -> bool {
     if action == "request" {
         let Some((name, tag)) = target.split_once('#') else {
             return false;
@@ -271,6 +276,7 @@ pub fn social_party_clear(state: tauri::State<'_, Social>) {
     }
 }
 fn join_url(origin: &Url, code: &str, invite: &str) -> AccountResult<Url> {
+    parse_origin(origin.as_str())?;
     let Some((payload, signature)) = invite.split_once('.') else {
         return Err(AccountError::invalid());
     };
@@ -289,6 +295,77 @@ fn join_url(origin: &Url, code: &str, invite: &str) -> AccountResult<Url> {
         .map_err(|_| AccountError::invalid())?;
     url.set_fragment(Some(&format!("t={invite}")));
     Ok(url)
+}
+#[derive(Serialize)]
+pub struct GuestRoom {
+    code: String,
+    invite: String,
+    signal: String,
+}
+impl GuestRoom {
+    fn parse(origin: &Url, value: &Value) -> AccountResult<Self> {
+        let code = value["code"].as_str().ok_or_else(AccountError::invalid)?;
+        let invite = value["invite"].as_str().ok_or_else(AccountError::invalid)?;
+        join_url(origin, code, invite)?;
+        let mut signal = origin
+            .join("/signal")
+            .map_err(|_| AccountError::invalid())?;
+        signal
+            .set_scheme(if origin.scheme() == "https" {
+                "wss"
+            } else {
+                "ws"
+            })
+            .map_err(|_| AccountError::invalid())?;
+        signal.query_pairs_mut().append_pair("room", code);
+        // Only this explicit capability crosses IPC, never the authenticated response.
+        Ok(Self {
+            code: code.into(),
+            invite: invite.into(),
+            signal: signal.into(),
+        })
+    }
+}
+#[tauri::command]
+pub fn social_game_busy(app: tauri::AppHandle) -> AccountResult<bool> {
+    let social = app.state::<Social>();
+    let playing = social
+        .0
+        .lock()
+        .map_err(|_| AccountError::invalid())?
+        .game
+        .is_some();
+    // External emulators publish activity too, but do not reserve an embedded runtime.
+    Ok(playing
+        || crate::in_game::in_game_status(app.clone())
+            .map_err(|_| AccountError::invalid())?
+            .is_some())
+}
+#[tauri::command]
+pub async fn social_join_room(
+    friend_id: String,
+    app: tauri::AppHandle,
+    gate: tauri::State<'_, AccountGate>,
+) -> AccountResult<GuestRoom> {
+    if uuid::Uuid::parse_str(&friend_id).is_err() {
+        return Err(AccountError::new("invalid", "Jogador inválido."));
+    }
+    if social_game_busy(app)? {
+        return Err(AccountError::new(
+            "busy",
+            "Feche o jogo para entrar no Party.",
+        ));
+    }
+    let _guard = gate.0.lock().await;
+    let service = service()?;
+    let value = service
+        .authenticated(
+            Method::POST,
+            "/api/friends/party/join",
+            Some(json!({"friendId":friend_id})),
+        )
+        .await?;
+    GuestRoom::parse(&service.origin, &value)
 }
 #[tauri::command]
 pub async fn social_join(
@@ -436,6 +513,47 @@ async fn run(app: tauri::AppHandle, mut wanted: watch::Receiver<Value>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn guest_room_validates_capability_and_serializes_only_the_join_fields() {
+        let invite = format!("eyJ2IjoxfQ.{}", "a".repeat(64));
+        let value = json!({"code":"ABC234","invite":invite,"token":"never-expose","signal":"wss://evil.test"});
+        for (origin, expected) in [
+            (
+                "https://party.example.test",
+                "wss://party.example.test/signal?room=ABC234",
+            ),
+            (
+                "http://127.0.0.1:8787",
+                "ws://127.0.0.1:8787/signal?room=ABC234",
+            ),
+        ] {
+            let room = GuestRoom::parse(&Url::parse(origin).unwrap(), &value).unwrap();
+            let serialized = serde_json::to_value(room).unwrap();
+            assert_eq!(
+                serialized,
+                json!({"code":"ABC234","invite":invite,"signal":expected})
+            );
+        }
+        for origin in [
+            "http://evil.test",
+            "https://user:pass@party.test",
+            "https://party.test/path",
+            "https://party.test/?token=secret",
+            "https://party.test/#secret",
+        ] {
+            assert!(GuestRoom::parse(&Url::parse(origin).unwrap(), &value).is_err());
+        }
+        let origin = parse_origin("https://party.test").unwrap();
+        for invalid in [
+            json!({}),
+            json!({"code":12,"invite":invite}),
+            json!({"code":"ABC23I","invite":invite}),
+            json!({"code":"ABC234","invite":"x.a"}),
+            json!({"code":"ABC234","invite":format!("{}.{}", "x".repeat(2048), "a".repeat(64))}),
+        ] {
+            assert!(GuestRoom::parse(&origin, &invalid).is_err());
+        }
+    }
     #[test]
     fn party_url_keeps_invitation_in_fragment_on_the_configured_origin() {
         let origin = parse_origin("https://party.example.test").unwrap();

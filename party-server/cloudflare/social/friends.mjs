@@ -4,6 +4,8 @@ import { quota } from "./limits.mjs";
 import { hubCall, presenceFor } from "./hub.mjs";
 import { partyRoute } from "./invites.mjs";
 import { FRIEND_CODE } from "./friend-code.mjs";
+import { peopleRoute } from "./people.mjs";
+import { historyRoute } from "./history.mjs";
 
 export const friendView = (row) => ({
   id: row.id,
@@ -33,6 +35,13 @@ export async function friendsRoute(request, env, url) {
   const db = database(env, url),
     now = Date.now();
   const { user, session } = await authenticate(request, db, now);
+  if (url.pathname === "/api/friends/history")
+    return historyRoute(request, env, { db, user, now });
+  if (
+    url.pathname === "/api/friends/people" ||
+    url.pathname.startsWith("/api/friends/people/")
+  )
+    return peopleRoute(request, env, url, { db, user, now });
   if (url.pathname.startsWith("/api/friends/party/"))
     return partyRoute(request, env, url, { db, user, session, now });
   if (url.pathname === "/social") {

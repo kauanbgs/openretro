@@ -40,6 +40,8 @@ import { ControllerSelect } from "./ControllerSelect";
 import { HeroArtwork } from "./HeroArtwork";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
+import { PlayTogether } from "../../components/PlayTogether";
+import { nextControl, type Direction } from "./workspaceNavigation";
 export interface CatalogViewState {
   query: string;
   platform: string;
@@ -50,6 +52,10 @@ export interface CatalogViewState {
 export function BigPictureCatalog({
   mode = "catalog",
   onLibrary,
+  onPhone,
+  onParty,
+  onFriends,
+  onPeople,
   library,
   selected,
   setSelected,
@@ -66,6 +72,10 @@ export function BigPictureCatalog({
 }: {
   mode?: "catalog" | "home";
   onLibrary: () => void;
+  onPhone: () => void;
+  onParty: () => void;
+  onFriends: () => void;
+  onPeople: () => void;
   library: LibraryGame[];
   selected: number;
   setSelected: (index: number) => void;
@@ -275,7 +285,7 @@ export function BigPictureCatalog({
       if (key === "previous-control" || key === "next-control") {
         const controls = Array.from(
           document.querySelectorAll<HTMLElement>(
-            ".tv-catalog-toolbar input, .tv-catalog-toolbar button, .tv-catalog-toolbar select:not(:disabled), .tv-catalog-load:not(:disabled)",
+            ".tv-home-discover .play-together button, .tv-catalog-toolbar input, .tv-catalog-toolbar button, .tv-catalog-toolbar select:not(:disabled), .tv-catalog-load:not(:disabled)",
           ),
         );
         const index = controls.indexOf(document.activeElement as HTMLElement);
@@ -286,6 +296,50 @@ export function BigPictureCatalog({
         return true;
       }
       const control = document.activeElement;
+      if (
+        mode === "home" &&
+        control instanceof HTMLButtonElement &&
+        control.closest(".play-together")
+      ) {
+        if (key === "a") {
+          control.click();
+          return true;
+        }
+        if (["left", "right", "up", "down"].includes(key)) {
+          const buttons = Array.from(
+            control
+              .closest(".play-together")!
+              .querySelectorAll<HTMLButtonElement>("button"),
+          );
+          const index = buttons.indexOf(control);
+          const next = nextControl(
+            buttons.map((button) => button.getBoundingClientRect()),
+            index,
+            key as Direction,
+          );
+          if (next !== index) {
+            buttons[next]?.focus();
+            return true;
+          }
+          if (key === "left") return false;
+          if (key === "right") return true;
+        }
+        if (key === "up") {
+          document
+            .querySelector<HTMLButtonElement>(".tv-home-feature .tv-play")
+            ?.focus();
+          return true;
+        }
+        if (key === "down") {
+          (
+            document.querySelector<HTMLButtonElement>(
+              ".tv-home-recent button",
+            ) ?? grid.current?.querySelector<HTMLButtonElement>("button")
+          )?.focus();
+          setSelected(0);
+          return true;
+        }
+      }
       if (
         mode === "home" &&
         control instanceof HTMLButtonElement &&
@@ -302,7 +356,9 @@ export function BigPictureCatalog({
         }
         if (key === "up") {
           document
-            .querySelector<HTMLButtonElement>(".tv-home-feature .tv-play")
+            .querySelector<HTMLButtonElement>(
+              ".tv-home-discover .play-together button",
+            )
             ?.focus();
           return true;
         }
@@ -324,14 +380,19 @@ export function BigPictureCatalog({
           return true;
         }
       }
-      if (mode === "home" && key === "up" && library.length) {
+      if (mode === "home" && key === "up") {
         const columns = grid.current
           ? getComputedStyle(grid.current).gridTemplateColumns.split(" ").length
           : 4;
         if (selected < columns && !control?.closest(".tv-home-feature")) {
-          document
-            .querySelector<HTMLButtonElement>(".tv-home-recent button")
-            ?.focus();
+          (
+            document.querySelector<HTMLButtonElement>(
+              ".tv-home-recent button",
+            ) ??
+            document.querySelector<HTMLButtonElement>(
+              ".tv-home-discover .play-together button",
+            )
+          )?.focus();
           return true;
         }
       }
@@ -347,7 +408,7 @@ export function BigPictureCatalog({
         if (key === "down") {
           (
             document.querySelector<HTMLButtonElement>(
-              ".tv-home-recent button",
+              ".tv-home-discover .play-together button",
             ) ?? grid.current?.querySelector<HTMLButtonElement>("button")
           )?.focus();
           return true;
@@ -469,6 +530,14 @@ export function BigPictureCatalog({
             </div>
           </div>
         </section>
+      )}
+      {mode === "home" && (
+        <PlayTogether
+          onPhone={onPhone}
+          onParty={onParty}
+          onFriends={onFriends}
+          onPeople={onPeople}
+        />
       )}
       {mode === "catalog" ? (
         <div className="tv-catalog-toolbar tv-compact-toolbar">

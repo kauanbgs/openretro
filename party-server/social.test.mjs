@@ -14,6 +14,80 @@ const BASE = "https://social.example.test";
 const EMAIL = "player@example.test";
 const PEPPER = "test-only-auth-pepper-not-a-production-secret";
 const INVITE_SECRET = "test-only-invite-secret-not-for-production";
+test("profiles bound game history, preserve newer sessions and restrict it to owner and friends", () => using(async f => {
+  const a = await f.login("history@example.test"), b = await f.login("friend@example.test"), c = await f.login("stranger@example.test");
+  const now = Date.now() - 120000;
+  const game = {title:"Super Mario World",console:"Super Nintendo",cover:null,startedAt:now};
+  const write = (who, value) => f.call("/api/friends/history",value,{token:who.token});
+  const profile = async (who, id=a.user.id) => (await f.call(`/api/friends/people/${id}`,undefined,{token:who.token})).json();
+  assert.equal((await f.call("/api/friends/history",{game,playSeconds:0})).status,401);
+  for (const body of [{game,playSeconds:-1},{game,playSeconds:99999999},{game:{...game,cover:"https://evil.test/image.png"},playSeconds:0},{game:{...game,title:"private\npath"},playSeconds:0},{game,playSeconds:0,userId:b.user.id}])
+    assert.equal((await write(a,body)).status,400);
+  await Promise.all(Array.from({length:12},(_,i) => write(a,{game:{...game,title:`Game ${i}`,startedAt:now+i},playSeconds:10})));
+  let own = await profile(a);
+  assert.equal(own.isSelf,true); assert.equal(own.recentGames.length,10);
+  assert.equal(own.recentGames[0].title,"Game 11");
+  assert.equal(own.recentGames.at(-1).title,"Game 2");
+  await write(a,{game:{...game,title:"Game 11",startedAt:now+11},playSeconds:60});
+  await write(a,{game:{...game,title:"Game 11",startedAt:now+11},playSeconds:0});
+  await write(a,{game:{...game,title:"Game 11",startedAt:now},playSeconds:90});
+  assert.equal((await profile(a)).recentGames[0].playSeconds,60);
+  const stranger = await profile(c);
+  assert.equal(stranger.historyVisible,false); assert.deepEqual(stranger.recentGames,[]);
+  assert.deepEqual(stranger.presence,{status:"offline",playing:null,party:null});
+  assert.ok(!JSON.stringify(stranger).includes("@")); assert.equal(stranger.email,undefined); assert.equal(stranger.token,undefined);
+  await pair(f,a,b);
+  assert.equal((await profile(b)).recentGames.length,10);
+  await f.call("/api/account/profile",{shareHistory:false,discoverable:false},{token:a.token,method:"PATCH"});
+  assert.equal((await profile(b)).historyVisible,false);
+  assert.equal((await profile(a)).recentGames.length,10);
+  assert.equal((await f.call(`/api/friends/people/${a.user.id}`,undefined,{token:c.token})).status,404);
+  assert.equal((await f.call("/api/account/profile",{shareHistory:"true"},{token:a.token,method:"PATCH"})).status,400);
+  const exported = await (await f.call("/api/account/export",undefined,{token:a.token})).json();
+  assert.equal(exported.recentGames.length,10);
+  await action(f,a,"block",b.user.id);
+  assert.equal((await f.call(`/api/friends/people/${a.user.id}`,undefined,{token:b.token})).status,404);
+  assert.equal((await profile(b,b.user.id)).recentGames.length,0);
+  await f.call("/api/account",undefined,{token:a.token,method:"DELETE"});
+  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM recent_games WHERE user_id=?").bind(a.user.id).first()).n,0);
+}));
+test("people discovery is authenticated, paginated, minimal and respects hiding and blocks", () => using(async f => {
+  const a = await f.login("alice@example.test"), b = await f.login("bob@example.test"), c = await f.login("carol@example.test");
+  assert.equal(a.user.discoverable, true);
+  assert.equal((await f.call("/api/friends/people")).status, 401);
+  const people = async () => (await f.call("/api/friends/people", undefined, { token: a.token })).json();
+  let page = await people();
+  assert.equal(page.people.length, 2); assert.equal(page.next, null);
+  for (const row of page.people) assert.deepEqual(Object.keys(row).sort(), ["avatar", "displayName", "friendCode", "id", "relationship"]);
+  assert.ok(!JSON.stringify(page).includes("example.test"));
+  assert.equal((await f.call("/api/friends/people?after=bad", undefined, { token: a.token })).status, 400);
+  assert.equal((await f.call("/api/friends/people?email=private", undefined, { token: a.token })).status, 400);
+  assert.equal((await f.call("/api/friends/people", {}, { token: a.token })).status, 405);
+  await action(f, a, "request", b.user.friendCode);
+  assert.equal((await people()).people.find(p => p.id === b.user.id).relationship, "outgoing");
+  assert.equal((await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: b.token })).json()).relationship, "incoming");
+  await action(f, b, "accept", a.user.id);
+  assert.equal((await people()).people.find(p => p.id === b.user.id).relationship, "friend");
+  assert.equal((await f.call("/api/account/profile", { discoverable: "false" }, { method: "PATCH", token: b.token })).status, 400);
+  await f.call("/api/account/profile", { discoverable: false }, { method: "PATCH", token: b.token });
+  assert.ok(!(await people()).people.some(p => p.id === b.user.id));
+  assert.equal((await f.call(`/api/friends/people/${b.user.id}`, undefined, { token: a.token })).status, 200);
+  assert.equal((await f.call(`/api/friends/people/${b.user.id}`, undefined, { token: c.token })).status, 404);
+  assert.ok((await list(f, a)).friends.some(p => p.id === b.user.id));
+  await f.call("/api/account/profile", { discoverable: true, appearOffline: true, showPlaying: false }, { method: "PATCH", token: b.token });
+  assert.ok((await people()).people.some(p => p.id === b.user.id));
+  await action(f, a, "block", b.user.id);
+  assert.ok(!(await people()).people.some(p => p.id === b.user.id));
+  assert.equal((await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: b.token })).status, 404);
+  await action(f, c, "block", a.user.id);
+  assert.equal((await people()).people.length, 0);
+  const seed = Array.from({ length: 26 }, (_, i) => ({ id: `00000000-0000-4000-8000-${i.toString().padStart(12, "0")}`, code: `player#${i.toString().padStart(4, "0")}` }));
+  await f.db.batch(seed.map(p => f.db.prepare("INSERT INTO users(id,email,display_name,friend_code,created_at) VALUES(?,?,?,?,?)").bind(p.id, `${p.id}@example.test`, "Player", p.code, Date.now())));
+  page = await people(); assert.equal(page.people.length, 24); assert.equal(page.next, page.people.at(-1).id);
+  const last = await (await f.call(`/api/friends/people?after=${page.next}`, undefined, { token: a.token })).json();
+  assert.equal(last.people.length, 2); assert.equal(last.next, null);
+  assert.equal(new Set([...page.people, ...last.people].map(p => p.id)).size, 26);
+}));
 test("players choose four-character tags with case-insensitive, atomic conflict checks", () =>
   using(async (f) => {
     const a = await f.login("alice@example.test"),
@@ -428,7 +502,7 @@ test("Party friends prove ownership, get an automatic unique seat and cannot rep
       for (const guest of [b, c, d, e]) await pair(f, a, guest);
       await f.call(
         "/api/account/profile",
-        { displayName: "Bobby" },
+        { displayName: "Bobby", avatar: 14 },
         { method: "PATCH", token: b.token },
       );
       const room = await hostRoom(f, a),
@@ -471,6 +545,7 @@ test("Party friends prove ownership, get an automatic unique seat and cannot rep
         );
         const member = roster.guests.find((g) => g.name === "Bobby");
         assert.equal(member.player, 2);
+        assert.equal(member.avatar, 14);
         assert.equal(JSON.stringify(first).includes(b.token), false);
         room.host.send({ type: "remove", id: member.id });
         await eventually(() => guest.messages.some((m) => m.type === "ended"));
@@ -774,6 +849,12 @@ test("SocialHub sends presence only to friends and applies privacy immediately",
       );
       const row = (await list(f, b)).friends[0];
       assert.equal(row.presence.playing.title, playing.title);
+      const ownProfile = await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: a.token })).json();
+      assert.equal(ownProfile.presence.playing.title, playing.title);
+      const friendProfile = await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: b.token })).json();
+      assert.equal(friendProfile.presence.playing.title, playing.title);
+      const strangerProfile = await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: c.token })).json();
+      assert.equal(strangerProfile.presence.playing, null);
       assert.equal(
         (
           await f.call(
@@ -1362,7 +1443,7 @@ test("Party needs the account service, privacy does not; hourly cleanup removes 
     );
     const page = await mf.dispatchFetch("http://localhost/privacidade");
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /Rascunho para revisão/);
+    assert.match(await page.text(), /Responsável e contato/);
     assert.equal(page.headers.get("Cache-Control"), "no-store");
   } finally {
     await mf.dispose();

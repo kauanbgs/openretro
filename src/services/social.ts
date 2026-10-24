@@ -6,6 +6,15 @@ import {
   type AccountSession,
 } from "./account";
 import { t } from "../i18n";
+import type { GuestRoom } from "../features/party/partyGuest";
+import {
+  SocialActivityTracker,
+  recordSocialActivity,
+  clearSocialActivity,
+  pruneSocialActivity,
+} from "./socialActivity";
+const activityTracker = new SocialActivityTracker();
+let presenceReady = false;
 
 export interface Playing {
   title: string;
@@ -30,6 +39,38 @@ export interface FriendList {
   incoming: Friend[];
   outgoing: Friend[];
   blocked: Friend[];
+}
+export interface PublicPerson {
+  id: string;
+  displayName: string | null;
+  friendCode: string;
+  avatar: number;
+  relationship: "none" | "friend" | "incoming" | "outgoing";
+}
+export interface UserProfileData extends PublicPerson {
+  isSelf: boolean;
+  createdAt: number;
+  historyVisible: boolean;
+  recentGames: {
+    title: string;
+    console: string;
+    cover: string | null;
+    lastPlayedAt: number;
+    playSeconds: number;
+  }[];
+  presence: Presence;
+}
+export interface PeoplePage {
+  people: PublicPerson[];
+  next: string | null;
+}
+export async function discoverPeople(after: string | null = null) {
+  if (!enabled) throw new Error("unsupported");
+  return invoke<PeoplePage>("social_people", { after });
+}
+export async function publicProfile(userId: string) {
+  if (!enabled) throw new Error("unsupported");
+  return invoke<UserProfileData>("social_person", { userId });
 }
 export type FriendAction =
   "request" | "accept" | "decline" | "cancel" | "remove" | "block" | "unblock";
@@ -107,7 +148,6 @@ export const socialStore = {
 let generation = 0,
   requestVersion = 0,
   enabled = false;
-let notify: (message: string) => void = () => {};
 export async function refreshFriends(announce = false) {
   if (!enabled || !state.session.hasSession) return;
   const current = generation,
@@ -126,18 +166,29 @@ export async function refreshFriends(announce = false) {
           state.outgoing.some((old) => old.id === row.id),
       );
       if (incoming)
-        notify(
+        recordSocialActivity(
+          "friendship",
+          incoming,
           t("{name} enviou um pedido de amizade.", {
             name: incoming.displayName ?? incoming.friendCode,
           }),
         );
       if (accepted)
-        notify(
+        recordSocialActivity(
+          "friendship",
+          accepted,
           t("{name} aceitou seu pedido de amizade.", {
             name: accepted.displayName ?? accepted.friendCode,
           }),
         );
     }
+    activityTracker.seed(rows.friends);
+    presenceReady = state.connected;
+    pruneSocialActivity(
+      new Set(
+        [...rows.friends, ...rows.incoming, ...rows.outgoing].map((f) => f.id),
+      ),
+    );
     update({ ...rows, loading: false, error: "" });
   } catch (cause) {
     if (current !== generation || version !== requestVersion) return;
@@ -158,7 +209,22 @@ export async function joinFriendParty(friendId: string) {
   if (!enabled) throw new Error("unsupported");
   await invoke("social_join", { friendId });
 }
+export async function joinFriendRoom(friendId: string) {
+  if (!enabled) throw new Error("unsupported");
+  return invoke<GuestRoom>("social_join_room", { friendId });
+}
+export async function checkPartyAvailable(friend: Friend) {
+  if (await invoke<boolean>("social_game_busy"))
+    throw new Error(
+      t("Feche o jogo para entrar no Party de {name}.", {
+        name: friend.displayName ?? friend.friendCode,
+      }),
+    );
+}
 async function syncAccount() {
+  presenceReady = false;
+  activityTracker.clear();
+  clearSocialActivity();
   const current = ++generation;
   ++requestVersion;
   update({ ...emptyFriends(), connected: false, loading: true, error: "" });
@@ -180,7 +246,6 @@ async function syncAccount() {
 export function startSocialClient(onNotify: (message: string) => void) {
   if (!isTauri || isRemote || enabled) return () => {};
   enabled = true;
-  notify = onNotify;
   const unlisten = listen<{ type: string; id?: string; presence?: Presence }>(
     "social-event",
     ({ payload: event }) => {
@@ -188,7 +253,9 @@ export function startSocialClient(onNotify: (message: string) => void) {
       if (event.type === "connected") {
         update({ connected: true, error: "" });
         void refreshFriends();
-      } else if (event.type === "disconnected")
+      } else if (event.type === "disconnected") {
+        presenceReady = false;
+        ++requestVersion;
         update({
           connected: false,
           friends: state.friends.map((friend) => ({
@@ -196,20 +263,13 @@ export function startSocialClient(onNotify: (message: string) => void) {
             presence: offlinePresence(),
           })),
         });
-      else if (event.type === "expired") void syncAccount();
+      } else if (event.type === "expired") void syncAccount();
       else if (event.type === "changed") void refreshFriends(true);
       else if (event.type === "presence" && event.id && event.presence) {
         const old = state.friends.find((friend) => friend.id === event.id);
-        if (
-          old &&
-          event.presence.party?.joinable &&
-          old.presence?.party?.code !== event.presence.party.code
-        )
-          notify(
-            t("{name} abriu um Party.", {
-              name: old.displayName ?? old.friendCode,
-            }),
-          );
+        if (old && presenceReady)
+          for (const activity of activityTracker.changes(old, event.presence))
+            recordSocialActivity(activity.kind, old, activity.message);
         state = presenceDelta(state, event.id, event.presence);
         subscribers.forEach((fn) => fn());
       }
@@ -222,6 +282,7 @@ export function startSocialClient(onNotify: (message: string) => void) {
     })
     .catch(() => {
       update({ error: t("Não foi possível conectar aos amigos.") });
+      onNotify(t("Não foi possível conectar aos amigos."));
     });
   const changed = () => {
     void syncAccount();
@@ -253,6 +314,9 @@ export function startSocialClient(onNotify: (message: string) => void) {
   }, 30000);
   return () => {
     enabled = false;
+    presenceReady = false;
+    activityTracker.clear();
+    clearSocialActivity();
     ++generation;
     ++requestVersion;
     void unlisten.then((fn) => fn()).catch(() => {});

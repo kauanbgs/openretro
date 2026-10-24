@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Dices } from "lucide-react";
 import { GameArtwork } from "../../components/GameArtwork";
 import { GameCard } from "../../components/GameCard";
+import { PlayTogether } from "../../components/PlayTogether";
 import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
 import {
   metadataProvider,
@@ -22,6 +23,10 @@ interface Props {
   onLibrary: () => void;
   onDiscover: () => void;
   onDownloads: () => void;
+  onPhone: () => void;
+  onParty: () => void;
+  onFriends: () => void;
+  onPeople: () => void;
 }
 type Category = "popular" | "multiplayer";
 const categories: {
@@ -33,7 +38,15 @@ const categories: {
   { id: "popular", label: t("Em alta"), emoji: "🔥" },
   { id: "multiplayer", label: t("Multiplayer"), emoji: "🎮", players: "multi" },
 ];
-export function HomePage({ library, onSelect, onDiscover }: Props) {
+export function HomePage({
+  library,
+  onSelect,
+  onDiscover,
+  onPhone,
+  onParty,
+  onFriends,
+  onPeople,
+}: Props) {
   const [category, setCategory] = useState<Category>("popular");
   const current = categories.find((c) => c.id === category)!;
   const [surprising, setSurprising] = useState(false);
@@ -155,6 +168,12 @@ export function HomePage({ library, onSelect, onDiscover }: Props) {
           </div>
         </div>
       )}
+      <PlayTogether
+        onPhone={onPhone}
+        onParty={onParty}
+        onFriends={onFriends}
+        onPeople={onPeople}
+      />
       <div className="home-categories">
         <div role="tablist" aria-label={t("Categorias")}>
           {categories.map((c) => (

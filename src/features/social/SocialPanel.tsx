@@ -15,7 +15,7 @@ import {
   socialStore,
   refreshFriends,
   friendAction,
-  joinFriendParty,
+  checkPartyAvailable,
   sortFriends,
   elapsedMinutes,
   type Friend,
@@ -28,6 +28,10 @@ import { AccountAvatar, type PresenceStatus } from "./accountAvatars";
 import type { PlayerProfile } from "../../types";
 import { t } from "../../i18n";
 import "./SocialPanel.css";
+import { SocialActivity } from "./SocialActivity";
+import { socialActivityStore } from "../../services/socialActivity";
+import { UserProfile } from "./UserProfile";
+import { PeopleDirectory } from "./PeopleDirectory";
 
 type Kind = "friend" | "incoming" | "outgoing" | "blocked";
 
@@ -47,6 +51,9 @@ export function SocialPanel({
   player,
   onPlayers,
   onClose,
+  onJoinParty,
+  initialView = "friends",
+  onProfile,
 }: {
   notify: (message: string) => void;
   layout?: "popover" | "page";
@@ -54,13 +61,26 @@ export function SocialPanel({
   player?: PlayerProfile | null;
   onPlayers?: () => void;
   onClose?: () => void;
+  onJoinParty: (friend: Friend) => void;
+  initialView?: "friends" | "activity" | "people";
+  onProfile?: (id: string) => void;
 }) {
   const state = useSyncExternalStore(
     socialStore.subscribe,
     socialStore.snapshot,
   );
+  const [profileId, setProfileId] = useState<string>();
+  const openProfile = onProfile ?? setProfileId;
   const user = state.session.user;
-  const [view, setView] = useState<"friends" | "account">("friends");
+  const [view, setView] = useState<
+    "friends" | "account" | "activity" | "people"
+  >(initialView);
+  useEffect(() => setView(initialView), [initialView]);
+  const activity = useSyncExternalStore(
+    socialActivityStore.subscribe,
+    socialActivityStore.snapshot,
+  );
+  const unread = activity.entries.filter((e) => !e.read).length;
   const needsProfile = state.session.hasSession && !!user && !user.displayName;
   const accountView =
     !state.session.hasSession || needsProfile || view === "account";
@@ -79,6 +99,15 @@ export function SocialPanel({
       : view === "account"
         ? t("Sua conta")
         : t("Amigos");
+  if (profileId && !accountView)
+    return (
+      <UserProfile
+        userId={profileId}
+        onBack={() => setProfileId(undefined)}
+        onJoinParty={onJoinParty}
+        notify={notify}
+      />
+    );
   return (
     <section
       className={`social-panel layout-${layout}`}
@@ -106,6 +135,29 @@ export function SocialPanel({
           </button>
         )}
       </header>
+      {!accountView && (
+        <nav className="social-tabs" aria-label={t("Área social")}>
+          <button
+            aria-pressed={view === "friends"}
+            onClick={() => setView("friends")}
+          >
+            {t("Amigos")}
+          </button>
+          <button
+            aria-pressed={view === "activity"}
+            onClick={() => setView("activity")}
+          >
+            {t("Atividade")}
+            {unread > 0 && <b>{unread}</b>}
+          </button>
+          <button
+            aria-pressed={view === "people"}
+            onClick={() => setView("people")}
+          >
+            {t("Conhecer")}
+          </button>
+        </nav>
+      )}
       <div className="social-body">
         {accountView ? (
           <div className="social-account">
@@ -125,8 +177,17 @@ export function SocialPanel({
             )}
             <AccountSettings notify={notify} />
           </div>
+        ) : view === "activity" ? (
+          <SocialActivity />
+        ) : view === "people" ? (
+          <PeopleDirectory onProfile={openProfile} />
         ) : (
-          <Friends notify={notify} onAccount={() => setView("account")} />
+          <Friends
+            notify={notify}
+            onProfile={openProfile}
+            onAccount={() => setView("account")}
+            onJoinParty={onJoinParty}
+          />
         )}
       </div>
       {onPlayers && (
@@ -147,10 +208,14 @@ export function SocialPanel({
 
 function Friends({
   notify,
+  onProfile,
   onAccount,
+  onJoinParty,
 }: {
   notify: (message: string) => void;
+  onProfile: (id: string) => void;
   onAccount: () => void;
+  onJoinParty: (friend: Friend) => void;
 }) {
   const state = useSyncExternalStore(
     socialStore.subscribe,
@@ -221,8 +286,8 @@ function Friends({
     });
   const join = (friend: Friend) =>
     run(async () => {
-      await joinFriendParty(friend.id);
-      notify(t("Party aberto no navegador."));
+      await checkPartyAvailable(friend);
+      onJoinParty(friend);
     });
   const appearOffline = (value: boolean) =>
     run(async () => {
@@ -300,13 +365,26 @@ function Friends({
             : ""
         }`}
       >
-        <AccountAvatar
-          avatar={friend.avatar}
-          size={38}
-          status={kind === "friend" ? statusOf(friend) : undefined}
-        />
+        <button
+          className="social-profile-avatar"
+          disabled={kind === "blocked"}
+          aria-label={t("Perfil de {name}", { name })}
+          onClick={() => onProfile(friend.id)}
+        >
+          <AccountAvatar
+            avatar={friend.avatar}
+            size={38}
+            status={kind === "friend" ? statusOf(friend) : undefined}
+          />
+        </button>
         <span className="social-row-text">
-          <strong>{name}</strong>
+          <button
+            className="social-profile-name"
+            disabled={kind === "blocked"}
+            onClick={() => onProfile(friend.id)}
+          >
+            {name}
+          </button>
           <span>{detail(friend, kind)}</span>
         </span>
         {game?.cover && (
@@ -405,9 +483,23 @@ function Friends({
   return (
     <div className="social-friends" aria-busy={busy}>
       <div className="social-me">
-        <AccountAvatar avatar={user?.avatar} size={48} status={myStatus} />
+        <button
+          className="social-profile-avatar"
+          aria-label={t("Meu perfil")}
+          onClick={() => user && onProfile(user.id)}
+        >
+          <AccountAvatar avatar={user?.avatar} size={48} status={myStatus} />
+        </button>
         <span className="social-me-text">
-          <strong>{user?.displayName}</strong>
+          <button
+            className="social-profile-name"
+            onClick={() => user && onProfile(user.id)}
+          >
+            {user?.displayName}
+            <span className="social-own-profile-label">
+              {t("Ver meu perfil")}
+            </span>
+          </button>
           <button
             className="social-code"
             title={t("Copiar código de amigo")}

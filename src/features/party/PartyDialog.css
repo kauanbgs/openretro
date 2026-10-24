@@ -83,6 +83,9 @@
   color: var(--text);
   font-weight: 600;
 }
+.party-seat > .account-avatar {
+  margin-bottom: 12px;
+}
 .party-seat small {
   font-size: 11px;
   margin-top: 5px;

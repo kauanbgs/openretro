@@ -17,6 +17,7 @@ import {
 import "./PartyDialog.css";
 import { socialStore } from "../../services/social";
 import { t } from "../../i18n";
+import { AccountAvatar } from "../social/accountAvatars";
 
 export function PartyDialog({
   onClose,
@@ -97,8 +98,19 @@ export function PartyDialog({
                     </button>
                   )}
                 </div>
+                {(player === 1 || guest) && (
+                  <AccountAvatar
+                    avatar={
+                      player === 1 ? social.session.user?.avatar : guest?.avatar
+                    }
+                    size={42}
+                    status={player === 1 || connected ? "online" : "idle"}
+                  />
+                )}
                 <strong>
-                  {player === 1 ? "Você" : guest?.name || "Lugar livre"}
+                  {player === 1
+                    ? (social.session.user?.displayName ?? t("Você"))
+                    : guest?.name || t("Lugar livre")}
                 </strong>
                 <small>
                   {player === 1

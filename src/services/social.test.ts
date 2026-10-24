@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { socialActivityStore } from "./socialActivity";
 const native = vi.hoisted(() => ({
   call: vi.fn(),
   listener: undefined as
@@ -66,6 +67,44 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("optional friends and presence", () => {
+  it("announces live game starts once, suppresses reconnect snapshots and ignores unknown friends", async () => {
+    const social = await import("./social");
+    vi.stubGlobal("window", new EventTarget());
+    let rows = { ...emptyFriends(), friends: [friend("Alice", "online")] };
+    native.call.mockImplementation(async (command) =>
+      command === "social_friends" ? rows : undefined,
+    );
+    const stop = social.startSocialClient(vi.fn());
+    try {
+      await vi.waitFor(() =>
+        expect(social.socialStore.snapshot().friends).toHaveLength(1),
+      );
+      native.listener!({ payload: { type: "connected" } });
+      await social.refreshFriends();
+      const playing = friend("Alice", "online", true).presence!;
+      const event = {
+        payload: { type: "presence", id: "Alice", presence: playing },
+      };
+      native.listener!(event);
+      native.listener!(event);
+      expect(socialActivityStore.snapshot().entries).toHaveLength(1);
+      expect(socialActivityStore.snapshot().entries[0].message).toBe(
+        "Alice começou a jogar Mario.",
+      );
+      native.listener!({
+        payload: { type: "presence", id: "stranger", presence: playing },
+      });
+      rows = { ...rows, friends: [friend("Alice", "online", true)] };
+      native.listener!({ payload: { type: "disconnected" } });
+      native.listener!({ payload: { type: "connected" } });
+      await social.refreshFriends();
+      native.listener!(event);
+      expect(socialActivityStore.snapshot().entries).toHaveLength(1);
+    } finally {
+      stop();
+    }
+    expect(socialActivityStore.snapshot().entries).toHaveLength(0);
+  });
   it("sorts playing, online, away and offline without mutating the list", () => {
     const list = [
       friend("Zelda"),
@@ -131,6 +170,26 @@ describe("optional friends and presence", () => {
       expect(native.call).toHaveBeenCalledWith("social_join", {
         friendId: "Alice",
       });
+      await social.joinFriendRoom("Alice");
+      expect(native.call).toHaveBeenCalledWith("social_join_room", {
+        friendId: "Alice",
+      });
+      await social.discoverPeople();
+      expect(native.call).toHaveBeenLastCalledWith("social_people", {
+        after: null,
+      });
+      await social.publicProfile("Alice");
+      expect(native.call).toHaveBeenLastCalledWith("social_person", {
+        userId: "Alice",
+      });
+      native.call.mockResolvedValueOnce(true);
+      await expect(social.checkPartyAvailable(friend("Alice"))).rejects.toThrow(
+        "Feche o jogo para entrar no Party de Alice.",
+      );
+      expect(native.call).toHaveBeenLastCalledWith("social_game_busy");
+      await expect(
+        social.checkPartyAvailable(friend("Alice")),
+      ).resolves.toBeUndefined();
       native.listener!({ payload: { type: "disconnected" } });
       expect(social.socialStore.snapshot().friends[0].presence).toEqual(
         offlinePresence(),
@@ -138,7 +197,9 @@ describe("optional friends and presence", () => {
       rows = { ...rows, incoming: [friend("Bob")] };
       native.listener!({ payload: { type: "changed" } });
       await vi.waitFor(() =>
-        expect(notify).toHaveBeenCalledWith("Bob enviou um pedido de amizade."),
+        expect(socialActivityStore.snapshot().entries[0]?.message).toBe(
+          "Bob enviou um pedido de amizade.",
+        ),
       );
       await social.friendAction("block", "Alice");
       expect(native.call).toHaveBeenCalledWith("social_action", {

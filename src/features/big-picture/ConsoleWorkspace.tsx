@@ -27,7 +27,11 @@ import {
 } from "../../services/bridge";
 import { ConsoleFilePicker } from "./ConsoleFilePicker";
 import "./ConsoleWorkspace.css";
+import { UserProfile } from "../social/UserProfile";
 import { SocialPanel } from "../social/SocialPanel";
+import { PartyGuestScreen } from "../party/PartyGuestScreen";
+import { partyOwnsInput } from "../party/partyInput";
+import type { Friend } from "../../services/social";
 import { t } from "../../i18n";
 
 const SettingsPage = lazy(() =>
@@ -62,15 +66,23 @@ export type WorkspacePage =
   | "sources"
   | "game"
   | "import"
-  | "friends";
+  | "profile"
+  | "friends"
+  | "party-guest";
 export interface WorkspaceRoute {
   page: WorkspacePage;
   game?: GameMetadata;
   /** Open the game page with its online-play dialog showing. */
   online?: boolean;
+  friend?: Friend;
+  userId?: string;
+  activity?: boolean;
+  people?: boolean;
 }
 const titles: Record<WorkspacePage, string> = {
+  "party-guest": t("Party"),
   friends: t("Amigos"),
+  profile: t("Perfil"),
   settings: t("Configurações"),
   emulators: t("Emuladores"),
   downloads: "Downloads",
@@ -350,7 +362,7 @@ export function ConsoleWorkspace({
   const handler = useRef(handle);
   handler.current = handle;
   useEffect(() => {
-    const forward = (key: string) => handler.current(key);
+    const forward = (key: string) => partyOwnsInput() || handler.current(key);
     input.current = forward;
     return () => {
       if (input.current === forward) input.current = null;
@@ -358,6 +370,7 @@ export function ConsoleWorkspace({
   }, [input]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (partyOwnsInput()) return;
       if (!active) return;
       if (editing) return;
       if (
@@ -421,6 +434,15 @@ export function ConsoleWorkspace({
       item.game.id === route.game?.id &&
       item.item.platformId === route.game.platformId,
   );
+  if (route.page === "party-guest" && route.friend)
+    return (
+      <section className="tv-workspace tv-party-workspace">
+        <PartyGuestScreen
+          friend={route.friend}
+          onClose={() => onRoute({ page: "friends" })}
+        />
+      </section>
+    );
   return (
     <section
       ref={root}
@@ -470,7 +492,7 @@ export function ConsoleWorkspace({
                   : t("Verificar atualizações")}
             </button>
           )}
-          {route.page !== "friends" && (
+          {route.page !== "friends" && route.page !== "profile" && (
             <button onClick={() => setImporting({})}>
               <Plus size={18} />
               {t("Adicionar jogo")}
@@ -480,7 +502,7 @@ export function ConsoleWorkspace({
       </header>
       <div
         className="tv-workspace-scroll"
-        key={route.page + (route.game?.id ?? "")}
+        key={route.page + (route.game?.id ?? route.userId ?? "")}
       >
         <Suspense
           fallback={
@@ -489,8 +511,30 @@ export function ConsoleWorkspace({
             </p>
           }
         >
+          {route.page === "profile" && route.userId && (
+            <UserProfile
+              userId={route.userId}
+              onBack={back}
+              notify={notify}
+              onJoinParty={(friend) =>
+                navigate({ page: "party-guest", friend })
+              }
+            />
+          )}
           {route.page === "friends" && (
-            <SocialPanel notify={notify} layout="page" />
+            <SocialPanel
+              onProfile={(userId) => navigate({ page: "profile", userId })}
+              initialView={
+                route.people
+                  ? "people"
+                  : route.activity
+                    ? "activity"
+                    : "friends"
+              }
+              notify={notify}
+              layout="page"
+              onJoinParty={(friend) => onRoute({ page: "party-guest", friend })}
+            />
           )}
           {route.page === "settings" && (
             <SettingsPage

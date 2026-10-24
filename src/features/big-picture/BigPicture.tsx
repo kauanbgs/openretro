@@ -55,6 +55,8 @@ import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
 import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
 import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
+import { partyOwnsInput } from "../party/partyInput";
+import { SocialNotice, SocialUnreadBadge } from "../social/SocialActivity";
 import { playUiSound, setNavigationSounds, soundFor } from "./navigationSounds";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PlayerPicker } from "../../components/PlayerPicker";
@@ -570,7 +572,13 @@ export function BigPicture({
               (value + (key === "up" ? -1 : 1) + sections.length + 2) %
               (sections.length + 2),
           );
-        if (key === "right") setNavFocused(false);
+        if (key === "right") {
+          setNavFocused(false);
+          if (section === "home" && !grid.current?.querySelector("button"))
+            root.current
+              ?.querySelector<HTMLButtonElement>(".play-together button")
+              ?.focus();
+        }
         return;
       }
       const currentGrid =
@@ -614,6 +622,7 @@ export function BigPicture({
     };
     dispatchInput.current = handle;
     const onKey = (event: KeyboardEvent) => {
+      if (partyOwnsInput()) return;
       if (event.key === "Tab") {
         const scope =
           root.current?.querySelector(
@@ -808,6 +817,12 @@ export function BigPicture({
         }
       />
       <BootSplash />
+      <SocialNotice
+        onOpen={(view) => {
+          selectSection("friends");
+          setWorkspace({ page: "friends", activity: view === "activity" });
+        }}
+      />
       {navFocused && (
         <button
           className="tv-menu-scrim"
@@ -950,6 +965,7 @@ export function BigPicture({
                 <PlayerAvatar player={activePlayer} size={24} />
               )}
               {account?.displayName ?? t("Entrar")}
+              <SocialUnreadBadge />
               {social.incoming.length > 0 && (
                 <b className="tv-topbar-badge">{social.incoming.length}</b>
               )}
@@ -1033,6 +1049,13 @@ export function BigPicture({
         <main ref={content} className="tv-content" key={section}>
           {(section === "catalog" || section === "home") && (
             <BigPictureCatalog
+              onPeople={() => {
+                selectSection("friends");
+                setWorkspace({ page: "friends", people: true });
+              }}
+              onFriends={() => selectSection("friends")}
+              onPhone={() => setPhoneOpen(true)}
+              onParty={() => setPartyOpen(true)}
               mode={section === "home" ? "home" : "catalog"}
               onLibrary={() => selectSection("library")}
               library={library}
@@ -1290,7 +1313,7 @@ export function BigPicture({
                   ] as const,
                   [
                     "OpenRetro Party",
-                    "Convide amigos para jogar pelo navegador",
+                    t("Abra uma partida e convide seus amigos."),
                     "party",
                     Users,
                   ] as const,

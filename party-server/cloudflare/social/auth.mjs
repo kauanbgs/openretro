@@ -65,6 +65,8 @@ export function publicUser(row) {
     avatar: row.avatar ?? 0,
     showPlaying: Boolean(row.show_playing),
     appearOffline: Boolean(row.appear_offline),
+    discoverable: Boolean(row.discoverable),
+    shareHistory: Boolean(row.share_history),
     createdAt: row.created_at,
   };
 }
@@ -301,6 +303,11 @@ export async function authenticate(request, db, now) {
 async function exportAccount(db, user, now, pepper) {
   const queries = [
     [
+      "recentGames",
+      "SELECT title,console,cover,last_played_at,play_seconds FROM recent_games WHERE user_id=? ORDER BY last_played_at DESC,title,console",
+      [user.id],
+    ],
+    [
       "loginChallenges",
       "SELECT created_at, expires_at, attempts, used_at FROM login_codes WHERE email_hash = ?",
       [await emailHash(pepper, user.email)],
@@ -312,13 +319,15 @@ async function exportAccount(db, user, now, pepper) {
     ],
     [
       "friendQuota",
-      "SELECT count, expires_at FROM auth_rate_limits WHERE key IN (?,?,?,?)",
+      "SELECT count, expires_at FROM auth_rate_limits WHERE key IN (?,?,?,?,?,?)",
       await Promise.all(
         [
           "friend-actions",
           "friend-requests-day",
           "party-host",
           "party-invites",
+          "people-read",
+          "history-write",
         ].map((scope) =>
           hmac(pepper, JSON.stringify(["auth-quota", scope, user.id])),
         ),
@@ -408,6 +417,8 @@ export async function accountRoute(request, env, url) {
             "appearOffline",
             "friendTag",
             "avatar",
+            "discoverable",
+            "shareHistory",
           ].includes(key),
       )
     )
@@ -430,7 +441,12 @@ export async function accountRoute(request, env, url) {
           "Use um nome com 3 a 24 caracteres, sem caracteres de controle.",
         );
     }
-    for (const key of ["showPlaying", "appearOffline"])
+    for (const key of [
+      "showPlaying",
+      "appearOffline",
+      "discoverable",
+      "shareHistory",
+    ])
       if (key in patch && typeof patch[key] !== "boolean")
         throw new AccountError(400, "Dados do perfil inválidos.");
     if ("avatar" in patch && !validAvatar(patch.avatar))
@@ -451,7 +467,7 @@ export async function accountRoute(request, env, url) {
       .prepare(
         `UPDATE users SET display_name = COALESCE(?, display_name),
       show_playing = COALESCE(?, show_playing), appear_offline = COALESCE(?, appear_offline), friend_code = COALESCE(?, friend_code),
-      avatar = COALESCE(?, avatar)
+      avatar = COALESCE(?, avatar), discoverable = COALESCE(?, discoverable), share_history = COALESCE(?, share_history)
       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM users other WHERE other.friend_code = ? AND other.id <> ?) RETURNING *`,
       )
       .bind(
@@ -460,6 +476,8 @@ export async function accountRoute(request, env, url) {
         "appearOffline" in patch ? Number(patch.appearOffline) : null,
         friendCode,
         "avatar" in patch ? patch.avatar : null,
+        "discoverable" in patch ? Number(patch.discoverable) : null,
+        "shareHistory" in patch ? Number(patch.shareHistory) : null,
         user.id,
         friendCode,
         user.id,
@@ -531,6 +549,8 @@ export async function accountRoute(request, env, url) {
       "friend-requests-day",
       "party-host",
       "party-invites",
+      "people-read",
+      "history-write",
     ].map((scope) =>
       hmac(env.AUTH_PEPPER, JSON.stringify(["auth-quota", scope, user.id])),
     ),
@@ -544,7 +564,7 @@ export async function accountRoute(request, env, url) {
       .bind(await emailQuotaKey(env.AUTH_PEPPER, user.email)),
     db.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
     db
-      .prepare("DELETE FROM auth_rate_limits WHERE key IN (?,?,?,?)")
+      .prepare("DELETE FROM auth_rate_limits WHERE key IN (?,?,?,?,?,?)")
       .bind(...quotaKeys),
   ]);
   await notifyUsers(env, [

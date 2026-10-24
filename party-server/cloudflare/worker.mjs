@@ -370,7 +370,7 @@ export class PartyRoom extends DurableObject {
       type: "roster",
       guests: this.guests().map((ws) => {
         const a = ws.deserializeAttachment();
-        return { id: a.id, name: a.name, player: a.player };
+        return { id: a.id, name: a.name, player: a.player, avatar: a.avatar ?? 0 };
       }),
     });
   }
@@ -472,7 +472,7 @@ export class PartyRoom extends DurableObject {
     if (!(await related(db, ticket.guestId, ticket.hostId))) return null;
     const profile = await db
       .prepare(
-        "SELECT u.display_name,u.friend_code FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.id=? AND s.id=? AND s.expires_at>?",
+        "SELECT u.display_name,u.friend_code,u.avatar FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.id=? AND s.id=? AND s.expires_at>?",
       )
       .bind(ticket.guestId, ticket.sessionId, Date.now())
       .first();
@@ -487,7 +487,7 @@ export class PartyRoom extends DurableObject {
       Object.keys(this.meta.usedInvites).length >= 128
     )
       return null;
-    return { ticket, name: profile.display_name || profile.friend_code };
+    return { ticket, name: profile.display_name || profile.friend_code, avatar: profile.avatar };
   }
   async fetch(request) {
     if (
@@ -643,6 +643,7 @@ export class PartyRoom extends DurableObject {
             }
             a.role = "guest";
             a.name = automatic.name;
+            a.avatar = automatic.avatar;
             a.joined = Date.now();
             a.userId = automatic.ticket.guestId;
             ws.serializeAttachment(a);

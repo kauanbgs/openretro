@@ -42,19 +42,13 @@
 			]
 		},
 	],
-	// Replace this placeholder with the id returned by `wrangler d1 create`.
+	// The account database, created with `wrangler d1 create openretro-social`.
 	"d1_databases": [
 		{
 			"binding": "SOCIAL_DB",
 			"database_name": "openretro-social",
 			"database_id": "f2c998b7-ad25-4747-9f1b-5a3d23762caf",
 			"migrations_dir": "migrations",
-		},
-		{
-			"binding": "openretro_social",
-			"database_name": "openretro-social",
-			"database_id": "f2c998b7-ad25-4747-9f1b-5a3d23762caf",
-			"remote": true
 		},
 	],
 	"triggers": {
@@ -63,7 +57,7 @@
 		]
 	},
 	"vars": {
-		"EMAIL_FROM": "OpenRetro <conta@example.com>",
+		"EMAIL_FROM": "OpenRetro <login@mail.openretro.com.br>",
 		"MAX_ROOMS": "32",
 		"MAX_ROOMS_PER_IP": "2",
 		"MAX_CREATES_PER_10_MIN": "12",

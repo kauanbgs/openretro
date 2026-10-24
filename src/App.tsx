@@ -38,7 +38,16 @@ import { BrandMark } from "./components/Brand";
 import { TitleBar } from "./components/TitleBar";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
 import { PartyDialog } from "./features/party/PartyDialog";
+import { UserProfile } from "./features/social/UserProfile";
 import { SocialPanel } from "./features/social/SocialPanel";
+import {
+  SocialNotice,
+  SocialUnreadBadge,
+} from "./features/social/SocialActivity";
+import { usePlayTogether } from "./components/PlayTogether";
+import { PartyGuestScreen } from "./features/party/PartyGuestScreen";
+import { partyOwnsInput } from "./features/party/partyInput";
+import type { Friend } from "./services/social";
 import { AccountAvatar } from "./features/social/accountAvatars";
 import { socialStore, startSocialClient } from "./services/social";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
@@ -164,13 +173,22 @@ export function App() {
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
+  const [profileId, setProfileId] = useState<string>();
   const [socialOpen, setSocialOpen] = useState(false);
+  const [socialView, setSocialView] = useState<
+    "friends" | "activity" | "people"
+  >("friends");
+  const playTogether = usePlayTogether();
+  const [guestFriend, setGuestFriend] = useState<Friend>();
   const social = useSyncExternalStore(
     socialStore.subscribe,
     socialStore.snapshot,
   );
   // With an account, the sidebar's profile button is the account's icon.
   const account = social.session.hasSession ? social.session.user : null;
+  useEffect(() => {
+    setProfileId(undefined);
+  }, [page, selected?.id, social.session.user?.id]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState("");
   const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
@@ -259,6 +277,7 @@ export function App() {
   }, [playing]);
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
+      if (partyOwnsInput()) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
         document.getElementById("global-search")?.focus();
@@ -268,6 +287,7 @@ export function App() {
     return () => window.removeEventListener("keydown", fn);
   }, []);
   const navigate = (p: Page) => {
+    setProfileId(undefined);
     setSearchOpen(false);
     setPage(p);
     setSelected(undefined);
@@ -363,6 +383,12 @@ export function App() {
   return (
     <div className={`app density-${settings.density}`}>
       {titleBar && <TitleBar />}
+      <SocialNotice
+        onOpen={(view) => {
+          setSocialView(view);
+          setSocialOpen(true);
+        }}
+      />
       {updateOverlay}
       <aside className="sidebar">
         <button
@@ -393,6 +419,7 @@ export function App() {
           {!isRemote && social.incoming.length > 0 && (
             <b className="sidebar-profile-badge">{social.incoming.length}</b>
           )}
+          {!isRemote && <SocialUnreadBadge />}
           <span>
             <strong>
               {account?.displayName ?? activePlayer?.name ?? t("Jogador 1")}
@@ -424,6 +451,31 @@ export function App() {
             </button>
           ))}
         </nav>
+        {!isRemote && (
+          <nav className="sidebar-together" aria-label={t("Jogar junto")}>
+            <h2>{t("Jogar junto")}</h2>
+            <button
+              onClick={() => setPhoneOpen(true)}
+              title={t("Jogar no celular")}
+              aria-label={t("Jogar no celular")}
+            >
+              <Smartphone size={18} />
+              <span>{t("Jogar no celular")}</span>
+              {playTogether.phoneActive && (
+                <i aria-label={t("Conexão ativa")} />
+              )}
+            </button>
+            <button
+              onClick={() => setPartyOpen(true)}
+              title={t("Jogar com amigos")}
+              aria-label={t("Jogar com amigos")}
+            >
+              <Users size={18} />
+              <span>{t("Jogar com amigos")}</span>
+              {playTogether.partyActive && <i aria-label={t("Party aberto")} />}
+            </button>
+          </nav>
+        )}
         <section className="sidebar-library" aria-label={t("Minha biblioteca")}>
           <div className="sidebar-library-heading">
             <button
@@ -455,7 +507,10 @@ export function App() {
               <li key={item.id}>
                 <button
                   className={selected?.id === game.id ? "active" : ""}
-                  onClick={() => setSelected(game)}
+                  onClick={() => {
+                    setProfileId(undefined);
+                    setSelected(game);
+                  }}
                   title={game.title}
                 >
                   {game.coverUrl ? (
@@ -501,7 +556,13 @@ export function App() {
               <BrandMark /> {t("OpenRetro")}
             </span>
           ) : (
-            <h1>{selected ? selected.title : pageLabels[page]}</h1>
+            <h1>
+              {profileId
+                ? t("Perfil")
+                : selected
+                  ? selected.title
+                  : pageLabels[page]}
+            </h1>
           )}
           <div className="header-actions">
             {updateVersion && (
@@ -542,22 +603,12 @@ export function App() {
             ) : (
               <>
                 <button
-                  className="button secondary"
-                  onClick={() => setPhoneOpen(true)}
-                >
-                  <Smartphone size={16} /> {t("Celular")}
-                </button>
-                <button
-                  className="button secondary"
-                  onClick={() => setPartyOpen(true)}
-                >
-                  <Users size={16} /> Party
-                </button>
-                <button
-                  className="button secondary"
+                  className="button big-picture-button"
                   onClick={() => setBigPicture(true)}
+                  title={t("Abrir Big Picture")}
+                  aria-label={t("Abrir Big Picture")}
                 >
-                  <Gamepad2 size={16} /> {t("Big Picture")}
+                  <Gamepad2 size={18} /> <span>{t("Big Picture")}</span>
                 </button>
               </>
             )}
@@ -622,7 +673,18 @@ export function App() {
           </div>
         )}
         <Suspense fallback={<PageLoading />}>
-          {selected ? (
+          {profileId ? (
+            <UserProfile
+              key={profileId}
+              userId={profileId}
+              notify={notify}
+              onBack={() => {
+                setProfileId(undefined);
+                setSocialOpen(true);
+              }}
+              onJoinParty={setGuestFriend}
+            />
+          ) : selected ? (
             <GamePage
               key={selected.id}
               game={selected}
@@ -647,6 +709,16 @@ export function App() {
             />
           ) : page === "Home" ? (
             <HomePage
+              onPeople={() => {
+                setSocialView("people");
+                setSocialOpen(true);
+              }}
+              onFriends={() => {
+                setSocialView("friends");
+                setSocialOpen(true);
+              }}
+              onPhone={() => setPhoneOpen(true)}
+              onParty={() => setPartyOpen(true)}
               library={library}
               onSelect={setSelected}
               onImport={() => openImport()}
@@ -735,6 +807,15 @@ export function App() {
             onClick={() => setSocialOpen(false)}
           />
           <SocialPanel
+            onProfile={(id) => {
+              setSocialOpen(false);
+              setProfileId(id);
+            }}
+            initialView={socialView}
+            onJoinParty={(friend) => {
+              setSocialOpen(false);
+              setGuestFriend(friend);
+            }}
             notify={notify}
             player={activePlayer}
             onPlayers={() => {
@@ -744,6 +825,15 @@ export function App() {
             onClose={() => setSocialOpen(false)}
           />
         </>
+      )}
+      {guestFriend && (
+        <PartyGuestScreen
+          friend={guestFriend}
+          onClose={() => {
+            setGuestFriend(undefined);
+            setSocialOpen(true);
+          }}
+        />
       )}
       {phoneOpen && (
         <PhonePlayDialog onClose={() => setPhoneOpen(false)} notify={notify} />

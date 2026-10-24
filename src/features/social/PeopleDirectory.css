@@ -1,0 +1,129 @@
+.people-directory {
+  padding: 4px 8px 14px;
+}
+.people-heading > div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #b9b3ff;
+}
+.people-heading h3 {
+  font-size: 16px;
+  margin: 10px 0;
+}
+.people-heading p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.people-visibility {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.people-visibility > div {
+  flex: 1;
+  display: grid;
+  gap: 5px;
+}
+.people-visibility strong {
+  font-size: 12px;
+}
+.people-visibility small {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--body);
+}
+.people-visibility .switch {
+  flex-shrink: 0;
+}
+.people-list-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.people-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.people-list li > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-align: left;
+}
+.people-list li > button:hover {
+  background: var(--panel2);
+}
+.people-list li > button > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.people-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.people-list small,
+.people-code {
+  color: var(--body);
+  font-size: 12px;
+}
+.people-more {
+  width: 100%;
+  margin-top: 14px;
+}
+.people-empty {
+  color: var(--body);
+  padding: 24px 12px;
+  font-size: 13px;
+  text-align: center;
+}
+.people-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 8px 24px;
+}
+.people-back {
+  align-self: flex-start;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.people-profile h3 {
+  margin: 0;
+  font-size: 24px;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.people-profile p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--body);
+}
+.people-profile .button {
+  margin-top: 10px;
+  width: 100%;
+}

@@ -402,6 +402,16 @@ export function AccountSettings({
                         label: "Aparecer offline",
                         on: user.appearOffline,
                       },
+                      {
+                        key: "shareHistory",
+                        label: "Compartilhar histórico com amigos",
+                        on: user.shareHistory !== false,
+                      },
+                      {
+                        key: "discoverable",
+                        label: "Aparecer em Conheça novas pessoas",
+                        on: user.discoverable !== false,
+                      },
                     ] as const
                   ).map((item) => (
                     <div className="setting-row" key={item.key}>
@@ -409,9 +419,13 @@ export function AccountSettings({
                         <strong>{t(item.label)}</strong>
                         <p>
                           {t(
-                            item.key === "showPlaying"
-                              ? "Você escolhe se seus amigos podem ver o jogo atual."
-                              : "Seus amigos verão você como offline.",
+                            item.key === "shareHistory"
+                              ? "Só você e seus amigos podem ver estes jogos. Você pode ocultá-los."
+                              : item.key === "showPlaying"
+                                ? "Você escolhe se seus amigos podem ver o jogo atual."
+                                : item.key === "discoverable"
+                                  ? "Outros usuários conectados podem ver seu nome, ícone e código de amigo. Desative para se ocultar."
+                                  : "Seus amigos verão você como offline.",
                           )}
                         </p>
                       </div>

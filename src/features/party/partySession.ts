@@ -4,6 +4,7 @@ import { validatePartyServer } from "./partyConfig";
 import { preferH264VideoCodec } from "./partyCodecs";
 import { socialStore } from "../../services/social";
 import { accountFailure } from "../../services/account";
+import { parsePartyRoster } from "./partyRoster";
 import {
   canvasSource,
   frameTrack,
@@ -19,6 +20,7 @@ export interface PartyGuest {
   id: string;
   name: string;
   player: number | null;
+  avatar?: number;
 }
 export interface PartyState {
   friendsAllowed: boolean;
@@ -342,7 +344,7 @@ export async function startParty() {
           hostTicket = reservation.ticket || "";
           syncFriendsAccess();
         }
-        if (m.type === "roster") update({ guests: m.guests });
+        if (m.type === "roster") update({ guests: parsePartyRoster(m.guests) });
         if (m.type === "error") {
           if (state.phase === "connecting") fail(m.message);
           else update({ error: m.message });

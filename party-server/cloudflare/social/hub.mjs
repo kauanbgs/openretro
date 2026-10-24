@@ -98,7 +98,10 @@ export function validPresence(value, now = Date.now()) {
   return { status: value.status, playing, party };
 }
 export async function presenceFor(env, viewer, subject) {
-  if (!env.SOCIAL_HUB || !(await related(primary(env), viewer, subject)))
+  if (
+    !env.SOCIAL_HUB ||
+    (viewer !== subject && !(await related(primary(env), viewer, subject)))
+  )
     return offline();
   const response = await hubCall(env, subject, "/presence", { id: subject });
   return response.ok ? response.json() : offline();
