@@ -10,7 +10,11 @@ import {
   Heart,
   Monitor,
   Smartphone,
+  Library,
+  Users,
+  Save,
 } from "lucide-react";
+import { PixelLandscape } from "./PixelLandscape";
 
 const REPO = "https://github.com/kauanbgs/openretro";
 const DOWNLOAD = `${REPO}/releases/latest`;
@@ -27,18 +31,6 @@ const covers = [
   "tekken",
   "sonic",
   "final-fantasy",
-];
-const systems = [
-  "NES",
-  "Super Nintendo",
-  "Game Boy",
-  "Mega Drive",
-  "PlayStation",
-  "Nintendo 64",
-  "Dreamcast",
-  "PlayStation 2",
-  "PSP",
-  "PlayStation 3",
 ];
 const devices = [
   {
@@ -67,11 +59,11 @@ const devices = [
     id: "friends",
     icon: Gamepad2,
     label: "Com seus amigos",
-    detail: "Online por VPN",
+    detail: "Party pelo navegador",
     title: "O player 2 pode estar longe.",
     description:
-      "Crie uma partida e compartilhe o convite. Nos consoles compatíveis, cada pessoa roda o jogo no próprio PC pela VPN.",
-    caption: "Mesmo jogo e core em cada PC",
+      "Entre na sua conta, adicione seus amigos e abra um Party. Eles recebem imagem e áudio no navegador e participam com teclado ou controle. O jogo roda no seu PC.",
+    caption: "Seus amigos entram na sua partida",
     button: "Ver como funciona",
   },
 ];
@@ -137,62 +129,55 @@ export function Website() {
         </div>
       </header>
       <main id="main">
-        <section className="landing-hero">
-          <div className="cover-wall" aria-hidden="true">
-            {[...covers, ...covers, ...covers].map((cover, i) => (
-              <img
-                key={i}
-                src={`./art/${cover}.jpg`}
-                alt=""
-                fetchPriority={i < 11 ? "high" : "auto"}
-              />
-            ))}
-          </div>
-          <div className="hero-shade" />
+        <section className="landing-hero page-width">
           <div className="hero-content">
             <span className="hero-insert">
-              <span className="status-dot live" /> Pronto para o próximo play
+              <span className="status-dot live" /> OpenRetro para Windows
             </span>
             <h1>
-              Sua coleção.
+              Seus clássicos,
               <br />
-              Seu próximo play.
+              em boa companhia.
             </h1>
             <p>
-              Os jogos que marcaram você. Um lugar para voltar.
-              <br className="desktop-break" /> Organize sua biblioteca, conecte
-              o controle e dê o play com o OpenRetro.
+              A sua biblioteca no PC. Uma partida no celular. Um amigo no player
+              2. Reúna seus jogos e encontre um novo jeito de voltar a eles.
             </p>
             <div className="hero-actions">
               <a className="pixel-button primary" href={DOWNLOAD}>
                 <Download size={16} />
                 Baixar OpenRetro
               </a>
+              <a className="hero-resource-link" href="#recursos">
+                Conhecer os recursos <ArrowDown size={15} />
+              </a>
             </div>
             <div className="hero-footnote">
-              Gratuito e de código aberto <span>✦</span> Para Windows
+              Gratuito. Código aberto. Feito para jogar.
             </div>
           </div>
-          <a
-            className="hero-scroll"
-            href="#recursos"
-            aria-label="Explorar recursos"
-          >
-            <ArrowDown size={16} />
-          </a>
-        </section>
-        <section className="system-strip" aria-label="Consoles no aplicativo">
-          <div className="strip-label">
-            <span>Uma casa para seus clássicos</span>
-            <span>Consoles, portáteis e boas memórias</span>
-          </div>
-          <div className="systems">
-            {systems.map((system, i) => (
-              <div key={system}>
-                <PixelConsole kind={i % 4} />
-                <span>{system}</span>
+          <div className="adventure-art">
+            <div className="adventure-frame">
+              <div className="adventure-top">
+                <span>
+                  <i /> Uma nova partida
+                </span>
+                <span>J1 + J2</span>
               </div>
-            ))}
+              <PixelLandscape />
+              <div className="adventure-bottom">
+                <span>É bom estar de volta.</span>
+                <Gamepad2 size={20} />
+              </div>
+            </div>
+            <div className="adventure-sticker">
+              <Users size={16} />
+              <span>
+                Melhor com
+                <br />
+                companhia.
+              </span>
+            </div>
           </div>
         </section>
 
@@ -200,19 +185,43 @@ export function Website() {
           <div className="section-heading">
             <div>
               <span className="section-kicker">
-                Menos configuração. Mais jogo.
+                Do primeiro play à próxima fase
               </span>
               <h2>
-                O controle está
-                <br />
-                na sua mão.
+                O que importa
+                <br />é jogar.
               </h2>
             </div>
             <p>
-              Da sua coleção ao primeiro comando.
-              <br />
-              Tudo no mesmo lugar, com a cara de um console.
+              Seus jogos e seus amigos, por perto.
+              <br />O OpenRetro cuida do caminho até a partida.
             </p>
+          </div>
+          <div className="feature-highlights">
+            <article>
+              <Library />
+              <h3>Uma biblioteca sua</h3>
+              <p>
+                Organize seus jogos com capas, informações e favoritos. Perfis
+                separados guardam o progresso de cada jogador.
+              </p>
+            </article>
+            <article>
+              <Smartphone />
+              <h3>Mais uma tela para jogar</h3>
+              <p>
+                Leia o QR code e jogue no celular pela rede local, com imagem,
+                áudio e controles de toque no navegador.
+              </p>
+            </article>
+            <article>
+              <Users />
+              <h3>Chame o player 2</h3>
+              <p>
+                Abra um Party para seus amigos entrarem pelo navegador. A
+                partida roda no seu PC e a diversão vai mais longe.
+              </p>
+            </article>
           </div>
           <div className="product-preview">
             <div className="preview-toolbar">
@@ -272,19 +281,19 @@ export function Website() {
               </p>
             </article>
             <article>
-              <Smartphone />
-              <h3>O celular entra na partida</h3>
+              <Save />
+              <h3>Continue de onde parou</h3>
               <p>
-                Conecte pela rede local para receber imagem, áudio e controles
-                de toque direto no navegador.
+                Retome a partida e gerencie seus saves nos cores compatíveis.
+                Cada jogador tem seu próprio progresso.
               </p>
             </article>
             <article>
-              <Heart />
-              <h3>Sua coleção, bem cuidada</h3>
+              <Download />
+              <h3>Seu jeito de jogar</h3>
               <p>
-                Capas, informações, favoritos e perfis de jogadores. Cada
-                clássico encontra seu lugar.
+                Emuladores integrados, fontes de download, traduções e mods.
+                Prepare seus jogos dentro do próprio aplicativo.
               </p>
             </article>
           </div>
@@ -428,7 +437,7 @@ export function Website() {
             <p>
               Baixe o OpenRetro, aponte para a sua coleção e conecte o controle.
               <br />
-              Gratuito, de código aberto e sem conta.
+              Gratuito e de código aberto. Jogue localmente sem conta.
             </p>
             <a className="pixel-button primary" href={DOWNLOAD}>
               <Download size={15} />
@@ -504,43 +513,5 @@ export function Website() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function PixelConsole({ kind }: { kind: number }) {
-  return (
-    <svg viewBox="0 0 48 32" aria-hidden="true" shapeRendering="crispEdges">
-      {kind === 0 ? (
-        <>
-          <path fill="#797583" d="M4 9h40v18H4z" />
-          <path fill="#c4bec4" d="M4 7h40v12H4z" />
-          <path fill="#393944" d="M25 7h13v20H25z" />
-          <path fill="#b1a0e5" d="M8 21h10v3H8z" />
-          <path fill="#b14d65" d="M30 21h4v3h-4z" />
-        </>
-      ) : kind === 1 ? (
-        <>
-          <path fill="#afa7b9" d="M5 10h38v18H5zM9 6h30v4H9z" />
-          <path fill="#777082" d="M14 6h20v10H14zM9 22h10v3H9z" />
-          <path fill="#a896ff" d="M31 21h5v4h-5z" />
-        </>
-      ) : kind === 2 ? (
-        <>
-          <path fill="#bdb9ad" d="M13 1h23v28H13zM13 29h18v2H13z" />
-          <path fill="#525462" d="M16 4h17v13H16z" />
-          <path fill="#8fa792" d="M19 7h11v7H19z" />
-          <path fill="#54515f" d="M17 22h9v3h-9zM20 19h3v9h-3z" />
-          <path fill="#b55c80" d="M29 20h3v3h-3zM32 24h3v3h-3z" />
-        </>
-      ) : (
-        <>
-          <path fill="#6e6b78" d="M8 6h32v23H8z" />
-          <path fill="#aaa3b1" d="M8 6h32v16H8z" />
-          <path fill="#595563" d="M15 9h19v10H15z" />
-          <path fill="#8f83b7" d="M5 8h3v13H5zM40 8h3v13h-3z" />
-          <path fill="#b4dbce" d="M29 24h4v2h-4z" />
-        </>
-      )}
-    </svg>
   );
 }
