@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -37,6 +38,9 @@ import { BrandMark } from "./components/Brand";
 import { TitleBar } from "./components/TitleBar";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
 import { PartyDialog } from "./features/party/PartyDialog";
+import { SocialPanel } from "./features/social/SocialPanel";
+import { AccountAvatar } from "./features/social/accountAvatars";
+import { socialStore, startSocialClient } from "./services/social";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop, isRemote } from "./services/bridge";
 import { invoke, isTauri } from "./services/transport";
@@ -160,6 +164,13 @@ export function App() {
   const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
+  const [socialOpen, setSocialOpen] = useState(false);
+  const social = useSyncExternalStore(
+    socialStore.subscribe,
+    socialStore.snapshot,
+  );
+  // With an account, the sidebar's profile button is the account's icon.
+  const account = social.session.hasSession ? social.session.user : null;
   const [searchOpen, setSearchOpen] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState("");
   const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
@@ -172,6 +183,7 @@ export function App() {
   const libraryRef = useRef(library);
   libraryRef.current = library;
   const notify = useCallback((s: string) => setToast(s), []);
+  useEffect(() => startSocialClient(notify), [notify]);
   const { data: settings = defaultSettings, isSuccess: settingsLoaded } =
     useQuery({
       queryKey: ["settings"],
@@ -355,16 +367,44 @@ export function App() {
       <aside className="sidebar">
         <button
           className="sidebar-profile"
-          onClick={() => setPlayersOpen(true)}
-          title={t("Trocar jogador")}
+          aria-expanded={isRemote ? undefined : socialOpen}
+          onClick={() =>
+            isRemote ? setPlayersOpen(true) : setSocialOpen((open) => !open)
+          }
+          title={isRemote ? t("Trocar jogador") : t("Conta e amigos")}
         >
-          <PlayerAvatar player={activePlayer} size={36} />
+          {account ? (
+            <AccountAvatar
+              avatar={account.avatar}
+              size={36}
+              status={
+                account.appearOffline
+                  ? "offline"
+                  : social.connected
+                    ? playing
+                      ? "playing"
+                      : "online"
+                    : "idle"
+              }
+            />
+          ) : (
+            <PlayerAvatar player={activePlayer} size={36} />
+          )}
+          {!isRemote && social.incoming.length > 0 && (
+            <b className="sidebar-profile-badge">{social.incoming.length}</b>
+          )}
           <span>
-            <strong>{activePlayer?.name ?? t("Jogador 1")}</strong>
+            <strong>
+              {account?.displayName ?? activePlayer?.name ?? t("Jogador 1")}
+            </strong>
             <small>
               {playing
                 ? t("Jogando {title}", { title: playing.game.title })
-                : t("Trocar jogador")}
+                : isRemote
+                  ? t("Trocar jogador")
+                  : account
+                    ? t("Amigos e conta")
+                    : t("Entrar e ver amigos")}
             </small>
           </span>
         </button>
@@ -678,7 +718,33 @@ export function App() {
         </button>
       </footer>
       {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
-      {partyOpen && <PartyDialog onClose={() => setPartyOpen(false)} />}
+      {partyOpen && (
+        <PartyDialog
+          onClose={() => setPartyOpen(false)}
+          onSignIn={() => {
+            setPartyOpen(false);
+            setSocialOpen(true);
+          }}
+        />
+      )}
+      {socialOpen && (
+        <>
+          <div
+            className="social-layer"
+            aria-hidden="true"
+            onClick={() => setSocialOpen(false)}
+          />
+          <SocialPanel
+            notify={notify}
+            player={activePlayer}
+            onPlayers={() => {
+              setSocialOpen(false);
+              setPlayersOpen(true);
+            }}
+            onClose={() => setSocialOpen(false)}
+          />
+        </>
+      )}
       {phoneOpen && (
         <PhonePlayDialog onClose={() => setPhoneOpen(false)} notify={notify} />
       )}

@@ -2,6 +2,8 @@ import { bridge } from "../../services/bridge";
 import { invoke, isTauri } from "../../services/transport";
 import { validatePartyServer } from "./partyConfig";
 import { preferH264VideoCodec } from "./partyCodecs";
+import { socialStore } from "../../services/social";
+import { accountFailure } from "../../services/account";
 import {
   canvasSource,
   frameTrack,
@@ -19,6 +21,10 @@ export interface PartyGuest {
   player: number | null;
 }
 export interface PartyState {
+  friendsAllowed: boolean;
+  friendsReady: boolean;
+  friendsBusy: boolean;
+  friendsError: string;
   phase: "idle" | "connecting" | "open";
   url: string;
   code: string;
@@ -29,6 +35,10 @@ export interface PartyState {
   relay: boolean;
 }
 const initial: PartyState = {
+  friendsAllowed: true,
+  friendsReady: false,
+  friendsBusy: false,
+  friendsError: "",
   phase: "idle",
   url: "",
   code: "",
@@ -60,6 +70,57 @@ let stream: MediaStream | undefined;
 let timeout: ReturnType<typeof setTimeout> | undefined;
 let heartbeat: ReturnType<typeof setInterval> | undefined;
 let generation = 0;
+let hostTicket = "";
+let confirmedFriendsAllowed = false;
+let friendChanges = Promise.resolve();
+export function setFriendsAllowed(value: boolean) {
+  update({ friendsAllowed: value, friendsReady: false });
+  syncFriendsAccess();
+}
+function syncFriendsAccess() {
+  const run = generation,
+    code = state.code,
+    ticket = hostTicket,
+    joinable = state.friendsAllowed;
+  if (
+    !isTauri ||
+    state.phase !== "open" ||
+    !socialStore.snapshot().session.hasSession
+  )
+    return;
+  if (!ticket) {
+    update({
+      friendsError: "Os convites de amigos exigem o servidor Cloudflare.",
+    });
+    return;
+  }
+  update({ friendsBusy: true, friendsError: "" });
+  friendChanges = friendChanges
+    .catch(() => {})
+    .then(async () => {
+      if (run !== generation) return;
+      try {
+        await invoke("social_party", { code, ticket, joinable });
+        if (run === generation && joinable === state.friendsAllowed) {
+          confirmedFriendsAllowed = joinable;
+          update({ friendsReady: joinable, friendsError: "" });
+        }
+      } catch (cause) {
+        if (run === generation)
+          update({
+            friendsAllowed: confirmedFriendsAllowed,
+            friendsReady: confirmedFriendsAllowed,
+            friendsError: accountFailure(cause).message,
+          });
+      } finally {
+        if (run === generation) update({ friendsBusy: false });
+      }
+    });
+}
+window.addEventListener("openretro-social-ready", () => syncFriendsAccess());
+window.addEventListener("openretro-account-changed", () =>
+  update({ friendsReady: false, friendsError: "" }),
+);
 let video: FrameTrack | undefined;
 let latest: Source | undefined;
 let decode = packetDecoder();
@@ -118,6 +179,9 @@ function dropPeer(id: string) {
 }
 export function endParty() {
   generation++;
+  hostTicket = "";
+  confirmedFriendsAllowed = false;
+  if (isTauri) void invoke("social_party_clear").catch(() => {});
   clearTimeout(timeout);
   clearInterval(heartbeat);
   const previous = signaling;
@@ -139,9 +203,6 @@ export function endParty() {
   playing = false;
   audioTime = 0;
   update({ ...initial });
-}
-export function acceptGuest(id: string) {
-  send({ type: "accept", id });
 }
 export function removeGuest(id: string) {
   dropPeer(id);
@@ -168,30 +229,17 @@ export async function startParty() {
     await context.resume();
     if (run !== generation) return;
     const audio = context.createMediaStreamDestination();
-    const reservationResponse = await fetch(new URL("/api/rooms", url), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-      signal: AbortSignal.timeout(15000),
-    });
-    if (run !== generation) return;
-    let reservation: { code?: string; ticket?: string } = {};
-    // The standalone development server still supports the original handshake.
-    if (reservationResponse.status !== 404) {
-      const result = await reservationResponse.json();
-      if (!reservationResponse.ok)
-        throw new Error(
-          result.error || "Não foi possível criar a sala. Tente novamente.",
-        );
-      if (
-        !/^[A-Z2-9]{6}$/.test(result.code || "") ||
-        !/^[a-f0-9]{64}$/.test(result.ticket || "")
-      )
-        throw new Error(
-          "O serviço não respondeu como esperado. Tente novamente.",
-        );
-      reservation = result;
+    // Party is not anonymous: the room is reserved with the account's
+    // session, which only the Rust side holds, and only friends join.
+    if (!socialStore.snapshot().session.hasSession)
+      throw new Error("Entre na sua conta para criar um Party.");
+    let reservation: { code: string; ticket: string };
+    try {
+      reservation = await invoke("social_party_reserve");
+    } catch (cause) {
+      throw new Error(accountFailure(cause).message);
     }
+    if (run !== generation) return;
     // Every frame the server paces at 30 fps becomes a video frame, without
     // a canvas: a capture capped at that same rate dropped frames that
     // arrived close together and left doubled gaps.
@@ -291,6 +339,8 @@ export async function startParty() {
           iceServers = m.iceServers;
           policy = m.policy === "all" ? "all" : "relay";
           update({ phase: "open", url: m.url, code: m.code, relay: m.relay });
+          hostTicket = reservation.ticket || "";
+          syncFriendsAccess();
         }
         if (m.type === "roster") update({ guests: m.guests });
         if (m.type === "error") {

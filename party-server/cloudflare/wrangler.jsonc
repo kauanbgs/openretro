@@ -1,41 +1,78 @@
 {
-  "$schema": "../node_modules/wrangler/config-schema.json",
-  "name": "openretro-party",
-  "main": "worker.mjs",
-  "compatibility_date": "2026-10-23",
-  "workers_dev": true,
-  "preview_urls": false,
-  "assets": {
-    "directory": "../public",
-    "binding": "ASSETS",
-    "run_worker_first": true,
-    "html_handling": "none",
-  },
-  "durable_objects": {
-    "bindings": [
-      { "name": "DIRECTORY", "class_name": "PartyDirectory" },
-      { "name": "ROOMS", "class_name": "PartyRoom" },
-    ],
-  },
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["PartyDirectory", "PartyRoom"] },
-  ],
-  // Replace this placeholder with the id returned by `wrangler d1 create`.
-  "d1_databases": [
-    {
-      "binding": "SOCIAL_DB",
-      "database_name": "openretro-social",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations",
-    },
-  ],
-  "triggers": { "crons": ["0 * * * *"] },
-  "vars": {
-    "EMAIL_FROM": "OpenRetro <conta@example.com>",
-    "MAX_ROOMS": "32",
-    "MAX_ROOMS_PER_IP": "2",
-    "MAX_CREATES_PER_10_MIN": "12",
-  },
-  "dev": { "ip": "127.0.0.1", "port": 8787 },
-  "observability": { "enabled": false },
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "openretro-party",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-10-23",
+	"workers_dev": true,
+	"preview_urls": false,
+	"assets": {
+		"directory": "../public",
+		"binding": "ASSETS",
+		"run_worker_first": true,
+		"html_handling": "none",
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "DIRECTORY",
+				"class_name": "PartyDirectory"
+			},
+			{
+				"name": "ROOMS",
+				"class_name": "PartyRoom"
+			},
+			{
+				"name": "SOCIAL_HUB",
+				"class_name": "SocialHub"
+			},
+		],
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"PartyDirectory",
+				"PartyRoom"
+			]
+		},
+		{
+			"tag": "v2-social",
+			"new_sqlite_classes": [
+				"SocialHub"
+			]
+		},
+	],
+	// Replace this placeholder with the id returned by `wrangler d1 create`.
+	"d1_databases": [
+		{
+			"binding": "SOCIAL_DB",
+			"database_name": "openretro-social",
+			"database_id": "f2c998b7-ad25-4747-9f1b-5a3d23762caf",
+			"migrations_dir": "migrations",
+		},
+		{
+			"binding": "openretro_social",
+			"database_name": "openretro-social",
+			"database_id": "f2c998b7-ad25-4747-9f1b-5a3d23762caf",
+			"remote": true
+		},
+	],
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		]
+	},
+	"vars": {
+		"EMAIL_FROM": "OpenRetro <conta@example.com>",
+		"MAX_ROOMS": "32",
+		"MAX_ROOMS_PER_IP": "2",
+		"MAX_CREATES_PER_10_MIN": "12",
+	},
+	"dev": {
+		"ip": "127.0.0.1",
+		"port": 8787
+	},
+	"observability": {
+		"enabled": false
+	},
 }

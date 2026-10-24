@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -61,6 +62,8 @@ import { PhonePlayDialog } from "../../components/PhonePlayDialog";
 import { PartyDialog } from "../party/PartyDialog";
 import { NETPLAY_PLATFORMS } from "../../types";
 import { PlayerAvatar, playerAccent } from "../../components/PlayerAvatar";
+import { AccountAvatar } from "../social/accountAvatars";
+import { socialStore } from "../../services/social";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
 import { HeroArtwork } from "./HeroArtwork";
 import {
@@ -74,7 +77,13 @@ import {
 import { t } from "../../i18n";
 
 type Section =
-  "home" | "catalog" | "library" | "downloads" | "emulators" | "system";
+  | "home"
+  | "catalog"
+  | "library"
+  | "downloads"
+  | "emulators"
+  | "system"
+  | "friends";
 const sections: { id: Section; label: string; icon: typeof Home }[] = [
   { id: "home", label: t("Início"), icon: Home },
   { id: "catalog", label: t("Catálogo"), icon: Grid2X2 },
@@ -82,6 +91,7 @@ const sections: { id: Section; label: string; icon: typeof Home }[] = [
   { id: "downloads", label: "Downloads", icon: Download },
   { id: "emulators", label: t("Emuladores"), icon: MonitorCog },
   { id: "system", label: t("Configurações"), icon: Settings },
+  { id: "friends", label: t("Amigos"), icon: Users },
 ];
 const activeDownload = (state: string) =>
   ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING", "INSTALLING"].includes(
@@ -121,6 +131,11 @@ export function BigPicture({
   const [libraryPlatform, setLibraryPlatform] = useState("all");
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
   const [playersOpen, setPlayersOpen] = useState(false);
+  const social = useSyncExternalStore(
+    socialStore.subscribe,
+    socialStore.snapshot,
+  );
+  const account = social.session.hasSession ? social.session.user : null;
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceRoute>();
@@ -305,7 +320,9 @@ export function BigPicture({
       scroll: content.current?.scrollTop ?? 0,
     };
     setWorkspace(
-      next === "downloads" || next === "emulators" ? { page: next } : undefined,
+      next === "downloads" || next === "emulators" || next === "friends"
+        ? { page: next }
+        : undefined,
     );
     setSection(next);
     setNavIndex(sections.findIndex((item) => item.id === next));
@@ -416,6 +433,7 @@ export function BigPicture({
       return setWorkspace({ page: "downloads" });
     }
     if (section === "emulators") return setWorkspace({ page: "emulators" });
+    if (section === "friends") return setWorkspace({ page: "friends" });
     if (selected === 0) return setPlayersOpen(true);
     const page = [
       "players",
@@ -450,6 +468,7 @@ export function BigPicture({
   }, []);
   useEffect(() => {
     const handle = (key: string) => {
+      window.dispatchEvent(new Event("openretro-user-activity"));
       pulseGlyph(root.current, key);
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
@@ -887,7 +906,14 @@ export function BigPicture({
         />
       )}
       {partyOpen && (
-        <PartyDialog input={selectInput} onClose={() => setPartyOpen(false)} />
+        <PartyDialog
+          input={selectInput}
+          onClose={() => setPartyOpen(false)}
+          onSignIn={() => {
+            setPartyOpen(false);
+            selectSection("friends");
+          }}
+        />
       )}
       {playersOpen && (
         <PlayerPicker
@@ -905,11 +931,28 @@ export function BigPicture({
           </span>
           <div>
             <button
-              onClick={() => setPlayersOpen(true)}
-              aria-label={t("Trocar jogador")}
+              aria-label={t("Conta e amigos")}
+              onClick={() => selectSection("friends")}
             >
-              <PlayerAvatar player={activePlayer} size={24} />
-              {activePlayer?.name ?? t("Jogadores")}
+              {account ? (
+                <AccountAvatar
+                  avatar={account.avatar}
+                  size={26}
+                  status={
+                    account.appearOffline
+                      ? "offline"
+                      : social.connected
+                        ? "online"
+                        : "idle"
+                  }
+                />
+              ) : (
+                <PlayerAvatar player={activePlayer} size={24} />
+              )}
+              {account?.displayName ?? t("Entrar")}
+              {social.incoming.length > 0 && (
+                <b className="tv-topbar-badge">{social.incoming.length}</b>
+              )}
             </button>
             <ConsoleClock />
             <span
@@ -952,7 +995,11 @@ export function BigPicture({
           onMenu={() => setNavFocused(true)}
           onClose={() => {
             setWorkspace(undefined);
-            if (section === "emulators" || section === "downloads")
+            if (
+              section === "emulators" ||
+              section === "downloads" ||
+              section === "friends"
+            )
               selectSection("home");
           }}
           onImported={(game) => {

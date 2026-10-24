@@ -93,6 +93,7 @@ fn apply(app: &tauri::AppHandle, state: &mut State) {
 }
 
 pub fn game_started(app: &tauri::AppHandle, activity: Value) {
+    crate::account::social::game(app, Some(&activity));
     if let Ok(mut state) = app.state::<Presence>().0.lock() {
         state.current = Some(activity);
         apply(app, &mut state);
@@ -100,6 +101,7 @@ pub fn game_started(app: &tauri::AppHandle, activity: Value) {
 }
 
 pub fn game_finished(app: &tauri::AppHandle) {
+    crate::account::social::game(app, None);
     if let Ok(mut state) = app.state::<Presence>().0.lock() {
         state.current = None;
         apply(app, &mut state);

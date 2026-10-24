@@ -2,7 +2,15 @@ import { hmac } from "./crypto.mjs";
 import { AccountError } from "./http.mjs";
 
 export const QUOTA_MS = 15 * 60 * 1000;
-export async function quota(db, pepper, scope, subject, max, now) {
+export async function quota(
+  db,
+  pepper,
+  scope,
+  subject,
+  max,
+  now,
+  duration = QUOTA_MS,
+) {
   const key = await hmac(
     pepper,
     JSON.stringify(["auth-quota", scope, subject]),
@@ -16,7 +24,7 @@ export async function quota(db, pepper, scope, subject, max, now) {
     expires_at = CASE WHEN expires_at <= ? THEN excluded.expires_at ELSE expires_at END
     RETURNING count, expires_at`,
     )
-    .bind(key, now + QUOTA_MS, now, now)
+    .bind(key, now + duration, now, now)
     .first();
   if (row.count > max)
     throw new AccountError(

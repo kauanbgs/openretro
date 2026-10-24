@@ -27,6 +27,7 @@ import {
 } from "../../services/bridge";
 import { ConsoleFilePicker } from "./ConsoleFilePicker";
 import "./ConsoleWorkspace.css";
+import { SocialPanel } from "../social/SocialPanel";
 import { t } from "../../i18n";
 
 const SettingsPage = lazy(() =>
@@ -55,7 +56,13 @@ const SourceManager = lazy(() =>
 );
 
 export type WorkspacePage =
-  "settings" | "emulators" | "downloads" | "sources" | "game" | "import";
+  | "settings"
+  | "emulators"
+  | "downloads"
+  | "sources"
+  | "game"
+  | "import"
+  | "friends";
 export interface WorkspaceRoute {
   page: WorkspacePage;
   game?: GameMetadata;
@@ -63,6 +70,7 @@ export interface WorkspaceRoute {
   online?: boolean;
 }
 const titles: Record<WorkspacePage, string> = {
+  friends: t("Amigos"),
   settings: t("Configurações"),
   emulators: t("Emuladores"),
   downloads: "Downloads",
@@ -462,10 +470,12 @@ export function ConsoleWorkspace({
                   : t("Verificar atualizações")}
             </button>
           )}
-          <button onClick={() => setImporting({})}>
-            <Plus size={18} />
-            {t("Adicionar jogo")}
-          </button>
+          {route.page !== "friends" && (
+            <button onClick={() => setImporting({})}>
+              <Plus size={18} />
+              {t("Adicionar jogo")}
+            </button>
+          )}
         </div>
       </header>
       <div
@@ -479,6 +489,9 @@ export function ConsoleWorkspace({
             </p>
           }
         >
+          {route.page === "friends" && (
+            <SocialPanel notify={notify} layout="page" />
+          )}
           {route.page === "settings" && (
             <SettingsPage
               onEmulators={() => navigate({ page: "emulators" })}

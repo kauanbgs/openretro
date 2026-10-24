@@ -21,34 +21,14 @@
         <form id="join-form" class="ticket">
           <h1>Entre na partida.</h1>
           <p>
-            Jogue com seu amigo pelo navegador.<br />Você não precisa instalar o
-            jogo.
+            O Party é para amigos do OpenRetro.<br />Você entra com a sua conta,
+            pelo painel de amigos do app.
           </p>
-          <label for="room-code">Código da sala</label>
-          <input
-            id="room-code"
-            name="room-code"
-            maxlength="6"
-            minlength="6"
-            pattern="[a-zA-Z2-9]{6}"
-            required
-            autocomplete="off"
-            autocapitalize="characters"
-            spellcheck="false"
-            placeholder="5JKL3A"
-          />
-          <label for="name">Seu nome</label
-          ><input
-            id="name"
-            name="name"
-            maxlength="24"
-            required
-            autocomplete="nickname"
-            placeholder="Nome ou apelido"
-          /><button id="join" type="submit">Pedir para entrar</button>
-          <p id="status" role="status" aria-live="polite">
-            O anfitrião precisa aprovar sua entrada.
-          </p>
+          <!-- Guests join with a ticket from their account; no code or name. -->
+          <input id="room-code" name="room-code" type="hidden" />
+          <input id="name" name="name" type="hidden" />
+          <button id="join" type="submit">Entrar no Party</button>
+          <p id="status" role="status" aria-live="polite"></p>
           <small
             >Use fones. Você pode jogar com controle, teclado ou os botões na
             tela.</small

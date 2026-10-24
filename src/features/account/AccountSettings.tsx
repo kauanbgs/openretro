@@ -13,9 +13,12 @@ import {
   remainingSeconds,
   signedOut,
   validDisplayName,
+  validFriendTag,
+  friendPrefix,
   type AccountApi,
   type AccountPatch,
 } from "../../services/account";
+import { AccountAvatar, AvatarPicker } from "../social/accountAvatars";
 import "./AccountSettings.css";
 
 export function AccountSettings({
@@ -37,6 +40,8 @@ export function AccountSettings({
   );
   const [remaining, setRemaining] = useState(0);
   const [name, setName] = useState("");
+  const [friendTag, setFriendTag] = useState("");
+  const [avatar, setAvatar] = useState(0);
   const [privacy, setPrivacy] = useState("");
   const [vaultError, setVaultError] = useState(false);
   const [confirmation, setConfirmation] = useState<
@@ -44,6 +49,11 @@ export function AccountSettings({
   >(null);
   const [deleteText, setDeleteText] = useState("");
   const user = session.user;
+  // The code as it will read once saved, following the name being typed.
+  const shownCode =
+    user && session.online && validFriendTag(friendTag)
+      ? `${friendPrefix(name)}#${friendTag.trim().toLowerCase()}`
+      : (user?.friendCode ?? "");
   function adopt(next: typeof session) {
     if (next.hasSession) {
       clearPendingLogin();
@@ -51,7 +61,12 @@ export function AccountSettings({
       setCode("");
     }
     setSession((previous) => mergeAccountSession(previous, next));
-    if (next.user) setName(next.user.displayName ?? "");
+    if (next.user) {
+      setName(next.user.displayName ?? "");
+      const tag = next.user.friendCode.split("#")[1] ?? "";
+      setFriendTag(validFriendTag(tag) ? tag : "");
+      setAvatar(next.user.avatar ?? 0);
+    }
   }
   useEffect(() => {
     let active = true;
@@ -219,15 +234,7 @@ export function AccountSettings({
                 <h3>{t("Seu perfil online")}</h3>
                 <div className="setting-row">
                   <div className="account-identity">
-                    <span className="account-initials" aria-hidden="true">
-                      {(user?.displayName ?? user?.email ?? "?")
-                        .trim()
-                        .split(/\s+/)
-                        .map((part) => [...part][0])
-                        .slice(0, 2)
-                        .join("")
-                        .toLocaleUpperCase()}
-                    </span>
+                    <AccountAvatar avatar={user?.avatar} size={44} />
                     <div>
                       <strong>
                         {user
@@ -274,12 +281,19 @@ export function AccountSettings({
                       <input
                         aria-label={t("Código de amigo")}
                         readOnly
-                        value={user.friendCode}
+                        value={shownCode}
                         onFocus={(e) => e.currentTarget.select()}
                       />
                       <button
                         className="button secondary"
                         aria-label={t("Copiar código de amigo")}
+                        // An unsaved code does not exist yet; nobody could add it.
+                        disabled={shownCode !== user.friendCode}
+                        title={
+                          shownCode !== user.friendCode
+                            ? t("Salve o perfil para usar este código.")
+                            : undefined
+                        }
                         onClick={() => {
                           void navigator.clipboard
                             .writeText(user.friendCode)
@@ -301,9 +315,19 @@ export function AccountSettings({
                     className="account-form"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      void profile({ displayName: name.trim() });
+                      void profile({
+                        displayName: name.trim(),
+                        friendTag: friendTag.trim().toLowerCase(),
+                        avatar,
+                      });
                     }}
                   >
+                    <span className="account-label">{t("Ícone da conta")}</span>
+                    <AvatarPicker
+                      value={avatar}
+                      onChange={setAvatar}
+                      disabled={busy}
+                    />
                     <label htmlFor="account-name">
                       {t("Nome de exibição")}
                     </label>
@@ -320,16 +344,45 @@ export function AccountSettings({
                         "De 3 a 24 caracteres. Esse nome será visto pelos seus amigos.",
                       )}
                     </p>
+                    <label htmlFor="account-friend-tag">
+                      {t("Seus 4 caracteres depois do #")}
+                    </label>
+                    <div className="account-tag-editor">
+                      <span aria-hidden="true">{friendPrefix(name)}#</span>
+                      <input
+                        id="account-friend-tag"
+                        aria-describedby="account-tag-hint"
+                        value={friendTag}
+                        maxLength={4}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        placeholder="ab12"
+                        disabled={busy}
+                        onChange={(event) =>
+                          setFriendTag(event.target.value.toLowerCase())
+                        }
+                      />
+                    </div>
+                    <p id="account-tag-hint" className="account-hint">
+                      {t(
+                        "Antes do # vai o seu nome, sem acentos nem espaços. Escolha 4 letras ou números para depois dele; se a combinação já estiver em uso, escolha outra.",
+                      )}
+                    </p>
                     <button
                       className="button primary"
                       disabled={
                         busy ||
                         !validDisplayName(name) ||
-                        name.trim() === user?.displayName
+                        !validFriendTag(friendTag) ||
+                        (name.trim() === user?.displayName &&
+                          friendTag.trim().toLowerCase() ===
+                            user?.friendCode.split("#")[1] &&
+                          avatar === user?.avatar)
                       }
                       type="submit"
                     >
-                      {busy ? t("Salvando…") : t("Salvar nome")}
+                      {busy ? t("Salvando…") : t("Salvar perfil")}
                     </button>
                   </form>
                 )}

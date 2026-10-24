@@ -6,6 +6,8 @@ export interface AccountUser {
   email: string;
   displayName: string | null;
   friendCode: string;
+  /** One of the 15 preset icons, 0 to 14. */
+  avatar: number;
   showPlaying: boolean;
   appearOffline: boolean;
   createdAt: number;
@@ -23,9 +25,11 @@ export interface AccountFailure {
   retryAfter: number;
 }
 export interface AccountPatch {
+  friendTag?: string;
   displayName?: string;
   showPlaying?: boolean;
   appearOffline?: boolean;
+  avatar?: number;
 }
 export const signedOut: AccountSession = {
   supported: false,
@@ -65,6 +69,21 @@ export function validDisplayName(name: string) {
     !/[\p{C}\p{Zl}\p{Zp}]/u.test(value)
   );
 }
+/** The part of the friend code before the #: the name without accents,
+ * spaces or symbols, up to 16 characters, or "jogador". Identical to the
+ * server's `friendPrefix` (party-server/cloudflare/social/friend-code.mjs). */
+export function friendPrefix(name: string | null | undefined) {
+  const slug = (name ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 16);
+  return slug || "jogador";
+}
+export function validFriendTag(tag: string) {
+  return /^[a-z0-9]{4}$/i.test(tag.trim());
+}
 export function mergeAccountSession(
   previous: AccountSession,
   next: AccountSession,
@@ -99,20 +118,27 @@ export function createAccountApi(
       });
     return call<T>(command, args);
   };
+  const changed = <T>(result: T) => {
+    if (typeof window !== "undefined")
+      window.dispatchEvent(new Event("openretro-account-changed"));
+    return result;
+  };
   return {
     session: () =>
       desktop ? native("account_session") : Promise.resolve(signedOut),
     start: (email) =>
       native("account_start", { email: email.trim().toLowerCase() }),
     verify: (email, code) =>
-      native("account_verify", {
+      native<AccountSession>("account_verify", {
         email: email.trim().toLowerCase(),
         code: code.trim(),
-      }),
-    profile: (patch) => native("account_profile", { patch }),
-    logout: (all) => native("account_logout", { all }),
-    forget: () => native("account_forget"),
-    remove: (confirmation) => native("account_delete", { confirmation }),
+      }).then(changed),
+    profile: (patch) =>
+      native<AccountSession>("account_profile", { patch }).then(changed),
+    logout: (all) => native<void>("account_logout", { all }).then(changed),
+    forget: () => native<void>("account_forget").then(changed),
+    remove: (confirmation) =>
+      native<void>("account_delete", { confirmation }).then(changed),
     export: () => native("account_export"),
     privacy: () =>
       desktop

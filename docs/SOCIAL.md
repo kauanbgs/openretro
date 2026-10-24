@@ -1,10 +1,11 @@
 # Contas e social do OpenRetro
 
-**Estado: fases 1 e 2 implementadas localmente. Nada foi publicado.**
+**Estado: fases 1 a 4 implementadas localmente. Nada foi publicado.**
 
 O login é opcional e compartilha o Worker do Party. A seção Conta está em
-Configurações no desktop e no Big Picture. Amigos, presença, SocialHub e ingressos de amigos pertencem às próximas
-fases. Jogar offline, o celular e o Party anônimo continuam sem depender de conta.
+Configurações no desktop e no Big Picture. O painel Amigos tem pedidos, bloqueios e
+presença, ingressos e entrada automática no Party de amigos. Jogar offline,
+o celular e o Party anônimo continuam sem depender de conta.
 
 ## O servidor nesta fase
 
@@ -36,10 +37,44 @@ dez solicitações por IP por 15 minutos; 30 verificações por IP por 15 minuto
 Respostas 429 incluem mensagem e `Retry-After`. Cotas usam HMACs com escopo, sem
 armazenar IPs ou e-mails em claro; as chaves por IP também mudam diariamente.
 
-A conta nasce com `displayName: null`, `needsProfile: true` e código de amigo
-único gerado pelo servidor, no formato `jogador#` mais 12 caracteres hexadecimais.
-Mostrar o jogo começa ligado; aparecer offline começa desligado. Não há
-publicação de presença nesta fase. O nome é preenchido no primeiro acesso pela seção Conta.
+A conta nasce com `displayName: null`, `needsProfile: true` e um código curto
+provisório, no formato `jogador#ab12`. Ao criar o perfil, a pessoa escolhe o
+nome e os quatro caracteres depois do `#`. **O código segue o nome:** o prefixo
+é o nome sem acentos, espaços nem símbolos, em minúsculas e com até 16
+caracteres ("Kauã Plaza" vira `kauaplaza#ab12`). Um nome sem letras nem
+números mantém `jogador`. O sufixo são letras ASCII ou números, sem distinção
+entre maiúsculas e minúsculas. A combinação completa precisa estar livre.
+Trocar o nome troca o prefixo; as amizades continuam, porque são guardadas pelo
+id da conta. Contas que já tinham nome com o prefixo `jogador` passam para o
+nome na próxima consulta de sessão, se a combinação estiver livre; senão, ficam
+como estão. A regra está em `friend-code.mjs` e é repetida em
+`src/services/account.ts`, com um teste que compara as duas. Mostrar o jogo
+começa ligado; aparecer offline começa desligado.
+
+### Atualização para códigos de quatro caracteres
+
+Se você já concluiu os passos 1 a 4 deste documento, não refaça domínio, e-mail,
+segredos nem a criação do D1. Aplique apenas a nova migração
+`0002_four_character_friend_codes.sql` antes de publicar o Worker atualizado.
+Dentro de `party-server`, atualize o banco local e o banco de produção que você
+já criou:
+
+```powershell
+npx wrangler d1 migrations apply openretro-social --local --config cloudflare/wrangler.jsonc
+npx wrangler d1 migrations apply openretro-social --remote --config cloudflare/wrangler.jsonc
+```
+
+O Wrangler aplica só as migrações pendentes. A migração atribui códigos curtos
+distintos às contas antigas e preserva escolhas que já tenham quatro caracteres.
+Não muda IDs, e-mails, sessões, pedidos, amizades ou bloqueios. Os códigos antigos
+longos deixam de funcionar para novos pedidos; amizades existentes continuam.
+Em **Sua conta**, no painel social, escolha os quatro caracteres e clique
+**Salvar perfil**. O prefixo vem do nome; só o sufixo é editável. O servidor recusa com
+409 uma combinação ocupada, sem alterar o restante do perfil, inclusive quando
+duas contas tentam escolher a mesma combinação ao mesmo tempo.
+
+Depois da migração, use o Worker e o app atualizados: versões antigas do app
+ainda esperam o código longo ao adicionar amigos. Nenhum segredo precisa mudar.
 
 ## 1. Domínio e DNS para e-mail
 
@@ -106,16 +141,15 @@ senhas e mantenha a cópia fora do repositório. Nunca use o marcador local em
 produção nem passe segredos como argumentos de comando. Preserve as chaves TURN
 existentes; elas não precisam ser substituídas.
 
-O segredo de ingressos só será necessário na fase 4. O nome reservado é
-`PARTY_TICKET_SECRET`; **não precisa configurá-lo nesta fase**. Quando o recurso
-estiver implementado, use outro segredo independente e execute:
+Para os ingressos de amigos, configure também `PARTY_TICKET_SECRET`, com pelo
+menos 32 caracteres e independente do `AUTH_PEPPER`. Execute:
 
 ```powershell
 npx wrangler secret put PARTY_TICKET_SECRET --config cloudflare/wrangler.jsonc
 ```
 
-`SocialHub` será adicionado na fase 3, com nova tag de migração Durable Object.
-Não criamos um stub nem alteramos `v1` agora. Consulte [migrações D1](https://developers.cloudflare.com/d1/reference/migrations/).
+`SocialHub` está na tag `v2-social`; a tag `v1` não foi alterada. Não há nova
+migração D1 na fase 4. Consulte [migrações D1](https://developers.cloudflare.com/d1/reference/migrations/).
 
 ## 4. Desenvolvimento local sem enviar e-mail
 
@@ -261,3 +295,170 @@ sessão nova, expiração, resposta 429, bloqueio de redirects, validação de p
 e ausência de token na resposta enviada à interface. O fluxo visual foi conferido
 com um serviço simulado local; o envio de e-mail real e a integração completa com
 um Worker de produção ainda dependem da configuração do domínio.
+
+## Fase 3: amigos e presença
+
+O botão **Amigos** fica no cabeçalho do desktop e na barra de navegação do
+Big Picture. O painel permite adicionar por código, aceitar ou recusar pedidos,
+cancelar envios, desfazer amizade, bloquear e desbloquear. Bloquear remove os
+pedidos e as duas direções da amizade numa transação; desbloquear não restaura
+amizades. Os perfis públicos de amigos contêm somente id, nome e código, sem e-mail.
+
+As rotas novas são `GET /api/friends`, `POST /api/friends/action {action,target}`
+e `GET /social` com upgrade WebSocket. Todas exigem a sessão e a política de
+origem já aplicada ao login. O alvo de `request` é o código; nas demais ações é o
+id do jogador. Ações: `request`, `accept`, `decline`, `cancel`, `remove`, `block`
+e `unblock`. Há 20 pedidos por dia por conta, 120 ações por 15 minutos, até 200
+amigos, 100 pedidos pendentes por direção e 200 bloqueios. Cancelar um pedido
+não devolve a cota diária. As cotas são HMACs, entram na exportação sem os hashes
+e são removidas ao excluir a conta.
+
+`SOCIAL_HUB` aponta para o novo Durable Object SQLite `SocialHub`, declarado
+na tag **`v2-social`**. A tag original `v1` permanece igual. O Wrangler aplica a
+migração do objeto no deploy; não existe outra migração D1 nesta fase. Continue
+aplicando as migrações D1 antes do Worker, e publicando o Worker antes do app.
+Não publique com o id D1 de exemplo. O serviço social é opcional para o Party.
+
+Cada usuário tem um hub com até cinco conexões. A API de hibernação mantém as
+conexões sem timer em memória; anexos dos sockets guardam apenas id da conta,
+id da sessão, estado e prazos. Nunca guardam token ou e-mail. O app envia um
+heartbeat a cada 30 segundos; conexões sem atividade por 90 segundos deixam de
+contar como online. Um alarme detecta conexões abandonadas e para quando não há
+mais sockets ativos. Cada heartbeat verifica revogação e renova a sessão válida.
+Sair de todos os aparelhos encerra as sessões sociais existentes.
+
+As presenças têm `status: online|idle`, `playing` opcional e `party` opcional.
+O servidor valida formato, limites de tamanho, horários, códigos e URLs de capa.
+Só aceita capas HTTPS de `images.igdb.com` e `images.launchbox-app.com`, sem
+credenciais, porta alternativa, consulta ou fragmento. Mensagens têm no máximo
+2 KiB e 30 mensagens por janela de dez segundos. A lista mostra jogando/online
+primeiro e offline por último, com console e minutos transcorridos.
+
+A sessão continua somente no Rust/cofre. Diferente do exemplo em TypeScript
+do pedido original, **o próprio Rust abre o WebSocket** e envia o token no
+cabeçalho Authorization, nunca na URL nem ao JavaScript. A interface recebe
+eventos validados por IPC. O transporte reconecta com espera crescente de até
+60 segundos e variação aleatória; reenvia o estado atual após reconectar.
+Sem conta, não abre conexão. No celular, o painel não é exposto nem os comandos
+da conta entram na API remota.
+
+A montagem do jogo reaproveita diretamente a atividade do Discord: título,
+nome completo do console, capa e início. Funciona mesmo com a integração do
+Discord desligada. O Rust guarda o jogo atual em memória para reconectar ou
+entrar na conta durante uma partida, cobrindo desktop e Big Picture sem copiar
+a tabela de consoles. Fora de uma partida, cinco minutos sem interação colocam
+o app como ausente. O jogo em andamento mantém o estado online.
+
+`showPlaying=false` oculta só o jogo; `appearOffline=true` oculta a presença
+inteira, inclusive Party. As preferências são consultadas no envio e no
+recebimento. Cada repasse também confere amizade e bloqueio na base primária,
+para descartar mensagens que estavam em trânsito quando uma relação foi cortada.
+Alterações de perfil, amizade e sessão atualizam os painéis conectados. Há toasts
+internos para pedido recebido, aceitação e anúncio de Party quando esse estado
+é publicado ao abrir uma sala; não são notificações do sistema.
+
+### Conferir a fase 3
+
+Execute os testes descritos acima. Miniflare simula múltiplas contas/conexões,
+incluindo cancelamento/recusa, aceitação por terceiros negada, bloqueio nas duas
+direções, cotas diárias, privacidade, capa maliciosa, origem não permitida e
+revogação de sessão. Os testes do cliente cobrem ordenação, deltas atrasados para
+usuários removidos, reconexão e notificações. Rust valida ações, perfis e a
+conversão da atividade do jogo sem expor o token.
+
+No Big Picture, selecione Amigos na barra; A no campo Adicionar amigo abre o
+teclado, Y alterna para símbolos para digitar `#`, B fecha o teclado. As ações
+de cada linha e a confirmação de bloqueio usam a navegação do workspace.
+
+A conferência visual usa dados fictícios locais. Ainda falta a conferência
+com dois PCs e contas reais no Worker publicado, após configurar D1, domínio e
+Resend. O Party anônimo mantém o fluxo atual.
+
+## Fase 4: entrar no Party de um amigo
+
+Quando uma conta conectada abre uma sala, **Amigos podem entrar** começa ligado.
+A opção usa a sessão do Rust e a capacidade de anfitrião já emitida pelo Party
+para vincular a sala à conta. Só o verdadeiro anfitrião pode fazer essa
+vinculação; uma mensagem de presença não pode anunciar a sala de outra pessoa.
+A configuração só é considerada confirmada após resposta do servidor. Se ela
+falhar, aparece um erro e a sala continua disponível pelo fluxo manual.
+
+No painel Amigos, **Entrar** aparece quando o amigo anuncia uma sala disponível.
+O Rust pede o ingresso e abre o navegador do sistema em
+`/party/ABC234#t=...`. A sessão da conta nunca é entregue ao navegador ou ao
+JavaScript. A página remove imediatamente o fragmento do histórico e envia o
+ingresso somente na mensagem `join` do WebSocket, sem colocá-lo na URL de rede.
+O visitante entra com o nome do perfil, sem preencher o formulário de novo.
+
+O ingresso usa HMAC-SHA-256 com `PARTY_TICKET_SECRET`, dura dois minutos e contém
+versão, sala, conta do anfitrião, conta e sessão do convidado, identificador da
+permissão atual, emissão, expiração e nonce aleatório. Não contém e-mail nem
+token de sessão. O servidor valida a assinatura em tempo constante e confere
+amizade, bloqueios, sessão válida, privacidade e permissão na emissão e no uso.
+Desligar e religar a opção troca o identificador da permissão: ingressos antigos
+continuam inválidos. Sair da conta, excluir a conta, aparecer offline ou cortar
+a amizade também impede a aprovação automática.
+
+O PartyRoom reserva o primeiro lugar livre entre J2, J3 e J4, usando o mesmo
+caminho de aprovação manual. Um ingresso aprovado só pode ser usado uma vez;
+o nonce consumido fica no estado durável da sala, com expiração, sem o ingresso.
+Não há lugar extra nem reutilização de um lugar ocupado. Sem ingresso, com
+ingresso inválido ou sem lugar livre, continua o pedido de aprovação manual.
+Se um ingresso vencido foi aberto sem nome, a página solicita o nome para tentar
+novamente no fluxo normal. Sem o novo segredo, a sala anônima continua funcionando.
+
+Rotas novas: `POST /api/friends/party/host {code,ticket,joinable}` e
+`POST /api/friends/party/join {friendId}`, ambas autenticadas. Há limite de 120
+alterações da permissão e 60 emissões por 15 minutos por conta. Essas cotas
+também entram na exportação e são apagadas na exclusão da conta. Nenhuma rota
+interna de vínculo ou emissão do Durable Object é exposta pelo Worker público.
+
+### Testar localmente e publicar depois
+
+Adicione a variável de exemplo `PARTY_TICKET_SECRET` ao seu `.dev.vars` ignorado,
+sem reutilizar o segredo de autenticação. Para testar conta e Party no mesmo
+Worker local, use as duas variáveis no terminal do app:
+
+```powershell
+$env:OPENRETRO_SOCIAL_URL = 'http://127.0.0.1:8787'
+$env:OPENRETRO_PARTY_URL = 'http://127.0.0.1:8787'
+npm run tauri -- dev
+```
+
+O Worker local precisa do modo de teste TURN já descrito em `docs/PARTY.md`.
+Em produção, configure o segredo com o comando da seção 3 e publique o Worker
+antes de distribuir o app. Builds antigas continuam usando aprovação manual.
+Não foi necessário alterar as migrações D1 ou os bindings nesta fase.
+
+Miniflare cobre ingresso válido, assinatura adulterada, expiração, outra sala,
+replay, lotação, troca de permissão, bloqueio após emissão, sessão revogada,
+perfil offline, tentativa de anunciar sala alheia e ausência do novo segredo.
+O teste da página confere remoção do fragmento e retorno ao formulário manual;
+Rust confere a origem fixa e a URL com ingresso somente no fragmento. O teste
+real com dois PCs e transmissão de áudio/vídeo pelo Worker publicado ainda falta.
+
+## Painel social e ícones da conta
+
+A conta saiu das Configurações. O botão de perfil no topo da barra lateral,
+onde ficava o jogador local, mostra o ícone da conta e abre o painel social:
+sua conta e status, Partys abertos, solicitações de amizade agrupadas, amigos
+online e, recolhidos, offline e bloqueados. Sem conta, o mesmo painel faz o
+login por código; logo depois, pede nome, código e ícone. O jogador local do PC
+continua no rodapé do painel (**Trocar**). No Big Picture, o botão da conta
+fica na barra superior e abre o painel em tela cheia; trocar o jogador local
+continua em Sistema → Jogadores.
+
+Cada conta tem um de 15 ícones predefinidos (`avatar`, de 0 a 14). Uma conta
+nova recebe um aleatório, e o jogador pode trocar ao criar o perfil ou depois,
+em **Sua conta**. `PATCH /api/account/profile` aceita `avatar` e recusa qualquer
+valor fora dessa faixa; a lista de amigos devolve o ícone de cada um.
+
+Antes de publicar o Worker com os ícones, aplique a nova migração:
+
+```powershell
+npx wrangler d1 migrations apply openretro-social --local --config cloudflare/wrangler.jsonc
+npx wrangler d1 migrations apply openretro-social --remote --config cloudflare/wrangler.jsonc
+```
+
+`0003_preset_avatars.sql` adiciona a coluna e sorteia um ícone para as contas
+que já existem. Versões antigas do app ignoram o campo e continuam funcionando.

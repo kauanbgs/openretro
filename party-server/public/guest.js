@@ -1,5 +1,25 @@
 const $ = (id) => document.getElementById(id);
 let room = /^\/party\/([A-Z2-9]{6})$/.exec(location.pathname)?.[1];
+const inviteRoom = room;
+let friendInvite =
+  typeof location.hash === "string" &&
+  /^#t=[A-Za-z0-9_-]+\.[a-f0-9]{64}$/.test(location.hash) &&
+  location.hash.length <= 2051
+    ? location.hash.slice(3)
+    : "";
+// Remove the bearer capability from browser history before opening any connection.
+if (location.hash)
+  history.replaceState(null, "", location.pathname + (location.search || ""));
+// Party is not anonymous: guests arrive from the OpenRetro friends panel with
+// a single-use ticket from their account. Without one there is nothing to do.
+const viaApp =
+  "Abra o OpenRetro, vá em Amigos e clique em Entrar no Party do seu amigo.";
+$("name").required = false;
+$("room-code").required = false;
+if (!friendInvite) {
+  $("join").disabled = true;
+  $("status").textContent = viaApp;
+}
 $("room-code").value = room || "";
 let socket,
   pc,
@@ -71,12 +91,10 @@ function ended(message) {
   $("screen").srcObject = null;
   $("stage").hidden = true;
   $("lobby").hidden = false;
-  $("join").disabled = false;
-  $("join").textContent = "Tentar novamente";
-  $("name").disabled = false;
-  $("room-code").disabled = false;
+  // A ticket works once; joining again needs a new one from the app.
+  $("join").disabled = true;
   $("connection").textContent = "Conexão encerrada";
-  status(message);
+  status(`${message} ${viaApp}`);
   if (document.fullscreenElement) void document.exitFullscreen();
 }
 if (!window.isSecureContext || !window.RTCPeerConnection) {
@@ -85,13 +103,8 @@ if (!window.isSecureContext || !window.RTCPeerConnection) {
 }
 $("join-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  if (joined) return;
+  if (joined || !friendInvite || room !== inviteRoom) return;
   if (!window.isSecureContext || !window.RTCPeerConnection) return;
-  room = $("room-code").value.trim().toUpperCase();
-  if (!/^[A-Z2-9]{6}$/.test(room)) {
-    status("Digite o código de seis caracteres enviado pelo seu amigo.");
-    return;
-  }
   history.replaceState(null, "", `/party/${room}`);
   joined = true;
   candidates.length = 0;
@@ -110,7 +123,9 @@ $("join-form").addEventListener("submit", (event) => {
   }, 15000);
   socket.onopen = () => {
     clearTimeout(timer);
-    send({ type: "join", room, name: $("name").value.trim() });
+    // The name comes from the account on the server, not from this page.
+    send({ type: "join", room, invite: friendInvite });
+    friendInvite = "";
     heartbeat = setInterval(() => {
       if (thisSocket.readyState === WebSocket.OPEN) thisSocket.send("ping");
     }, 20000);
@@ -277,3 +292,5 @@ window.addEventListener("pagehide", () => {
   socket?.close();
   pc?.close();
 });
+if (friendInvite && room && window.isSecureContext && window.RTCPeerConnection)
+  $("join-form").requestSubmit();

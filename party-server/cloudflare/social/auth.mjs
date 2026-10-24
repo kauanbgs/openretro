@@ -16,6 +16,12 @@ import {
 } from "./http.mjs";
 import { emailQuotaKey, quota } from "./limits.mjs";
 import { sendLoginEmail } from "./email.mjs";
+import { notifyUsers } from "./friends.mjs";
+import {
+  availableFriendCode,
+  chosenTag,
+  friendCodeFor,
+} from "./friend-code.mjs";
 
 const CODE_MS = 10 * 60 * 1000;
 const SESSION_MS = 90 * 24 * 60 * 60 * 1000;
@@ -24,18 +30,53 @@ const invalidCode =
   "Código inválido ou expirado. Confira o e-mail ou peça outro código.";
 const invalidSession = () =>
   new AccountError(401, "Sua sessão expirou. Entre novamente.");
+/** The preset icons the app draws; 0 to AVATARS - 1. */
+export const AVATARS = 15;
+// A new account starts with a random icon; the player can change it later.
+const randomAvatar = () =>
+  crypto.getRandomValues(new Uint32Array(1))[0] % AVATARS;
+const validAvatar = (value) =>
+  Number.isInteger(value) && value >= 0 && value < AVATARS;
+/** Accounts named before codes followed names still read "jogador#…". The
+ * session check moves them to their name when that code is free; SQL alone
+ * cannot strip accents, so this runs here instead of in a migration. */
+async function alignFriendCode(db, user) {
+  if (!user.display_name) return user;
+  const wanted = friendCodeFor(
+    user.display_name,
+    user.friend_code.split("#")[1],
+  );
+  if (wanted === user.friend_code) return user;
+  const updated = await db
+    .prepare(
+      `UPDATE users SET friend_code = ? WHERE id = ? AND friend_code = ?
+      AND NOT EXISTS (SELECT 1 FROM users other WHERE other.friend_code = ? AND other.id <> ?) RETURNING *`,
+    )
+    .bind(wanted, user.id, user.friend_code, wanted, user.id)
+    .first();
+  return updated ?? user;
+}
 export function publicUser(row) {
   return {
     id: row.id,
     email: row.email,
     displayName: row.display_name,
     friendCode: row.friend_code,
+    avatar: row.avatar ?? 0,
     showPlaying: Boolean(row.show_playing),
     appearOffline: Boolean(row.appear_offline),
     createdAt: row.created_at,
   };
 }
-function database(env, url) {
+export function database(env, url) {
+  if (
+    url.protocol !== "https:" &&
+    !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+  )
+    throw new AccountError(
+      400,
+      "Use uma conexão HTTPS para acessar sua conta.",
+    );
   if (
     !env.SOCIAL_DB ||
     typeof env.AUTH_PEPPER !== "string" ||
@@ -160,60 +201,65 @@ async function verify(request, env, db, now) {
   const expires = now + SESSION_MS;
   // Code consumption, account creation and session issuance are one D1 transaction.
   // A concurrent verifier cannot issue a session from somebody else's claim.
-  const results = await db.batch([
-    db
-      .prepare(
-        `UPDATE login_codes SET attempts = attempts + 1,
+  let results;
+  for (let retry = 0; retry < 5; retry++) {
+    const friendCode = await availableFriendCode(db);
+    try {
+      results = await db.batch([
+        db
+          .prepare(
+            `UPDATE login_codes SET attempts = attempts + 1,
       used_at = CASE WHEN ? = 1 THEN ? ELSE NULL END,
       claim_id = CASE WHEN ? = 1 THEN ? ELSE NULL END
       WHERE email_hash = ? AND challenge_id = ? AND used_at IS NULL
       AND expires_at > ? AND attempts < 5 RETURNING attempts, claim_id`,
-      )
-      .bind(
-        Number(matches),
-        now,
-        Number(matches),
-        tokenHash,
-        subject,
-        row.challenge_id,
-        now,
-      ),
-    db
-      .prepare(
-        `INSERT INTO users (id, email, friend_code, created_at)
-      SELECT ?, ?, ?, ? FROM login_codes WHERE email_hash = ? AND claim_id = ?
+          )
+          .bind(
+            Number(matches),
+            now,
+            Number(matches),
+            tokenHash,
+            subject,
+            row.challenge_id,
+            now,
+          ),
+        db
+          .prepare(
+            `INSERT INTO users (id, email, friend_code, avatar, created_at)
+      SELECT ?, ?, ?, ?, ? FROM login_codes WHERE email_hash = ? AND claim_id = ?
       ON CONFLICT(email) DO NOTHING`,
-      )
-      .bind(
-        id,
-        email,
-        `jogador#${id.replaceAll("-", "").slice(0, 12)}`,
-        now,
-        subject,
-        tokenHash,
-      ),
-    db
-      .prepare(
-        `INSERT INTO sessions (token_hash, id, user_id, created_at, last_seen_at, expires_at)
+          )
+          .bind(id, email, friendCode, randomAvatar(), now, subject, tokenHash),
+        db
+          .prepare(
+            `INSERT INTO sessions (token_hash, id, user_id, created_at, last_seen_at, expires_at)
       SELECT ?, ?, users.id, ?, ?, ? FROM users JOIN login_codes
       ON login_codes.email_hash = ? AND login_codes.claim_id = ? WHERE users.email = ?`,
-      )
-      .bind(
-        tokenHash,
-        crypto.randomUUID(),
-        now,
-        now,
-        expires,
-        subject,
-        tokenHash,
-        email,
-      ),
-    db
-      .prepare(
-        "SELECT users.* FROM users JOIN sessions ON sessions.user_id = users.id WHERE sessions.token_hash = ?",
-      )
-      .bind(tokenHash),
-  ]);
+          )
+          .bind(
+            tokenHash,
+            crypto.randomUUID(),
+            now,
+            now,
+            expires,
+            subject,
+            tokenHash,
+            email,
+          ),
+        db
+          .prepare(
+            "SELECT users.* FROM users JOIN sessions ON sessions.user_id = users.id WHERE sessions.token_hash = ?",
+          )
+          .bind(tokenHash),
+      ]);
+      break;
+    } catch (error) {
+      // A competing signup can reserve the same candidate; the failed batch
+      // rolls back OTP consumption too, so retry the whole transaction.
+      if (retry === 4 || !String(error.message).includes("users.friend_code"))
+        throw error;
+    }
+  }
   const user = results[3].results[0];
   if (!user) {
     if (results[0].results[0]?.attempts === 5)
@@ -233,7 +279,7 @@ async function verify(request, env, db, now) {
     },
   };
 }
-async function authenticate(request, db, now) {
+export async function authenticate(request, db, now) {
   const authorization = request.headers.get("Authorization") || "";
   if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) throw invalidSession();
   const tokenHash = await sha256(authorization.slice(7));
@@ -263,6 +309,20 @@ async function exportAccount(db, user, now, pepper) {
       "loginQuota",
       "SELECT count, expires_at FROM auth_rate_limits WHERE key = ?",
       [await emailQuotaKey(pepper, user.email)],
+    ],
+    [
+      "friendQuota",
+      "SELECT count, expires_at FROM auth_rate_limits WHERE key IN (?,?,?,?)",
+      await Promise.all(
+        [
+          "friend-actions",
+          "friend-requests-day",
+          "party-host",
+          "party-invites",
+        ].map((scope) =>
+          hmac(pepper, JSON.stringify(["auth-quota", scope, user.id])),
+        ),
+      ),
     ],
     [
       "sessions",
@@ -325,21 +385,30 @@ export async function accountRoute(request, env, url) {
     return start(request, env, db, url, now);
   if (url.pathname === "/api/auth/verify") return verify(request, env, db, now);
   const { user, session, tokenHash } = await authenticate(request, db, now);
-  if (url.pathname === "/api/auth/session")
+  if (url.pathname === "/api/auth/session") {
+    const current = await alignFriendCode(db, user);
     return {
       data: {
-        user: publicUser(user),
+        user: publicUser(current),
         expiresAt: session.expires_at,
-        needsProfile: !user.display_name,
+        needsProfile: !current.display_name,
       },
     };
+  }
   if (url.pathname === "/api/account/profile") {
     const patch = await readJson(request);
     const fields = Object.keys(patch);
     if (
       !fields.length ||
       fields.some(
-        (key) => !["displayName", "showPlaying", "appearOffline"].includes(key),
+        (key) =>
+          ![
+            "displayName",
+            "showPlaying",
+            "appearOffline",
+            "friendTag",
+            "avatar",
+          ].includes(key),
       )
     )
       throw new AccountError(400, "Dados do perfil inválidos.");
@@ -364,21 +433,65 @@ export async function accountRoute(request, env, url) {
     for (const key of ["showPlaying", "appearOffline"])
       if (key in patch && typeof patch[key] !== "boolean")
         throw new AccountError(400, "Dados do perfil inválidos.");
+    if ("avatar" in patch && !validAvatar(patch.avatar))
+      throw new AccountError(400, "Escolha um dos ícones do OpenRetro.");
+    // The code follows the name: renaming changes the part before the #.
+    // Friendships are kept by account id, so existing friends stay.
+    const friendCode =
+      "friendTag" in patch || name !== null
+        ? friendCodeFor(
+            name ?? user.display_name,
+            "friendTag" in patch
+              ? chosenTag(patch.friendTag)
+              : user.friend_code.split("#")[1],
+          )
+        : null;
     // Patch each field atomically so a concurrent name edit cannot undo privacy.
     const updated = await db
       .prepare(
         `UPDATE users SET display_name = COALESCE(?, display_name),
-      show_playing = COALESCE(?, show_playing), appear_offline = COALESCE(?, appear_offline)
-      WHERE id = ? RETURNING *`,
+      show_playing = COALESCE(?, show_playing), appear_offline = COALESCE(?, appear_offline), friend_code = COALESCE(?, friend_code),
+      avatar = COALESCE(?, avatar)
+      WHERE id = ? AND NOT EXISTS (SELECT 1 FROM users other WHERE other.friend_code = ? AND other.id <> ?) RETURNING *`,
       )
       .bind(
         name,
         "showPlaying" in patch ? Number(patch.showPlaying) : null,
         "appearOffline" in patch ? Number(patch.appearOffline) : null,
+        friendCode,
+        "avatar" in patch ? patch.avatar : null,
+        user.id,
+        friendCode,
         user.id,
       )
       .first();
-    if (!updated) throw invalidSession();
+    if (!updated) {
+      if (
+        !(await db
+          .prepare("SELECT 1 FROM users WHERE id=?")
+          .bind(user.id)
+          .first())
+      )
+        throw invalidSession();
+      throw new AccountError(
+        409,
+        "Esse código de amigo já está em uso. Escolha outros 4 caracteres.",
+      );
+    }
+    const contacts =
+      updated.friend_code !== user.friend_code ||
+      updated.display_name !== user.display_name ||
+      updated.avatar !== user.avatar
+        ? (
+            await db
+              .prepare(
+                "SELECT friend_id AS id FROM friendships WHERE user_id=? UNION SELECT receiver_id AS id FROM friend_requests WHERE sender_id=? UNION SELECT sender_id AS id FROM friend_requests WHERE receiver_id=?",
+              )
+              .bind(user.id, user.id, user.id)
+              .all()
+          ).results.map((row) => row.id)
+        : [];
+    await notifyUsers(env, [user.id, ...contacts]);
     return {
       data: {
         user: publicUser(updated),
@@ -392,6 +505,7 @@ export async function accountRoute(request, env, url) {
       .prepare("DELETE FROM sessions WHERE token_hash = ?")
       .bind(tokenHash)
       .run();
+    await notifyUsers(env, [user.id]);
     return { status: 204 };
   }
   if (url.pathname === "/api/auth/logout-all") {
@@ -399,6 +513,7 @@ export async function accountRoute(request, env, url) {
       .prepare("DELETE FROM sessions WHERE user_id = ?")
       .bind(user.id)
       .run();
+    await notifyUsers(env, [user.id]);
     return { status: 204 };
   }
   if (url.pathname === "/api/account/export")
@@ -406,6 +521,20 @@ export async function accountRoute(request, env, url) {
       data: await exportAccount(db, user, now, env.AUTH_PEPPER),
       attachment: true,
     };
+  const formerFriends = await db
+    .prepare("SELECT friend_id FROM friendships WHERE user_id=?")
+    .bind(user.id)
+    .all();
+  const quotaKeys = await Promise.all(
+    [
+      "friend-actions",
+      "friend-requests-day",
+      "party-host",
+      "party-invites",
+    ].map((scope) =>
+      hmac(env.AUTH_PEPPER, JSON.stringify(["auth-quota", scope, user.id])),
+    ),
+  );
   await db.batch([
     db
       .prepare("DELETE FROM login_codes WHERE email_hash = ?")
@@ -414,6 +543,13 @@ export async function accountRoute(request, env, url) {
       .prepare("DELETE FROM auth_rate_limits WHERE key = ?")
       .bind(await emailQuotaKey(env.AUTH_PEPPER, user.email)),
     db.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
+    db
+      .prepare("DELETE FROM auth_rate_limits WHERE key IN (?,?,?,?)")
+      .bind(...quotaKeys),
+  ]);
+  await notifyUsers(env, [
+    user.id,
+    ...formerFriends.results.map((row) => row.friend_id),
   ]);
   return { status: 204 };
 }

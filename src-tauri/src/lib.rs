@@ -50,6 +50,7 @@ pub fn run() {
             app.manage(remote_play::RemotePlay::default());
             app.manage(discord::Presence::default());
             app.manage(account::AccountGate::default());
+            app.manage(account::social::Social::default());
             app.manage(mods::ModService::default());
             mods::recover(app.handle());
             in_game::setup(app.handle())?;
@@ -81,6 +82,15 @@ pub fn run() {
             account::account_privacy,
             account::account_open_privacy,
             account::account_forget,
+            account::social::social_start,
+            account::social::social_stop,
+            account::social::social_idle,
+            account::social::social_friends,
+            account::social::social_action,
+            account::social::social_party,
+            account::social::social_party_reserve,
+            account::social::social_party_clear,
+            account::social::social_join,
             file_browser::browse_files,
             file_browser::read_source_json,
             profiles::list_profiles,

@@ -1,5 +1,48 @@
 /** Portuguese source text → English. */
 export const en: Record<string, string> = {
+  "Salvar perfil": "Save profile",
+  "Seus 4 caracteres depois do #": "Your 4 characters after #",
+  "Escolha 4 letras ou números. Maiúsculas e minúsculas são equivalentes. Se já estiver em uso, escolha outra combinação.":
+    "Choose 4 letters or digits. Uppercase and lowercase are equivalent. If taken, choose another combination.",
+  "Escolha exatamente 4 letras ou números para depois do #.":
+    "Choose exactly 4 letters or digits after #.",
+  "Esse código de amigo já está em uso. Escolha outros 4 caracteres.":
+    "This friend code is already taken. Choose another 4 characters.",
+  "Não foi possível reservar seu código de amigo. Tente novamente.":
+    "Could not reserve your friend code. Try again.",
+  "Amigos podem entrar": "Friends can join",
+  "Seu Party fica oculto enquanto você aparece offline.":
+    "Your Party stays hidden while you appear offline.",
+  "Amigos entram pelo painel sem pedir aprovação. O código continua disponível para convites manuais.":
+    "Friends can join from the panel without approval. The code is still available for manual invitations.",
+  "Atualizando acesso dos amigos…": "Updating friend access…",
+  "Seu Party está disponível para os amigos.":
+    "Your Party is available to friends.",
+  "Reconectando aos amigos…": "Reconnecting to friends…",
+  "Party aberto no navegador.": "Party opened in the browser.",
+  "Os convites de amigos exigem o servidor Cloudflare.":
+    "Friend invitations require the Cloudflare server.",
+  "Dados do Party inválidos.": "Invalid Party data.",
+  "Os convites de amigos ainda não estão disponíveis.":
+    "Friend invitations are not available yet.",
+  "Não foi possível atualizar o acesso dos amigos ao Party.":
+    "Could not update friend access to the Party.",
+  "Este Party não está disponível para você.":
+    "This Party is not available to you.",
+  "Este amigo não está com um Party aberto.":
+    "This friend does not have an open Party.",
+  "Jogador inválido.": "Invalid player.",
+  "Não foi possível abrir a página no navegador.":
+    "Could not open the page in the browser.",
+  "Buscar amigos": "Search friends",
+  "Reconectando…": "Reconnecting…",
+  "Atualizar amigos": "Refresh friends",
+  "Código do amigo": "Friend code",
+  "Nenhum amigo encontrado.": "No friends found.",
+  "Nenhum amigo online": "No friends online",
+  "Opções de {name}": "Options for {name}",
+  "Aceitar pedido de {name}": "Accept request from {name}",
+  "Recusar pedido de {name}": "Decline request from {name}",
   Início: "Home",
   Biblioteca: "Library",
   Catálogo: "Catalog",
@@ -810,6 +853,56 @@ export const en: Record<string, string> = {
   "A rede {name} deste computador está marcada como Pública, e o Windows não deixa celulares se conectarem ao OpenRetro nela. Na sua casa, mude o perfil de rede para Privada. Este aviso some sozinho quando a rede mudar.":
     "This computer's {name} network is marked as Public, and Windows doesn't let phones connect to OpenRetro on it. At home, change the network profile to Private. This warning goes away on its own once the network changes.",
   "Abrir configurações de rede": "Open network settings",
+  "Antes do # vai o seu nome, sem acentos nem espaços. Escolha 4 letras ou números para depois dele; se a combinação já estiver em uso, escolha outra.":
+    "Before the # comes your name, without accents or spaces. Choose 4 letters or digits for after it; if the combination is taken, choose another.",
+  "nome#ab12": "name#ab12",
+  "Salve o perfil para usar este código.":
+    "Save your profile to use this code.",
+  "Jogue com seus amigos": "Play with your friends",
+  "Jogue com seus amigos.": "Play with your friends.",
+  "O jogo roda no seu PC. Seus amigos do OpenRetro entram com um clique, pelo painel de amigos.":
+    "The game runs on your PC. Your OpenRetro friends join in one click from the friends panel.",
+  "Seus amigos veem o Party no painel e entram com um clique. Desligue para fechar a sala para novas entradas.":
+    "Your friends see the Party in their panel and join in one click. Turn this off to close the room to new players.",
+  "Sala aberta": "Room open",
+  "Até três amigos podem entrar": "Up to three friends can join",
+  "Crie uma sala para seus amigos.": "Create a room for your friends.",
+  "Ela aparece no painel de amigos, e cada um ganha um lugar na partida ao entrar.":
+    "It shows up in their friends panel, and each one gets a seat in the game on joining.",
+  "Criando sala…": "Creating room…",
+  "Criar sala": "Create room",
+  "Entre na sua conta para criar um Party.":
+    "Sign in to your account to create a Party.",
+  "O Party é só para amigos: quem entra usa a própria conta do OpenRetro.":
+    "Party is for friends only: everyone joins with their own OpenRetro account.",
+  "Entrar na conta": "Sign in",
+  "Crie seu perfil": "Create your profile",
+  "Sua conta": "Your account",
+  "Voltar aos amigos": "Back to friends",
+  "Veja o que seus amigos estão jogando e entre no Party deles com um clique.":
+    "See what your friends are playing and join their Party in one click.",
+  "Jogador neste PC": "Player on this PC",
+  Trocar: "Switch",
+  "há {minutes} min": "{minutes} min ago",
+  Disponível: "Available",
+  "Seu status": "Your status",
+  "Partys abertos": "Open Parties",
+  Amizades: "Friends",
+  "Solicitações de amizade": "Friend requests",
+  Recebidas: "Received",
+  Enviadas: "Sent",
+  "Nenhum amigo online agora.": "No friends online right now.",
+  "Adicione amigos pelo código para ver o que estão jogando.":
+    "Add friends by their code to see what they're playing.",
+  Bloqueados: "Blocked",
+  "Ícone da conta": "Account icon",
+  "Conta e amigos": "Account and friends",
+  "Amigos e conta": "Friends and account",
+  "Entrar e ver amigos": "Sign in and see friends",
+  Joystick: "Joystick",
+  Escudo: "Shield",
+  Diamante: "Gem",
+  "Escolha um dos ícones do OpenRetro.": "Choose one of OpenRetro's icons.",
   "Mostrar o jogo no Discord": "Show the game on Discord",
   "Seus amigos no Discord veem o jogo, o console e a capa enquanto você joga. Precisa do Discord aberto neste computador.":
     "Your Discord friends see the game, its console and cover while you play. Needs Discord open on this computer.",
@@ -1510,4 +1603,63 @@ export const en: Record<string, string> = {
   "Sessão salva neste computador": "Session saved on this computer",
   "Salvando…": "Saving…",
   "Aguarde…": "Please wait…",
+  "Pedido de amizade enviado.": "Friend request sent.",
+  Online: "Online",
+  Ausente: "Away",
+  Offline: "Offline",
+  "Há {minutes} min": "For {minutes} min",
+  "Party aberto": "Party open",
+  Aceitar: "Accept",
+  Recusar: "Decline",
+  "Cancelar pedido": "Cancel request",
+  Desbloquear: "Unblock",
+  "Desfazer amizade com {name}": "Unfriend {name}",
+  "Desfazer amizade": "Unfriend",
+  "Bloquear {name}": "Block {name}",
+  Bloquear: "Block",
+  "Jogue perto dos seus amigos.": "Stay close to your friends.",
+  "Abrir Configurações": "Open Settings",
+  "Seu código de amigo": "Your friend code",
+  Atualizar: "Refresh",
+  "Reconectando aos amigos… Seus jogos continuam disponíveis.":
+    "Reconnecting to friends… Your games are still available.",
+  "Adicionar amigo": "Add friend",
+  "Enviar pedido": "Send request",
+  "Confirmar ação": "Confirm action",
+  "Vocês deixarão de ver a presença um do outro.":
+    "You will no longer see each other's presence.",
+  "Pedidos recebidos": "Received requests",
+  Amigos: "Friends",
+  "Compartilhe seu código ou envie um pedido para começar.":
+    "Share your code or send a request to get started.",
+  "Pedidos enviados": "Sent requests",
+  "Jogadores bloqueados": "Blocked players",
+  "{name} enviou um pedido de amizade.": "{name} sent a friend request.",
+  "{name} aceitou seu pedido de amizade.":
+    "{name} accepted your friend request.",
+  "{name} abriu um Party.": "{name} opened a Party.",
+  "Não foi possível conectar aos amigos.": "Could not connect to friends.",
+  "Entre na sua conta para adicionar amigos e ver o que estão jogando.":
+    "Sign in to add friends and see what they are playing.",
+  "A amizade, os pedidos e a presença serão removidos entre vocês.":
+    "Your friendship, requests and shared presence will be removed.",
+  "Dados de amizade inválidos.": "Invalid friendship data.",
+  "Ação inválida.": "Invalid action.",
+  "Confira o código de amigo.": "Check the friend code.",
+  "Não foi possível encontrar esse jogador.": "Could not find this player.",
+  "Não foi possível enviar o pedido para esse jogador.":
+    "Could not send a request to this player.",
+  "Você atingiu o limite de 200 amigos.":
+    "You have reached the limit of 200 friends.",
+  "Já existe uma amizade ou um pedido entre vocês.":
+    "You are already friends or have a pending request.",
+  "Este pedido não está mais disponível ou o limite de amigos foi atingido.":
+    "This request is no longer available or the friend limit has been reached.",
+  "Confira o código de amigo e a ação escolhida.":
+    "Check the friend code and the chosen action.",
+  "Limite de conexões atingido.": "Connection limit reached.",
+  "O social ainda não está disponível.":
+    "Social features are not available yet.",
+  "Você atingiu o limite de 200 bloqueios.":
+    "You have reached the limit of 200 blocked players.",
 };

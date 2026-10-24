@@ -73,6 +73,19 @@
 .tv-topbar button:hover {
   background: #ffffff16;
 }
+.tv-topbar .account-avatar {
+  --social-surface: #111;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.tv-topbar-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #2f8cff;
+  color: #fff;
+  font-size: 11px;
+}
 .tv-topbar .tv-exit {
   color: #d4d4d4;
   font-size: 12px;

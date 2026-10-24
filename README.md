@@ -146,10 +146,12 @@ the host's local address. It does not add video/audio streaming or a lobby.
 
 ## Party
 
-**Party** creates an approval-based browser room for up to three remote guests.
-The host runs the game and guests receive WebRTC video/audio and send controller
-input. Players click Create, share a six-character code and approve their friends.
-Invitations use the standard `/party/ABC234` address. Cloudflare Workers and
+**Party** creates a browser room for up to three friends. It is not anonymous:
+the host signs in to an OpenRetro account to create it, and friends join from
+their own account by clicking **Entrar** in the friends panel, which opens the
+Party page with a single-use ticket. There is no joining by code or name. The
+host runs the game and guests receive WebRTC video/audio and send controller
+input. Cloudflare Workers and
 Durable Objects manage rooms; Cloudflare Realtime TURN carries the stream.
 Users never enter server addresses or keys. The operator configures TURN once
 with `npm run turn:configure --prefix party-server`.

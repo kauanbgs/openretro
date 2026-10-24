@@ -7,6 +7,7 @@ ALLOW_LOCAL_TEST=true
 # Local account development only; the Worker rejects this mode on public hosts.
 SOCIAL_DEV_MODE=true
 AUTH_PEPPER=local-development-placeholder-not-for-production
+PARTY_TICKET_SECRET=local-invite-placeholder-not-for-production
 # Omit RESEND_API_KEY locally to print only the code in the local terminal.
 # RESEND_API_KEY=replace-in-ignored-dev-vars-only
 # EMAIL_FROM=OpenRetro <conta@seu-dominio.com.br>

@@ -3,10 +3,151 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
+test("friend ticket leaves browser history and reaches signaling only in the join message", () => {
+  const handlers = new Map(),
+    elements = new Map(),
+    requests = [],
+    historyEntries = [],
+    packets = [];
+  const invitation = "eyJ2IjoxfQ." + "a".repeat(64);
+  const element = (id) => {
+    if (!elements.has(id))
+      elements.set(id, {
+        value: "",
+        required: true,
+        addEventListener(type, fn) {
+          handlers.set(id + ":" + type, fn);
+        },
+        requestSubmit() {
+          handlers.get(id + ":submit")({ preventDefault() {} });
+        },
+        classList: { remove() {} },
+        focus() {},
+      });
+    return elements.get(id);
+  };
+  class Socket {
+    static OPEN = 1;
+    constructor(url) {
+      requests.push(String(url));
+      this.readyState = 1;
+    }
+    send(value) {
+      packets.push(JSON.parse(value));
+    }
+    close() {}
+  }
+  const context = vm.createContext({
+    document: {
+      hidden: false,
+      hasFocus: () => true,
+      getElementById: element,
+      querySelectorAll: () => [],
+      addEventListener() {},
+    },
+    location: {
+      pathname: "/party/ABC234",
+      hash: "#t=" + invitation,
+      href: "http://localhost/party/ABC234#t=" + invitation,
+      protocol: "http:",
+    },
+    history: { replaceState: (_a, _b, url) => historyEntries.push(url) },
+    URL,
+    WebSocket: Socket,
+    window: {
+      isSecureContext: true,
+      RTCPeerConnection: class {},
+      addEventListener() {},
+    },
+    navigator: { getGamepads: () => [] },
+    setInterval() {},
+    clearInterval() {},
+    setTimeout() {},
+    clearTimeout() {},
+  });
+  vm.runInContext(
+    readFileSync(new URL("public/guest.js", import.meta.url), "utf8"),
+    context,
+  );
+  assert.equal(element("name").required, false);
+  assert.ok(historyEntries.length > 0);
+  assert.ok(historyEntries.every((url) => !url.includes(invitation)));
+  assert.equal(requests[0], "ws://localhost/signal?room=ABC234");
+  vm.runInContext("socket.onopen()", context);
+  assert.equal(packets[0].invite, invitation);
+  assert.equal(packets[0].name, undefined);
+  // The ticket worked once. There is no anonymous retry by name.
+  vm.runInContext('ended("Convite expirado")', context);
+  assert.equal(element("join").disabled, true);
+  element("name").value = "Nome manual";
+  handlers.get("join-form:submit")({ preventDefault() {} });
+  assert.equal(requests.length, 1);
+  assert.equal(packets.length, 1);
+});
+
+test("without a friend ticket the guest page only explains how to join", () => {
+  const elements = new Map(),
+    requests = [];
+  const element = (id) => {
+    if (!elements.has(id))
+      elements.set(id, {
+        value: "",
+        textContent: "",
+        addEventListener() {},
+        requestSubmit() {},
+        classList: { remove() {} },
+        focus() {},
+      });
+    return elements.get(id);
+  };
+  const context = vm.createContext({
+    document: {
+      hidden: false,
+      hasFocus: () => true,
+      getElementById: element,
+      querySelectorAll: () => [],
+      addEventListener() {},
+    },
+    location: {
+      pathname: "/party/ABC234",
+      hash: "",
+      href: "http://localhost/party/ABC234",
+      protocol: "http:",
+    },
+    history: { replaceState() {} },
+    WebSocket: class {
+      constructor(url) {
+        requests.push(url);
+      }
+    },
+    window: {
+      isSecureContext: true,
+      RTCPeerConnection: class {},
+      addEventListener() {},
+    },
+    navigator: { getGamepads: () => [] },
+    setInterval() {},
+    clearInterval() {},
+  });
+  vm.runInContext(
+    readFileSync(new URL("public/guest.js", import.meta.url), "utf8"),
+    context,
+  );
+  assert.equal(element("join").disabled, true);
+  assert.match(element("status").textContent, /clique em Entrar/);
+  assert.equal(requests.length, 0);
+});
+
 test("guest releases a controller and keeps it neutral while another app has focus", () => {
-  let focused = true, polls = 0;
+  let focused = true,
+    polls = 0;
   const packets = [];
-  const element = { value: "", addEventListener() {}, focus() {}, classList: { remove() {} } };
+  const element = {
+    value: "",
+    addEventListener() {},
+    focus() {},
+    classList: { remove() {} },
+  };
   const document = {
     hidden: false,
     hasFocus: () => focused,
@@ -15,49 +156,84 @@ test("guest releases a controller and keeps it neutral while another app has foc
     addEventListener() {},
   };
   const context = vm.createContext({
-    document, location: { pathname: "/party" },
+    document,
+    location: { pathname: "/party" },
     window: { addEventListener() {} },
-    navigator: { getGamepads() { polls++; return [{ mapping: "standard", buttons: [{ pressed: true }], axes: [1, 0, 0, 0] }]; } },
-    setInterval() {}, clearInterval() {},
+    navigator: {
+      getGamepads() {
+        polls++;
+        return [
+          {
+            mapping: "standard",
+            buttons: [{ pressed: true }],
+            axes: [1, 0, 0, 0],
+          },
+        ];
+      },
+    },
+    setInterval() {},
+    clearInterval() {},
   });
-  vm.runInContext(readFileSync(new URL("public/guest.js", import.meta.url), "utf8"), context);
+  vm.runInContext(
+    readFileSync(new URL("public/guest.js", import.meta.url), "utf8"),
+    context,
+  );
   context.record = (value) => packets.push(JSON.parse(value));
-  vm.runInContext('channel = { readyState: "open", bufferedAmount: 0, send: record }; input();', context);
+  vm.runInContext(
+    'channel = { readyState: "open", bufferedAmount: 0, send: record }; input();',
+    context,
+  );
   assert.equal(packets.at(-1).buttons, 1 << 8);
   assert.equal(packets.at(-1).axes[0], 32767);
   focused = false;
-  vm.runInContext('clearInput(); input(); input();', context);
+  vm.runInContext("clearInput(); input(); input();", context);
   for (const packet of packets.slice(1)) {
     assert.equal(packet.buttons, 0);
     assert.deepEqual(packet.axes, [0, 0, 0, 0]);
   }
   assert.equal(polls, 1);
   focused = true;
-  vm.runInContext('input();', context);
+  vm.runInContext("input();", context);
   assert.equal(packets.at(-1).buttons, 1 << 8);
   document.hidden = true;
-  vm.runInContext('input();', context);
+  vm.runInContext("input();", context);
   assert.equal(packets.at(-1).buttons, 0);
 });
 
 test("guest sends a controller change on the next frame and stays quiet otherwise", () => {
   let pad = { mapping: "standard", buttons: [], axes: [0, 0, 0, 0] };
-  const packets = [], frames = [];
-  const element = { value: "", addEventListener() {}, focus() {}, classList: { remove() {} } };
+  const packets = [],
+    frames = [];
+  const element = {
+    value: "",
+    addEventListener() {},
+    focus() {},
+    classList: { remove() {} },
+  };
   const context = vm.createContext({
     document: {
-      hidden: false, hasFocus: () => true, getElementById: () => element,
-      querySelectorAll: () => [], addEventListener() {},
+      hidden: false,
+      hasFocus: () => true,
+      getElementById: () => element,
+      querySelectorAll: () => [],
+      addEventListener() {},
     },
     location: { pathname: "/party" },
     window: { addEventListener() {} },
     navigator: { getGamepads: () => [pad] },
-    setInterval() {}, clearInterval() {},
+    setInterval() {},
+    clearInterval() {},
     requestAnimationFrame: (fn) => frames.push(fn),
   });
-  vm.runInContext(readFileSync(new URL("public/guest.js", import.meta.url), "utf8"), context);
+  vm.runInContext(
+    readFileSync(new URL("public/guest.js", import.meta.url), "utf8"),
+    context,
+  );
   context.record = (value) => packets.push(JSON.parse(value));
-  vm.runInContext('channel = { readyState: "open", bufferedAmount: 0, send: record }; input();', context);
+  vm.runInContext(
+    'channel = { readyState: "open", bufferedAmount: 0, send: record }; input();',
+    context,
+  );
   const frame = () => frames.shift()();
   frame();
   assert.equal(packets.length, 1);

@@ -233,3 +233,25 @@
   letter-spacing: 0.08em;
   min-width: 0;
 }
+.party-friends-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0 20px;
+  margin-bottom: 20px;
+}
+.party-friends-setting p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 5px 0 0;
+  color: var(--body);
+}
+.party-friends-setting > .party-friends-error,
+.party-friends-setting > .party-friends-status {
+  grid-column: 1 / -1;
+}
+.party-friends-setting > .party-friends-error {
+  color: var(--danger);
+}

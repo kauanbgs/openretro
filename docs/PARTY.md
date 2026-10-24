@@ -12,16 +12,25 @@ a configured internet relay.
 
 ## Player experience
 
-1. Open **Party → Criar sala** in the desktop app.
-2. Copy the six-character room code and send it to a friend.
-3. The friend opens the standard Party page, enters the code and their name.
-   A `/party/5JKL3A` link fills the code automatically.
-4. The host approves the participant. Guests occupy exclusive J2–J4 slots;
-   J1 stays on the PC. Controls work by touch, keyboard or supported gamepad.
+Party is not anonymous. Hosts and guests both use an OpenRetro account, and
+only friends join.
 
-The game runs on the host's Windows PC. Guests do not need the game, emulator,
-OpenRetro installer, a VPN, account or server settings. Closing the dialog keeps
-Party running. Ending the room disconnects guests and invalidates the code.
+1. Signed in, open **Party → Criar sala** in the desktop app. The Worker
+   refuses to reserve a room without a valid session (`/api/rooms` → 401).
+2. The room appears in the host's friends' panels while **Amigos podem
+   entrar** is on.
+3. A friend clicks **Entrar**. The app opens the Party page with a single-use,
+   two-minute ticket in the URL fragment, and the room seats them in the first
+   free J2–J4 slot. J1 stays on the PC. Controls work by touch, keyboard or
+   supported gamepad.
+4. A join without a valid ticket is refused; the page only explains how to join
+   from the app. Typing a room code or a name no longer works.
+
+The game runs on the host's Windows PC. Guests need OpenRetro and an account
+to click Entrar, but not the game, emulator, a VPN or server settings. Closing
+the dialog keeps Party running. Ending the room disconnects guests.
+Party also needs `PARTY_TICKET_SECRET` and the account service
+([SOCIAL.md](SOCIAL.md)); without them no room opens.
 
 ## One-time Cloudflare setup
 

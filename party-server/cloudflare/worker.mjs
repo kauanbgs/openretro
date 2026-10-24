@@ -1,5 +1,15 @@
 import { socialResponse } from "./social/router.mjs";
+export { SocialHub } from "./social/hub.mjs";
 import { cleanupSocial } from "./social/limits.mjs";
+import {
+  hostAvailable,
+  inviteConfigured,
+  signInvite,
+  verifyInvite,
+} from "./social/invites.mjs";
+import { related } from "./social/friends.mjs";
+import { authenticate, database } from "./social/auth.mjs";
+import { AccountError } from "./social/http.mjs";
 import { cloudflareTurn } from "./turn.mjs";
 import { DurableObject } from "cloudflare:workers";
 
@@ -76,6 +86,8 @@ export default {
       });
     try {
       if (
+        url.pathname === "/social" ||
+        url.pathname.startsWith("/api/friends") ||
         url.pathname.startsWith("/api/auth/") ||
         url.pathname === "/api/account" ||
         url.pathname.startsWith("/api/account/")
@@ -89,7 +101,7 @@ export default {
             headers: {
               ...headers,
               "Access-Control-Allow-Methods": "POST",
-              "Access-Control-Allow-Headers": "Content-Type",
+              "Access-Control-Allow-Headers": "Content-Type, Authorization",
             },
           });
         if (request.method !== "POST")
@@ -108,6 +120,27 @@ export default {
             { error: "O Party ainda não está disponível. Tente mais tarde." },
             503,
           );
+        // Party is not anonymous: hosts sign in, and guests can only join
+        // with a friend ticket, which needs the ticket secret.
+        if (!inviteConfigured(env))
+          return reply(
+            { error: "O Party ainda não está disponível. Tente mais tarde." },
+            503,
+          );
+        try {
+          await authenticate(request, database(env, url), Date.now());
+        } catch (error) {
+          if (!(error instanceof AccountError)) throw error;
+          return reply(
+            {
+              error:
+                error.status === 401
+                  ? "Entre na sua conta para criar um Party."
+                  : error.message,
+            },
+            error.status,
+          );
+        }
         const ip = await hash(
           request.headers.get("CF-Connecting-IP") || "local",
         );
@@ -341,7 +374,127 @@ export class PartyRoom extends DurableObject {
       }),
     });
   }
+  approve(guest) {
+    const member = guest.deserializeAttachment();
+    if (member.player !== null) return false;
+    const player = [2, 3, 4].find(
+      (p) =>
+        !this.guests().some((ws) => ws.deserializeAttachment().player === p),
+    );
+    if (!player) return false;
+    member.player = player;
+    guest.serializeAttachment(member);
+    send(guest, { type: "accepted", player, ...this.meta.transport });
+    send(this.host(), { type: "peer", id: member.id, player });
+    return true;
+  }
+  async social(request) {
+    return this.ctx.blockConcurrencyWhile(async () => {
+      if (!this.meta?.active || this.meta.expires <= Date.now() || !this.host())
+        return json({ error: invalid }, 404);
+      const data = await request.json(),
+        path = new URL(request.url).pathname;
+      if (path === "/social-bind") {
+        if (
+          typeof data.ticket !== "string" ||
+          data.ticket.length !== 64 ||
+          (await hash(data.ticket)) !== this.meta.hostHash
+        )
+          return json({ error: invalid }, 403);
+        if (
+          typeof data.joinable !== "boolean" ||
+          (data.joinable && !inviteConfigured(this.env))
+        )
+          return json({ error: invalid }, 503);
+        const previous = this.meta.social;
+        const unchanged =
+          previous?.owner === data.owner &&
+          previous.sessionId === data.sessionId &&
+          previous.joinable === data.joinable;
+        this.meta.social = {
+          owner: data.owner,
+          sessionId: data.sessionId,
+          joinable: data.joinable,
+          epoch: unchanged ? previous.epoch : crypto.randomUUID(),
+        };
+        await this.ctx.storage.put("room", this.meta);
+        return json({ ok: true });
+      }
+      const social = this.meta.social;
+      if (!(await hostAvailable(this.env, social)))
+        return json({ error: invalid }, 403);
+      if (path === "/social-status")
+        return json({
+          joinable:
+            social.owner === data.owner && social.sessionId === data.sessionId,
+        });
+      if (path !== "/social-issue" || social.owner !== data.hostId)
+        return json({ error: invalid }, 403);
+      const db = this.env.SOCIAL_DB.withSession("first-primary");
+      if (
+        !(await related(db, data.guestId, data.hostId)) ||
+        !(await db
+          .prepare(
+            "SELECT 1 FROM sessions WHERE id=? AND user_id=? AND expires_at>?",
+          )
+          .bind(data.sessionId, data.guestId, Date.now())
+          .first())
+      )
+        return json({ error: invalid }, 403);
+      const token = await signInvite(this.env, {
+        room: this.meta.code,
+        hostId: social.owner,
+        guestId: data.guestId,
+        sessionId: data.sessionId,
+        epoch: social.epoch,
+      });
+      return json({ code: this.meta.code, invite: token });
+    });
+  }
+  async automaticGuest(invite) {
+    const ticket = await verifyInvite(this.env, invite);
+    const social = this.meta.social;
+    if (
+      !ticket ||
+      ticket.room !== this.meta.code ||
+      ticket.epoch !== social?.epoch ||
+      ticket.hostId !== social.owner ||
+      !(await hostAvailable(this.env, social))
+    )
+      return null;
+    if (
+      this.guests().some(
+        (ws) => ws.deserializeAttachment().userId === ticket.guestId,
+      )
+    )
+      return null;
+    const db = this.env.SOCIAL_DB.withSession("first-primary");
+    if (!(await related(db, ticket.guestId, ticket.hostId))) return null;
+    const profile = await db
+      .prepare(
+        "SELECT u.display_name,u.friend_code FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.id=? AND s.id=? AND s.expires_at>?",
+      )
+      .bind(ticket.guestId, ticket.sessionId, Date.now())
+      .first();
+    if (!profile) return null;
+    this.meta.usedInvites = Object.fromEntries(
+      Object.entries(this.meta.usedInvites || {}).filter(
+        ([, expires]) => expires > Date.now(),
+      ),
+    );
+    if (
+      this.meta.usedInvites[ticket.nonce] ||
+      Object.keys(this.meta.usedInvites).length >= 128
+    )
+      return null;
+    return { ticket, name: profile.display_name || profile.friend_code };
+  }
   async fetch(request) {
+    if (
+      new URL(request.url).pathname.startsWith("/social-") &&
+      request.method === "POST"
+    )
+      return this.social(request);
     if (
       new URL(request.url).pathname === "/initialize" &&
       request.method === "POST"
@@ -462,20 +615,41 @@ export class PartyRoom extends DurableObject {
               ws.close(1008, "Room full");
               return;
             }
-            const name =
-              typeof m.name === "string" ? m.name.trim().slice(0, 24) : "";
-            if (!name) {
+            // Only friends with a valid ticket from their account join;
+            // there is no anonymous entry by name.
+            const automatic = await this.automaticGuest(m.invite).catch(
+              () => null,
+            );
+            if (!automatic) {
               send(ws, {
                 type: "error",
-                message: "Digite seu nome para entrar.",
+                message:
+                  "Para entrar, use o botão Entrar na lista de amigos do OpenRetro.",
               });
+              ws.close(1008, "Account required");
+              return;
+            }
+            if (
+              ![2, 3, 4].some(
+                (p) =>
+                  !this.guests().some(
+                    (guest) => guest.deserializeAttachment().player === p,
+                  ),
+              )
+            ) {
+              send(ws, { type: "error", message: "A sala está cheia." });
+              ws.close(1008, "Room full");
               return;
             }
             a.role = "guest";
-            a.name = name;
+            a.name = automatic.name;
             a.joined = Date.now();
+            a.userId = automatic.ticket.guestId;
             ws.serializeAttachment(a);
-            send(ws, { type: "waiting" });
+            this.meta.usedInvites[automatic.ticket.nonce] =
+              automatic.ticket.expiresAt;
+            await this.ctx.storage.put("room", this.meta);
+            this.approve(ws);
             this.roster();
             await this.schedule();
             return;
@@ -491,23 +665,13 @@ export class PartyRoom extends DurableObject {
           if (!guest) return;
           const member = guest.deserializeAttachment();
           if (member.player !== null) return;
-          const player = [2, 3, 4].find(
-            (p) =>
-              !this.guests().some(
-                (s) => s.deserializeAttachment().player === p,
-              ),
-          );
-          if (!player) {
+          if (!this.approve(guest)) {
             send(ws, {
               type: "error",
               message: "Os três lugares já estão ocupados.",
             });
             return;
           }
-          member.player = player;
-          guest.serializeAttachment(member);
-          send(guest, { type: "accepted", player, ...this.meta.transport });
-          send(ws, { type: "peer", id: member.id, player });
           this.roster();
           await this.schedule();
           return;

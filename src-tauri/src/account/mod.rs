@@ -1,4 +1,5 @@
 //! Optional accounts. Bearer tokens are held by Rust and the OS vault only.
+pub mod social;
 mod vault;
 use reqwest::{Client, Method, Url};
 use serde::{Deserialize, Serialize};
@@ -61,10 +62,15 @@ pub struct User {
     email: String,
     display_name: Option<String>,
     friend_code: String,
+    /// One of the app's preset icons; servers before icons send none.
+    #[serde(default)]
+    avatar: u8,
     show_playing: bool,
     appear_offline: bool,
     created_at: i64,
 }
+/// The preset icons the app draws, numbered from 0.
+pub const AVATARS: u8 = 15;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionView {
@@ -95,6 +101,7 @@ impl SessionView {
         if uuid::Uuid::parse_str(&user.id).is_err()
             || user.email.len() > 254
             || user.friend_code.len() > 64
+            || user.avatar >= AVATARS
             || user
                 .display_name
                 .as_ref()
@@ -120,14 +127,31 @@ impl SessionView {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProfilePatch {
     #[serde(skip_serializing_if = "Option::is_none")]
+    friend_tag: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     display_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     show_playing: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     appear_offline: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    avatar: Option<u8>,
 }
 impl ProfilePatch {
     fn validate(&mut self) -> AccountResult<()> {
+        if let Some(tag) = self.friend_tag.as_mut() {
+            *tag = tag.trim().to_ascii_lowercase();
+            if tag.len() != 4
+                || !tag
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+            {
+                return Err(AccountError::new(
+                    "invalid",
+                    "Escolha exatamente 4 letras ou números para depois do #.",
+                ));
+            }
+        }
         if let Some(name) = self.display_name.as_mut() {
             *name = name.trim().into();
             if !(3..=24).contains(&name.chars().count()) || name.chars().any(char::is_control) {
@@ -137,9 +161,17 @@ impl ProfilePatch {
                 ));
             }
         }
+        if self.avatar.is_some_and(|avatar| avatar >= AVATARS) {
+            return Err(AccountError::new(
+                "invalid",
+                "Escolha um dos ícones do OpenRetro.",
+            ));
+        }
         if self.display_name.is_none()
+            && self.friend_tag.is_none()
             && self.show_playing.is_none()
             && self.appear_offline.is_none()
+            && self.avatar.is_none()
         {
             return Err(AccountError::new("invalid", "Dados do perfil inválidos."));
         }
@@ -446,7 +478,11 @@ pub async fn account_profile(
     )
 }
 #[tauri::command]
-pub async fn account_logout(all: bool, gate: tauri::State<'_, AccountGate>) -> AccountResult<()> {
+pub async fn account_logout(
+    all: bool,
+    app: tauri::AppHandle,
+    gate: tauri::State<'_, AccountGate>,
+) -> AccountResult<()> {
     let _guard = gate.0.lock().await;
     let service = service()?;
     // A failed remote revocation leaves the credential available for a retry.
@@ -467,16 +503,24 @@ pub async fn account_logout(all: bool, gate: tauri::State<'_, AccountGate>) -> A
             return Err(error);
         }
     }
-    service.vault.clear()
+    service.vault.clear()?;
+    social::stop(&app);
+    Ok(())
 }
 #[tauri::command]
-pub async fn account_forget(gate: tauri::State<'_, AccountGate>) -> AccountResult<()> {
+pub async fn account_forget(
+    app: tauri::AppHandle,
+    gate: tauri::State<'_, AccountGate>,
+) -> AccountResult<()> {
     let _guard = gate.0.lock().await;
-    service()?.vault.clear()
+    service()?.vault.clear()?;
+    social::stop(&app);
+    Ok(())
 }
 #[tauri::command]
 pub async fn account_delete(
     confirmation: String,
+    app: tauri::AppHandle,
     gate: tauri::State<'_, AccountGate>,
 ) -> AccountResult<()> {
     if confirmation != "EXCLUIR" {
@@ -490,7 +534,9 @@ pub async fn account_delete(
     service
         .authenticated(Method::DELETE, "/api/account", None)
         .await?;
-    service.vault.clear()
+    service.vault.clear()?;
+    social::stop(&app);
+    Ok(())
 }
 #[tauri::command]
 pub async fn account_export(
@@ -534,15 +580,18 @@ pub fn account_privacy() -> AccountResult<String> {
 #[tauri::command]
 pub fn account_open_privacy() -> AccountResult<()> {
     let url = account_privacy()?;
+    open_external(&url)
+}
+fn open_external(url: &str) -> AccountResult<()> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         std::process::Command::new("rundll32.exe")
-            .args(["url.dll,FileProtocolHandler", &url])
+            .args(["url.dll,FileProtocolHandler", url])
             .creation_flags(0x08000000)
             .spawn()
             .map_err(|_| {
-                AccountError::new("invalid", "Não foi possível abrir a página de privacidade.")
+                AccountError::new("invalid", "Não foi possível abrir a página no navegador.")
             })?;
         Ok(())
     }

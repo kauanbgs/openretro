@@ -4,31 +4,39 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
-import { Check, Copy, LoaderCircle, X } from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { isTauri } from "../../services/transport";
 import {
-  acceptGuest,
   endParty,
   partyStore,
   removeGuest,
   startParty,
+  setFriendsAllowed,
 } from "./partySession";
 import "./PartyDialog.css";
+import { socialStore } from "../../services/social";
+import { t } from "../../i18n";
 
 export function PartyDialog({
   onClose,
+  onSignIn,
   input,
 }: {
   onClose: () => void;
+  /** Opens the account panel: a Party needs an account. */
+  onSignIn?: () => void;
   input?: RefObject<((key: string) => boolean) | null>;
 }) {
   const room = useSyncExternalStore(partyStore.subscribe, partyStore.snapshot);
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const [copyError, setCopyError] = useState("");
+  const social = useSyncExternalStore(
+    socialStore.subscribe,
+    socialStore.snapshot,
+  );
   const [confirmEnd, setConfirmEnd] = useState(false);
   const active = room.phase === "open";
   const busy = room.phase === "connecting";
+  const signedIn = social.session.hasSession;
   useEffect(() => {
     if (!input) return;
     const handler = (button: string) => {
@@ -57,30 +65,15 @@ export function PartyDialog({
       if (input.current === handler) input.current = null;
     };
   }, [input, onClose]);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(null), 2500);
-    return () => clearTimeout(timer);
-  }, [copied]);
-  async function copy(kind: "code" | "link") {
-    try {
-      await navigator.clipboard.writeText(
-        kind === "code" ? room.code : room.url,
-      );
-      setCopied(kind);
-      setCopyError("");
-    } catch {
-      setCopyError("Selecione e copie o convite abaixo.");
-    }
-  }
   return (
     <Modal title="Party" wide onClose={onClose}>
       <div className="party-room">
         <div className="party-heading">
-          <h3>Jogue com seus amigos.</h3>
+          <h3>{t("Jogue com seus amigos.")}</h3>
           <p>
-            O jogo roda no seu PC. Seus amigos entram pelo navegador, sem
-            instalar nada.
+            {t(
+              "O jogo roda no seu PC. Seus amigos do OpenRetro entram com um clique, pelo painel de amigos.",
+            )}
           </p>
         </div>
         <div className="party-seats" aria-label="Jogadores da sala">
@@ -120,75 +113,61 @@ export function PartyDialog({
             );
           })}
         </div>
-        {room.guests.some((g) => g.player === null) && (
-          <div className="party-requests" aria-label="Pedidos de entrada">
-            {room.guests
-              .filter((g) => g.player === null)
-              .map((g) => (
-                <div key={g.id}>
-                  <span>
-                    <strong>{g.name}</strong>
-                    <small>Quer entrar na partida</small>
-                  </span>
-                  <button
-                    className="button secondary"
-                    onClick={() => removeGuest(g.id)}
-                  >
-                    Recusar
-                  </button>
-                  <button
-                    className="button primary"
-                    disabled={
-                      room.guests.filter((g) => g.player !== null).length >= 3
-                    }
-                    onClick={() => acceptGuest(g.id)}
-                  >
-                    Aceitar
-                  </button>
-                </div>
-              ))}
-          </div>
-        )}
-        <section className="party-invite" aria-label="Convite">
+        <section className="party-invite" aria-label={t("Convite")}>
+          {active && signedIn && (
+            <div className="party-friends-setting">
+              <div>
+                <strong>{t("Amigos podem entrar")}</strong>
+                <p>
+                  {t(
+                    "Seus amigos veem o Party no painel e entram com um clique. Desligue para fechar a sala para novas entradas.",
+                  )}
+                </p>
+              </div>
+              <button
+                className={"switch " + (room.friendsAllowed ? "on" : "")}
+                role="switch"
+                aria-label={t("Amigos podem entrar")}
+                aria-checked={room.friendsAllowed}
+                disabled={room.friendsBusy}
+                onClick={() => setFriendsAllowed(!room.friendsAllowed)}
+              >
+                <span />
+              </button>
+              {room.friendsError && (
+                <p className="party-friends-error" role="alert">
+                  {t(room.friendsError)}
+                </p>
+              )}
+              {room.friendsAllowed && !room.friendsError && (
+                <p className="party-friends-status" role="status">
+                  {room.friendsBusy
+                    ? t("Atualizando acesso dos amigos…")
+                    : room.friendsReady
+                      ? t(
+                          social.session.user?.appearOffline
+                            ? "Seu Party fica oculto enquanto você aparece offline."
+                            : "Seu Party está disponível para os amigos.",
+                        )
+                      : t("Reconectando aos amigos…")}
+                </p>
+              )}
+            </div>
+          )}
           {active ? (
+            <div className="party-invite-heading">
+              <strong>{t("Sala aberta")}</strong>
+              <span className="party-status">
+                {t("Até três amigos podem entrar")}
+              </span>
+            </div>
+          ) : signedIn ? (
             <>
-              <div className="party-invite-heading">
-                <strong>Convide seus amigos</strong>
-                <span className="party-status">Sala aberta</span>
-              </div>
-              <div className="party-link">
-                <input
-                  aria-label="Código da sala"
-                  className="party-code"
-                  readOnly
-                  value={room.code}
-                  onFocus={(event) => event.target.select()}
-                />
-                <button
-                  className="button primary"
-                  onClick={() => void copy("code")}
-                >
-                  {copied === "code" ? <Check size={16} /> : <Copy size={16} />}
-                  {copied === "code" ? "Copiado" : "Copiar código"}
-                </button>
-                <button
-                  className="button secondary"
-                  onClick={() => void copy("link")}
-                >
-                  {copied === "link" ? "Copiado" : "Copiar link"}
-                </button>
-              </div>
+              <strong>{t("Crie uma sala para seus amigos.")}</strong>
               <p>
-                {copyError ||
-                  "Você decide quem entra. Até três amigos podem participar."}
-              </p>
-            </>
-          ) : (
-            <>
-              <strong>Crie uma sala e envie o código.</strong>
-              <p>
-                Você aprova cada entrada e seus amigos recebem um lugar na
-                partida.
+                {t(
+                  "Ela aparece no painel de amigos, e cada um ganha um lugar na partida ao entrar.",
+                )}
               </p>
               <button
                 className="button primary party-create"
@@ -196,8 +175,26 @@ export function PartyDialog({
                 onClick={() => void startParty()}
               >
                 {busy && <LoaderCircle size={16} className="spin" />}
-                {busy ? "Criando sala…" : "Criar sala"}
+                {busy ? t("Criando sala…") : t("Criar sala")}
               </button>
+            </>
+          ) : (
+            <>
+              <strong>{t("Entre na sua conta para criar um Party.")}</strong>
+              <p>
+                {t(
+                  "O Party é só para amigos: quem entra usa a própria conta do OpenRetro.",
+                )}
+              </p>
+              {onSignIn && (
+                <button
+                  className="button primary party-create"
+                  disabled={!isTauri}
+                  onClick={onSignIn}
+                >
+                  {t("Entrar na conta")}
+                </button>
+              )}
             </>
           )}
         </section>

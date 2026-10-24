@@ -20,6 +20,7 @@ export async function runtime(bindings = {}, options = {}) {
       durableObjects: {
         DIRECTORY: { className: "PartyDirectory", useSQLite: true },
         ROOMS: { className: "PartyRoom", useSQLite: true },
+        SOCIAL_HUB: { className: "SocialHub", useSQLite: true },
       },
       bindings: { ALLOW_LOCAL_TEST: "true", ...bindings },
       serviceBindings: {

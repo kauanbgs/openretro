@@ -10,18 +10,10 @@
 .account-identity p {
   overflow-wrap: anywhere;
 }
-.account-initials {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: var(--panel2);
-  border: 1px solid var(--border);
-  font-size: 16px;
-  font-weight: 650;
+.account-label {
+  font-size: 13px;
   color: var(--text);
+  font-weight: 600;
 }
 .account-status {
   font-size: 12px;
@@ -123,4 +115,30 @@
   .account-form {
     max-width: 100%;
   }
+}
+.account-tag-editor {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  padding-left: 13px;
+}
+.account-tag-editor > span {
+  color: var(--body);
+  font-size: 14px;
+}
+.account-form .account-tag-editor > input {
+  border: 0;
+  background: transparent;
+  width: 110px;
+  letter-spacing: 0.12em;
+}
+.account-tag-editor:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.account-form .account-tag-editor > input:focus-visible {
+  outline: none;
 }

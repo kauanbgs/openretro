@@ -1,0 +1,506 @@
+/* The account and friends panel. On the desktop it drops from the account
+   button at the top of the sidebar; in Big Picture it fills the workspace. */
+.social-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.social-panel {
+  --social-surface: color-mix(in srgb, var(--panel) 88%, #000);
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: var(--social-surface);
+}
+.social-panel.layout-popover {
+  position: fixed;
+  /* Above the sidebar (40) and its click-away layer. */
+  z-index: 81;
+  top: calc(var(--titlebar-height) + var(--header-height) + 6px);
+  left: 10px;
+  width: min(400px, calc(100vw - 20px));
+  max-height: calc(
+    100vh - var(--titlebar-height) - var(--header-height) - 18px
+  );
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 55%),
+    0 2px 0 rgb(255 255 255 / 4%) inset;
+  overflow: hidden;
+  animation: social-drop 0.14s ease-out;
+}
+.social-panel.layout-page {
+  max-width: 640px;
+  margin: 0 auto;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+@keyframes social-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .social-panel.layout-popover {
+    animation: none;
+  }
+}
+
+.social-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 18px 10px;
+}
+.social-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+.social-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 12px;
+}
+
+/* You */
+.social-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel2) 70%, transparent);
+}
+.social-me-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.social-me-text strong {
+  overflow: hidden;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.social-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--body);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.social-code:hover {
+  color: var(--text);
+}
+.social-status {
+  max-width: 132px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.social-banner {
+  margin: 6px 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel2) 60%, transparent);
+  color: var(--body);
+  font-size: 12px;
+}
+.social-banner.is-error {
+  color: var(--danger);
+}
+
+/* Sections */
+.social-section {
+  padding-top: 10px;
+}
+.social-section h3,
+.social-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.social-group-toggle {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.social-group-toggle:hover {
+  background: rgb(255 255 255 / 5%);
+}
+.social-count {
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+}
+.social-tools {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.social-tools .icon-button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.social-section ul {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.social-section h4 {
+  margin: 8px 8px 2px;
+  color: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.social-empty {
+  margin: 6px 8px 10px;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* A friend */
+.social-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 7px 8px;
+  border-radius: 10px;
+}
+.social-row:hover,
+.social-row:focus-within {
+  background: rgb(255 255 255 / 6%);
+}
+.social-row.is-dim .account-avatar {
+  filter: saturate(0.35) brightness(0.8);
+}
+.social-row-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+.social-row-text strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.social-row-text > span {
+  overflow: hidden;
+  color: var(--body);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.social-available {
+  color: #3ddc84;
+  font-weight: 650;
+}
+.social-cover {
+  width: 28px;
+  height: 38px;
+  flex: none;
+  border-radius: 4px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+}
+.social-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Options appear on hover or focus, so the list stays calm. */
+.social-row .social-more {
+  opacity: 0;
+}
+.social-row:hover .social-more,
+.social-row:focus-within .social-more,
+.social-row .social-more[aria-expanded="true"] {
+  opacity: 1;
+}
+.social-join {
+  min-height: 30px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.social-accept {
+  color: #3ddc84;
+}
+.social-menu {
+  position: absolute;
+  top: calc(100% - 6px);
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  min-width: 170px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel2);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 45%);
+}
+.social-menu button {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.social-menu button:hover,
+.social-menu button:focus-visible {
+  background: rgb(255 255 255 / 8%);
+}
+.social-menu button.danger {
+  color: var(--danger);
+}
+
+/* Friend requests, collapsed into one row */
+.social-requests {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.social-requests:hover {
+  background: rgb(255 255 255 / 6%);
+}
+.social-stack {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+.social-stack .account-avatar {
+  position: absolute;
+  box-shadow: 0 0 0 2px var(--social-surface);
+}
+.social-stack .account-avatar:first-child {
+  top: 0;
+  left: 0;
+}
+.social-stack .account-avatar:nth-child(2) {
+  right: 0;
+  bottom: 0;
+}
+.social-badge {
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #2f8cff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.social-nested {
+  margin: 0 0 6px 14px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.social-add {
+  display: flex;
+  gap: 8px;
+  margin: 4px 8px 8px;
+}
+.social-add input,
+.social-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.social-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 8px 8px;
+  padding-left: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--body);
+}
+.social-search input {
+  padding-left: 0;
+  border: 0;
+  background: none;
+}
+.social-search input:focus {
+  outline: none;
+}
+
+.social-confirm {
+  display: grid;
+  gap: 8px;
+  margin: 8px 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.social-confirm p {
+  margin: 0;
+  color: var(--body);
+  font-size: 13px;
+}
+.social-confirm div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Signing in and the account itself */
+.social-account {
+  padding: 0 8px 8px;
+}
+.social-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 0 4px;
+}
+.social-welcome-text {
+  margin: 8px 0 4px;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+.social-account .account-settings {
+  max-width: none;
+}
+.social-account .settings-group {
+  margin-top: 12px;
+}
+.social-account .account-form {
+  max-width: none;
+}
+/* The welcome text already says the account is optional. */
+.social-account .account-settings > .settings-group-note {
+  display: none;
+}
+.social-account .account-form > .button {
+  align-self: stretch;
+}
+/* Settings rows were laid out for a wide page; in the panel the control
+   moves below its text when both do not fit. */
+.social-account .setting-row {
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+.social-account .setting-row > div:first-child {
+  flex: 1 1 200px;
+}
+.social-account .account-friend-code {
+  flex: 1 1 100%;
+}
+
+/* The local player on this PC, below the account */
+.social-local {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--social-surface) 70%, #000);
+}
+.social-local .player-avatar {
+  flex: none;
+}
+.social-local > span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.social-local small {
+  color: var(--body);
+  font-size: 11px;
+}
+.social-local strong {
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The account button at the top of the sidebar */
+.sidebar-profile {
+  position: relative;
+}
+.sidebar-profile .account-avatar {
+  flex: none;
+}
+.sidebar-profile-badge {
+  position: absolute;
+  top: 10px;
+  left: 40px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #2f8cff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}

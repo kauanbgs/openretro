@@ -47,85 +47,22 @@ async function connect(mf, code) {
   return inbox(response.webSocket);
 }
 
-test("Cloudflare rooms authenticate the host capability, enforce slots and revoke on exit", async () => {
+// Room hosting, guests and quotas need accounts; social.test.mjs covers them.
+test("Cloudflare never opens an anonymous room", async () => {
   const mf = await runtime();
-  const sockets = [];
   try {
-    const reservation = await create(mf);
-    assert.equal(reservation.status, 201);
-    const { code, ticket } = await reservation.json();
-    assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/);
-    assert.equal(ticket.length, 64);
-    const impostor = await connect(mf, code);
-    sockets.push(impostor);
-    impostor.send({ type: "create", ticket: "0".repeat(64) });
-    assert.match((await impostor.next("error")).message, /inválido/);
-    const host = await connect(mf, code);
-    sockets.push(host);
-    host.send({ type: "create", ticket });
-    const created = await host.next("created");
-    assert.equal(created.code, code);
-    assert.equal(created.url, `http://localhost/party/${code}`);
-    host.ws.send("ping");
-    await host.next("pong");
-    const guests = [];
-    for (let i = 0; i < 4; i++) {
-      const guest = await connect(mf, code);
-      sockets.push(guest);
-      guests.push(guest);
-      guest.send({ type: "join", room: code, name: `Amigo ${i}` });
-      await guest.next("waiting");
-      let roster = await host.next("roster");
-      while (!roster.guests.some((g) => g.name === `Amigo ${i}`))
-        roster = await host.next("roster");
-      guest.id = roster.guests.find((g) => g.name === `Amigo ${i}`).id;
-      // A guest cannot self-approve. The host must assign its exclusive port.
-      guest.send({ type: "accept", id: guest.id });
-      host.send({ type: "accept", id: guest.id });
-      if (i === 3) {
-        assert.match((await host.next("error")).message, /ocupados/);
-        continue;
-      }
-      assert.equal((await guest.next("accepted")).player, i + 2);
-      await host.next("peer");
-      guest.send({
-        type: "signal",
-        id: "forged-id",
-        signal: { type: "answer", sdp: { type: "answer", sdp: "fixture" } },
-      });
-      assert.equal((await host.next("signal")).id, guest.id);
-    }
-    host.send({ type: "remove", id: guests[0].id });
-    await guests[0].next("ended");
-    await host.next("left");
-    host.send({ type: "accept", id: guests[3].id });
-    assert.equal((await guests[3].next("accepted")).player, 2);
-    host.ws.close(1000);
-    await guests[1].next("ended");
-    const expired = await mf.dispatchFetch(
-      `http://localhost/signal?room=${code}`,
-      { headers: { Upgrade: "websocket" } },
-    );
-    assert.equal(expired.status, 404);
+    const anonymous = await create(mf);
+    assert.equal(anonymous.status, 503);
+    const guest = await connect(mf, "ABC234").catch(() => null);
+    assert.equal(guest, null);
   } finally {
-    for (const s of sockets) {
-      try {
-        s.ws.close(1000);
-      } catch {}
-    }
     await mf.dispose();
   }
 });
 
-test("Cloudflare quotas and static invitation pages work in the Workers runtime", async () => {
-  const mf = await runtime({
-    MAX_ROOMS_PER_IP: "1",
-    MAX_CREATES_PER_10_MIN: "2",
-  });
+test("Cloudflare invitation pages and origin checks work in the Workers runtime", async () => {
+  const mf = await runtime();
   try {
-    assert.equal((await create(mf)).status, 201);
-    assert.equal((await create(mf)).status, 429);
-    assert.match((await (await create(mf)).json()).error, /muitas salas/);
     for (const path of ["/party", "/party/5JKL3A", "/guest.js", "/guest.css"]) {
       const response = await mf.dispatchFetch(`http://localhost${path}`);
       assert.equal(response.status, 200);

@@ -106,6 +106,13 @@ fn service_origins_reject_credentials_paths_and_public_http() {
 }
 #[test]
 fn validates_codes_profiles_and_email_without_accepting_settings_fields() {
+    let mut tag: ProfilePatch = serde_json::from_value(json!({"friendTag":" AB12 "})).unwrap();
+    tag.validate().unwrap();
+    assert_eq!(tag.friend_tag.as_deref(), Some("ab12"));
+    for value in ["abc", "abcde", "ab#1", "é123", "１２３４"] {
+        let mut patch: ProfilePatch = serde_json::from_value(json!({"friendTag":value})).unwrap();
+        assert!(patch.validate().is_err());
+    }
     assert_eq!(
         normalized_email(" TEST@EXAMPLE.TEST ").unwrap(),
         "test@example.test"
@@ -122,6 +129,11 @@ fn validates_codes_profiles_and_email_without_accepting_settings_fields() {
     patch.validate().unwrap();
     assert_eq!(patch.display_name.as_deref(), Some("Jogador 🎮"));
     assert!(serde_json::from_value::<ProfilePatch>(json!({"token": "never-accepted"})).is_err());
+    let mut icon: ProfilePatch = serde_json::from_value(json!({"avatar": 14})).unwrap();
+    icon.validate().unwrap();
+    let mut icon: ProfilePatch = serde_json::from_value(json!({"avatar": 15})).unwrap();
+    assert!(icon.validate().is_err());
+    assert!(serde_json::from_value::<ProfilePatch>(json!({"avatar": -1})).is_err());
     assert!(valid_token(&"a".repeat(64)));
     assert!(!valid_token(&"g".repeat(64)));
 }

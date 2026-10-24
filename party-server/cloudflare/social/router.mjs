@@ -1,5 +1,6 @@
 import { accountRoute } from "./auth.mjs";
 import { AccountError } from "./http.mjs";
+import { friendsRoute } from "./friends.mjs";
 
 export async function socialResponse(request, env, { allowed, headers }) {
   const reply = (data, status, extra = {}) =>
@@ -18,11 +19,14 @@ export async function socialResponse(request, env, { allowed, headers }) {
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     });
   try {
-    const {
-      data,
-      status = 200,
-      attachment,
-    } = await accountRoute(request, env, new URL(request.url));
+    const result = await (
+      new URL(request.url).pathname === "/social" ||
+        new URL(request.url).pathname.startsWith("/api/friends")
+        ? friendsRoute
+        : accountRoute
+    )(request, env, new URL(request.url));
+    if (result.response) return result.response;
+    const { data, status = 200, attachment } = result;
     return reply(
       data,
       status,

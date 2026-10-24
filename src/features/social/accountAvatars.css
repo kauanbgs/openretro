@@ -1,0 +1,67 @@
+.account-avatar {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(140deg, var(--avatar-from), var(--avatar-to));
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 22%),
+    inset 0 -6px 12px rgb(0 0 0 / 18%);
+  color: #fff;
+}
+.account-avatar svg {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 30%));
+}
+/* Status dot, cut out of the avatar by a ring of the surface colour. */
+.account-avatar > i {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 32%;
+  min-width: 9px;
+  max-width: 14px;
+  aspect-ratio: 1;
+  border: 2px solid var(--social-surface, var(--panel));
+  border-radius: 50%;
+  background: var(--muted);
+}
+.account-avatar.status-online > i,
+.account-avatar.status-playing > i {
+  background: #3ddc84;
+}
+.account-avatar.status-idle > i {
+  background: #f5b942;
+}
+.account-avatar.status-offline > i {
+  background: #6b6f7a;
+}
+
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.avatar-picker button {
+  display: grid;
+  place-items: center;
+  padding: 5px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.12s ease;
+}
+.avatar-picker button:hover:not(:disabled),
+.avatar-picker button:focus-visible {
+  transform: scale(1.06);
+}
+.avatar-picker button[aria-pressed="true"] {
+  border-color: var(--text);
+}
+.avatar-picker button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

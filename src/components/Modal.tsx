@@ -8,11 +8,13 @@ export function Modal({
   children,
   onClose,
   wide = false,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -93,7 +95,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         aria-labelledby={titleId}
-        className={`modal ${wide ? "modal-wide" : ""}`}
+        className={`modal ${wide ? "modal-wide" : ""} ${className}`}
       >
         <header>
           <div>
