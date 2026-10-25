@@ -19,7 +19,6 @@ import {
   Power,
   Home,
   Library,
-  MonitorCog,
   Play,
   Search,
   Smartphone,
@@ -31,7 +30,6 @@ import {
   Info,
   LayoutGrid,
   List,
-  UserRound,
   FolderPlus,
 } from "lucide-react";
 import type {
@@ -59,11 +57,9 @@ import { partyOwnsInput } from "../party/partyInput";
 import { SocialNotice, SocialUnreadBadge } from "../social/SocialActivity";
 import { playUiSound, setNavigationSounds, soundFor } from "./navigationSounds";
 import { ControllerKeyboard } from "./ControllerKeyboard";
-import { PlayerPicker } from "../../components/PlayerPicker";
 import { PhonePlayDialog } from "../../components/PhonePlayDialog";
 import { PartyDialog } from "../party/PartyDialog";
 import { NETPLAY_PLATFORMS } from "../../types";
-import { PlayerAvatar, playerAccent } from "../../components/PlayerAvatar";
 import { AccountAvatar } from "../social/accountAvatars";
 import { socialStore } from "../../services/social";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
@@ -79,19 +75,12 @@ import {
 import { t } from "../../i18n";
 
 type Section =
-  | "home"
-  | "catalog"
-  | "library"
-  | "downloads"
-  | "emulators"
-  | "system"
-  | "friends";
+  "home" | "catalog" | "library" | "downloads" | "system" | "friends";
 const sections: { id: Section; label: string; icon: typeof Home }[] = [
   { id: "home", label: t("Início"), icon: Home },
   { id: "catalog", label: t("Catálogo"), icon: Grid2X2 },
   { id: "library", label: t("Biblioteca"), icon: Library },
   { id: "downloads", label: "Downloads", icon: Download },
-  { id: "emulators", label: t("Emuladores"), icon: MonitorCog },
   { id: "system", label: t("Configurações"), icon: Settings },
   { id: "friends", label: t("Amigos"), icon: Users },
 ];
@@ -132,7 +121,6 @@ export function BigPicture({
   const [librarySort, setLibrarySort] = useState("recent");
   const [libraryPlatform, setLibraryPlatform] = useState("all");
   const [libraryView, setLibraryView] = useState<"grid" | "list">("grid");
-  const [playersOpen, setPlayersOpen] = useState(false);
   const social = useSyncExternalStore(
     socialStore.subscribe,
     socialStore.snapshot,
@@ -142,11 +130,6 @@ export function BigPicture({
   const [partyOpen, setPartyOpen] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceRoute>();
   const workspaceInput = useRef<((key: string) => boolean) | null>(null);
-  const { data: players } = useQuery({
-    queryKey: ["players"],
-    queryFn: bridge.profiles,
-  });
-  const activePlayer = players?.players.find((p) => p.id === players.activeId);
   const { data: settings } = useQuery({
     queryKey: ["settings"],
     queryFn: bridge.settings,
@@ -215,7 +198,6 @@ export function BigPicture({
     setKeyboardOpen(false);
     setRemoveTarget(undefined);
     setPowerOpen(false);
-    setPlayersOpen(false);
     setWorkspace(undefined);
     setFilter("all");
     setQuery("");
@@ -322,9 +304,7 @@ export function BigPicture({
       scroll: content.current?.scrollTop ?? 0,
     };
     setWorkspace(
-      next === "downloads" || next === "emulators" || next === "friends"
-        ? { page: next }
-        : undefined,
+      next === "downloads" || next === "friends" ? { page: next } : undefined,
     );
     setSection(next);
     setNavIndex(sections.findIndex((item) => item.id === next));
@@ -364,11 +344,9 @@ export function BigPicture({
       ? catalogCount
       : section === "downloads"
         ? jobs.length
-        : section === "emulators"
-          ? emulators.length
-          : section === "system"
-            ? 9
-            : visibleGames.length;
+        : section === "system"
+          ? 7
+          : visibleGames.length;
   const launch = async (entry = heroGame) => {
     if (!entry || launching) return;
     setLaunching(true);
@@ -434,16 +412,12 @@ export function BigPicture({
     if (section === "downloads") {
       return setWorkspace({ page: "downloads" });
     }
-    if (section === "emulators") return setWorkspace({ page: "emulators" });
     if (section === "friends") return setWorkspace({ page: "friends" });
-    if (selected === 0) return setPlayersOpen(true);
     const page = [
-      "players",
       "phone",
       "party",
       "Discover",
       "Settings",
-      "Emulators",
       "import",
       "sources",
       "exit",
@@ -456,13 +430,11 @@ export function BigPicture({
         ? selectSection("catalog")
         : setWorkspace({
             page:
-              page === "Emulators"
-                ? "emulators"
-                : page === "import"
-                  ? "import"
-                  : page === "sources"
-                    ? "sources"
-                    : "settings",
+              page === "import"
+                ? "import"
+                : page === "sources"
+                  ? "sources"
+                  : "settings",
           });
   };
   useEffect(() => {
@@ -475,14 +447,7 @@ export function BigPicture({
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
       if (selectInput.current?.(key)) return;
-      if (
-        workspace &&
-        !navFocused &&
-        !powerOpen &&
-        !playersOpen &&
-        !phoneOpen &&
-        !partyOpen
-      ) {
+      if (workspace && !navFocused && !powerOpen && !phoneOpen && !partyOpen) {
         workspaceInput.current?.(key);
         return;
       }
@@ -795,7 +760,6 @@ export function BigPicture({
     <section
       ref={root}
       className={`console-mode ${navFocused ? "menu-open" : ""}`}
-      style={playerAccent(activePlayer)}
       data-section={workspace ? workspace.page : section}
       aria-label={t("Modo console do OpenRetro")}
       onClickCapture={(event) => {
@@ -930,12 +894,6 @@ export function BigPicture({
           }}
         />
       )}
-      {playersOpen && (
-        <PlayerPicker
-          input={selectInput}
-          onClose={() => setPlayersOpen(false)}
-        />
-      )}
       {!workspace && (
         <header className="tv-topbar">
           <span>
@@ -949,21 +907,19 @@ export function BigPicture({
               aria-label={t("Conta e amigos")}
               onClick={() => selectSection("friends")}
             >
-              {account ? (
-                <AccountAvatar
-                  avatar={account.avatar}
-                  size={26}
-                  status={
-                    account.appearOffline
+              <AccountAvatar
+                avatar={account?.avatar}
+                size={26}
+                status={
+                  !account
+                    ? undefined
+                    : account.appearOffline
                       ? "offline"
                       : social.connected
                         ? "online"
                         : "idle"
-                  }
-                />
-              ) : (
-                <PlayerAvatar player={activePlayer} size={24} />
-              )}
+                }
+              />
               {account?.displayName ?? t("Entrar")}
               <SocialUnreadBadge />
               {social.incoming.length > 0 && (
@@ -1000,7 +956,7 @@ export function BigPicture({
           key={section}
           route={workspace}
           input={workspaceInput}
-          active={!navFocused && !powerOpen && !playersOpen}
+          active={!navFocused && !powerOpen}
           onContentFocus={() => setNavFocused(false)}
           library={library}
           emulators={emulators}
@@ -1011,11 +967,7 @@ export function BigPicture({
           onMenu={() => setNavFocused(true)}
           onClose={() => {
             setWorkspace(undefined);
-            if (
-              section === "emulators" ||
-              section === "downloads" ||
-              section === "friends"
-            )
+            if (section === "downloads" || section === "friends")
               selectSection("home");
           }}
           onImported={(game) => {
@@ -1296,12 +1248,6 @@ export function BigPicture({
               <div className="tv-system-grid">
                 {[
                   [
-                    t("Jogadores"),
-                    t("Troque o perfil e mantenha seus saves separados"),
-                    "players",
-                    UserRound,
-                  ] as const,
-                  [
                     t("Jogar no celular"),
                     t("Jogue pelo navegador do celular na mesma rede"),
                     "phone",
@@ -1324,12 +1270,6 @@ export function BigPicture({
                     t("Ajuste a experiência"),
                     "Settings",
                     Settings,
-                  ] as const,
-                  [
-                    t("Gerenciar emuladores"),
-                    t("Revise sistemas e cores"),
-                    "Emulators",
-                    MonitorCog,
                   ] as const,
                   [
                     t("Adicionar jogos"),
@@ -1357,26 +1297,22 @@ export function BigPicture({
                       index === selected && !navFocused ? "focused" : ""
                     }
                     onClick={() =>
-                      page === "players"
-                        ? setPlayersOpen(true)
-                        : page === "phone"
-                          ? setPhoneOpen(true)
-                          : page === "party"
-                            ? setPartyOpen(true)
-                            : page === "exit"
-                              ? close()
-                              : page === "Discover"
-                                ? selectSection("catalog")
-                                : setWorkspace({
-                                    page:
-                                      page === "Emulators"
-                                        ? "emulators"
-                                        : page === "sources"
-                                          ? "sources"
-                                          : page === "import"
-                                            ? "import"
-                                            : "settings",
-                                  })
+                      page === "phone"
+                        ? setPhoneOpen(true)
+                        : page === "party"
+                          ? setPartyOpen(true)
+                          : page === "exit"
+                            ? close()
+                            : page === "Discover"
+                              ? selectSection("catalog")
+                              : setWorkspace({
+                                  page:
+                                    page === "sources"
+                                      ? "sources"
+                                      : page === "import"
+                                        ? "import"
+                                        : "settings",
+                                })
                     }
                   >
                     <Icon size={25} />

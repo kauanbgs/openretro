@@ -79,12 +79,6 @@ export interface RemotePlayStatus {
   /** The network phones connect on, once checked; Windows blocks a public one. */
   network: { public: boolean; name: string } | null;
 }
-export interface PlayerProfile {
-  id: string;
-  name: string;
-  avatar: string;
-  color: string;
-}
 export interface LibraryItem {
   id: string;
   gameId: string;
@@ -197,7 +191,7 @@ export const defaultSettings: AppSettings = {
   bandwidthLimit: 0,
   developerMode: false,
   ps2Resolution: "2x",
-  gameScreenMode: "original",
+  gameScreenMode: "stretch",
   navigationSounds: true,
   autoUpdate: true,
   deleteArchives: true,

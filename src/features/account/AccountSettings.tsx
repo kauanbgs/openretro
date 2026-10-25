@@ -48,7 +48,16 @@ export function AccountSettings({
     "delete" | "all" | "forget" | null
   >(null);
   const [deleteText, setDeleteText] = useState("");
+  const [skipped, setSkipped] = useState(false);
+  const [editingTag, setEditingTag] = useState(false);
   const user = session.user;
+  // A new account has no name yet: finish it in one short step first.
+  const onboarding =
+    session.hasSession &&
+    session.online &&
+    !!user &&
+    !user.displayName &&
+    !skipped;
   // The code as it will read once saved, following the name being typed.
   const shownCode =
     user && session.online && validFriendTag(friendTag)
@@ -145,10 +154,10 @@ export function AccountSettings({
       notify(t("Código enviado. Confira seu e-mail."));
     });
   }
-  async function verify(event: FormEvent) {
-    event.preventDefault();
+  async function verify(event?: FormEvent, value = code) {
+    event?.preventDefault();
     await action(async () => {
-      adopt(await api.verify(email, code));
+      adopt(await api.verify(email, value));
       clearPendingLogin();
       setCode("");
       setSent(false);
@@ -225,7 +234,99 @@ export function AccountSettings({
               {t("Tentar novamente")}
             </button>
           )}
-          {session.hasSession ? (
+          {onboarding ? (
+            <section className="account-signup">
+              <Steps current={2} />
+              <h3>{t("Como seus amigos vão ver você")}</h3>
+              <p className="account-hint">
+                {t("Escolha um ícone e um nome. Dá para mudar quando quiser.")}
+              </p>
+              <form
+                className="account-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void profile({
+                    displayName: name.trim(),
+                    friendTag: friendTag.trim().toLowerCase(),
+                    avatar,
+                  });
+                }}
+              >
+                <AvatarPicker
+                  value={avatar}
+                  onChange={setAvatar}
+                  disabled={busy}
+                />
+                <label htmlFor="account-new-name">{t("Seu nome")}</label>
+                <input
+                  id="account-new-name"
+                  autoFocus
+                  autoComplete="nickname"
+                  maxLength={24}
+                  value={name}
+                  placeholder={t("Como você quer ser chamado")}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={busy}
+                />
+                <div className="account-code-preview">
+                  <span>
+                    {t("Seu código de amigo")}:{" "}
+                    <strong>
+                      {friendPrefix(name) || t("nome")}#{friendTag || "????"}
+                    </strong>
+                  </span>
+                  {!editingTag && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setEditingTag(true)}
+                    >
+                      {t("Personalizar")}
+                    </button>
+                  )}
+                </div>
+                {editingTag && (
+                  <>
+                    <label htmlFor="account-new-tag">
+                      {t("4 letras ou números depois do #")}
+                    </label>
+                    <input
+                      id="account-new-tag"
+                      value={friendTag}
+                      maxLength={4}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      placeholder="ab12"
+                      disabled={busy}
+                      onChange={(e) =>
+                        setFriendTag(e.target.value.toLowerCase())
+                      }
+                    />
+                  </>
+                )}
+                <button
+                  className="button primary"
+                  type="submit"
+                  disabled={
+                    busy ||
+                    !validDisplayName(name) ||
+                    !validFriendTag(friendTag)
+                  }
+                >
+                  {busy ? t("Salvando…") : t("Concluir")}
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => setSkipped(true)}
+                >
+                  {t("Pular por agora")}
+                </button>
+              </form>
+            </section>
+          ) : session.hasSession ? (
             <>
               <section
                 className="settings-group"
@@ -514,8 +615,21 @@ export function AccountSettings({
               </section>
             </>
           ) : (
-            <section className="settings-group">
-              <h3>{t("Entrar na sua conta")}</h3>
+            <section className="account-signup">
+              <Steps current={sent ? 1 : 0} />
+              <h3>
+                {sent ? t("Confira seu e-mail") : t("Criar conta ou entrar")}
+              </h3>
+              <p className="account-hint">
+                {sent
+                  ? t(
+                      "Enviamos um código de 6 dígitos para {email}. Ele vale por 10 minutos.",
+                      { email },
+                    )
+                  : t(
+                      "Com uma conta você adiciona amigos, joga junto no Party e vê o que eles estão jogando. Não tem senha: enviamos um código para o seu e-mail.",
+                    )}
+              </p>
               {!session.supported && (
                 <p className="account-hint">
                   {t("O login está disponível no aplicativo para Windows.")}
@@ -527,19 +641,24 @@ export function AccountSettings({
                   void (sent ? verify(e) : sendCode(e));
                 }}
               >
-                <label htmlFor="account-email">{t("E-mail")}</label>
-                <input
-                  id="account-email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  maxLength={254}
-                  required
-                  value={email}
-                  readOnly={sent}
-                  disabled={busy || !session.supported}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+                {!sent && (
+                  <>
+                    <label htmlFor="account-email">{t("Seu e-mail")}</label>
+                    <input
+                      id="account-email"
+                      type="email"
+                      autoComplete="email"
+                      inputMode="email"
+                      maxLength={254}
+                      required
+                      autoFocus
+                      placeholder={t("voce@exemplo.com")}
+                      value={email}
+                      disabled={busy || !session.supported}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </>
+                )}
                 {sent && (
                   <>
                     <label htmlFor="account-code">
@@ -547,21 +666,27 @@ export function AccountSettings({
                     </label>
                     <input
                       id="account-code"
+                      className="account-code-input"
                       type="text"
                       autoComplete="one-time-code"
                       inputMode="numeric"
                       pattern="[0-9]{6}"
                       maxLength={6}
                       required
+                      autoFocus
+                      placeholder="000000"
                       value={code}
                       disabled={busy}
-                      onChange={(e) =>
-                        setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
-                      }
+                      onChange={(e) => {
+                        const digits = e.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 6);
+                        setCode(digits);
+                        // Typing or pasting the sixth digit signs in.
+                        if (digits.length === 6 && !busy)
+                          void verify(undefined, digits);
+                      }}
                     />
-                    <p className="account-hint">
-                      {t("Confira seu e-mail. O código vale por 10 minutos.")}
-                    </p>
                   </>
                 )}
                 <button
@@ -575,11 +700,7 @@ export function AccountSettings({
                     (!sent && remaining > 0)
                   }
                 >
-                  {busy
-                    ? t("Aguarde…")
-                    : sent
-                      ? t("Entrar")
-                      : t("Enviar código")}
+                  {busy ? t("Aguarde…") : sent ? t("Entrar") : t("Continuar")}
                 </button>
                 {sent && (
                   <div className="account-actions">
@@ -710,5 +831,25 @@ export function AccountSettings({
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Where the player is in signing up: e-mail, code, then profile. */
+function Steps({ current }: { current: number }) {
+  const steps = [t("E-mail"), t("Código"), t("Perfil")];
+  return (
+    <ol className="account-steps" aria-label={t("Etapas")}>
+      {steps.map((step, index) => (
+        <li
+          key={step}
+          className={
+            index === current ? "current" : index < current ? "done" : ""
+          }
+          aria-current={index === current ? "step" : undefined}
+        >
+          <span>{index + 1}</span> {step}
+        </li>
+      ))}
+    </ol>
   );
 }

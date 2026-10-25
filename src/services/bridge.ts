@@ -9,7 +9,6 @@ import type {
   ImportCandidate,
   LibraryGame,
   NetplaySession,
-  PlayerProfile,
   RemotePlayStatus,
   SaveState,
 } from "../types";
@@ -22,7 +21,6 @@ import type {
 } from "../types";
 import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
 import { sourceStore, type PreviewSource } from "./sourceStore";
-import { DEFAULT_AVATAR, PLAYER_COLORS } from "./playerAppearance";
 import { t } from "../i18n";
 export interface FilePickerRequest {
   title: string;
@@ -50,29 +48,17 @@ function pickPath(request: FilePickerRequest): Promise<string | null> {
 export const isDesktop = hasBackend;
 export { isRemote };
 const key = "openretro-preview-v1";
-export interface PlayerProfiles {
-  activeId: string;
-  players: PlayerProfile[];
+export interface GameRemoval {
+  /** The download folder or game file, or null when it is already gone. */
+  path: string | null;
+  /** From an OpenRetro download: its whole folder goes with the game. */
+  downloaded: boolean;
+  bytes: number;
 }
 export interface GameCapture {
   name: string;
   takenAt: string;
   data: string;
-}
-function readPlayerProfiles(): PlayerProfiles {
-  const stored: PlayerProfiles = JSON.parse(
-    localStorage.getItem("openretro-players") ?? "null",
-  ) ?? {
-    activeId: "default",
-    players: [{ id: "default", name: t("Jogador 1") }],
-  };
-  // Profiles saved before avatars existed get the same defaults as the database.
-  stored.players = stored.players.map((player) => ({
-    ...player,
-    avatar: player.avatar ?? DEFAULT_AVATAR,
-    color: player.color ?? PLAYER_COLORS[0],
-  }));
-  return stored;
 }
 interface PreviewStore {
   library: LibraryGame[];
@@ -119,75 +105,6 @@ export const bridge = {
       directory: false,
     });
     return path ? invoke("read_source_json", { path }) : null;
-  },
-  async profiles(): Promise<PlayerProfiles> {
-    if (isDesktop) return invoke("list_profiles");
-    return readPlayerProfiles();
-  },
-  async createProfile(name: string): Promise<void> {
-    if (isDesktop) return invoke("create_profile", { name });
-    const profiles = readPlayerProfiles();
-    if (!name.trim() || name.trim().length > 32)
-      throw new Error(t("Use um nome entre 1 e 32 caracteres."));
-    profiles.players.push({
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      avatar: DEFAULT_AVATAR,
-      color: PLAYER_COLORS[profiles.players.length % PLAYER_COLORS.length],
-    });
-    localStorage.setItem("openretro-players", JSON.stringify(profiles));
-  },
-  async updateProfile(
-    id: string,
-    name: string,
-    avatar: string,
-    color: string,
-  ): Promise<void> {
-    if (isDesktop) return invoke("update_profile", { id, name, avatar, color });
-    const profiles = readPlayerProfiles();
-    const player = profiles.players.find((p) => p.id === id);
-    if (!player) throw new Error(t("Jogador não encontrado."));
-    if (!name.trim() || name.trim().length > 32)
-      throw new Error(t("Use um nome entre 1 e 32 caracteres."));
-    Object.assign(player, { name: name.trim(), avatar, color });
-    localStorage.setItem("openretro-players", JSON.stringify(profiles));
-  },
-  async selectProfile(id: string): Promise<void> {
-    if (isDesktop) return invoke("select_profile", { id });
-    const profiles = readPlayerProfiles();
-    if (!profiles.players.some((p) => p.id === id))
-      throw new Error(t("Jogador não encontrado."));
-    // Preview uses the same projection behavior as the native library.
-    const progress = JSON.parse(
-      localStorage.getItem("openretro-player-progress") ?? "{}",
-    );
-    progress[profiles.activeId] = read().library.map(({ item }) => ({
-      id: item.id,
-      favorite: item.favorite,
-      playtime: item.playtime,
-      lastPlayedAt: item.lastPlayedAt,
-    }));
-    localStorage.setItem("openretro-player-progress", JSON.stringify(progress));
-    const store = read();
-    store.library = store.library.map((entry) => {
-      const item = progress[id]?.find(
-        (p: { id: string }) => p.id === entry.item.id,
-      );
-      return {
-        ...entry,
-        item: {
-          ...entry.item,
-          favorite: item?.favorite ?? false,
-          playtime: item?.playtime ?? 0,
-          lastPlayedAt: item?.lastPlayedAt ?? null,
-        },
-      };
-    });
-    write(store);
-    localStorage.setItem(
-      "openretro-players",
-      JSON.stringify({ ...profiles, activeId: id }),
-    );
   },
   async downloadSources(): Promise<DownloadSource[]> {
     return isDesktop
@@ -441,6 +358,11 @@ export const bridge = {
     });
     write(data);
   },
+  /** What removing a game with its files would delete. */
+  async gameRemoval(id: string): Promise<GameRemoval> {
+    if (isDesktop) return invoke("game_removal", { id });
+    return { path: null, downloaded: false, bytes: 0 };
+  },
   async removeGame(id: string, deleteFile = false) {
     if (isDesktop) return invoke("remove_game", { id, deleteFile });
     const d = read();
@@ -512,12 +434,22 @@ export const bridge = {
     slot?: number,
     netplay?: NetplaySession,
   ): Promise<number> {
-    if (isDesktop)
-      return invoke("launch_game", {
-        id,
-        slot: slot ?? null,
-        netplay: netplay ?? null,
-      });
+    if (isDesktop) {
+      const start = () =>
+        invoke<number>("launch_game", {
+          id,
+          slot: slot ?? null,
+          netplay: netplay ?? null,
+        });
+      try {
+        return await start();
+      } catch (error) {
+        // OpenGL failed on this PC and the runtime switched to Direct3D 11:
+        // start again once, so the player never sees that first failure.
+        if (String(error).startsWith("VIDEO_FALLBACK")) return start();
+        throw error;
+      }
+    }
     throw new Error(
       t("Open the desktop app to launch a game with your configured emulator."),
     );

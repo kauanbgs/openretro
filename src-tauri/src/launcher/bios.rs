@@ -1,6 +1,5 @@
 //! BIOS files for runtime cores that cannot boot without them. OpenRetro keeps
-//! one canonical copy under `<data>/system` and mirrors it into each player's
-//! system folder, which also holds that player's PS2 memory cards.
+//! one copy under `<data>/system`, which also holds the PS2 memory cards.
 use crate::database::{error, Result};
 use std::{
     io::Read,
@@ -121,24 +120,6 @@ pub fn install(system: &Path, platform: &str, source: &Path) -> Result<usize> {
     Ok(images)
 }
 
-/// Copies missing BIOS files from the shared folder into a player's folder.
-pub fn mirror(shared: &Path, player: &Path) -> Result<()> {
-    for dir in ["pcsx2/bios"] {
-        let Ok(entries) = std::fs::read_dir(shared.join(dir)) else {
-            continue;
-        };
-        let target = player.join(dir);
-        std::fs::create_dir_all(&target).map_err(error)?;
-        for entry in entries.flatten() {
-            let destination = target.join(entry.file_name());
-            if entry.metadata().is_ok_and(|m| m.is_file()) && !destination.exists() {
-                std::fs::copy(entry.path(), destination).map_err(error)?;
-            }
-        }
-    }
-    Ok(())
-}
-
 #[tauri::command(async)]
 pub fn runtime_bios_status(app: tauri::AppHandle, platform: String) -> Result<bool> {
     Ok(!required(&platform)
@@ -201,10 +182,6 @@ mod tests {
         assert!(!bios.join("readme.exe").exists());
         assert!(!root.join("evil.bin").exists() && !system.join("evil.bin").exists());
         assert!(installed(&system, "ps2"));
-
-        let player = root.join("player");
-        mirror(&system, &player).unwrap();
-        assert!(installed(&player, "ps2"));
         std::fs::remove_dir_all(root).unwrap();
     }
 

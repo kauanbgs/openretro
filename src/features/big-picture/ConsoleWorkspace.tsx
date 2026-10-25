@@ -37,11 +37,6 @@ import { t } from "../../i18n";
 const SettingsPage = lazy(() =>
   import("../settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
-const EmulatorsPage = lazy(() =>
-  import("../emulators/EmulatorsPage").then((m) => ({
-    default: m.EmulatorsPage,
-  })),
-);
 const DownloadsPage = lazy(() =>
   import("../downloads/DownloadsPage").then((m) => ({
     default: m.DownloadsPage,
@@ -61,7 +56,6 @@ const SourceManager = lazy(() =>
 
 export type WorkspacePage =
   | "settings"
-  | "emulators"
   | "downloads"
   | "sources"
   | "game"
@@ -84,7 +78,6 @@ const titles: Record<WorkspacePage, string> = {
   friends: t("Amigos"),
   profile: t("Perfil"),
   settings: t("Configurações"),
-  emulators: t("Emuladores"),
   downloads: "Downloads",
   sources: t("Fontes de download"),
   game: t("Gerenciar jogo"),
@@ -536,19 +529,7 @@ export function ConsoleWorkspace({
               onJoinParty={(friend) => onRoute({ page: "party-guest", friend })}
             />
           )}
-          {route.page === "settings" && (
-            <SettingsPage
-              onEmulators={() => navigate({ page: "emulators" })}
-              notify={notify}
-            />
-          )}
-          {route.page === "emulators" && (
-            <EmulatorsPage
-              emulators={emulators}
-              refresh={refresh}
-              notify={notify}
-            />
-          )}
+          {route.page === "settings" && <SettingsPage notify={notify} />}
           {route.page === "sources" && (
             <div className="page-content">
               <SourceManager />
@@ -572,7 +553,6 @@ export function ConsoleWorkspace({
               emulators={emulators}
               onBack={back}
               onImport={(game) => setImporting({ game })}
-              onEmulators={() => navigate({ page: "emulators" })}
               onSelect={(game) => navigate({ page: "game", game })}
               refresh={refresh}
               notify={notify}

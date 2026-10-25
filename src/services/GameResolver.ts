@@ -47,10 +47,9 @@ export class GameResolver {
     if (!emulator || !(await this.exists(emulator.executablePath)))
       return {
         state: "MISSING_EMULATOR",
-        message: t(
-          "An emulator is required to play this game. Configure a compatible emulator for {console}.",
-          { console: platform.name },
-        ),
+        message: t("O OpenRetro ainda não roda jogos de {console}.", {
+          console: platform.name,
+        }),
       };
     if (emulator.id === MANAGED_RUNTIME_ID) {
       if (!(await this.runtimeBios(platform.id)))

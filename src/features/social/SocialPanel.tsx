@@ -23,9 +23,7 @@ import {
 } from "../../services/social";
 import { accountApi, accountFailure } from "../../services/account";
 import { AccountSettings } from "../account/AccountSettings";
-import { PlayerAvatar } from "../../components/PlayerAvatar";
 import { AccountAvatar, type PresenceStatus } from "./accountAvatars";
-import type { PlayerProfile } from "../../types";
 import { t } from "../../i18n";
 import "./SocialPanel.css";
 import { SocialActivity } from "./SocialActivity";
@@ -48,8 +46,6 @@ function statusOf(friend: Friend): PresenceStatus {
 export function SocialPanel({
   notify,
   layout = "popover",
-  player,
-  onPlayers,
   onClose,
   onJoinParty,
   initialView = "friends",
@@ -57,9 +53,6 @@ export function SocialPanel({
 }: {
   notify: (message: string) => void;
   layout?: "popover" | "page";
-  /** The local player on this PC, switched separately from the account. */
-  player?: PlayerProfile | null;
-  onPlayers?: () => void;
   onClose?: () => void;
   onJoinParty: (friend: Friend) => void;
   initialView?: "friends" | "activity" | "people";
@@ -190,18 +183,6 @@ export function SocialPanel({
           />
         )}
       </div>
-      {onPlayers && (
-        <footer className="social-local">
-          <PlayerAvatar player={player} size={30} />
-          <span>
-            <small>{t("Jogador neste PC")}</small>
-            <strong>{player?.name ?? t("Jogador 1")}</strong>
-          </span>
-          <button className="button secondary" onClick={onPlayers}>
-            {t("Trocar")}
-          </button>
-        </footer>
-      )}
     </section>
   );
 }

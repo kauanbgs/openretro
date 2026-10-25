@@ -142,3 +142,72 @@
 .account-form .account-tag-editor > input:focus-visible {
   outline: none;
 }
+
+/* Signing up: steps, then e-mail, code and a short profile */
+.account-signup {
+  display: grid;
+  gap: 8px;
+  max-width: 440px;
+  margin-top: 8px;
+}
+.account-signup h3 {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+}
+.account-signup .account-form {
+  padding-top: 10px;
+}
+.account-steps {
+  display: flex;
+  gap: 14px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  color: var(--quiet);
+  font-size: 12px;
+}
+.account-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-steps span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+.account-steps li.current {
+  color: var(--text);
+}
+.account-steps li.current span {
+  border-color: #12ace2;
+  background: #12ace2;
+  color: #fff;
+}
+.account-steps li.done span {
+  border-color: #12ace2;
+  color: #12ace2;
+}
+.account-code-input {
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+.account-code-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--body);
+  font-size: 13px;
+}
+.account-code-preview strong {
+  color: var(--text);
+}

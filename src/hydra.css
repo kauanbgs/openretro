@@ -750,6 +750,191 @@ html.remote .recommendation-row {
   gap: 10px;
 }
 
+/* Download sources page */
+.source-manager {
+  display: grid;
+  gap: 16px;
+  max-width: 1100px;
+  min-width: 0;
+}
+.source-intro {
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.source-toolbar,
+.source-toolbar > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.source-toolbar {
+  justify-content: space-between;
+}
+.source-status {
+  color: var(--success);
+  font-size: 13px;
+}
+.source-empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 40px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--body);
+  text-align: center;
+}
+.source-cards {
+  display: grid;
+  gap: 16px;
+}
+.source-card {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.source-card.disabled {
+  opacity: 0.65;
+}
+.source-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.source-card h3 {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.source-badge {
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  background: #ffffff14;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.source-count {
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.source-url {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.source-url > div {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.source-url input {
+  flex: 1;
+  min-width: 0;
+}
+.source-url .button {
+  flex: none;
+}
+@media (max-width: 560px) {
+  .source-url > div {
+    flex-direction: column;
+  }
+}
+
+/* Library card actions and game removal */
+.library-card {
+  display: contents;
+}
+.context-menu {
+  position: fixed;
+  z-index: 3000;
+  display: grid;
+  min-width: 180px;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: #1a1a1a;
+  box-shadow: 0 12px 32px #0009;
+}
+.context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+.context-menu button:hover,
+.context-menu button:focus-visible {
+  background: #ffffff14;
+  outline: none;
+}
+.context-menu button.danger {
+  color: var(--danger);
+}
+.remove-game {
+  display: grid;
+  gap: 14px;
+}
+.remove-options {
+  display: grid;
+  gap: 10px;
+}
+.remove-options label {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.remove-options label.selected {
+  border-color: var(--border-strong);
+  background: #ffffff0d;
+}
+.remove-options label:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+.remove-options span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.remove-options strong {
+  color: var(--text);
+  font-size: 14px;
+}
+.remove-options small {
+  color: var(--body);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 /* Game cards */
 .cards-grid,
 .app .games-grid,
@@ -1675,11 +1860,7 @@ html.remote .header-actions .button.primary {
   padding: 0 10px;
   text-decoration: none;
 }
-html.remote .header-player {
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-}
+
 html.remote .app .page-content {
   padding: var(--page-gutter);
 }
@@ -1950,7 +2131,6 @@ html.remote .header-search:not(.collapsed):focus-within {
   flex: 1;
   width: auto;
 }
-html.remote .header:has(.header-search:not(.collapsed)) .header-player,
 html.remote .header:has(.header-search:not(.collapsed)) .header-actions > a {
   display: none;
 }
@@ -2319,22 +2499,18 @@ html.remote .mobile-home {
   color: var(--body);
   font-size: 14px;
 }
-.settings-group,
-.settings-panel .source-manager {
+.settings-group {
   max-width: 880px;
   margin: 32px 0 0;
 }
-.settings-group h3,
-.settings-panel .source-manager .section-heading h2 {
+.settings-group h3 {
   margin: 0 0 4px;
   color: var(--text);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0;
 }
-.settings-panel .source-manager .section-heading p {
-  font-size: 13px;
-}
+
 .settings-group-body > .setting-row:last-child {
   border-bottom: 0;
 }
@@ -2381,12 +2557,7 @@ html.remote .mobile-home {
   font-size: 12px;
   word-break: break-all;
 }
-.settings-panel .player-chip {
-  gap: 14px;
-}
-.settings-panel .player-chip strong {
-  font-size: 15px;
-}
+
 .setting-row.setting-row-stack {
   flex-direction: column;
   align-items: stretch;

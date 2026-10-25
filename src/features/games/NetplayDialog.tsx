@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Globe2, LogIn } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { bridge } from "../../services/bridge";
+import { socialStore } from "../../services/social";
 import {
   checkInviteGame,
   createNetplayInvite,
@@ -38,18 +39,15 @@ export function NetplayDialog({
   const [code, setCode] = useState("");
   const [port, setPort] = useState(String(NETPLAY_DEFAULT_PORT));
   const [password, setPassword] = useState("");
-  const profiles = useQuery({
-    queryKey: ["players"],
-    queryFn: () => bridge.profiles(),
-  });
   const localAddress = useQuery({
     queryKey: ["netplay-local-address"],
     queryFn: () => bridge.netplayLocalAddress(),
     enabled: role === "host",
   });
-  const nickname = profiles.data?.players.find(
-    (p) => p.id === profiles.data?.activeId,
-  )?.name;
+  // Other players see the account's name; without an account, RetroArch's default.
+  const nickname =
+    useSyncExternalStore(socialStore.subscribe, socialStore.snapshot).session
+      .user?.displayName ?? undefined;
   const portNumber = Number(port);
   const validPort =
     Number.isInteger(portNumber) && portNumber >= 1024 && portNumber <= 65535;

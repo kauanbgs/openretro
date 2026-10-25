@@ -39,6 +39,7 @@ pub fn run() {
             std::fs::create_dir_all(&dir)?;
             let db = database::initialize(&dir.join("openretro.sqlite"))
                 .map_err(std::io::Error::other)?;
+            profiles::retire_players(&dir);
             commands::sync_runtime_platforms(&db).map_err(std::io::Error::other)?;
             #[cfg(windows)]
             commands::register_rpcs3(&db, &dir).map_err(std::io::Error::other)?;
@@ -98,10 +99,6 @@ pub fn run() {
             account::social::social_game_busy,
             file_browser::browse_files,
             file_browser::read_source_json,
-            profiles::list_profiles,
-            profiles::create_profile,
-            profiles::select_profile,
-            profiles::update_profile,
             metadata::catalog_status,
             metadata::catalog_refresh,
             metadata::catalog_genres,
@@ -135,6 +132,7 @@ pub fn run() {
             commands::file_exists,
             commands::add_game,
             commands::remove_game,
+            commands::game_removal,
             commands::set_favorite,
             commands::configure_game,
             commands::relocate_game,

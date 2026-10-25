@@ -1,5 +1,88 @@
 /** Portuguese source text → English. */
 export const en: Record<string, string> = {
+  "Console ainda não suportado": "Console not supported yet",
+  "O OpenRetro ainda não roda jogos de {console}.":
+    "OpenRetro cannot run {console} games yet.",
+  "O OpenRetro ainda não roda jogos deste console.":
+    "OpenRetro cannot run games for this console yet.",
+  Jogos: "Games",
+  "Como a imagem dos jogos aparece e as atualizações do PS3.":
+    "How games look on screen and PS3 updates.",
+  "Como o OpenRetro abre, joga e se atualiza.":
+    "How OpenRetro starts, plays and updates.",
+  "O OpenRetro procura links de download em todas as fontes ativas. A URL da fonte deve ser um link direto para um arquivo .json com uma lista de links.":
+    "OpenRetro looks for download links in every active source. A source URL must link directly to a .json file with a list of links.",
+  Sincronizar: "Sync",
+  "Sincronizando…": "Syncing…",
+  "Fontes sincronizadas.": "Sources synced.",
+  "Remover todas": "Remove all",
+  "Nenhuma fonte adicionada. Adicione a URL de uma fonte para encontrar downloads dos jogos.":
+    "No sources yet. Add a source URL to find game downloads.",
+  "Desativar fonte": "Disable source",
+  "Ativar fonte": "Enable source",
+  Desativada: "Disabled",
+  Sincronizada: "Synced",
+  Importada: "Imported",
+  "Atualizada em {date}": "Updated on {date}",
+  "{count} downloads na lista": "{count} downloads listed",
+  "Arquivo JSON importado neste computador":
+    "JSON file imported on this computer",
+  "Substituir JSON": "Replace JSON",
+  "Remover todas as fontes?": "Remove all sources?",
+  "Os jogos já baixados continuam na sua biblioteca. Você pode adicionar as fontes de novo depois.":
+    "Games you already downloaded stay in your library. You can add the sources again later.",
+  "Removendo…": "Removing…",
+  "Importando…": "Importing…",
+  "Remover {title}?": "Remove {title}?",
+  "Remover e apagar os arquivos": "Remove and delete the files",
+  "O arquivo do jogo não está mais neste computador.":
+    "The game file is no longer on this computer.",
+  "Calculando o espaço…": "Measuring the space…",
+  "Apaga a pasta do download e libera {size} no disco.":
+    "Deletes the download folder and frees {size} of disk space.",
+  "Apaga o arquivo do jogo e libera {size} no disco.":
+    "Deletes the game file and frees {size} of disk space.",
+  "Só tirar da biblioteca": "Only remove from the library",
+  "Os arquivos continuam em {path}.": "The files stay in {path}.",
+  "Nenhum arquivo é apagado.": "No files are deleted.",
+  "Seus saves continuam neste computador e voltam se você adicionar o jogo de novo.":
+    "Your saves stay on this computer and come back if you add the game again.",
+  "Remover e apagar": "Remove and delete",
+  "{title} foi removido.": "{title} was removed.",
+  Abrir: "Open",
+  "Remover…": "Remove…",
+  "Os arquivos do jogo não puderam ser apagados. Feche programas que possam estar usando-os e tente de novo.":
+    "The game files could not be deleted. Close programs that may be using them and try again.",
+  "Sem conta": "No account",
+  "Criar conta ou entrar": "Create an account or sign in",
+  "Como seus amigos vão ver você": "How your friends will see you",
+  "Escolha um ícone e um nome. Dá para mudar quando quiser.":
+    "Pick an icon and a name. You can change them anytime.",
+  "Seu nome": "Your name",
+  "Como você quer ser chamado": "What should we call you",
+  nome: "name",
+  Personalizar: "Customize",
+  "4 letras ou números depois do #": "4 letters or numbers after the #",
+  "Pular por agora": "Skip for now",
+  "Confira seu e-mail": "Check your email",
+  "Enviamos um código de 6 dígitos para {email}. Ele vale por 10 minutos.":
+    "We sent a 6-digit code to {email}. It is valid for 10 minutes.",
+  "Com uma conta você adiciona amigos, joga junto no Party e vê o que eles estão jogando. Não tem senha: enviamos um código para o seu e-mail.":
+    "With an account you add friends, play together in Party and see what they are playing. There is no password: we email you a code.",
+  "Seu e-mail": "Your email",
+  "voce@exemplo.com": "you@example.com",
+  Código: "Code",
+  Etapas: "Steps",
+  "O driver de vídeo deste PC não conseguiu abrir o jogo, nem com OpenGL nem com Direct3D 11. Instale o driver mais recente da sua placa de vídeo pelo site da NVIDIA, AMD ou Intel. Detalhes em {details}":
+    "This PC's graphics driver could not open the game with OpenGL or Direct3D 11. Install the latest driver for your graphics card from the NVIDIA, AMD or Intel website. Details in {details}",
+  "O núcleo do emulador para este console não pôde ser carregado. Reinstale o emulador em Emuladores. Detalhes em {details}":
+    "The emulator core for this console could not be loaded. Reinstall the emulator in Emulators. Details in {details}",
+  "O emulador não conseguiu ler este jogo. O arquivo pode estar corrompido ou em um formato não suportado. Detalhes em {details}":
+    "The emulator could not read this game. The file may be damaged or in an unsupported format. Details in {details}",
+  "Falta um arquivo do Windows de que o emulador precisa. Atualize o Windows e tente de novo. Detalhes em {details}":
+    "A Windows file the emulator needs is missing. Update Windows and try again. Details in {details}",
+  "O emulador travou durante o jogo. Sua sessão foi salva. Detalhes em {details}":
+    "The emulator crashed during the game. Your session was saved. Details in {details}",
   "Recomendados para você": "Recommended for you",
   "Porque você jogou {title}": "Because you played {title}",
   "Porque você baixou {title}": "Because you downloaded {title}",

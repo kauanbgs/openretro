@@ -1,6 +1,6 @@
 import { PageHeader } from "../../components/PageHeader";
 import { PageLoading } from "../../components/PageLoading";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Plus,
@@ -10,8 +10,12 @@ import {
   List,
   Library,
   FolderOpen,
+  Play,
+  Trash2,
 } from "lucide-react";
 import { GameCard } from "../../components/GameCard";
+import { ContextMenu } from "../../components/ContextMenu";
+import { RemoveGameDialog } from "../../components/RemoveGameDialog";
 import { Capsule } from "../../components/Capsule";
 import { isRemote } from "../../services/transport";
 import { platforms } from "../../db/platforms";
@@ -46,7 +50,10 @@ export function CollectionPage({
   const [filter, setFilter] = useState("all"),
     [layout, setLayout] = useState("grid"),
     [sort, setSort] = useState("recent"),
-    [players, setPlayers] = useState<PlayersFilter | "all">("all");
+    [players, setPlayers] = useState<PlayersFilter | "all">("all"),
+    [menu, setMenu] = useState<{ entry: LibraryGame; x: number; y: number }>(),
+    [removing, setRemoving] = useState<LibraryGame>();
+  const closeMenu = useCallback(() => setMenu(undefined), []);
   // Looked up only once the filter is used; the catalog knows player counts.
   const counts = useQuery({
     queryKey: ["library-players", library.map((x) => x.game.id).join(",")],
@@ -203,12 +210,20 @@ export function CollectionPage({
           }
         >
           {visible.map((x) => (
-            <GameCard
+            <div
               key={x.item.id}
-              game={x.game}
-              item={x.item}
-              onClick={() => onSelect(x.game)}
-            />
+              className="library-card"
+              onKeyDown={(event) => {
+                if (event.key === "Delete" && !isRemote) setRemoving(x);
+              }}
+            >
+              <GameCard
+                game={x.game}
+                item={x.item}
+                onClick={() => onSelect(x.game)}
+                onMenu={(left, top) => setMenu({ entry: x, x: left, y: top })}
+              />
+            </div>
           ))}
         </div>
       ) : (
@@ -248,6 +263,37 @@ export function CollectionPage({
             )}
           </button>
         </div>
+      )}
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          items={[
+            {
+              label: t("Abrir"),
+              icon: <Play size={15} />,
+              onSelect: () => onSelect(menu.entry.game),
+            },
+            ...(isRemote
+              ? []
+              : [
+                  {
+                    label: t("Remover…"),
+                    icon: <Trash2 size={15} />,
+                    danger: true,
+                    onSelect: () => setRemoving(menu.entry),
+                  },
+                ]),
+          ]}
+        />
+      )}
+      {removing && (
+        <RemoveGameDialog
+          entry={removing}
+          onClose={() => setRemoving(undefined)}
+          onRemoved={() => setRemoving(undefined)}
+        />
       )}
     </div>
   );

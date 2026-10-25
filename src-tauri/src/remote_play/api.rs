@@ -71,8 +71,6 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
             take(&args, "favorite")?,
             db(),
         )?),
-        "list_profiles" => to_json(crate::profiles::list_profiles(db())?),
-        "select_profile" => to_json(crate::profiles::select_profile(take(&args, "id")?, db())?),
         "runtime_bios_status" => to_json(crate::launcher::bios::runtime_bios_status(
             app.clone(),
             take(&args, "platform")?,

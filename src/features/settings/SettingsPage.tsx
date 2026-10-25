@@ -5,10 +5,8 @@ import { useRef, useState, type ReactNode } from "react";
 import {
   Check,
   AlertCircle,
-  ExternalLink,
   Folder,
   Settings,
-  Library,
   Gamepad2,
   Download,
   Palette,
@@ -17,13 +15,9 @@ import {
 } from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
-import { SourceManager } from "../downloads/SourceManager";
-import { PlayerPicker } from "../../components/PlayerPicker";
-import { PlayerAvatar } from "../../components/PlayerAvatar";
 import { version as appVersion } from "../../../package.json";
 import { adoptLanguage, languages, t } from "../../i18n";
-type Section =
-  "General" | "Library" | "Emulators" | "Downloads" | "Appearance" | "Advanced";
+type Section = "General" | "Games" | "Downloads" | "Appearance" | "Advanced";
 const sections: {
   id: Section;
   label: string;
@@ -34,21 +28,13 @@ const sections: {
     id: "General",
     label: t("Geral"),
     icon: Settings,
-    description: t(
-      "Seu perfil de jogador, como o OpenRetro abre e se atualiza.",
-    ),
+    description: t("Como o OpenRetro abre, joga e se atualiza."),
   },
   {
-    id: "Library",
-    label: t("Biblioteca"),
-    icon: Library,
-    description: t("Onde ficam os jogos que você adicionou."),
-  },
-  {
-    id: "Emulators",
-    label: t("Emuladores"),
+    id: "Games",
+    label: t("Jogos"),
     icon: Gamepad2,
-    description: t("Consoles instalados e como a imagem dos jogos aparece."),
+    description: t("Como a imagem dos jogos aparece e as atualizações do PS3."),
   },
   {
     id: "Downloads",
@@ -106,23 +92,12 @@ function Switch({
     </button>
   );
 }
-export function SettingsPage({
-  onEmulators,
-  notify,
-}: {
-  onEmulators: () => void;
-  notify: (s: string) => void;
-}) {
+export function SettingsPage({ notify }: { notify: (s: string) => void }) {
   const [section, setSection] = useState<Section>("General");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const writes = useRef(Promise.resolve());
   const version = useRef(0);
-  const [playersOpen, setPlayersOpen] = useState(false);
-  const { data: players } = useQuery({
-    queryKey: ["players"],
-    queryFn: bridge.profiles,
-  });
   const client = useQueryClient();
   const { data: settings = defaultSettings } = useQuery({
     queryKey: ["settings"],
@@ -163,10 +138,8 @@ export function SettingsPage({
     }
   }
   const current = sections.find((s) => s.id === section)!;
-  const activePlayer = players?.players.find((p) => p.id === players.activeId);
   return (
     <div className="page-content">
-      {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
       <PageHeader
         title={t("Configurações")}
         description={t("Personalize como você organiza e joga.")}
@@ -229,25 +202,6 @@ export function SettingsPage({
           </header>
           {section === "General" ? (
             <>
-              <Group title={t("Perfil")}>
-                <div className="setting-row">
-                  <div className="player-chip">
-                    <PlayerAvatar player={activePlayer} size={44} />
-                    <div>
-                      <strong>{activePlayer?.name ?? t("Jogador 1")}</strong>
-                      <p>
-                        {t("Cada jogador tem seus próprios saves e favoritos.")}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    className="button secondary"
-                    onClick={() => setPlayersOpen(true)}
-                  >
-                    {t("Trocar ou personalizar")}
-                  </button>
-                </div>
-              </Group>
               <Group title={t("Jogando")}>
                 <div className="setting-row">
                   <div>
@@ -387,48 +341,8 @@ export function SettingsPage({
                 </div>
               </Group>
             </>
-          ) : section === "Library" ? (
-            <Group title={t("Arquivos")}>
-              <div className="setting-row">
-                <div>
-                  <strong>{t("Pastas da biblioteca")}</strong>
-                  <p>
-                    {t(
-                      "Seus arquivos permanecem nas pastas em que foram importados. Altere o caminho na aba de detalhes do jogo.",
-                    )}
-                  </p>
-                </div>
-                <Folder size={21} />
-              </div>
-              <div className="setting-row">
-                <div>
-                  <strong>{t("Buscar novos jogos automaticamente")}</strong>
-                  <p>
-                    {t(
-                      "Use Adicionar jogo para importar um arquivo ou uma pasta.",
-                    )}
-                  </p>
-                </div>
-                <span className="badge">{t("Em breve")}</span>
-              </div>
-            </Group>
-          ) : section === "Emulators" ? (
+          ) : section === "Games" ? (
             <>
-              <Group title={t("Consoles")}>
-                <div className="setting-row">
-                  <div>
-                    <strong>{t("Emuladores e consoles")}</strong>
-                    <p>
-                      {t(
-                        "Instale, teste e escolha o emulador padrão para cada console.",
-                      )}
-                    </p>
-                  </div>
-                  <button className="button secondary" onClick={onEmulators}>
-                    {t("Gerenciar")} <ExternalLink size={15} />
-                  </button>
-                </div>
-              </Group>
               <Group title={t("Imagem")}>
                 <div className="setting-row">
                   <div>
@@ -441,7 +355,7 @@ export function SettingsPage({
                   </div>
                   <select
                     aria-label={t("Formato da tela dos jogos")}
-                    value={settings.gameScreenMode ?? "original"}
+                    value={settings.gameScreenMode ?? "stretch"}
                     onChange={(e) =>
                       void save({
                         gameScreenMode: e.target
@@ -507,7 +421,6 @@ export function SettingsPage({
             </>
           ) : section === "Downloads" ? (
             <>
-              <SourceManager />
               <Group title={t("Destino")}>
                 <div className="setting-row setting-row-stack">
                   <div>

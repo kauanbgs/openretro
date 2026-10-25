@@ -10,6 +10,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 pub mod bios;
+mod diagnosis;
 pub mod netplay;
 mod managed_process;
 #[cfg(windows)]
@@ -125,7 +126,7 @@ pub fn select_emulator(
             .or_else(|| compatible.first())
     }
     .cloned()
-    .ok_or_else(|| "Configure a compatible emulator before playing this game.".into())
+    .ok_or_else(|| "O OpenRetro ainda não roda jogos deste console.".into())
 }
 /// Consoles whose core cannot load a save state while booting.
 pub fn boots_without_states(platform: &str) -> bool {
@@ -155,19 +156,19 @@ pub async fn launch_game(
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,player,auto_resume,ps2_resolution,stretch,sdl_library) = {
+ let (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
-  let player=crate::profiles::active(&conn)?;
   let settings: String=conn.query_row("SELECT value FROM settings WHERE key='app'",[],|r|r.get(0)).unwrap_or_default();
   let settings=serde_json::from_str::<serde_json::Value>(&settings).ok();
   let auto_resume=settings.as_ref().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
   let ps2_resolution=settings.as_ref().and_then(|v|v["ps2Resolution"].as_str().map(String::from));
-  let stretch=settings.as_ref().is_some_and(|v|v["gameScreenMode"]=="stretch");
+  // Stretched by default; only an explicit "original" keeps the console's shape.
+  let stretch=settings.as_ref().map_or(true,|v|v["gameScreenMode"]!="original");
   // The runtime's SDL2 tells which controllers are connected.
   let sdl_library=database::emulators(&conn)?.into_iter().find(|e|e.id=="openretro-retroarch").and_then(|e|std::path::Path::new(&e.executable_path).parent().map(|dir|dir.join("SDL2.dll")));
-  (entry,emulator,player,auto_resume,ps2_resolution,stretch,sdl_library)
+  (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library)
  };
  // The selected translation or hack plays instead of the original file.
  let variant=entry.item.active_variant.clone();
@@ -215,11 +216,19 @@ pub async fn launch_game(
  if managed_retroarch && entry.item.platform_id=="ps2" {
     runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "LRPS2", &runtime_menu::ps2_options(ps2_resolution.as_deref(), num_cpus::get_physical()))?;
  }
+ // The runtime logs every session, so a failure can say why it happened.
+ let mut runtime_log:Option<std::path::PathBuf>=None;
  let mut args:Vec<String>=if managed_retroarch {
     let data=app.path().app_data_dir().map_err(error)?;
-    let variant_saves=variant.as_ref().map(|v|crate::mods::variant_saves(&data,&player,v)).transpose()?;
-    let config=runtime_menu::prepare_player(&data, &executable, &entry.item.sha256, &player, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)))?;
+    let variant_saves=variant.as_ref().map(|v|crate::mods::variant_saves(&data,v)).transpose()?;
+    let config=runtime_menu::prepare_game(&data, &executable, &entry.item.sha256, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)))?;
     let mut args:Vec<String>=vec!["--appendconfig".into(),config.to_string_lossy().into_owned()];
+    // OpenGL by default; Direct3D 11 once OpenGL failed on this PC.
+    let video=diagnosis::video_driver(&*db.read()?);
+    std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?.write_all(format!("video_driver = \"{video}\"\n").as_bytes()).map_err(error)?;
+    let log=diagnosis::session_log(&data)?;
+    args.extend(["-v".into(),format!("--log-file={}",log.display())]);
+    runtime_log=Some(log);
     if let Some(netplay)=&netplay {
       let mut file=std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?;
       file.write_all(netplay.config().as_bytes()).map_err(error)?;
@@ -256,16 +265,15 @@ pub async fn launch_game(
     // Both play inside OpenRetro's window; only the runtime takes commands.
     let hosted=if ps3 { runtime_session.host(child.id()) } else if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable) } else { Ok(()) };
     if let Err(message)=hosted {
-      let _=child.kill();
-      let _=child.wait();
-      db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?;
-      return Err(message);
+      let code=match child.try_wait() { Ok(Some(status))=>status.code(), _=>{ let _=child.kill(); child.wait().ok().and_then(|status|status.code()) } };
+      let conn=db.0.lock().map_err(error)?;
+      conn.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?;
+      return Err(match &runtime_log { Some(log)=>diagnosis::explain(&conn,log,code,message), None=>message });
     }
  }
  {
  let conn=db.0.lock().map_err(error)?;
- if player=="default" { conn.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?; }
- else { conn.execute("INSERT INTO player_progress(profile_id,library_item_id,last_played_at) VALUES(?1,?2,?3) ON CONFLICT(profile_id,library_item_id) DO UPDATE SET last_played_at=excluded.last_played_at",params![player,id,started]).map_err(error)?; }
+ conn.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?;
  }
  let _=app.emit("game-started",&id); log::info!("Started game session {session}");
  crate::discord::game_started(&app,crate::discord::activity(&entry.game.title,&entry.item.platform_id,entry.game.cover_url.as_deref(),chrono::Utc::now().timestamp()));
@@ -289,12 +297,14 @@ pub async fn launch_game(
  }; let elapsed=timer.elapsed().as_secs() as i64; crate::discord::game_finished(&app);
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;
  tx.execute("UPDATE play_sessions SET finished_at=?1,duration=?2,exit_code=?3 WHERE id=?4",params![chrono::Utc::now().to_rfc3339(),elapsed,status.as_ref().ok().and_then(|s|s.code()),session]).map_err(error)?;
- if player=="default" { tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?; }
- else { tx.execute("UPDATE player_progress SET playtime=playtime+?1 WHERE profile_id=?2 AND library_item_id=?3",params![elapsed,player,id]).map_err(error)?; }
+ tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?;
  tx.commit().map_err(error)?; let _=app.emit("game-finished",&id);
  let status=status.map_err(error)?;
  // RPCS3 can report an error code while shutting down after a normal exit.
- if !status.success() && !ps3 { return Err(format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()))); }
+ if !status.success() && !ps3 {
+    let message=format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()));
+    return Err(match &runtime_log { Some(log)=>diagnosis::explain(&*db.0.lock().map_err(error)?,log,status.code(),message), None=>message });
+ }
  Ok(elapsed)
  }).await.map_err(error)?
 }

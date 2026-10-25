@@ -478,15 +478,14 @@ fn the_library_plays_the_selected_variant_with_its_own_saves() {
         .is_none());
     drop(conn);
 
-    let saves = variant_saves(&fixture.root, "default", &active).unwrap();
+    let saves = variant_saves(&fixture.root, &active).unwrap();
     let separate = saves.saves.clone().expect("unconfirmed saves stay apart");
     let executable = fixture.root.join("runtime").join("retroarch.exe");
     let hash = "a".repeat(64);
-    let config = crate::launcher::runtime_menu::prepare_player(
+    let config = crate::launcher::runtime_menu::prepare_game(
         &fixture.root,
         &executable,
         &hash,
-        "default",
         true,
         true,
         false,
@@ -506,13 +505,12 @@ fn the_library_plays_the_selected_variant_with_its_own_saves() {
         saves_shared: true,
         ..active.clone()
     };
-    let saves = variant_saves(&fixture.root, "default", &shared).unwrap();
+    let saves = variant_saves(&fixture.root, &shared).unwrap();
     assert!(saves.saves.is_none());
-    let config = crate::launcher::runtime_menu::prepare_player(
+    let config = crate::launcher::runtime_menu::prepare_game(
         &fixture.root,
         &executable,
         &hash,
-        "default",
         true,
         true,
         false,
@@ -528,23 +526,6 @@ fn the_library_plays_the_selected_variant_with_its_own_saves() {
         text.contains("savestate_directory"),
         "states are always separate"
     );
-    let player = uuid::Uuid::new_v4().to_string();
-    let saves = variant_saves(&fixture.root, &player, &active).unwrap();
-    let config = crate::launcher::runtime_menu::prepare_player(
-        &fixture.root,
-        &executable,
-        &hash,
-        &player,
-        true,
-        true,
-        false,
-        Some((&active.id, &saves)),
-    )
-    .unwrap();
-    let text = std::fs::read_to_string(config).unwrap();
-    assert_eq!(text.matches("savefile_directory").count(), 1);
-    assert_eq!(text.matches("savestate_directory").count(), 1);
-    assert!(text.contains(&active.id));
 }
 
 #[test]

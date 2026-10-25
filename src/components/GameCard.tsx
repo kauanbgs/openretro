@@ -9,6 +9,7 @@ export function GameCard({
   downloadAvailable = false,
   note,
   onClick,
+  onMenu,
 }: {
   game: GameMetadata;
   item?: LibraryItem;
@@ -16,9 +17,21 @@ export function GameCard({
   /** A short line under the title, such as why the game is suggested. */
   note?: string;
   onClick: () => void;
+  /** Right-click or the menu key: actions for this game at that point. */
+  onMenu?: (x: number, y: number) => void;
 }) {
   return (
-    <button className="game-card" onClick={onClick}>
+    <button
+      className="game-card"
+      onClick={onClick}
+      onContextMenu={
+        onMenu &&
+        ((event) => {
+          event.preventDefault();
+          onMenu(event.clientX, event.clientY);
+        })
+      }
+    >
       <GameArtwork game={game} hero loading="lazy" />
       <div className="game-card-content">
         <div className="game-card-title">

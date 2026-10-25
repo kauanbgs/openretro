@@ -53,6 +53,10 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("008_recommendations.sql"))
         .map_err(error)?;
+    tx.execute_batch(include_str!("009_single_player.sql"))
+        .map_err(error)?;
+    tx.execute_batch(include_str!("010_managed_emulators.sql"))
+        .map_err(error)?;
     // Old signals say little about today's taste and only grow the file.
     tx.execute(
         "DELETE FROM interest_events WHERE at < ?1",
@@ -118,7 +122,7 @@ pub fn library(db: &Connection) -> Result<Vec<LibraryGame>> {
             ))
         })
         .map_err(error)?;
-    let mut entries = rows
+    let entries = rows
         .map(|row| {
             let (metadata, item) = row.map_err(error)?;
             Ok(LibraryGame {
@@ -127,7 +131,6 @@ pub fn library(db: &Connection) -> Result<Vec<LibraryGame>> {
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    crate::profiles::project_library(db, &mut entries)?;
     Ok(entries)
 }
 pub fn emulators(db: &Connection) -> Result<Vec<Emulator>> {

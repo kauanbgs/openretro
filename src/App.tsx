@@ -15,7 +15,7 @@ import {
   Play,
   Compass,
   Download,
-  Cpu,
+  Link2,
   Settings,
   Search,
   Smartphone,
@@ -32,8 +32,6 @@ import {
   downloadPollInterval,
 } from "./services/activity";
 import { Modal } from "./components/Modal";
-import { PlayerAvatar } from "./components/PlayerAvatar";
-import { PlayerPicker } from "./components/PlayerPicker";
 import { BrandMark } from "./components/Brand";
 import { TitleBar } from "./components/TitleBar";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
@@ -96,14 +94,14 @@ const GamePage = lazy(() =>
     default: module.GamePage,
   })),
 );
-const EmulatorsPage = lazy(() =>
-  import("./features/emulators/EmulatorsPage").then((module) => ({
-    default: module.EmulatorsPage,
-  })),
-);
 const DownloadsPage = lazy(() =>
   import("./features/downloads/DownloadsPage").then((module) => ({
     default: module.DownloadsPage,
+  })),
+);
+const SourcesPage = lazy(() =>
+  import("./features/downloads/SourcesPage").then((module) => ({
+    default: module.SourcesPage,
   })),
 );
 const SettingsPage = lazy(() =>
@@ -117,13 +115,13 @@ const BigPicture = lazy(() =>
   })),
 );
 type Page =
-  "Home" | "Library" | "Discover" | "Downloads" | "Emulators" | "Settings";
+  "Home" | "Library" | "Discover" | "Downloads" | "Sources" | "Settings";
 const pageLabels: Record<Page, string> = {
   Home: t("Início"),
   Library: t("Biblioteca"),
   Discover: t("Catálogo"),
   Downloads: "Downloads",
-  Emulators: t("Emuladores"),
+  Sources: t("Fontes"),
   Settings: t("Configurações"),
 };
 // A phone browses, downloads and plays; emulators and settings stay on the PC.
@@ -138,7 +136,7 @@ const navItems = isRemote
       { page: "Home" as Page, icon: Home },
       { page: "Discover" as Page, icon: Compass },
       { page: "Downloads" as Page, icon: Download },
-      { page: "Emulators" as Page, icon: Cpu },
+      { page: "Sources" as Page, icon: Link2 },
       { page: "Settings" as Page, icon: Settings },
     ];
 export function App() {
@@ -171,7 +169,6 @@ export function App() {
   // Encodes phone play video while phone play runs, from any screen.
   useEffect(() => startPhoneVideoHost(), []);
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
-  const [playersOpen, setPlayersOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
   const [profileId, setProfileId] = useState<string>();
@@ -192,7 +189,6 @@ export function App() {
   }, [page, selected?.id, social.session.user?.id]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [libraryFilter, setLibraryFilter] = useState("");
-  const players = useQuery({ queryKey: ["players"], queryFn: bridge.profiles });
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [page, selected?.id]);
@@ -376,9 +372,6 @@ export function App() {
       </>
     );
   const activeEntry = library.find((x) => x.game.id === selected?.id);
-  const activePlayer = players.data?.players.find(
-    (p) => p.id === players.data?.activeId,
-  );
   const shownLibrary = library.filter((x) =>
     x.game.title.toLowerCase().includes(libraryFilter.trim().toLowerCase()),
   );
@@ -394,50 +387,44 @@ export function App() {
       />
       {updateOverlay}
       <aside className="sidebar">
-        <button
-          className="sidebar-profile"
-          aria-expanded={isRemote ? undefined : socialOpen}
-          onClick={() =>
-            isRemote ? setPlayersOpen(true) : setSocialOpen((open) => !open)
-          }
-          title={isRemote ? t("Trocar jogador") : t("Conta e amigos")}
-        >
-          {account ? (
+        {!isRemote && (
+          <button
+            className="sidebar-profile"
+            aria-expanded={socialOpen}
+            onClick={() => setSocialOpen((open) => !open)}
+            title={account ? t("Conta e amigos") : t("Criar conta ou entrar")}
+          >
             <AccountAvatar
-              avatar={account.avatar}
+              avatar={account?.avatar}
               size={36}
               status={
-                account.appearOffline
-                  ? "offline"
-                  : social.connected
-                    ? playing
-                      ? "playing"
-                      : "online"
-                    : "idle"
+                !account
+                  ? undefined
+                  : account.appearOffline
+                    ? "offline"
+                    : social.connected
+                      ? playing
+                        ? "playing"
+                        : "online"
+                      : "idle"
               }
             />
-          ) : (
-            <PlayerAvatar player={activePlayer} size={36} />
-          )}
-          {!isRemote && social.incoming.length > 0 && (
-            <b className="sidebar-profile-badge">{social.incoming.length}</b>
-          )}
-          {!isRemote && <SocialUnreadBadge />}
-          <span>
-            <strong>
-              {account?.displayName ?? activePlayer?.name ?? t("Jogador 1")}
-            </strong>
-            <small>
-              {playing
-                ? t("Jogando {title}", { title: playing.game.title })
-                : isRemote
-                  ? t("Trocar jogador")
+            {social.incoming.length > 0 && (
+              <b className="sidebar-profile-badge">{social.incoming.length}</b>
+            )}
+            <SocialUnreadBadge />
+            <span>
+              <strong>{account?.displayName ?? t("Sem conta")}</strong>
+              <small>
+                {playing
+                  ? t("Jogando {title}", { title: playing.game.title })
                   : account
                     ? t("Amigos e conta")
-                    : t("Entrar e ver amigos")}
-            </small>
-          </span>
-        </button>
+                    : t("Criar conta ou entrar")}
+              </small>
+            </span>
+          </button>
+        )}
         <nav className="sidebar-nav" aria-label={t("Navegação")}>
           {navItems.map((n) => (
             <button
@@ -595,13 +582,6 @@ export function App() {
                     <Play size={15} fill="currentColor" /> {t("Voltar ao jogo")}
                   </a>
                 )}
-                <button
-                  className="header-player"
-                  aria-label={t("Trocar jogador")}
-                  onClick={() => setPlayersOpen(true)}
-                >
-                  <PlayerAvatar player={activePlayer} size={32} />
-                </button>
               </>
             ) : (
               <>
@@ -695,7 +675,6 @@ export function App() {
               emulators={emulators}
               onBack={() => setSelected(undefined)}
               onImport={(game) => openImport(game)}
-              onEmulators={() => navigate("Emulators")}
               onSelect={(game) => {
                 setSelected(game);
                 window.scrollTo({ top: 0, behavior: "smooth" });
@@ -747,12 +726,6 @@ export function App() {
               onSelect={setSelected}
               onImport={() => openImport()}
             />
-          ) : page === "Emulators" ? (
-            <EmulatorsPage
-              emulators={emulators}
-              refresh={refresh}
-              notify={notify}
-            />
           ) : page === "Downloads" ? (
             <DownloadsPage
               jobs={jobs}
@@ -764,11 +737,10 @@ export function App() {
                 setImporting(true);
               }}
             />
+          ) : page === "Sources" ? (
+            <SourcesPage />
           ) : (
-            <SettingsPage
-              onEmulators={() => navigate("Emulators")}
-              notify={notify}
-            />
+            <SettingsPage notify={notify} />
           )}
         </Suspense>
       </main>
@@ -788,7 +760,6 @@ export function App() {
           {isDesktop ? "" : t(" · prévia no navegador")}
         </button>
       </footer>
-      {playersOpen && <PlayerPicker onClose={() => setPlayersOpen(false)} />}
       {partyOpen && (
         <PartyDialog
           onClose={() => setPartyOpen(false)}
@@ -816,11 +787,6 @@ export function App() {
               setGuestFriend(friend);
             }}
             notify={notify}
-            player={activePlayer}
-            onPlayers={() => {
-              setSocialOpen(false);
-              setPlayersOpen(true);
-            }}
             onClose={() => setSocialOpen(false)}
           />
         </>

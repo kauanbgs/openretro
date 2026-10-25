@@ -1617,11 +1617,7 @@ pub struct VariantSaves {
     pub saves: Option<PathBuf>,
     pub states: PathBuf,
 }
-pub fn variant_saves(
-    data_root: &Path,
-    player: &str,
-    variant: &ActiveVariant,
-) -> Result<VariantSaves> {
+pub fn variant_saves(data_root: &Path, variant: &ActiveVariant) -> Result<VariantSaves> {
     if uuid::Uuid::parse_str(&variant.id).is_err() {
         return Err("Versão modificada inválida.".into());
     }
@@ -1629,7 +1625,7 @@ pub fn variant_saves(
         .join("mods")
         .join("saves")
         .join(&variant.id)
-        .join(player);
+        .join(crate::profiles::PLAYER);
     Ok(VariantSaves {
         saves: (!variant.saves_shared).then(|| root.join("saves")),
         states: root.join("states"),

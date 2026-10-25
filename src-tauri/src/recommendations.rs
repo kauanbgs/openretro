@@ -1395,7 +1395,7 @@ pub async fn recommendations(app: tauri::AppHandle) -> Result<Value> {
         let (signals, fatigue) = {
             let db = app.state::<Database>();
             let conn = db.read()?;
-            let profile = crate::profiles::active(&conn)?;
+            let profile = crate::profiles::PLAYER;
             let mut signals = library_signals(&conn, now)?;
             signals.extend(event_signals(&conn, &profile, now)?);
             (merge(signals), fatigue(&conn, &profile, now)?)
@@ -1448,19 +1448,18 @@ pub fn interest_view(game: GameMetadata, seconds: f64, db: State<Database>) -> R
         return Ok(());
     }
     let conn = db.0.lock().map_err(error)?;
-    let profile = crate::profiles::active(&conn)?;
+    let profile = crate::profiles::PLAYER;
     insert_event(&conn, &profile, &game, "view", seconds)
 }
 
 /// Notes a game leaving the library with how long it was played, before it goes.
 pub fn record_removal(conn: &Connection, library_item_id: &str) -> Result<()> {
-    let profile = crate::profiles::active(conn)?;
+    let profile = crate::profiles::PLAYER;
     let row: Option<(String, i64)> = conn
         .query_row(
-            "SELECT g.metadata, CASE WHEN ?2='default' THEN l.playtime ELSE IFNULL((SELECT p.playtime \
-             FROM player_progress p WHERE p.profile_id=?2 AND p.library_item_id=l.id),0) END \
-             FROM library_items l JOIN games g ON g.id=l.game_id WHERE l.id=?1",
-            params![library_item_id, profile],
+            "SELECT g.metadata, l.playtime FROM library_items l JOIN games g ON g.id=l.game_id \
+             WHERE l.id=?1",
+            [library_item_id],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()
@@ -1480,7 +1479,7 @@ pub fn recommendations_seen(ids: Vec<String>, db: State<Database>) -> Result<()>
         return Err("Recomendações demais de uma vez.".into());
     }
     let mut conn = db.0.lock().map_err(error)?;
-    let profile = crate::profiles::active(&conn)?;
+    let profile = crate::profiles::PLAYER;
     let now = Utc::now();
     let recent = (now - chrono::Duration::hours(6)).to_rfc3339();
     let tx = conn.transaction().map_err(error)?;
@@ -1500,7 +1499,7 @@ pub fn recommendations_seen(ids: Vec<String>, db: State<Database>) -> Result<()>
 #[tauri::command(async)]
 pub fn recommendation_opened(id: String, db: State<Database>) -> Result<()> {
     let conn = db.0.lock().map_err(error)?;
-    let profile = crate::profiles::active(&conn)?;
+    let profile = crate::profiles::PLAYER;
     conn.execute(
         "UPDATE recommendation_impressions SET opened=opened+1 WHERE profile_id=?1 AND game_id=?2",
         params![profile, id],

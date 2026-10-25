@@ -456,34 +456,6 @@
   flex: 1 1 100%;
 }
 
-/* The local player on this PC, below the account */
-.social-local {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--social-surface) 70%, #000);
-}
-.social-local .player-avatar {
-  flex: none;
-}
-.social-local > span {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-}
-.social-local small {
-  color: var(--body);
-  font-size: 11px;
-}
-.social-local strong {
-  overflow: hidden;
-  font-size: 13px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 /* The account button at the top of the sidebar */
 .sidebar-profile {
   position: relative;

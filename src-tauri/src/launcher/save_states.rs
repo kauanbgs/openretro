@@ -40,32 +40,28 @@ fn parse_slot(name: &str, stem: &str) -> Option<i32> {
     }
 }
 
-/// Jogador 1 keeps the runtime's own state directory (portable `:\states` unless
-/// retroarch.cfg overrides it); other players use their isolated directory.
-/// Each candidate's direct subfolders are included for sort-by-core layouts.
-fn directories(data: &Path, runtime: &Path, game: &Path, hash: &str, player: &str) -> Vec<PathBuf> {
-    let base = if player != "default" {
-        data.join("players").join(player).join(hash).join("states")
-    } else {
-        let configured = std::fs::read_to_string(runtime.join("retroarch.cfg"))
-            .ok()
-            .and_then(|config| {
-                config.lines().find_map(|line| {
-                    let (key, value) = line.split_once('=')?;
-                    (key.trim() == "savestate_directory")
-                        .then(|| value.trim().trim_matches('"').to_string())
-                })
-            });
-        match configured.as_deref() {
-            None | Some("default") => runtime.join("states"),
-            Some("") => game.parent().map(Path::to_path_buf).unwrap_or_default(),
-            Some(value) if value.starts_with(':') => runtime.join(
-                value
-                    .trim_start_matches(':')
-                    .trim_start_matches(['/', '\\']),
-            ),
-            Some(value) => PathBuf::from(value),
-        }
+/// The runtime's own state directory (portable `:\states` unless
+/// retroarch.cfg overrides it). Each candidate's direct subfolders are
+/// included for sort-by-core layouts.
+fn directories(runtime: &Path, game: &Path) -> Vec<PathBuf> {
+    let configured = std::fs::read_to_string(runtime.join("retroarch.cfg"))
+        .ok()
+        .and_then(|config| {
+            config.lines().find_map(|line| {
+                let (key, value) = line.split_once('=')?;
+                (key.trim() == "savestate_directory")
+                    .then(|| value.trim().trim_matches('"').to_string())
+            })
+        });
+    let base = match configured.as_deref() {
+        None | Some("default") => runtime.join("states"),
+        Some("") => game.parent().map(Path::to_path_buf).unwrap_or_default(),
+        Some(value) if value.starts_with(':') => runtime.join(
+            value
+                .trim_start_matches(':')
+                .trim_start_matches(['/', '\\']),
+        ),
+        Some(value) => PathBuf::from(value),
     };
     with_subfolders(base)
 }
@@ -122,14 +118,14 @@ fn thumbnail_path(state: &Path) -> PathBuf {
 
 fn locate(app: &tauri::AppHandle, id: &str) -> Result<Vec<StateFile>> {
     let db = app.state::<Database>();
-    let (entry, emulator, player) = {
+    let (entry, emulator) = {
         let conn = db.0.lock().map_err(error)?;
         let entry = database::library(&conn)?
             .into_iter()
             .find(|g| g.item.id == id)
             .ok_or("This game is no longer in your library.")?;
         let emulator = super::select_emulator(&conn, &entry)?;
-        (entry, emulator, crate::profiles::active(&conn)?)
+        (entry, emulator)
     };
     if !super::is_managed_runtime(&emulator, &entry) {
         return Ok(Vec::new());
@@ -144,11 +140,11 @@ fn locate(app: &tauri::AppHandle, id: &str) -> Result<Vec<StateFile>> {
     let data = app.path().app_data_dir().map_err(error)?;
     // A modified version keeps its own states (see `mods::variant_saves`).
     if let Some(variant) = &entry.item.active_variant {
-        let saves = crate::mods::variant_saves(&data, &player, variant)?;
+        let saves = crate::mods::variant_saves(&data, variant)?;
         return Ok(state_files(&with_subfolders(saves.states), stem));
     }
     Ok(state_files(
-        &directories(&data, runtime, &game, &entry.item.sha256, &player),
+        &directories(runtime, &game),
         stem,
     ))
 }
@@ -219,27 +215,14 @@ mod tests {
         assert_eq!(parse_slot("Mario.state1234", "Mario"), None);
     }
     #[test]
-    fn finds_states_in_core_subfolders_for_isolated_players() {
+    fn finds_states_in_core_subfolders() {
         let root = std::env::temp_dir().join(format!("openretro-states-{}", uuid::Uuid::new_v4()));
-        let hash = "a".repeat(64);
-        let player = uuid::Uuid::new_v4().to_string();
-        let core = root
-            .join("players")
-            .join(&player)
-            .join(&hash)
-            .join("states")
-            .join("Snes9x");
+        let core = root.join("runtime").join("states").join("Snes9x");
         std::fs::create_dir_all(&core).unwrap();
         std::fs::write(core.join("Zelda.state2"), b"x").unwrap();
         std::fs::write(core.join("Zelda.state2.png"), b"x").unwrap();
         std::fs::write(core.join("Other.state"), b"x").unwrap();
-        let dirs = directories(
-            &root,
-            &root.join("runtime"),
-            &root.join("Zelda.sfc"),
-            &hash,
-            &player,
-        );
+        let dirs = directories(&root.join("runtime"), &root.join("Zelda.sfc"));
         let files = state_files(&dirs, "Zelda");
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].slot, 2);
@@ -247,13 +230,13 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
-    fn default_player_follows_the_runtime_state_directory() {
+    fn states_follow_the_runtime_state_directory() {
         let root = std::env::temp_dir().join(format!("openretro-states-{}", uuid::Uuid::new_v4()));
         let runtime = root.join("runtime");
         std::fs::create_dir_all(&runtime).unwrap();
         let game = root.join("roms").join("Zelda.sfc");
         assert_eq!(
-            directories(&root, &runtime, &game, "h", "default")[0],
+            directories(&runtime, &game)[0],
             runtime.join("states")
         );
         std::fs::write(
@@ -262,7 +245,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            directories(&root, &runtime, &game, "h", "default")[0],
+            directories(&runtime, &game)[0],
             runtime.join("custom")
         );
         std::fs::write(
@@ -271,7 +254,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            directories(&root, &runtime, &game, "h", "default")[0],
+            directories(&runtime, &game)[0],
             root.join("roms")
         );
         std::fs::remove_dir_all(root).unwrap();

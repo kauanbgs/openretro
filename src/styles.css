@@ -10,47 +10,11 @@
   color: #ccc;
 }
 
-.source-manager,
 .transfer-section {
   margin-bottom: 36px;
   min-width: 0;
 }
-.source-manager > .section-heading {
-  align-items: flex-start;
-  gap: 20px;
-}
-.source-list {
-  margin-top: 18px;
-}
-.source-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--border);
-}
-.source-row > svg {
-  color: var(--accent);
-  flex-shrink: 0;
-}
-.source-info {
-  flex: 1;
-  min-width: 0;
-}
-.source-info strong {
-  overflow-wrap: anywhere;
-}
-.source-info p {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 5px;
-}
-.source-info small {
-  display: block;
-  font-size: 12px;
-  color: var(--quiet);
-  margin-top: 5px;
-}
+
 .transfer-actions {
   display: flex;
   gap: 18px;
@@ -64,18 +28,6 @@
 }
 .downloaded-file small {
   color: var(--muted);
-}
-@media (max-width: 680px) {
-  .source-row {
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .source-info {
-    flex-basis: calc(100% - 45px);
-  }
-  .source-manager > .section-heading {
-    flex-direction: column;
-  }
 }
 
 :root {
@@ -1068,6 +1020,11 @@ main {
   margin-bottom: 25px;
   max-width: 55ch;
 }
+.import-drop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .import-drop small {
   font-size: 11px;
   color: var(--quiet);
@@ -1166,23 +1123,7 @@ legend {
   color: var(--muted);
   padding: 0 6px;
 }
-.platform-checkboxes {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px 12px;
-}
-.platform-checkboxes label {
-  flex-direction: row;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 450;
-  gap: 7px;
-}
-.platform-checkboxes input {
-  width: 14px;
-  height: 14px;
-  min-height: 0;
-}
+
 .emulator-install-progress {
   grid-column: 2 / -1;
   margin-top: -3px;
@@ -1208,32 +1149,7 @@ legend {
   display: block;
   overflow-wrap: anywhere;
 }
-.detected-panel {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 24px;
-  margin-top: 28px;
-}
-.detected-panel h3 {
-  font-size: 20px;
-  margin-bottom: 20px;
-}
-.detected-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  gap: 20px;
-  font-size: 13px;
-}
-.detected-item small {
-  display: block;
-  font-size: 11px;
-  color: var(--quiet);
-  line-height: 1.7;
-  margin-top: 6px;
-  overflow-wrap: anywhere;
-}
+
 .download-job {
   display: flex;
   align-items: center;
@@ -1751,9 +1667,7 @@ html[data-playing="true"] *:after {
   .modal h2 {
     font-size: 24px;
   }
-  .platform-checkboxes {
-    grid-template-columns: repeat(3, 1fr);
-  }
+
   .steps {
     gap: 12px;
     font-size: 11px;
@@ -1774,12 +1688,7 @@ html[data-playing="true"] *:after {
   .file-summary small {
     font-size: 9px;
   }
-  .detected-panel {
-    padding: 20px;
-  }
-  .detected-item {
-    flex-wrap: wrap;
-  }
+
   .setting-row {
     gap: 18px;
     padding: 22px 0;
@@ -1846,35 +1755,6 @@ html[data-playing="true"] *:after {
   }
 }
 
-.player-picker {
-  display: grid;
-  gap: 10px;
-  margin: 24px 0;
-  max-height: 45vh;
-  overflow-y: auto;
-}
-.player-picker .button {
-  justify-content: flex-start;
-  min-height: 58px;
-  gap: 14px;
-}
-.player-picker .button:focus-visible {
-  outline: 2px solid var(--accent, #12ace2);
-  outline-offset: 2px;
-}
-
-/* Player appearance: avatar badge, picker rows and the editor. */
-.player-avatar {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  border-radius: 50%;
-  color: #04131a;
-  background: var(--player-color);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--player-color) 35%, transparent),
-    0 6px 18px color-mix(in srgb, var(--player-color) 30%, transparent);
-}
 .player-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1885,27 +1765,7 @@ html[data-playing="true"] *:after {
   width: 58px;
   padding: 0;
 }
-.player-editor h3 {
-  margin: 20px 0 10px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.player-editor-preview {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-.player-editor-preview label {
-  display: grid;
-  flex: 1;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 13px;
-}
-.player-avatar-grid,
+
 .player-color-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1914,7 +1774,6 @@ html[data-playing="true"] *:after {
 .player-color-grid {
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }
-.player-avatar-grid button,
 .player-color-grid button {
   display: grid;
   place-items: center;
@@ -1932,24 +1791,14 @@ html[data-playing="true"] *:after {
   border-radius: 50%;
   color: #04131a;
 }
-.player-avatar-grid button[aria-pressed="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--panel2));
-}
+
 .player-color-grid button[aria-pressed="true"] {
   border: 2px solid var(--text);
 }
-.player-avatar-grid button:focus-visible,
 .player-color-grid button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   transform: scale(1.06);
-}
-.player-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
 }
 
 /* Richer game page: badges, trailer, gallery, similar games. */
@@ -2272,97 +2121,6 @@ html[data-playing="true"] *:after {
   }
 }
 
-/* Emulators page: configured emulators, then the install catalog. */
-.emu-section {
-  margin-top: 8px;
-  margin-bottom: 40px;
-}
-.emu-section-heading {
-  margin-bottom: 16px;
-}
-.emu-section-heading h2 {
-  font-size: 20px;
-}
-.emu-section-heading p {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 13px;
-}
-.emu-section-heading svg {
-  color: var(--accent);
-}
-.emu-list {
-  display: grid;
-  gap: 10px;
-}
-.emu-icon {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel2));
-}
-.emu-row {
-  display: grid;
-  grid-template-columns: 46px minmax(180px, 0.9fr) minmax(0, 1.4fr) auto;
-  align-items: center;
-  gap: 18px;
-  padding: 16px 18px;
-  border: 1px solid var(--hairline, var(--border));
-  border-radius: 14px;
-  background: var(--glass, var(--panel));
-}
-.emu-identity {
-  min-width: 0;
-}
-.emu-identity h3 {
-  font-size: 17px;
-}
-.emu-path {
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--quiet);
-  font-size: 12px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.emu-platforms {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.emu-platforms span,
-.emu-offer-consoles span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  color: var(--muted);
-  background: var(--panel2);
-  font-size: 11px;
-  font-weight: 600;
-}
-.emu-platforms span.default {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
-.emu-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.emu-catalog {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 14px;
-}
 .emu-offer {
   display: flex;
   flex-direction: column;
@@ -2388,138 +2146,6 @@ html[data-playing="true"] *:after {
       transparent 60%
     ),
     var(--glass, var(--panel));
-}
-.emu-offer-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.emu-offer-top h3 {
-  font-size: 16px;
-}
-.emu-offer-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-.emu-offer-badges span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 700;
-}
-.emu-offer-badges .recommended {
-  color: var(--accent);
-}
-.emu-offer-badges .installed {
-  color: var(--success);
-}
-.emu-offer-description {
-  flex: 1;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-.emu-offer-consoles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.emu-offer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--hairline, var(--border));
-}
-.emu-offer-footer a {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.emu-offer-footer a:hover {
-  color: var(--accent);
-}
-.emu-offer-footer .button {
-  flex: none;
-}
-.emu-offer-progress {
-  padding-top: 14px;
-  border-top: 1px solid var(--hairline, var(--border));
-  color: var(--muted);
-  font-size: 12px;
-}
-.emu-offer-progress > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-.emu-offer-progress strong {
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-.emu-offer-progress progress {
-  width: 100%;
-}
-@media (max-width: 1100px) {
-  .emu-row {
-    grid-template-columns: 46px minmax(0, 1fr) auto;
-  }
-  .emu-platforms {
-    grid-column: 2 / -1;
-    grid-row: 2;
-  }
-}
-@media (max-width: 680px) {
-  .emu-row {
-    grid-template-columns: 46px minmax(0, 1fr);
-  }
-  .emu-actions {
-    grid-column: 1 / -1;
-  }
-}
-.emu-bios {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 18px;
-  margin-top: 10px;
-  padding: 14px 18px;
-  border: 1px dashed var(--hairline, var(--border));
-  border-radius: 14px;
-}
-.emu-bios h3 {
-  font-size: 15px;
-}
-.emu-bios p {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.emu-bios-ok {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--success);
-  font-size: 12px;
-  font-weight: 700;
-}
-@media (max-width: 680px) {
-  .emu-bios {
-    grid-template-columns: 46px minmax(0, 1fr);
-  }
-  .emu-bios .button,
-  .emu-bios-ok {
-    grid-column: 1 / -1;
-  }
 }
 
 /* Download jobs: post-transfer status. */

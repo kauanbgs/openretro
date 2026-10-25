@@ -579,6 +579,88 @@ pub fn insert_library_game(
     log::info!("Imported game {}", game.id);
     Ok(())
 }
+/// What deleting a game's files removes: the whole folder of the OpenRetro
+/// download it came from (archive, extracted files and all), unless another
+/// library game came from the same download; otherwise just the game file.
+struct Removal {
+    path: std::path::PathBuf,
+    /// The download whose folder goes, so its entry leaves Downloads too.
+    job: Option<String>,
+}
+
+fn removal(conn: &rusqlite::Connection, id: &str) -> Result<Removal> {
+    let source: String = conn
+        .query_row("SELECT source_path FROM library_items WHERE id=?1", [id], |r| r.get(0))
+        .map_err(|_| "This game is no longer in your library.".to_string())?;
+    let file = std::fs::canonicalize(&source)
+        .map_err(|_| "The game file could not be found to delete it.".to_string())?;
+    if !file.is_file() {
+        return Err("The game path is not a file.".into());
+    }
+    let mut stmt = conn
+        .prepare("SELECT id, json_extract(data,'$.directory') FROM download_jobs")
+        .map_err(error)?;
+    let jobs = stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?)))
+        .map_err(error)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(error)?;
+    let mut others = conn
+        .prepare("SELECT source_path FROM library_items WHERE id<>?1")
+        .map_err(error)?;
+    let others = others
+        .query_map([id], |r| r.get::<_, String>(0))
+        .map_err(error)?
+        .filter_map(|path| std::fs::canonicalize(path.ok()?).ok())
+        .collect::<Vec<_>>();
+    for (job, directory) in jobs {
+        let Some(directory) = directory.and_then(|d| std::fs::canonicalize(d).ok()) else {
+            continue;
+        };
+        if file.starts_with(&directory) && directory.is_dir() {
+            if others.iter().any(|other| other.starts_with(&directory)) {
+                break;
+            }
+            return Ok(Removal { path: directory, job: Some(job) });
+        }
+    }
+    Ok(Removal { path: file, job: None })
+}
+
+fn disk_size(path: &std::path::Path) -> u64 {
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_dir() => std::fs::read_dir(path)
+            .map(|entries| entries.flatten().map(|entry| disk_size(&entry.path())).sum())
+            .unwrap_or(0),
+        Ok(meta) => meta.len(),
+        Err(_) => 0,
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameRemoval {
+    /// What deleting the files removes, or None when the file is already gone.
+    path: Option<String>,
+    /// The game came from an OpenRetro download, so its whole folder goes.
+    downloaded: bool,
+    bytes: u64,
+}
+
+/// What removing a game with its files would delete, for the confirmation.
+#[tauri::command(async)]
+pub fn game_removal(id: String, db: State<Database>) -> Result<GameRemoval> {
+    let conn = db.read()?;
+    Ok(match removal(&conn, &id) {
+        Ok(removal) => GameRemoval {
+            bytes: disk_size(&removal.path),
+            downloaded: removal.job.is_some(),
+            path: Some(removal.path.to_string_lossy().trim_start_matches(r"\\?\").to_string()),
+        },
+        Err(_) => GameRemoval { path: None, downloaded: false, bytes: 0 },
+    })
+}
+
 #[tauri::command(async)]
 pub fn remove_game(
     app: tauri::AppHandle,
@@ -591,21 +673,21 @@ pub fn remove_game(
     if active {
         return Err("Close the running game before removing it from your library.".into());
     }
-    let source_path: String = conn
-        .query_row(
-            "SELECT source_path FROM library_items WHERE id=?1",
-            [&id],
-            |r| r.get(0),
-        )
-        .map_err(|_| "This game is no longer in your library.".to_string())?;
+    let target = if delete_file {
+        Some(removal(&conn, &id)?)
+    } else {
+        conn.query_row("SELECT 1 FROM library_items WHERE id=?1", [&id], |_| Ok(()))
+            .map_err(|_| "This game is no longer in your library.".to_string())?;
+        None
+    };
     drop(conn);
-    if delete_file {
-        let path = std::fs::canonicalize(&source_path)
-            .map_err(|_| "The game file could not be found to delete it.".to_string())?;
-        if !path.is_file() {
-            return Err("The game path is not a file.".into());
+    if let Some(target) = &target {
+        if target.job.is_some() {
+            std::fs::remove_dir_all(&target.path)
+        } else {
+            std::fs::remove_file(&target.path)
         }
-        std::fs::remove_file(path).map_err(error)?;
+        .map_err(|_| "Os arquivos do jogo não puderam ser apagados. Feche programas que possam estar usando-os e tente de novo.".to_string())?;
     }
     // Modified copies are OpenRetro's own files; they go with the game.
     crate::mods::forget_library_item(&app, &id)?;
@@ -616,16 +698,15 @@ pub fn remove_game(
     }
     conn.execute("DELETE FROM library_items WHERE id=?1", [id])
         .map_err(error)?;
+    if let Some(job) = target.and_then(|target| target.job) {
+        conn.execute("DELETE FROM download_jobs WHERE id=?1", [job])
+            .map_err(error)?;
+    }
     Ok(())
 }
 #[tauri::command(async)]
 pub fn set_favorite(id: String, favorite: bool, db: State<Database>) -> Result<()> {
     let conn = db.0.lock().map_err(error)?;
-    let profile = crate::profiles::active(&conn)?;
-    if profile != "default" {
-        conn.execute("INSERT INTO player_progress(profile_id,library_item_id,favorite) VALUES(?1,?2,?3) ON CONFLICT(profile_id,library_item_id) DO UPDATE SET favorite=excluded.favorite", params![profile,id,favorite]).map_err(error)?;
-        return Ok(());
-    }
     conn.execute(
         "UPDATE library_items SET favorite=?1 WHERE id=?2",
         params![favorite, id],
@@ -863,6 +944,52 @@ pub fn app_paths(app: tauri::AppHandle) -> Result<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn removing_files_takes_the_whole_download_unless_shared() {
+        let root = std::env::temp_dir().join(format!("openretro-remove-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let db = crate::database::initialize(&root.join("db.sqlite")).unwrap();
+        let conn = db.0.lock().unwrap();
+        let download = root.join("downloads").join("job-1");
+        let extracted = download.join("extracted");
+        std::fs::create_dir_all(&extracted).unwrap();
+        std::fs::write(download.join("Game.zip"), "zip").unwrap();
+        let add = |id: &str, path: &std::path::Path| {
+            std::fs::write(path, id).unwrap();
+            conn.execute(
+                "INSERT OR IGNORE INTO games(id,metadata) VALUES('g','{}')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO library_items(id,game_id,platform_id,source_provider,source_path,added_at,sha256) \
+                 VALUES(?1,'g','snes','local',?2,'now',?1)",
+                params![id, path.to_string_lossy()],
+            )
+            .unwrap();
+        };
+        add("a", &extracted.join("A.sfc"));
+        add("loose", &root.join("Loose.sfc"));
+        conn.execute(
+            "INSERT INTO download_jobs(id,data) VALUES('job-1',?1)",
+            [serde_json::json!({"directory": download.canonicalize().unwrap()}).to_string()],
+        )
+        .unwrap();
+        let whole = removal(&conn, "a").unwrap();
+        assert_eq!(whole.path, download.canonicalize().unwrap());
+        assert_eq!(whole.job.as_deref(), Some("job-1"));
+        assert_eq!(disk_size(&whole.path), 4);
+        let loose = removal(&conn, "loose").unwrap();
+        assert!(loose.path.ends_with("Loose.sfc") && loose.job.is_none());
+        // A second game from the same download keeps the folder for it.
+        add("b", &extracted.join("B.sfc"));
+        let shared = removal(&conn, "a").unwrap();
+        assert!(shared.path.ends_with("A.sfc") && shared.job.is_none());
+        drop(conn);
+        drop(db);
+        let _ = std::fs::remove_dir_all(root);
+    }
 
     #[test]
     fn runtime_updates_keep_player_saves() {

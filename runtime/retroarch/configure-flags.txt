@@ -41,7 +41,9 @@
 --disable-d3d9
 --disable-d3d10
 --disable-d3d12
---disable-d3d11
+# Direct3D 11 is the fallback for PCs whose graphics driver has no working
+# OpenGL, such as Microsoft's basic display driver; OpenGL stays the default.
+--enable-d3d11
 --disable-opengl1
 --enable-opengl
 --disable-opengl_core

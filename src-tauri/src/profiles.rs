@@ -1,195 +1,66 @@
-use crate::database::{error, Database, Result};
-use rusqlite::{params, Connection};
-use serde::Serialize;
-use tauri::State;
+//! OpenRetro has one local player; the account is the player's identity
+//! online. Earlier versions let several players share a PC: their progress
+//! is dropped by migration 009 and their files by `retire_players`.
+use std::path::Path;
 
-#[derive(Serialize)]
-pub struct PlayerProfile {
-    pub id: String,
-    pub name: String,
-    pub avatar: String,
-    pub color: String,
+/// The single player, as tables and folders keyed by player name it.
+pub const PLAYER: &str = "default";
+
+/// Deletes what extra players of earlier versions left on disk: their saves,
+/// states and PS2 memory cards, their saves of modified versions, and their
+/// runtime settings. Jogador 1's files are never touched.
+pub fn retire_players(data: &Path) {
+    let _ = std::fs::remove_dir_all(data.join("players"));
+    for variant in read_dir(&data.join("mods").join("saves")) {
+        for player in read_dir(&variant) {
+            if player.file_name().is_some_and(|name| name != PLAYER) {
+                let _ = std::fs::remove_dir_all(player);
+            }
+        }
+    }
+    let prefix = format!("{PLAYER}-");
+    for config in read_dir(&data.join("runtime-config")) {
+        let name = config.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+        // Base settings are "<hash>.cfg"; each player's are "<player>-<hash>.cfg".
+        if name.contains('-') && !name.starts_with(&prefix) {
+            let _ = std::fs::remove_file(config);
+        }
+    }
 }
 
-/// New players cycle through the same palette the editor offers.
-const COLORS: &[&str] = &[
-    "#12ace2", "#4ade80", "#f472b6", "#a78bfa", "#ffd23f", "#ff8a3d", "#f87171", "#2dd4bf",
-];
-
-fn validate(name: &str, avatar: &str, color: &str) -> Result<()> {
-    if name.is_empty() || name.chars().count() > 32 {
-        return Err("Use um nome entre 1 e 32 caracteres.".into());
-    }
-    if avatar.is_empty()
-        || avatar.len() > 24
-        || !avatar.bytes().all(|b| b.is_ascii_lowercase() || b == b'-')
-    {
-        return Err("Avatar inválido.".into());
-    }
-    if color.len() != 7
-        || !color.starts_with('#')
-        || !color[1..].bytes().all(|b| b.is_ascii_hexdigit())
-    {
-        return Err("Cor inválida.".into());
-    }
-    Ok(())
-}
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Profiles {
-    pub active_id: String,
-    pub players: Vec<PlayerProfile>,
-}
-
-pub fn active(conn: &Connection) -> Result<String> {
-    conn.query_row(
-        "SELECT value FROM settings WHERE key='active_profile'",
-        [],
-        |row| row.get(0),
-    )
-    .map_err(error)
-}
-
-#[tauri::command(async)]
-pub fn list_profiles(db: State<Database>) -> Result<Profiles> {
-    let conn = db.read()?;
-    let mut stmt = conn
-        .prepare("SELECT id,name,avatar,color FROM player_profiles ORDER BY rowid")
-        .map_err(error)?;
-    let players = stmt
-        .query_map([], |row| {
-            Ok(PlayerProfile {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                avatar: row.get(2)?,
-                color: row.get(3)?,
-            })
-        })
-        .map_err(error)?
-        .collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(error)?;
-    Ok(Profiles {
-        active_id: active(&conn)?,
-        players,
-    })
-}
-
-#[tauri::command(async)]
-pub fn create_profile(name: String, db: State<Database>) -> Result<()> {
-    let name = name.trim();
-    let conn = db.0.lock().map_err(error)?;
-    let count: usize = conn
-        .query_row("SELECT COUNT(*) FROM player_profiles", [], |r| r.get(0))
-        .map_err(error)?;
-    let color = COLORS[count % COLORS.len()];
-    validate(name, "gamepad", color)?;
-    conn.execute(
-        "INSERT INTO player_profiles(id,name,avatar,color) VALUES(?1,?2,'gamepad',?3)",
-        params![uuid::Uuid::new_v4().to_string(), name, color],
-    )
-    .map_err(error)?;
-    Ok(())
-}
-
-#[tauri::command(async)]
-pub fn update_profile(
-    id: String,
-    name: String,
-    avatar: String,
-    color: String,
-    db: State<Database>,
-) -> Result<()> {
-    let name = name.trim();
-    let color = color.to_ascii_lowercase();
-    validate(name, &avatar, &color)?;
-    let conn = db.0.lock().map_err(error)?;
-    let changed = conn
-        .execute(
-            "UPDATE player_profiles SET name=?2,avatar=?3,color=?4 WHERE id=?1",
-            params![id, name, avatar, color],
-        )
-        .map_err(error)?;
-    if changed == 0 {
-        return Err("Jogador não encontrado.".into());
-    }
-    Ok(())
-}
-
-#[tauri::command(async)]
-pub fn select_profile(id: String, db: State<Database>) -> Result<()> {
-    let conn = db.0.lock().map_err(error)?;
-    if conn
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM play_sessions WHERE finished_at IS NULL)",
-            [],
-            |r| r.get::<_, bool>(0),
-        )
-        .map_err(error)?
-    {
-        return Err("Encerre o jogo antes de trocar de jogador.".into());
-    }
-    let exists = conn
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM player_profiles WHERE id=?1)",
-            [&id],
-            |r| r.get::<_, bool>(0),
-        )
-        .map_err(error)?;
-    if !exists {
-        return Err("Jogador não encontrado.".into());
-    }
-    conn.execute(
-        "UPDATE settings SET value=?1 WHERE key='active_profile'",
-        [id],
-    )
-    .map_err(error)?;
-    Ok(())
-}
-
-pub fn project_library(
-    conn: &Connection,
-    entries: &mut [crate::models::LibraryGame],
-) -> Result<()> {
-    let profile = active(conn)?;
-    if profile == "default" {
-        return Ok(());
-    }
-    let mut stmt = conn.prepare("SELECT library_item_id,favorite,last_played_at,playtime FROM player_progress WHERE profile_id=?1").map_err(error)?;
-    let progress = stmt
-        .query_map([profile], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                (
-                    r.get::<_, bool>(1)?,
-                    r.get::<_, Option<String>>(2)?,
-                    r.get::<_, i64>(3)?,
-                ),
-            ))
-        })
-        .map_err(error)?
-        .collect::<std::result::Result<std::collections::HashMap<_, _>, _>>()
-        .map_err(error)?;
-    for entry in entries {
-        let (favorite, last_played_at, playtime) =
-            progress.get(&entry.item.id).cloned().unwrap_or_default();
-        entry.item.favorite = favorite;
-        entry.item.playtime = playtime;
-        entry.item.last_played_at = last_played_at;
-    }
-    Ok(())
+fn read_dir(path: &Path) -> Vec<std::path::PathBuf> {
+    std::fs::read_dir(path)
+        .map(|entries| entries.flatten().map(|entry| entry.path()).collect())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn appearance_is_validated() {
-        assert!(super::validate("Ana", "ghost", "#a78bfa").is_ok());
-        assert!(super::validate("", "ghost", "#a78bfa").is_err());
-        assert!(super::validate("Ana", "../x", "#a78bfa").is_err());
-        assert!(super::validate("Ana", "ghost", "red").is_err());
-        assert!(super::validate("Ana", "ghost", "#zzzzzz").is_err());
-        assert!(super::COLORS
-            .iter()
-            .all(|color| super::validate("Ana", "gamepad", color).is_ok()));
+    fn retiring_players_keeps_only_the_first_players_files() {
+        let root = std::env::temp_dir().join(format!("openretro-retire-{}", uuid::Uuid::new_v4()));
+        let other = uuid::Uuid::new_v4().to_string();
+        let hash = "a".repeat(64);
+        let variant = root.join("mods").join("saves").join("v1");
+        for dir in [
+            root.join("players").join(&other).join("states"),
+            variant.join(super::PLAYER),
+            variant.join(&other),
+            root.join("runtime-config"),
+        ] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let config = root.join("runtime-config");
+        for name in [format!("{hash}.cfg"), format!("default-{hash}.cfg"), format!("{other}-{hash}.cfg")] {
+            std::fs::write(config.join(name), "").unwrap();
+        }
+        super::retire_players(&root);
+        assert!(!root.join("players").exists());
+        assert!(variant.join(super::PLAYER).exists());
+        assert!(!variant.join(&other).exists());
+        assert!(config.join(format!("{hash}.cfg")).exists());
+        assert!(config.join(format!("default-{hash}.cfg")).exists());
+        assert!(!config.join(format!("{other}-{hash}.cfg")).exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

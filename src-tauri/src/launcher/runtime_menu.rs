@@ -131,19 +131,15 @@ pub fn prepare(data: &Path, executable: &Path, hash: &str) -> Result<PathBuf> {
     Ok(config)
 }
 
-pub fn prepare_player(
+pub fn prepare_game(
     data: &Path,
     executable: &Path,
     hash: &str,
-    player: &str,
     auto_save: bool,
     auto_load: bool,
     stretch: bool,
     variant: Option<(&str, &crate::mods::VariantSaves)>,
 ) -> Result<PathBuf> {
-    if player != "default" && uuid::Uuid::parse_str(player).is_err() {
-        return Err("Perfil de jogador inválido.".into());
-    }
     let base = prepare(data, executable, hash)?;
     let mut config = std::fs::read_to_string(base).map_err(error)?;
     config.push_str(screen_config(stretch));
@@ -154,20 +150,11 @@ pub fn prepare_player(
             port - 1
         ));
     }
-    // Existing saves and custom paths remain with the original player. New
-    // players get isolated paths, including per-game separation for same names.
+    // Saves and states stay where the runtime keeps them. A modified version
+    // never writes over the original's states, nor over its saves unless the
+    // author confirmed they are compatible.
     let mut directories: Vec<(&str, PathBuf)> = Vec::new();
-    if player != "default" {
-        let root = data.join("players").join(player).join(hash);
-        directories.push(("savefile_directory", root.join("saves")));
-        directories.push(("savestate_directory", root.join("states")));
-    }
-    // A modified version never writes over the original's states, nor over
-    // its saves unless the author confirmed they are compatible.
     if let Some((_, saves)) = variant {
-        directories.retain(|(key, _)| {
-            *key != "savestate_directory" && (saves.saves.is_none() || *key != "savefile_directory")
-        });
         if let Some(path) = &saves.saves {
             directories.push(("savefile_directory", path.clone()));
         }
@@ -177,17 +164,7 @@ pub fn prepare_player(
         std::fs::create_dir_all(&path).map_err(error)?;
         config.push_str(&format!("{key} = \"{}\"\n", quoted_path(&path)));
     }
-    if player != "default" {
-        // PS2 memory cards live in the system folder, so each player gets one
-        // with a mirrored copy of the shared BIOS files.
-        let shared = super::bios::system_dir(data);
-        let system = data.join("players").join(player).join("system");
-        super::bios::mirror(&shared, &system)?;
-        config = config.replace(
-            &format!("system_directory = \"{}\"", quoted_path(&shared)),
-            &format!("system_directory = \"{}\"", quoted_path(&system)),
-        );
-    }
+    let player = crate::profiles::PLAYER;
     let name = match variant {
         Some((id, _)) => format!("{player}-{hash}-{id}.cfg"),
         None => format!("{player}-{hash}.cfg"),
@@ -441,14 +418,14 @@ mod tests {
         let executable = root.join("runtime/retroarch.exe");
         let hash = "c".repeat(64);
         let path =
-            prepare_player(&root, &executable, &hash, "default", false, false, true, None).unwrap();
+            prepare_game(&root, &executable, &hash, false, false, true, None).unwrap();
         let stretched = std::fs::read_to_string(&path).unwrap();
         assert!(stretched.contains("aspect_ratio_index = \"24\""));
         assert!(stretched.contains("video_force_aspect = \"false\""));
         assert!(stretched.contains("video_scale_integer = \"false\""));
 
         let original =
-            prepare_player(&root, &executable, &hash, "default", false, false, false, None).unwrap();
+            prepare_game(&root, &executable, &hash, false, false, false, None).unwrap();
         assert_eq!(path, original);
         let original = std::fs::read_to_string(original).unwrap();
         assert!(original.contains("aspect_ratio_index = \"22\""));
@@ -534,36 +511,19 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
-    fn player_saves_are_isolated_and_resume_can_be_disabled() {
+    fn game_keeps_runtime_saves_and_resume_can_be_disabled() {
         let root = std::env::temp_dir().join(format!("openretro-player-{}", uuid::Uuid::new_v4()));
         let hash = "a".repeat(64);
-        let player = uuid::Uuid::new_v4().to_string();
-        let path = prepare_player(
-            &root,
-            &root.join("retroarch.exe"),
-            &hash,
-            &player,
-            true,
-            true,
-            false,
-            None,
-        )
-        .unwrap();
+        let path =
+            prepare_game(&root, &root.join("retroarch.exe"), &hash, true, true, false, None).unwrap();
         let text = std::fs::read_to_string(path).unwrap();
         assert!(text.contains("savestate_auto_save = \"true\""));
         assert!(text.contains("savestate_auto_load = \"true\""));
-        assert!(text.contains(&format!("players/{player}/{hash}/saves")));
-        assert!(text.contains(&format!("players/{player}/{hash}/states")));
-        assert!(text.contains(&format!(
-            "system_directory = \"{}\"",
-            quoted_path(&root.join("players").join(&player).join("system"))
-        )));
         assert!(text.contains("input_player4_joypad_index = \"3\""));
-        let default = prepare_player(
+        let default = prepare_game(
             &root,
             &root.join("retroarch.exe"),
             &hash,
-            "default",
             false,
             false,
             false,
@@ -578,17 +538,6 @@ mod tests {
             "system_directory = \"{}\"",
             quoted_path(&root.join("system"))
         )));
-        assert!(prepare_player(
-            &root,
-            &root.join("retroarch.exe"),
-            &hash,
-            "../outside",
-            true,
-            true,
-            false,
-            None
-        )
-        .is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]

@@ -227,25 +227,27 @@ export function ImportDialog({
               "OpenRetro detects the console and helps match the game’s details. Your original file stays where it is.",
             )}
           </p>
-          <button
-            className="button primary"
-            disabled={busy}
-            onClick={() => void pick()}
-          >
-            {busy ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <FolderOpen size={17} />
-            )}{" "}
-            {busy ? t("Reading and hashing…") : t("Choose game file")}
-          </button>
-          <button
-            className="button secondary"
-            disabled={busy || !isDesktop}
-            onClick={() => void pickFolder()}
-          >
-            <FolderTree size={17} /> {t("Import a folder")}
-          </button>
+          <div className="import-drop-actions">
+            <button
+              className="button primary"
+              disabled={busy}
+              onClick={() => void pick()}
+            >
+              {busy ? (
+                <LoaderCircle className="spin" size={17} />
+              ) : (
+                <FolderOpen size={17} />
+              )}{" "}
+              {busy ? t("Reading and hashing…") : t("Choose game file")}
+            </button>
+            <button
+              className="button secondary"
+              disabled={busy || !isDesktop}
+              onClick={() => void pickFolder()}
+            >
+              <FolderTree size={17} /> {t("Import a folder")}
+            </button>
+          </div>
           <small>{t("NES, SNES, Game Boy, PlayStation, and more")}</small>
         </div>
       ) : (

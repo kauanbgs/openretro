@@ -6,7 +6,6 @@ import {
   Download,
   Play,
   Heart,
-  Settings2,
   FolderOpen,
   ShieldCheck,
   Trash2,
@@ -48,6 +47,7 @@ import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
 import { NetplayDialog } from "./NetplayDialog";
 import { ModsTab } from "./ModsTab";
+import { RemoveGameDialog } from "../../components/RemoveGameDialog";
 import { playedSha256 } from "../../services/mods";
 import { formatRelative } from "../../utils/format";
 import { locale, t } from "../../i18n";
@@ -66,7 +66,6 @@ export function GamePage({
   emulators,
   onBack,
   onImport,
-  onEmulators,
   onSelect,
   refresh,
   notify,
@@ -78,7 +77,6 @@ export function GamePage({
   onBack: () => void;
   onSelect: (game: GameMetadata) => void;
   onImport: (game: GameMetadata) => void;
-  onEmulators: () => void;
   refresh: () => Promise<void>;
   notify: (message: string) => void;
   /** Open with the online-play dialog showing (Big Picture's "Jogar online"). */
@@ -104,12 +102,7 @@ export function GamePage({
   );
   const [resolution, setResolution] = useState<GameResolution>();
   const [running, setRunning] = useState(false);
-  const [config, setConfig] = useState(false);
   const [remove, setRemove] = useState(false);
-  const [deleteFile, setDeleteFile] = useState(false);
-  const [emulatorId, setEmulatorId] = useState(entry?.item.emulatorId ?? "");
-  const [bios, setBios] = useState(entry?.item.biosPath ?? "");
-  const [args, setArgs] = useState((entry?.item.runtimeArgs ?? []).join("\n"));
   const [busy, setBusy] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState(false);
   const [netplay, setNetplay] = useState(startOnline);
@@ -304,19 +297,12 @@ export function GamePage({
           )}
         </div>
         <div className="hero-panel-actions">
-          {!entry && !isRemote && (
-            <button className="button outline" onClick={() => onImport(game)}>
-              <FolderOpen size={16} /> {t("Adicionar à biblioteca")}
-            </button>
-          )}
           <button
             className={`button primary ${entry ? "play-button" : ""}`}
             disabled={running || busy}
             onClick={() =>
               entry
-                ? resolution?.state === "MISSING_EMULATOR"
-                  ? onEmulators()
-                  : void play()
+                ? void play()
                 : (setDownloadQuery(""),
                   setDownloadSource("all"),
                   setDownloadOptions(true))
@@ -332,11 +318,14 @@ export function GamePage({
             {running
               ? t("Jogo em execução")
               : entry
-                ? resolution?.state === "MISSING_EMULATOR"
-                  ? t("Configurar emulador")
-                  : t("Jogar")
+                ? t("Jogar")
                 : t("Opções de download")}
           </button>
+          {!entry && !isRemote && (
+            <button className="button outline" onClick={() => onImport(game)}>
+              <FolderOpen size={16} /> {t("Adicionar à biblioteca")}
+            </button>
+          )}
           {entry &&
             resolution?.state === "READY" &&
             resolution.emulator?.id === MANAGED_RUNTIME_ID &&
@@ -349,6 +338,17 @@ export function GamePage({
                 <Users size={16} /> {t("Jogar online")}
               </button>
             )}
+          {entry && !isRemote && (
+            <button
+              className="button outline"
+              aria-label={t("Remover jogo")}
+              title={t("Remover jogo")}
+              disabled={running || busy}
+              onClick={() => setRemove(true)}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
           {game.trailers?.length ? (
             <button
               className="button outline"
@@ -384,16 +384,6 @@ export function GamePage({
                   fill={entry.item.favorite ? "currentColor" : "none"}
                 />
               </button>
-              {!isRemote && (
-                <button
-                  className="button outline"
-                  aria-label={t("Configurar")}
-                  title={t("Configurar")}
-                  onClick={() => setConfig(true)}
-                >
-                  <Settings2 size={16} />
-                </button>
-              )}
             </>
           )}
         </div>
@@ -404,7 +394,7 @@ export function GamePage({
             <div>
               <strong>
                 {resolution.state === "MISSING_EMULATOR"
-                  ? t("Emulator required")
+                  ? t("Console ainda não suportado")
                   : resolution.state === "MISSING_GAME"
                     ? t("Game file not found")
                     : needsRuntimeBios
@@ -419,29 +409,23 @@ export function GamePage({
                   : resolution.message}
               </p>
             </div>
-            <button
-              className="button secondary"
-              onClick={() =>
-                resolution.state === "MISSING_EMULATOR"
-                  ? onEmulators()
-                  : resolution.state === "MISSING_GAME"
+            {(resolution.state === "MISSING_GAME" || needsRuntimeBios) && (
+              <button
+                className="button secondary"
+                onClick={() =>
+                  resolution.state === "MISSING_GAME"
                     ? void action(async () => {
                         const c = await bridge.pickGame();
                         if (c) await bridge.relocate(entry.item.id, c);
                       })
-                    : needsRuntimeBios
-                      ? void addRuntimeBios()
-                      : setConfig(true)
-              }
-            >
-              {resolution.state === "MISSING_EMULATOR"
-                ? t("Configurar emulador")
-                : resolution.state === "MISSING_GAME"
+                    : void addRuntimeBios()
+                }
+              >
+                {resolution.state === "MISSING_GAME"
                   ? t("Locate file")
-                  : needsRuntimeBios
-                    ? t("Selecionar BIOS")
-                    : t("Configurar")}
-            </button>
+                  : t("Selecionar BIOS")}
+              </button>
+            )}
           </div>
         )}
         <div className="detail-layout">
@@ -656,15 +640,6 @@ export function GamePage({
                         }
                       >
                         <FolderOpen size={16} /> {t("Locate file")}
-                      </button>
-                      <button
-                        className="button danger"
-                        onClick={() => {
-                          setDeleteFile(false);
-                          setRemove(true);
-                        }}
-                      >
-                        <Trash2 size={16} /> {t("Remover da biblioteca")}
                       </button>
                     </div>
                   </>
@@ -945,83 +920,6 @@ export function GamePage({
           </div>
         </Modal>
       )}
-      {config && entry && (
-        <Modal title={t("Configurar jogo")} onClose={() => setConfig(false)}>
-          <div className="form-stack">
-            <label>
-              {t("Emulator")}
-              <select
-                value={emulatorId}
-                onChange={(e) => setEmulatorId(e.target.value)}
-              >
-                <option value="">{t("Use platform default")}</option>
-                {emulators
-                  .filter((e) => e.supportedPlatforms.includes(game.platformId))
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              {t("BIOS path (if required)")}
-              <div className="input-action">
-                <input
-                  value={bios}
-                  onChange={(e) => setBios(e.target.value)}
-                  placeholder={t("Nenhuma BIOS selecionada")}
-                />
-                <button
-                  className="icon-button"
-                  aria-label={t("Selecionar BIOS")}
-                  onClick={() =>
-                    void action(async () => {
-                      const p = await bridge.pickBios();
-                      if (p) setBios(p);
-                    })
-                  }
-                >
-                  <FolderOpen size={18} />
-                </button>
-              </div>
-            </label>
-            <label>
-              {t("Arguments · one argument per line")}
-              <textarea
-                rows={4}
-                value={args}
-                onChange={(e) => setArgs(e.target.value)}
-                placeholder={"--bios\n{bios}\n{game}"}
-              />
-            </label>
-            <p className="hint">
-              {t("Use")} {"{game}"} {t("and")} {"{bios}"}{" "}
-              {t(
-                "for file paths. Each line is passed as one argument, without shell evaluation. If omitted, the game path is appended. Use the flags documented by your emulator.",
-              )}
-            </p>
-            <button
-              disabled={busy}
-              className="button primary full"
-              onClick={() =>
-                void action(async () => {
-                  await bridge.configureGame(
-                    entry.item.id,
-                    emulatorId || null,
-                    bios || null,
-                    args.split("\n").filter(Boolean),
-                  );
-                  setConfig(false);
-                  notify(t("Configurar jogo saved."));
-                })
-              }
-            >
-              {t("Salvar configuração")}
-            </button>
-          </div>
-        </Modal>
-      )}
       {netplay && entry && (
         <NetplayDialog
           title={game.title}
@@ -1037,40 +935,14 @@ export function GamePage({
         />
       )}
       {remove && entry && (
-        <Modal title={t("Remover este jogo?")} onClose={() => setRemove(false)}>
-          <p className="muted">
-            {game.title}{" "}
-            {t("and its play history will be removed from OpenRetro.")}
-          </p>
-          <label className="checkbox-line">
-            <input
-              type="checkbox"
-              checked={deleteFile}
-              onChange={(e) => setDeleteFile(e.target.checked)}
-            />{" "}
-            {t("Also delete the downloaded game file from this computer")}
-          </label>
-          <div className="modal-footer">
-            <button
-              className="button secondary"
-              onClick={() => setRemove(false)}
-            >
-              {t("Keep game")}
-            </button>
-            <button
-              className="button danger"
-              disabled={busy}
-              onClick={() =>
-                void action(async () => {
-                  await bridge.removeGame(entry.item.id, deleteFile);
-                  onBack();
-                })
-              }
-            >
-              {t("Remover da biblioteca")}
-            </button>
-          </div>
-        </Modal>
+        <RemoveGameDialog
+          entry={entry}
+          onClose={() => setRemove(false)}
+          onRemoved={() => {
+            notify(t("{title} foi removido.", { title: game.title }));
+            onBack();
+          }}
+        />
       )}
     </div>
   );
