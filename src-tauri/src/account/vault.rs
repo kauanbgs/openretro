@@ -10,6 +10,13 @@ pub trait Vault {
 pub struct NativeVault(pub String);
 impl NativeVault {
     pub fn for_origin(origin: &str) -> Self {
+        // The Party moved to its own domain; the saved session stays under
+        // the old address's name so nobody has to sign in again.
+        let origin = if origin == "https://party.openretro.com.br/" {
+            "https://openretro-party.openretro-party-server.workers.dev/"
+        } else {
+            origin
+        };
         Self(format!("OpenRetro/Social/v1/{origin}"))
     }
 }

@@ -4,6 +4,10 @@
 	"main": "worker.mjs",
 	"compatibility_date": "2026-10-23",
 	"workers_dev": true,
+	// The Party lives on the project's own domain; workers.dev keeps working.
+	"routes": [
+		{ "pattern": "party.openretro.com.br", "custom_domain": true }
+	],
 	"preview_urls": false,
 	"assets": {
 		"directory": "../public",

@@ -103,6 +103,10 @@ fn service_origins_reject_credentials_paths_and_public_http() {
         NativeVault::for_origin("https://a.example/").0
             != NativeVault::for_origin("https://b.example/").0
     );
+    assert_eq!(
+        NativeVault::for_origin("https://party.openretro.com.br/").0,
+        NativeVault::for_origin("https://openretro-party.openretro-party-server.workers.dev/").0
+    );
 }
 #[test]
 fn validates_codes_profiles_and_email_without_accepting_settings_fields() {
