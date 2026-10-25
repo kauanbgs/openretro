@@ -363,7 +363,7 @@ pub fn open_steam_controller_settings(app: tauri::AppHandle) -> Result<()> {
 }
 
 pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
-    let window = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         "game-menu",
         tauri::WebviewUrl::App("index.html".into()),
@@ -377,8 +377,23 @@ pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
     .always_on_top(true)
     .skip_taskbar(true)
     .fullscreen(true)
-    .resizable(false)
-    .build()?;
+    .resizable(false);
+    // Both WebViews share their browser profile. WebView2 refuses to create
+    // this window with ERROR_INVALID_STATE if its browser arguments differ
+    // from the already running main window's environment.
+    #[cfg(windows)]
+    let builder = match app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .and_then(|window| window.additional_browser_args.as_deref())
+    {
+        Some(arguments) => builder.additional_browser_args(arguments),
+        None => builder,
+    };
+    let window = builder.build()?;
     let target = app.clone();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {

@@ -26,6 +26,14 @@ jobs:
       - name: Prepare minimal OpenRetro Runtime
         uses: ./.github/actions/runtime
       - run: npm run prepare:runtime
+      - name: Build and verify Windows startup before publishing
+        shell: pwsh
+        run: |
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --release --features tauri/custom-protocol --manifest-path src-tauri/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-desktop-startup.ps1 -Executable ./src-tauri/target/release/openretro.exe
       - name: Read release notes
         shell: pwsh
         run: |
