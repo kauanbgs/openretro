@@ -15,6 +15,8 @@ import {
   PartyExitGesture,
   readPartyPad,
 } from "./partyInput";
+import { loadMapping, pickPad, type PadMapping } from "./partyPadMapping";
+import { PartyPadSetup } from "./PartyPadSetup";
 import { t } from "../../i18n";
 import "./PartyGuestScreen.css";
 
@@ -47,6 +49,12 @@ export function PartyGuestScreen({
   stateRef.current = state;
   const [menu, setMenu] = useState(false);
   const [play, setPlay] = useState(false);
+  // A connected controller the browser does not know, until it is set up.
+  const [unmapped, setUnmapped] = useState<string | null>(null);
+  const unmappedRef = useRef<string | null>(null);
+  const [setup, setSetup] = useState(false);
+  const setupRef = useRef(false);
+  const mappings = useRef(new Map<string, PadMapping | null>());
   const paused = useRef(false);
   const held = useRef(new Map<string, number>());
   const closeRef = useRef(onClose);
@@ -65,8 +73,27 @@ export function PartyGuestScreen({
     paused.current = false;
     setMenu(false);
   };
-  const actions = useRef({ openMenu, resume, leave });
-  actions.current = { openMenu, resume, leave };
+  // Setting a controller up pauses play, like the menu, so no press reaches the game.
+  const openSetup = () => {
+    paused.current = true;
+    setupRef.current = true;
+    held.current.clear();
+    guest.current?.setInput(neutralPad());
+    setMenu(false);
+    setSetup(true);
+  };
+  const closeSetup = () => {
+    if (unmappedRef.current) mappings.current.delete(unmappedRef.current);
+    setupRef.current = false;
+    paused.current = false;
+    setSetup(false);
+  };
+  const actions = useRef({ openMenu, resume, leave, closeSetup });
+  actions.current = { openMenu, resume, leave, closeSetup };
+  // A controller unplugged mid-setup must not leave play paused.
+  useEffect(() => {
+    if (setup && !unmapped) actions.current.closeSetup();
+  }, [setup, unmapped]);
   const activate = () => {
     void video.current
       ?.play()
@@ -107,7 +134,8 @@ export function PartyGuestScreen({
       if (event.code === "Escape") {
         event.preventDefault();
         if (event.type === "keydown" && !event.repeat) {
-          if (paused.current) actions.current.resume();
+          if (setupRef.current) actions.current.closeSetup();
+          else if (paused.current) actions.current.resume();
           else actions.current.openMenu();
         }
         return;
@@ -157,9 +185,18 @@ export function PartyGuestScreen({
     let previousMenuButtons = false;
     function sample() {
       const active = !document.hidden && document.hasFocus();
-      const pad = navigator
-        .getGamepads?.()
-        .find((p) => p?.mapping === "standard");
+      // Standard pads read directly; others once the player has mapped them.
+      const found = pickPad(navigator.getGamepads?.() ?? [], (id) => {
+        if (!mappings.current.has(id))
+          mappings.current.set(id, loadMapping(id));
+        return mappings.current.get(id) ?? null;
+      });
+      const pad = found.pad;
+      const missing = found.unmapped?.id ?? null;
+      if (missing !== unmappedRef.current) {
+        unmappedRef.current = missing;
+        setUnmapped(missing);
+      }
       const combo =
         active && !!pad?.buttons[8]?.pressed && !!pad?.buttons[9]?.pressed;
       if (exitGesture.sample(combo, performance.now()))
@@ -250,6 +287,17 @@ export function PartyGuestScreen({
         <small>
           {t("Esc ou segure Start + Select por 1 s para abrir o menu")}
         </small>
+        {unmapped && !setup && (
+          <button
+            className="button"
+            onClick={openSetup}
+            title={t(
+              "Este controle não foi reconhecido. Configure os botões uma vez.",
+            )}
+          >
+            {t("Configurar controle")}
+          </button>
+        )}
         <button
           className="button secondary"
           onClick={() =>
@@ -310,6 +358,13 @@ export function PartyGuestScreen({
       )}
       {state.message && state.connectedOnce && !failed && (
         <p className="party-guest-notice">{state.message}</p>
+      )}
+      {setup && unmapped && (
+        <PartyPadSetup
+          padId={unmapped}
+          onDone={closeSetup}
+          onCancel={closeSetup}
+        />
       )}
       {menu && (
         <div className="party-guest-shade">

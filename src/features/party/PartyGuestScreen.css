@@ -108,3 +108,18 @@
     width: 100%;
   }
 }
+
+/* Setting up a controller the browser does not know */
+.party-pad-step {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.party-pad-step small {
+  color: var(--body);
+  font-size: 12px;
+}
+.party-pad-step strong {
+  color: var(--text);
+  font-size: 22px;
+}

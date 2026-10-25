@@ -227,7 +227,9 @@ pub async fn launch_game(
     let video=diagnosis::video_driver(&*db.read()?);
     std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?.write_all(format!("video_driver = \"{video}\"\n").as_bytes()).map_err(error)?;
     let log=diagnosis::session_log(&data)?;
-    args.extend(["-v".into(),format!("--log-file={}",log.display())]);
+    // The log file comes first: verbose logging without one opens a console
+    // window, which OpenRetro would take for the game window.
+    args.extend([format!("--log-file={}",log.display()),"-v".into()]);
     runtime_log=Some(log);
     if let Some(netplay)=&netplay {
       let mut file=std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?;
@@ -255,6 +257,8 @@ pub async fn launch_game(
  // Command passes each argument directly to the executable. No shell interprets paths or arguments.
  let mut command=Command::new(&executable);
  command.args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?);
+ // With output connected, the runtime never opens a console of its own.
+ if managed_retroarch { command.stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()); }
  // RPCS3 keeps every core busy, so it gets the CPU before OpenRetro and other
  // apps. Above normal, not high: audio and input elsewhere keep their turn.
  #[cfg(windows)]
@@ -280,11 +284,17 @@ pub async fn launch_game(
  // A GUI emulator can leave its process alive after its embedded game window
  // closes. Give it time to finish saves, then reap the managed child.
  let mut closed_since=None;
+ let mut checked=Instant::now();
  let status=loop {
     match child.try_wait() {
        Ok(Some(status))=>break Ok(status),
        Err(error)=>break Err(error),
        Ok(None)=>{}
+    }
+    // The runtime can recreate its window or lose its place; keep the game inside OpenRetro.
+    if managed_retroarch && checked.elapsed()>=Duration::from_millis(500) {
+       if let Some(session)=&runtime_session { session.keep_embedded(child.id()); }
+       checked=Instant::now();
     }
     if runtime_session.as_ref().is_some_and(|session|session.window_closed()) {
        if closed_since.get_or_insert_with(Instant::now).elapsed()>=Duration::from_secs(5) {

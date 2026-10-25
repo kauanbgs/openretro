@@ -85,6 +85,39 @@ impl SessionGuard {
         drop(guard);
         self.host(pid)
     }
+    /// Brings the runtime's game window back inside OpenRetro if it left, for
+    /// example when the runtime recreated it. Cheap while it stays inside.
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
+    pub fn keep_embedded(&self, pid: u32) {
+        #[cfg(target_os = "windows")]
+        {
+            let service = self.app.state::<InGameService>();
+            let current = service.0.lock().ok().and_then(|guard| {
+                guard
+                    .as_ref()
+                    .filter(|session| session.info.id == self.id)
+                    .map(|session| session.embedded_window)
+            });
+            let Some(current) = current else { return };
+            if current.is_some_and(|window| host::inside(&self.app, window)) {
+                return;
+            }
+            match host::reembed(&self.app, pid) {
+                Ok(Some(embedded)) => {
+                    if let Ok(mut guard) = service.0.lock() {
+                        if let Some(session) =
+                            guard.as_mut().filter(|session| session.info.id == self.id)
+                        {
+                            session.embedded_window = Some(embedded.window);
+                            session.covered_views.extend(embedded.covered);
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(message) => log::warn!("Could not embed the runtime window again: {message}"),
+            }
+        }
+    }
     /// Shows the process's game window inside OpenRetro's main window. RPCS3
     /// takes no commands, so its session only gets this: no command channel
     /// and no OpenRetro menu; its own PS button menu exits the game.

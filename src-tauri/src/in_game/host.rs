@@ -60,6 +60,7 @@ extern "system" {
     fn SetFocus(window: *mut c_void) -> *mut c_void;
     fn BringWindowToTop(window: *mut c_void) -> i32;
     fn SetWindowRgn(window: *mut c_void, region: *mut c_void, redraw: i32) -> i32;
+    fn GetWindowTextW(window: *mut c_void, text: *mut u16, max: i32) -> i32;
     fn InvalidateRect(window: *mut c_void, rect: *const Rect, erase: i32) -> i32;
 }
 
@@ -187,13 +188,34 @@ fn child_style(style: isize) -> isize {
     (style | WS_CHILD) & !(WS_POPUP | WS_CAPTION | WS_THICKFRAME)
 }
 
-pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<Embedded> {
+/// The main window, full screen and shown, ready to hold the game.
+fn game_parent(app: &tauri::AppHandle) -> Result<*mut c_void> {
     let main = app
         .get_webview_window("main")
         .ok_or("A janela principal do OpenRetro não está disponível.")?;
     main.set_fullscreen(true).map_err(error)?;
     main.show().map_err(error)?;
-    let parent = main.hwnd().map_err(error)?.0;
+    Ok(main.hwnd().map_err(error)?.0)
+}
+
+/// A window's title and size, for the log.
+fn describe(window: *mut c_void) -> String {
+    let mut title = [0u16; 128];
+    let mut rect = Rect::default();
+    unsafe {
+        let length = GetWindowTextW(window, title.as_mut_ptr(), title.len() as i32).max(0);
+        GetWindowRect(window, &mut rect);
+        format!(
+            "\"{}\" {}x{}",
+            String::from_utf16_lossy(&title[..length as usize]),
+            rect.right - rect.left,
+            rect.bottom - rect.top
+        )
+    }
+}
+
+pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<Embedded> {
+    let parent = game_parent(app)?;
     // RPCS3 opens its window after loading the system software.
     let deadline = Instant::now() + Duration::from_secs(30);
     let child = loop {
@@ -211,6 +233,13 @@ pub fn embed(app: &tauri::AppHandle, pid: u32) -> Result<Embedded> {
         }
         thread::sleep(Duration::from_millis(40));
     };
+    log::info!("Embedding runtime window {}", describe(child));
+    attach(parent, child)
+}
+
+/// Makes `child` a borderless child filling OpenRetro's window, with the
+/// launcher views hidden behind it.
+fn attach(parent: *mut c_void, child: *mut c_void) -> Result<Embedded> {
     unsafe {
         let style = GetWindowLongPtrW(child, GWL_STYLE);
         let extended = GetWindowLongPtrW(child, GWL_EXSTYLE);
@@ -264,6 +293,31 @@ pub fn focus(window: isize) -> bool {
 
 pub fn is_open(window: isize) -> bool {
     window != 0 && unsafe { IsWindow(window as *mut c_void) } != 0
+}
+
+/// Whether the game window still sits inside OpenRetro's main window.
+pub fn inside(app: &tauri::AppHandle, window: isize) -> bool {
+    let Some(parent) = app
+        .get_webview_window("main")
+        .and_then(|main| main.hwnd().ok())
+    else {
+        return false;
+    };
+    is_open(window) && unsafe { GetParent(window as *mut c_void) } == parent.0
+}
+
+/// Puts the runtime's game window back inside OpenRetro when it is out on
+/// its own. Embedded windows are children, so the search only finds one that
+/// escaped or was created anew; None means there is nothing to bring back.
+pub fn reembed(app: &tauri::AppHandle, pid: u32) -> Result<Option<Embedded>> {
+    let Some(child) = process_window(pid) else {
+        return Ok(None);
+    };
+    log::warn!(
+        "Runtime window {} was outside OpenRetro; embedding it again",
+        describe(child)
+    );
+    attach(game_parent(app)?, child).map(Some)
 }
 
 /// Clip the renderer itself, without capturing frames or affecting game input.

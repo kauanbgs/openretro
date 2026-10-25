@@ -1,5 +1,26 @@
 /** Portuguese source text → English. */
 export const en: Record<string, string> = {
+  "Configurar controle": "Set up controller",
+  "Este controle não foi reconhecido. Configure os botões uma vez.":
+    "This controller was not recognized. Set up its buttons once.",
+  "Solte o controle e use só o que for pedido. O OpenRetro guarda o mapeamento deste controle.":
+    "Let go of the controller and use only what is asked. OpenRetro saves this controller's mapping.",
+  "{step} de {total}": "{step} of {total}",
+  "Pular (este controle não tem)": "Skip (this controller has none)",
+  "Botão de baixo (✕ / A)": "Bottom button (✕ / A)",
+  "Botão da direita (○ / B)": "Right button (○ / B)",
+  "Botão da esquerda (□ / X)": "Left button (□ / X)",
+  "Botão de cima (△ / Y)": "Top button (△ / Y)",
+  "L3 (aperte o analógico esquerdo)": "L3 (press the left stick)",
+  "R3 (aperte o analógico direito)": "R3 (press the right stick)",
+  "Direcional para cima": "D-pad up",
+  "Direcional para baixo": "D-pad down",
+  "Direcional para a esquerda": "D-pad left",
+  "Direcional para a direita": "D-pad right",
+  "Analógico esquerdo para a direita": "Left stick to the right",
+  "Analógico esquerdo para baixo": "Left stick down",
+  "Analógico direito para a direita": "Right stick to the right",
+  "Analógico direito para baixo": "Right stick down",
   "Console ainda não suportado": "Console not supported yet",
   "O OpenRetro ainda não roda jogos de {console}.":
     "OpenRetro cannot run {console} games yet.",
