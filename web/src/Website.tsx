@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDown,
   Check,
@@ -17,8 +17,36 @@ import {
 import { PixelLandscape } from "./PixelLandscape";
 
 const REPO = "https://github.com/kauanbgs/openretro";
-const DOWNLOAD = `${REPO}/releases/latest`;
+// Stable asset name published with every release; used until the API answers.
+const DOWNLOAD_FALLBACK = `${REPO}/releases/latest/download/OpenRetro-Setup.exe`;
+const LATEST_RELEASE_API =
+  "https://api.github.com/repos/kauanbgs/openretro/releases/latest";
 const DOCS = `${REPO}#readme`;
+
+// Resolves the latest Windows installer so the button downloads it directly.
+function useInstallerUrl() {
+  const [url, setUrl] = useState(DOWNLOAD_FALLBACK);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(LATEST_RELEASE_API, { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then(
+        (
+          release: {
+            assets?: { name: string; browser_download_url: string }[];
+          } | null,
+        ) => {
+          const installer = release?.assets?.find((asset) =>
+            /_x64-setup\.exe$/i.test(asset.name),
+          );
+          if (installer) setUrl(installer.browser_download_url);
+        },
+      )
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  return url;
+}
 const covers = [
   "mario-world",
   "zelda",
@@ -95,6 +123,7 @@ function Glyphs() {
 }
 
 export function Website() {
+  const installerUrl = useInstallerUrl();
   const [device, setDevice] = useState(0);
   const [theme, setTheme] = useState(false);
   const selected = devices[device];
@@ -144,7 +173,7 @@ export function Website() {
               2. Reúna seus jogos e encontre um novo jeito de voltar a eles.
             </p>
             <div className="hero-actions">
-              <a className="pixel-button primary" href={DOWNLOAD}>
+              <a className="pixel-button primary" href={installerUrl}>
                 <Download size={16} />
                 Baixar OpenRetro
               </a>
@@ -241,7 +270,7 @@ export function Website() {
                 <span>Super Nintendo</span>
                 <h3>Super Mario Kart</h3>
                 <p>Seu próximo play começa na linha de largada.</p>
-                <a className="pixel-button primary compact" href={DOWNLOAD}>
+                <a className="pixel-button primary compact" href={installerUrl}>
                   <Download size={13} />
                   Baixar OpenRetro
                 </a>
@@ -409,7 +438,7 @@ export function Website() {
               <p>{selected.description}</p>
               <a
                 className="pixel-button primary compact"
-                href={device === 0 ? DOWNLOAD : DOCS}
+                href={device === 0 ? installerUrl : DOCS}
               >
                 {selected.button}
                 <ExternalLink size={13} />
@@ -439,7 +468,7 @@ export function Website() {
               <br />
               Gratuito e de código aberto. Jogue localmente sem conta.
             </p>
-            <a className="pixel-button primary" href={DOWNLOAD}>
+            <a className="pixel-button primary" href={installerUrl}>
               <Download size={15} />
               Baixar para Windows
             </a>
@@ -498,7 +527,7 @@ export function Website() {
         </div>
         <div>
           <h3>OpenRetro</h3>
-          <a href={DOWNLOAD}>Baixar aplicativo</a>
+          <a href={installerUrl}>Baixar aplicativo</a>
           <a href={DOCS}>Documentação</a>
         </div>
         <div>

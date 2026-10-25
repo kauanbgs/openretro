@@ -64,3 +64,14 @@ jobs:
           Get-ChildItem dist-runtime -File | ForEach-Object {
             gh release upload "v$version" $_.FullName --clobber
           }
+      - name: Attach installer under a stable name for the website
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $setup = Get-ChildItem src-tauri/target/release/bundle/nsis -Filter "OpenRetro_${version}_x64-setup.exe" | Select-Object -First 1
+          if (-not $setup) { throw "NSIS installer for $version not found" }
+          $stable = Join-Path $env:RUNNER_TEMP "OpenRetro-Setup.exe"
+          Copy-Item $setup.FullName $stable
+          gh release upload "v$version" $stable --clobber
