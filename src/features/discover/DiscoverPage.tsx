@@ -16,6 +16,7 @@ import { platformById, platforms } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import { PageLoading } from "../../components/PageLoading";
 import { CatalogConnection } from "./CatalogConnection";
+import { RecommendationRows } from "../../components/RecommendationRows";
 import type {
   CatalogRequest,
   PlayersFilter,
@@ -132,6 +133,13 @@ export function DiscoverPage({
       ) : (
         <div className="catalogue-layout">
           <div className="catalogue-results">
+            {/* Suggestions sit above the plain catalog, not above a search or filter. */}
+            {!debounced &&
+              genre === null &&
+              players === null &&
+              platform === "all" && (
+                <RecommendationRows ready onSelect={onSelect} />
+              )}
             <div className="catalogue-summary">
               <p>
                 {browse.isFetching && !games.length

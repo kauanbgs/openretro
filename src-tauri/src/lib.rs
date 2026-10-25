@@ -11,6 +11,7 @@ mod metadata;
 mod models;
 mod mods;
 mod profiles;
+mod recommendations;
 mod remote_play;
 use tauri::Manager;
 
@@ -109,6 +110,10 @@ pub fn run() {
             metadata::catalog_match,
             metadata::catalog_players,
             metadata::catalog_thumbnail,
+            recommendations::recommendations,
+            recommendations::interest_view,
+            recommendations::recommendations_seen,
+            recommendations::recommendation_opened,
             downloads::sources::list_download_sources,
             downloads::sources::save_download_source,
             downloads::sources::set_download_source,

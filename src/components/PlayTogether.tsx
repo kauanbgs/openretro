@@ -52,12 +52,10 @@ export function PlayTogether({
   onPhone,
   onParty,
   onFriends,
-  onPeople,
 }: {
   onPhone: () => void;
   onParty: () => void;
   onFriends: () => void;
-  onPeople?: () => void;
 }) {
   const state = usePlayTogether();
   return (
@@ -126,14 +124,6 @@ export function PlayTogether({
           <b>{t("Ver amigos")}</b>
         </button>
       )}
-      <button
-        className="play-together-discover"
-        onClick={onPeople ?? onFriends}
-      >
-        <Users size={18} />
-        <span>{t("Conheça novas pessoas")}</span>
-        <small>{t("Encontre jogadores do OpenRetro")}</small>
-      </button>
     </section>
   );
 }

@@ -2,7 +2,10 @@
 // and Party. Each frame becomes a VideoFrame written to a track generator:
 // a raw frame is cropped in place, and only small frames and regions that
 // grow by whole pixels are copied. Nothing passes through a canvas.
-import { rawPartyFrame } from "../features/party/partyFrames";
+import {
+  isRawPartyFrame,
+  rawPartyFrame,
+} from "../features/party/partyFrames";
 
 export type ScreenLayout = "full" | "sideBySide" | "stacked" | "grid";
 export interface ScreenView {
@@ -100,19 +103,20 @@ export function retire(old: Source) {
   if (!old.users) old.image.close();
 }
 
-/** Turns local server packets into frames: tag 4 is raw RGBA, tag 3 a
- * lossless PNG of a small frame, skipped while the previous one decodes. */
+/** Turns local server packets into frames: tags 4 and 5 are raw RGBX and
+ * BGRX, tag 3 a lossless PNG of a small frame, skipped while the previous
+ * one decodes. */
 export function packetDecoder() {
   let decoding = false;
   return async (packet: ArrayBuffer): Promise<Source | undefined> => {
     const tag = new DataView(packet).getUint8(0);
-    if (tag === 4) {
+    if (isRawPartyFrame(tag)) {
       const raw = rawPartyFrame(packet);
       if (!raw) return;
       const timestamp = Math.round(performance.now() * 1000);
       return source(
         new VideoFrame(raw.pixels, {
-          format: "RGBX",
+          format: raw.format,
           codedWidth: raw.width,
           codedHeight: raw.height,
           timestamp,

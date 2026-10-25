@@ -4,6 +4,7 @@ import { Dices } from "lucide-react";
 import { GameArtwork } from "../../components/GameArtwork";
 import { GameCard } from "../../components/GameCard";
 import { PlayTogether } from "../../components/PlayTogether";
+import { RecommendationRows } from "../../components/RecommendationRows";
 import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
 import {
   metadataProvider,
@@ -26,7 +27,6 @@ interface Props {
   onPhone: () => void;
   onParty: () => void;
   onFriends: () => void;
-  onPeople: () => void;
 }
 type Category = "popular" | "multiplayer";
 const categories: {
@@ -45,7 +45,6 @@ export function HomePage({
   onPhone,
   onParty,
   onFriends,
-  onPeople,
 }: Props) {
   const [category, setCategory] = useState<Category>("popular");
   const current = categories.find((c) => c.id === category)!;
@@ -168,12 +167,8 @@ export function HomePage({
           </div>
         </div>
       )}
-      <PlayTogether
-        onPhone={onPhone}
-        onParty={onParty}
-        onFriends={onFriends}
-        onPeople={onPeople}
-      />
+      <PlayTogether onPhone={onPhone} onParty={onParty} onFriends={onFriends} />
+      <RecommendationRows ready={ready} limit={3} onSelect={onSelect} />
       <div className="home-categories">
         <div role="tablist" aria-label={t("Categorias")}>
           {categories.map((c) => (

@@ -1,7 +1,21 @@
 use crate::models::*;
 use rusqlite::{params, Connection};
-use std::{path::Path, sync::Mutex};
-pub struct Database(pub Mutex<Connection>);
+use std::{
+    path::Path,
+    sync::{Mutex, MutexGuard},
+};
+/// The connection every write uses, plus a read-only one. In WAL mode the
+/// reader sees each committed write but never waits for one, so lists the
+/// interface polls stay quick while a download saves its progress.
+pub struct Database(pub Mutex<Connection>, Mutex<Connection>);
+impl Database {
+    pub fn read(&self) -> Result<MutexGuard<'_, Connection>> {
+        self.1.lock().map_err(error)
+    }
+}
+/// WAL makes NORMAL durable against crashes of the app; only a power loss can
+/// drop the last commits, never corrupt the file. Busy waits cover checkpoints.
+const PRAGMAS: &str = "PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;";
 pub type Result<T> = std::result::Result<T, String>;
 pub fn error(e: impl std::fmt::Display) -> String {
     log::error!("{e}");
@@ -11,6 +25,7 @@ pub fn initialize(path: &Path) -> Result<Database> {
     let mut db = Connection::open(path).map_err(error)?;
     db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
         .map_err(error)?;
+    db.execute_batch(PRAGMAS).map_err(error)?;
     let tx = db.transaction().map_err(error)?;
     tx.execute_batch(include_str!("001_initial.sql"))
         .map_err(error)?;
@@ -36,6 +51,14 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("007_logo_blue_player.sql"))
         .map_err(error)?;
+    tx.execute_batch(include_str!("008_recommendations.sql"))
+        .map_err(error)?;
+    // Old signals say little about today's taste and only grow the file.
+    tx.execute(
+        "DELETE FROM interest_events WHERE at < ?1",
+        [(chrono::Utc::now() - chrono::Duration::days(365)).to_rfc3339()],
+    )
+    .map_err(error)?;
     // Restart requires explicit resume, which rechecks the partial files.
     tx.execute("UPDATE download_jobs SET data=json_set(data,'$.state','PAUSED') WHERE json_extract(data,'$.state') IN ('RESOLVING','DOWNLOADING','VERIFYING','QUEUED')", []).map_err(error)?;
     let platforms: serde_json::Value =
@@ -54,7 +77,13 @@ pub fn initialize(path: &Path) -> Result<Database> {
     )
     .map_err(error)?;
     tx.commit().map_err(error)?;
-    Ok(Database(Mutex::new(db)))
+    // Opened after the migrations, so it never reads a half-built schema.
+    let reader = Connection::open(path).map_err(error)?;
+    reader.execute_batch(PRAGMAS).map_err(error)?;
+    reader
+        .execute_batch("PRAGMA query_only=ON;")
+        .map_err(error)?;
+    Ok(Database(Mutex::new(db), Mutex::new(reader)))
 }
 pub fn library(db: &Connection) -> Result<Vec<LibraryGame>> {
     let mut stmt = db.prepare("SELECT g.metadata,l.id,l.game_id,l.platform_id,l.source_provider,l.source_path,l.emulator_id,l.installed,l.favorite,l.added_at,l.last_played_at,l.playtime,l.sha256,l.bios_path,l.runtime_args,v.id,v.path,v.sha256,v.data,(SELECT COUNT(*) FROM game_variants c WHERE c.library_item_id=l.id) FROM library_items l JOIN games g ON l.game_id=g.id LEFT JOIN game_variant_selection s ON s.library_item_id=l.id LEFT JOIN game_variants v ON v.id=s.variant_id ORDER BY l.added_at DESC").map_err(error)?;
@@ -132,6 +161,23 @@ mod tests {
             .unwrap();
         assert_eq!(avatar, "gamepad");
         assert!(color.starts_with('#'));
+        // The reader sees committed writes, even while the writer is held,
+        // and refuses to write itself.
+        let writer = db.0.lock().unwrap();
+        writer
+            .execute("INSERT INTO settings(key,value) VALUES('probe','1')", [])
+            .unwrap();
+        let reader = db.read().unwrap();
+        let probe: String = reader
+            .query_row("SELECT value FROM settings WHERE key='probe'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(probe, "1");
+        assert!(reader
+            .execute("DELETE FROM settings WHERE key='probe'", [])
+            .is_err());
+        drop((writer, reader));
         drop(db);
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));

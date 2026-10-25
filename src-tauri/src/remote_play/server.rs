@@ -188,6 +188,7 @@ pub async fn start(app: tauri::AppHandle, address: &str) -> Result<Running> {
         .route("/play", get(play))
         .route("/ws", get(socket))
         .route("/party-stream", get(party_socket))
+        .route("/party-input", get(party_input_socket))
         .route("/phone-encoder", get(encoder_socket))
         .route("/events", get(event_socket))
         .route("/api/invoke", post(api))
@@ -421,7 +422,7 @@ async fn socket(
     if !paired(&shared, &pairing, &headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    upgrade.on_upgrade(move |socket| session(shared, socket, false))
+    upgrade.on_upgrade(move |socket| session(shared, socket, false, true))
 }
 
 // Party's local bridge never sends the launcher's fallback screen to guests.
@@ -434,7 +435,21 @@ async fn party_socket(
     if !paired(&shared, &pairing, &headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    upgrade.on_upgrade(move |socket| session(shared, socket, true))
+    upgrade.on_upgrade(move |socket| session(shared, socket, true, true))
+}
+
+/// One Party guest's controller. It carries no frames or sound: each guest
+/// would otherwise receive a copy of every raw frame it never shows.
+async fn party_input_socket(
+    State(shared): State<Arc<Shared>>,
+    Query(pairing): Query<Pairing>,
+    headers: HeaderMap,
+    upgrade: WebSocketUpgrade,
+) -> Response {
+    if !paired(&shared, &pairing, &headers) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    upgrade.on_upgrade(move |socket| session(shared, socket, true, false))
 }
 
 /// The next packet of an optional feed; without one, never.
@@ -793,7 +808,7 @@ fn party_connected(shared: &Shared, joined: bool) {
     }
 }
 
-async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
+async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool, media: bool) {
     if party {
         party_connected(&shared, true);
     }
@@ -804,14 +819,16 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
     let mut phone = PhoneVideo {
         connection,
         selected: View::default(),
-        jpeg: Some(if party {
-            shared.video.subscribe_party()
-        } else {
-            shared.video.subscribe(View::default())
+        jpeg: media.then(|| {
+            if party {
+                shared.video.subscribe_party()
+            } else {
+                shared.video.subscribe(View::default())
+            }
         }),
     };
     let (to_phone, mut from_encoder) = mpsc::unbounded_channel::<String>();
-    let mut audio = shared.audio.subscribe();
+    let mut audio = media.then(|| shared.audio.subscribe());
     let mut relay = match input::Relay::new() {
         Ok(relay) => Some(relay),
         Err(error) => {
@@ -833,7 +850,7 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool) {
                 Err(_) => break,
             },
             signal = from_encoder.recv() => signal.map(|text| Message::Text(text.into())),
-            sound = audio.recv() => match sound {
+            sound = next(&mut audio) => match sound {
                 Ok(sound) => Some(Message::Binary(sound)),
                 Err(broadcast::error::RecvError::Lagged(_)) => None,
                 Err(_) => break,

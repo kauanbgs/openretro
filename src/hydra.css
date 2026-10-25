@@ -588,6 +588,9 @@ html[data-theme="light"] .sidebar-together button:last-of-type > svg {
   display: grid;
   gap: 24px;
 }
+.home > .play-together {
+  margin: 0;
+}
 .hero {
   position: relative;
   display: block;
@@ -691,6 +694,60 @@ html[data-theme="light"] .sidebar-together button:last-of-type > svg {
 }
 .app .home .game-card-title p {
   font-size: 16px;
+}
+
+/* Recommendations */
+.recommendations {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+.catalogue-results > .recommendations {
+  margin-bottom: 32px;
+}
+.recommendation-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.recommendation-section .home-section-title {
+  margin-bottom: 0;
+}
+.recommendation-section .home-section-title span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.recommendation-section .home-section-title svg {
+  flex-shrink: 0;
+  color: #12ace2;
+}
+.catalogue-results .recommendation-section .home-section-title {
+  font-size: 18px;
+}
+.recommendation-row {
+  display: grid;
+  grid-auto-columns: 280px;
+  grid-auto-flow: column;
+  gap: 16px;
+  padding-bottom: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+}
+.recommendation-row > * {
+  scroll-snap-align: start;
+}
+.game-card-note {
+  overflow: hidden;
+  color: #8e919b;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+html.remote .recommendation-row {
+  grid-auto-columns: 160px;
+  gap: 10px;
 }
 
 /* Game cards */

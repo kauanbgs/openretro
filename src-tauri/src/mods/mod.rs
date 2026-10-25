@@ -575,7 +575,7 @@ fn plaza_key(conn: &rusqlite::Connection) -> Result<Option<String>> {
     .map_err(error)
 }
 /// The key is kept in the local database and never sent back to the interface.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_set_plaza_key(app: tauri::AppHandle, key: Option<String>) -> Result<()> {
     let db = app.state::<Database>();
     let conn = db.0.lock().map_err(error)?;
@@ -769,7 +769,7 @@ fn update(app: &tauri::AppHandle, job: &mut ModJob, state: &str, stage: &str, pr
     emit(app, job);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_jobs(app: tauri::AppHandle) -> Result<Vec<ModJob>> {
     Ok(app
         .state::<ModService>()
@@ -780,7 +780,7 @@ pub fn mods_jobs(app: tauri::AppHandle) -> Result<Vec<ModJob>> {
         .cloned()
         .collect())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_cancel(app: tauri::AppHandle, id: String) -> Result<()> {
     if let Some(running) = app
         .state::<ModService>()
@@ -794,7 +794,7 @@ pub fn mods_cancel(app: tauri::AppHandle, id: String) -> Result<()> {
     }
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_dismiss(app: tauri::AppHandle, id: String) -> Result<()> {
     let service = app.state::<ModService>();
     if service.running.lock().map_err(error)?.contains_key(&id) {
@@ -805,7 +805,7 @@ pub fn mods_dismiss(app: tauri::AppHandle, id: String) -> Result<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_install(
     app: tauri::AppHandle,
     request: InstallRequest,
@@ -1465,7 +1465,7 @@ pub fn store_variant(
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_select_variant(
     app: tauri::AppHandle,
     library_item_id: String,
@@ -1522,7 +1522,7 @@ fn descendants(all: &[Variant], id: &str) -> Vec<String> {
 
 /// Removes a modified version and its saves folder. The original game file
 /// and its saves are never touched.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_remove_variant(app: tauri::AppHandle, variant_id: String) -> Result<Vec<String>> {
     let data = data_dir(&app)?;
     let removed = {
@@ -1636,7 +1636,7 @@ pub fn variant_saves(
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_sources(app: tauri::AppHandle) -> Result<Vec<SourceSummary>> {
     let db = app.state::<Database>();
     let conn = db.0.lock().map_err(error)?;
@@ -1662,7 +1662,7 @@ pub async fn mods_add_source(app: tauri::AppHandle, url: String) -> Result<Sourc
     .await
     .map_err(error)?
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_set_source(app: tauri::AppHandle, id: String, enabled: bool) -> Result<()> {
     let db = app.state::<Database>();
     let conn = db.0.lock().map_err(error)?;
@@ -1673,7 +1673,7 @@ pub fn mods_set_source(app: tauri::AppHandle, id: String, enabled: bool) -> Resu
     .map_err(error)?;
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mods_remove_source(app: tauri::AppHandle, id: String) -> Result<()> {
     let db = app.state::<Database>();
     let conn = db.0.lock().map_err(error)?;

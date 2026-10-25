@@ -55,6 +55,7 @@ import { bridge, isDesktop, isRemote } from "./services/bridge";
 import { invoke, isTauri } from "./services/transport";
 import { listen } from "./services/transport";
 import { useUpdates } from "./services/updates";
+import { usePageInterest } from "./services/recommendations";
 import { setPhoneFrameRate, startPhoneVideoHost } from "./services/phoneVideo";
 import {
   defaultSettings,
@@ -344,6 +345,8 @@ export function App() {
         </div>
       )
     );
+  // Time on a game's page feeds recommendations; playing or Big Picture pauses it.
+  usePageInterest(selected, Boolean(playing) || bigPicture);
   // Unmount desktop pages while the console owns the screen: no hidden catalog,
   // images, observers or page queries behind Big Picture.
   if (bigPicture)
@@ -709,10 +712,6 @@ export function App() {
             />
           ) : page === "Home" ? (
             <HomePage
-              onPeople={() => {
-                setSocialView("people");
-                setSocialOpen(true);
-              }}
               onFriends={() => {
                 setSocialView("friends");
                 setSocialOpen(true);

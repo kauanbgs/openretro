@@ -727,7 +727,7 @@ fn add_to_library(
 }
 /// Adds a finished download to the library in the background. Progress shows
 /// on the job like the automatic import; `path` picks one of several files.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn add_download_to_library(
     app: tauri::AppHandle,
     id: String,
@@ -887,9 +887,9 @@ pub async fn start_source_download(
     }
     Ok(id)
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_download_jobs(db: State<Database>) -> Result<Vec<DownloadJob>> {
-    let conn = db.0.lock().map_err(error)?;
+    let conn = db.read()?;
     let mut stmt = conn
         .prepare("SELECT data FROM download_jobs ORDER BY rowid DESC")
         .map_err(error)?;

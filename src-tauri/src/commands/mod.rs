@@ -71,14 +71,14 @@ const INSTALLERS: &[InstallerSpec] = &[
     },
 ];
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_library(db: State<Database>) -> Result<Vec<LibraryGame>> {
-    let conn = db.0.lock().map_err(error)?;
+    let conn = db.read()?;
     database::library(&conn)
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_emulators(db: State<Database>) -> Result<Vec<Emulator>> {
-    let conn = db.0.lock().map_err(error)?;
+    let conn = db.read()?;
     database::emulators(&conn)
 }
 #[tauri::command]
@@ -533,7 +533,7 @@ pub async fn inspect_game_folder(path: String) -> Result<Vec<ImportCandidate>> {
         .await
         .map_err(error)?
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn file_exists(path: String) -> bool {
     filesystem::canonical_file(&path).is_ok()
 }
@@ -579,7 +579,7 @@ pub fn insert_library_game(
     log::info!("Imported game {}", game.id);
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_game(
     app: tauri::AppHandle,
     id: String,
@@ -610,11 +610,15 @@ pub fn remove_game(
     // Modified copies are OpenRetro's own files; they go with the game.
     crate::mods::forget_library_item(&app, &id)?;
     let conn = db.0.lock().map_err(error)?;
+    // Recommendations learn from it; failing to note it never blocks the removal.
+    if let Err(e) = crate::recommendations::record_removal(&conn, &id) {
+        log::warn!("Could not note the removal for recommendations: {e}");
+    }
     conn.execute("DELETE FROM library_items WHERE id=?1", [id])
         .map_err(error)?;
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_favorite(id: String, favorite: bool, db: State<Database>) -> Result<()> {
     let conn = db.0.lock().map_err(error)?;
     let profile = crate::profiles::active(&conn)?;
@@ -629,7 +633,7 @@ pub fn set_favorite(id: String, favorite: bool, db: State<Database>) -> Result<(
     .map_err(error)?;
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn configure_game(
     id: String,
     emulator_id: Option<String>,
@@ -709,7 +713,7 @@ pub async fn verify_game(app: tauri::AppHandle, id: String) -> Result<bool> {
     .await
     .map_err(error)?
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_emulator(mut emulator: Emulator, db: State<Database>) -> Result<()> {
     emulator.executable_path = filesystem::executable(&emulator.executable_path)?
         .to_string_lossy()
@@ -743,7 +747,7 @@ pub fn save_emulator(mut emulator: Emulator, db: State<Database>) -> Result<()> 
     tx.commit().map_err(error)?;
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_emulator(id: String, db: State<Database>) -> Result<()> {
     db.0.lock()
         .map_err(error)?
@@ -751,7 +755,7 @@ pub fn remove_emulator(id: String, db: State<Database>) -> Result<()> {
         .map_err(error)?;
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn test_emulator(id: String, db: State<Database>) -> Result<String> {
     let list = database::emulators(&*db.0.lock().map_err(error)?)?;
     let emulator = list
@@ -761,7 +765,7 @@ pub fn test_emulator(id: String, db: State<Database>) -> Result<String> {
     filesystem::executable(&emulator.executable_path)?;
     Ok("Executable found and permissions validated. Launch a game to verify platform compatibility.".into())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn detect_emulators() -> Vec<Emulator> {
     let mut detected = Vec::new();
     #[cfg(windows)]
@@ -829,9 +833,9 @@ pub fn detect_emulators() -> Vec<Emulator> {
     );
     detected
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_settings(db: State<Database>) -> Result<serde_json::Value> {
-    let conn = db.0.lock().map_err(error)?;
+    let conn = db.read()?;
     let raw: std::result::Result<String, _> =
         conn.query_row("SELECT value FROM settings WHERE key='app'", [], |r| {
             r.get(0)
@@ -844,7 +848,7 @@ pub fn get_settings(db: State<Database>) -> Result<serde_json::Value> {
         Err(e) => Err(error(e)),
     }
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_settings(settings: serde_json::Value, db: State<Database>) -> Result<()> {
     db.0.lock().map_err(error)?.execute("INSERT INTO settings(key,value) VALUES('app',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[settings.to_string()]).map_err(error)?;
     Ok(())

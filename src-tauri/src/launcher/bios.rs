@@ -139,7 +139,7 @@ pub fn mirror(shared: &Path, player: &Path) -> Result<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn runtime_bios_status(app: tauri::AppHandle, platform: String) -> Result<bool> {
     Ok(!required(&platform)
         || installed(

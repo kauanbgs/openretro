@@ -50,6 +50,18 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
         "catalog_thumbnail" => {
             to_json(crate::metadata::catalog_thumbnail(app.clone(), take(&args, "url")?).await?)
         }
+        "recommendations" => to_json(crate::recommendations::recommendations(app.clone()).await?),
+        "interest_view" => to_json(crate::recommendations::interest_view(
+            take(&args, "game")?,
+            take(&args, "seconds")?,
+            db(),
+        )?),
+        "recommendations_seen" => {
+            to_json(crate::recommendations::recommendations_seen(take(&args, "ids")?, db())?)
+        }
+        "recommendation_opened" => {
+            to_json(crate::recommendations::recommendation_opened(take(&args, "id")?, db())?)
+        }
         "list_library" => to_json(crate::commands::list_library(db())?),
         "list_emulators" => to_json(crate::commands::list_emulators(db())?),
         "get_settings" => to_json(crate::commands::get_settings(db())?),

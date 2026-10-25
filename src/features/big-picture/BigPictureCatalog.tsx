@@ -55,7 +55,6 @@ export function BigPictureCatalog({
   onPhone,
   onParty,
   onFriends,
-  onPeople,
   library,
   selected,
   setSelected,
@@ -75,7 +74,6 @@ export function BigPictureCatalog({
   onPhone: () => void;
   onParty: () => void;
   onFriends: () => void;
-  onPeople: () => void;
   library: LibraryGame[];
   selected: number;
   setSelected: (index: number) => void;
@@ -536,7 +534,6 @@ export function BigPictureCatalog({
           onPhone={onPhone}
           onParty={onParty}
           onFriends={onFriends}
-          onPeople={onPeople}
         />
       )}
       {mode === "catalog" ? (

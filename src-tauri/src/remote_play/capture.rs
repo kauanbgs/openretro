@@ -128,25 +128,29 @@ fn fit(width: u32, height: u32, party: bool) -> (u32, u32) {
     )
 }
 
+/// Appends `w`×`h` samples of an RGBA frame to `out`: RGB for phone JPEGs,
+/// or all four bytes for an encoder's raw packet, whose unscaled rows are
+/// copied whole.
 fn downscale(
     rgba: &[u8],
     pitch: usize,
-    width: u32,
-    height: u32,
+    (width, height): (u32, u32),
+    (w, h): (u32, u32),
+    channels: usize,
     out: &mut Vec<u8>,
-    party: bool,
-) -> (u32, u32) {
-    let (w, h) = fit(width, height, party);
-    out.clear();
-    out.reserve((w * h * 3) as usize);
+) {
+    out.reserve(w as usize * h as usize * channels);
     for y in 0..h {
         let row = (y as u64 * height as u64 / h as u64) as usize * pitch;
+        if channels == 4 && w == width {
+            out.extend_from_slice(&rgba[row..row + width as usize * 4]);
+            continue;
+        }
         for x in 0..w {
             let at = row + (x as u64 * width as u64 / w as u64) as usize * 4;
-            out.extend_from_slice(&rgba[at..at + 3]);
+            out.extend_from_slice(&rgba[at..at + channels]);
         }
     }
-    (w, h)
 }
 
 impl GraphicsCaptureApiHandler for Handler {
@@ -188,16 +192,19 @@ impl GraphicsCaptureApiHandler for Handler {
         self.sent = Some(Instant::now());
         let mut buffer = frame.buffer_crop(x0, y0, x1, y1)?;
         let (width, height, pitch) = (buffer.width(), buffer.height(), buffer.row_pitch() as usize);
-        let (w, h) = downscale(
-            buffer.as_raw_buffer(),
-            pitch,
-            width,
-            height,
-            &mut self.rgb,
-            self.target.frames.encoder_active(),
-        );
+        let frames = &self.target.frames;
+        let (w, h) = fit(width, height, frames.encoder_active());
+        let raw = buffer.as_raw_buffer();
         // A lagging phone skips frames instead of falling behind.
-        self.target.frames.publish(&self.rgb, w, h, QUALITY)?;
+        if frames.takes_raw(w, h) {
+            let mut packet = super::video::raw_packet(super::video::RGBX, w, h);
+            downscale(raw, pitch, (width, height), (w, h), 4, &mut packet);
+            frames.publish_packet(packet, QUALITY)?;
+        } else {
+            self.rgb.clear();
+            downscale(raw, pitch, (width, height), (w, h), 3, &mut self.rgb);
+            frames.publish(&self.rgb, w, h, QUALITY)?;
+        }
         Ok(())
     }
 }
@@ -302,8 +309,19 @@ mod tests {
             rgba.extend_from_slice(&[0; 4]);
         }
         let mut out = Vec::new();
-        assert_eq!(downscale(&rgba, 20, 4, 2, &mut out, false), (4, 2));
+        downscale(&rgba, 20, (4, 2), (4, 2), 3, &mut out);
         assert_eq!(&out[..6], &[0, 0, 9, 1, 0, 9]);
         assert_eq!(&out[12..15], &[0, 1, 9]);
+        // Raw packets keep every byte; whole rows and samples alike.
+        for target in [(4, 2), (2, 1)] {
+            let mut packet = vec![7];
+            downscale(&rgba, 20, (4, 2), target, 4, &mut packet);
+            let expected: Vec<u8> = if target == (4, 2) {
+                [&rgba[..16], &rgba[20..36]].concat()
+            } else {
+                [&rgba[..4], &rgba[8..12]].concat()
+            };
+            assert_eq!(packet[1..], expected[..]);
+        }
     }
 }

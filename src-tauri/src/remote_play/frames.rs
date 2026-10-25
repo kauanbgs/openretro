@@ -92,30 +92,44 @@ fn output_size(width: usize, height: usize, format: Format, party: bool) -> (usi
     )
 }
 
-/// Converts one frame to packed RGB with nearest-neighbour sampling.
-fn to_rgb(
+/// The raw packet tag a format's pixels are written in: 32-bit formats keep
+/// their own B, G, R, X bytes, so unscaled rows are copied as they are.
+fn packet_tag(format: Format) -> u8 {
+    if format.bytes() == 4 {
+        super::video::BGRX
+    } else {
+        super::video::RGBX
+    }
+}
+
+/// Converts one frame with nearest-neighbour sampling to `w`×`h`, appended
+/// to `out`: packed RGB, or (`packet`) 4 bytes a pixel in `packet_tag` order.
+fn convert(
     data: &[u8],
-    width: usize,
-    height: usize,
-    pitch: usize,
+    (width, height, pitch): (usize, usize, usize),
     format: Format,
+    (w, h): (usize, usize),
+    packet: bool,
     out: &mut Vec<u8>,
-    party: bool,
-) -> (usize, usize) {
-    let (w, h) = output_size(width, height, format, party);
-    out.clear();
-    out.reserve(w * h * 3);
+) {
+    out.reserve(w * h * if packet { 4 } else { 3 });
     let expand5 = |v: u16| ((v << 3) | (v >> 2)) as u8;
+    let alpha: &[u8] = if packet { &[255] } else { &[] };
     for y in 0..h {
         let mut source = y * height / h;
         if format == Format::BgraFlipped {
             source = height - 1 - source;
         }
         let row = &data[source * pitch..source * pitch + width * format.bytes()];
+        if packet && format.bytes() == 4 && w == width {
+            out.extend_from_slice(row);
+            continue;
+        }
         for x in 0..w {
             let at = x * width / w * format.bytes();
             let px = &row[at..at + format.bytes()];
             match format {
+                Format::Xrgb8888 | Format::BgraFlipped if packet => out.extend_from_slice(&px[..4]),
                 Format::Xrgb8888 | Format::BgraFlipped => {
                     out.extend_from_slice(&[px[2], px[1], px[0]])
                 }
@@ -127,6 +141,7 @@ fn to_rgb(
                         ((g << 2) | (g >> 4)) as u8,
                         expand5(v & 0x1f),
                     ]);
+                    out.extend_from_slice(alpha);
                 }
                 Format::Rgb1555 => {
                     let v = u16::from_le_bytes([px[0], px[1]]);
@@ -135,11 +150,17 @@ fn to_rgb(
                         expand5((v >> 5) & 0x1f),
                         expand5(v & 0x1f),
                     ]);
+                    out.extend_from_slice(alpha);
                 }
             }
         }
     }
-    (w, h)
+}
+
+/// A converted frame on its way to the encoding thread.
+enum Converted {
+    Rgb(Vec<u8>, u32, u32),
+    Packet(Vec<u8>),
 }
 
 struct Mapping {
@@ -238,11 +259,15 @@ impl SharedFrames {
         // Encoding runs beside reading, so the next frame is converted while
         // the previous one encodes. One frame waits at most; when the encoder
         // falls behind, newer frames are dropped instead of queueing up.
-        let (encode, encoded) = std::sync::mpsc::sync_channel::<(Vec<u8>, u32, u32, u8)>(1);
+        let (encode, encoded) = std::sync::mpsc::sync_channel::<(Converted, u8)>(1);
         let sender = frames.clone();
         std::thread::spawn(move || {
-            for (rgb, w, h, quality) in encoded {
-                if sender.publish(&rgb, w, h, quality).is_ok() {
+            for (frame, quality) in encoded {
+                let sent = match frame {
+                    Converted::Rgb(rgb, w, h) => sender.publish(&rgb, w, h, quality),
+                    Converted::Packet(packet) => sender.publish_packet(packet, quality),
+                };
+                if sent.is_ok() {
                     last_frame.store(now_ms(), Ordering::Release);
                 }
             }
@@ -285,23 +310,42 @@ impl SharedFrames {
                     continue;
                 }
                 prepared = Instant::now();
-                let (w, h) = to_rgb(
-                    &raw,
-                    width,
-                    height,
-                    pitch,
-                    format,
-                    &mut rgb,
-                    frames.encoder_active(),
-                );
                 let quality = if format == Format::BgraFlipped {
                     READBACK_QUALITY
                 } else {
                     CORE_QUALITY
                 };
-                match encode.try_send((std::mem::take(&mut rgb), w as u32, h as u32, quality)) {
+                let (w, h) = output_size(width, height, format, frames.encoder_active());
+                let frame = if frames.takes_raw(w as u32, h as u32) {
+                    let mut packet =
+                        super::video::raw_packet(packet_tag(format), w as u32, h as u32);
+                    convert(
+                        &raw,
+                        (width, height, pitch),
+                        format,
+                        (w, h),
+                        true,
+                        &mut packet,
+                    );
+                    Converted::Packet(packet)
+                } else {
+                    rgb.clear();
+                    convert(
+                        &raw,
+                        (width, height, pitch),
+                        format,
+                        (w, h),
+                        false,
+                        &mut rgb,
+                    );
+                    Converted::Rgb(std::mem::take(&mut rgb), w as u32, h as u32)
+                };
+                match encode.try_send((frame, quality)) {
                     Ok(()) => {}
-                    Err(std::sync::mpsc::TrySendError::Full((back, ..))) => rgb = back,
+                    Err(std::sync::mpsc::TrySendError::Full((Converted::Rgb(back, ..), _))) => {
+                        rgb = back
+                    }
+                    Err(std::sync::mpsc::TrySendError::Full(_)) => {}
                     Err(std::sync::mpsc::TrySendError::Disconnected(_)) => break,
                 }
             }
@@ -319,6 +363,55 @@ impl Drop for SharedFrames {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One frame as packed RGB at its stream size.
+    fn to_rgb(
+        data: &[u8],
+        width: usize,
+        height: usize,
+        pitch: usize,
+        format: Format,
+        out: &mut Vec<u8>,
+        party: bool,
+    ) -> (usize, usize) {
+        let (w, h) = output_size(width, height, format, party);
+        out.clear();
+        convert(data, (width, height, pitch), format, (w, h), false, out);
+        (w, h)
+    }
+
+    #[test]
+    fn raw_packets_keep_32_bit_rows_and_expand_16_bit_pixels() {
+        // Two padded XRGB8888 rows copy as they are, padding left out.
+        let xrgb = [1, 2, 3, 0, 9, 9, 9, 9, 4, 5, 6, 0, 9, 9, 9, 9];
+        let mut out = Vec::new();
+        convert(&xrgb, (1, 2, 8), Format::Xrgb8888, (1, 2), true, &mut out);
+        assert_eq!(out, [1, 2, 3, 0, 4, 5, 6, 0]);
+        assert_eq!(packet_tag(Format::Xrgb8888), super::super::video::BGRX);
+        // Readbacks are flipped and scaled without reordering bytes.
+        let bgra = [1, 2, 3, 255, 5, 6, 7, 255, 11, 12, 13, 255, 15, 16, 17, 255];
+        out.clear();
+        convert(
+            &bgra,
+            (2, 2, 8),
+            Format::BgraFlipped,
+            (1, 2),
+            true,
+            &mut out,
+        );
+        assert_eq!(out, [11, 12, 13, 255, 1, 2, 3, 255]);
+        out.clear();
+        convert(
+            &0xf800u16.to_le_bytes(),
+            (1, 1, 2),
+            Format::Rgb565,
+            (1, 1),
+            true,
+            &mut out,
+        );
+        assert_eq!(out, [255, 0, 0, 255]);
+        assert_eq!(packet_tag(Format::Rgb565), super::super::video::RGBX);
+    }
 
     #[test]
     #[ignore = "manual GPU-frame conversion throughput benchmark"]

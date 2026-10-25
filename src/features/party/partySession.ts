@@ -6,6 +6,7 @@ import { configurePartyVideo } from "./partyQuality";
 import { socialStore } from "../../services/social";
 import { accountFailure } from "../../services/account";
 import { parsePartyRoster } from "./partyRoster";
+import { isRawPartyFrame } from "./partyFrames";
 import {
   canvasSource,
   frameTrack,
@@ -261,6 +262,9 @@ export async function startParty() {
     local.protocol = "ws:";
     local.hostname = "127.0.0.1";
     local.pathname = "/party-stream";
+    // Guests' controllers use their own sockets, which carry no media.
+    const controls = new URL(local);
+    controls.pathname = "/party-input";
     media = new WebSocket(local);
     media.binaryType = "arraybuffer";
     media.onclose = () => {
@@ -281,7 +285,7 @@ export async function startParty() {
       if (!playing) return;
       const data = new DataView(event.data as ArrayBuffer);
       if (data.byteLength === 0) return;
-      if (data.getUint8(0) === 4 || data.getUint8(0) === 3) {
+      if (isRawPartyFrame(data.getUint8(0)) || data.getUint8(0) === 3) {
         // Frames keep their aspect ratio instead of encoding black bars, and
         // small retro frames grow by whole pixels (frameTracks.ts).
         const frame = await decode(event.data as ArrayBuffer);
@@ -356,7 +360,7 @@ export async function startParty() {
             iceServers,
             iceTransportPolicy: policy,
           });
-          const pad = new WebSocket(local);
+          const pad = new WebSocket(controls);
           const channel = pc.createDataChannel("pad", {
             ordered: false,
             maxRetransmits: 0,

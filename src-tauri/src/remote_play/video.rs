@@ -10,6 +10,34 @@ use tokio::sync::broadcast;
 
 const PARTY_INTERVAL_US: u64 = 16_666;
 const DEFAULT_RTC_INTERVAL_US: u64 = 33_333;
+/// Loopback packet tags: little-endian width/height, then 4 bytes a pixel.
+pub const RGBX: u8 = 4;
+pub const BGRX: u8 = 5;
+const PACKET_HEADER: usize = 9;
+
+/// An empty raw packet; the producer appends `width`×`height` pixels in
+/// `tag`'s order, converting each frame once straight into what is sent.
+pub fn raw_packet(tag: u8, width: u32, height: u32) -> Vec<u8> {
+    let mut packet = Vec::with_capacity(PACKET_HEADER + width as usize * height as usize * 4);
+    packet.push(tag);
+    packet.extend_from_slice(&width.to_le_bytes());
+    packet.extend_from_slice(&height.to_le_bytes());
+    packet
+}
+
+/// Large frames cross loopback raw; small pixel-art frames stay compact PNGs.
+fn raw_size(width: u32, height: u32) -> bool {
+    u64::from(width) * u64::from(height) > 640 * 480
+}
+
+/// Nearest-neighbour fit for phone JPEGs beside an encoder (see `publish`).
+fn phone_size(width: u32, height: u32) -> (u32, u32) {
+    let scale = (640.0 / width as f64).min(480.0 / height as f64);
+    (
+        (width as f64 * scale).round() as u32,
+        (height as f64 * scale).round() as u32,
+    )
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -182,11 +210,11 @@ impl Video {
             && (width > 640 || height > 480)
         {
             let source = image::RgbImage::from_raw(width, height, rgb.to_vec()).unwrap();
-            let scale = (640.0 / width as f64).min(480.0 / height as f64);
+            let (w, h) = phone_size(width, height);
             Some(image::imageops::resize(
                 &source,
-                (width as f64 * scale).round() as u32,
-                (height as f64 * scale).round() as u32,
+                w,
+                h,
                 image::imageops::FilterType::Nearest,
             ))
         } else {
@@ -196,6 +224,59 @@ impl Video {
             .as_ref()
             .map(|frame| (frame.as_raw().as_slice(), frame.width(), frame.height()))
             .unwrap_or((rgb, width, height));
+        self.jpegs(rgb, width, height, quality)
+    }
+
+    /// Whether a producer should write this frame size straight into a raw
+    /// packet (`raw_packet`) and hand it to `publish_packet`.
+    pub fn takes_raw(&self, width: u32, height: u32) -> bool {
+        self.encoder_active() && raw_size(width, height)
+    }
+
+    /// Sends a finished raw packet as is. Phones still watching JPEG views
+    /// get RGB sampled from it, at the size `publish` gives them.
+    pub fn publish_packet(&self, packet: Vec<u8>, quality: u8) -> image::ImageResult<()> {
+        let packet = Bytes::from(packet);
+        if self.party_active() {
+            let _ = self.party.send(packet.clone());
+        }
+        if self.rtc.receiver_count() > 0 {
+            let _ = self.rtc.send(packet.clone());
+        }
+        if self
+            .channels
+            .iter()
+            .all(|(_, sender)| sender.receiver_count() == 0)
+        {
+            return Ok(());
+        }
+        let width = u32::from_le_bytes(packet[1..5].try_into().unwrap());
+        let height = u32::from_le_bytes(packet[5..9].try_into().unwrap());
+        let (w, h) = if quality <= 75 && (width > 640 || height > 480) {
+            phone_size(width, height)
+        } else {
+            (width, height)
+        };
+        let (w, h) = (w.max(1), h.max(1));
+        let pixels = &packet[PACKET_HEADER..];
+        let bgr = packet[0] == BGRX;
+        let mut rgb = Vec::with_capacity((w * h * 3) as usize);
+        for y in 0..h {
+            let row = (u64::from(y) * u64::from(height) / u64::from(h)) as usize * width as usize;
+            for x in 0..w {
+                let at = (row + (u64::from(x) * u64::from(width) / u64::from(w)) as usize) * 4;
+                let px = &pixels[at..at + 3];
+                rgb.extend_from_slice(&if bgr {
+                    [px[2], px[1], px[0]]
+                } else {
+                    [px[0], px[1], px[2]]
+                });
+            }
+        }
+        self.jpegs(&rgb, w, h, quality)
+    }
+
+    fn jpegs(&self, rgb: &[u8], width: u32, height: u32, quality: u8) -> image::ImageResult<()> {
         for (view, sender) in self.channels.iter() {
             if sender.receiver_count() == 0 {
                 continue;
@@ -228,13 +309,12 @@ impl Video {
 }
 
 fn party_packet(rgb: &[u8], width: u32, height: u32) -> image::ImageResult<Bytes> {
-    if u64::from(width) * u64::from(height) > 640 * 480 {
-        let mut packet = vec![255; 9 + width as usize * height as usize * 4];
-        packet[0] = 4; // tag, little-endian width/height, packed RGBA8
-        packet[1..5].copy_from_slice(&width.to_le_bytes());
-        packet[5..9].copy_from_slice(&height.to_le_bytes());
-        for (source, target) in rgb.chunks_exact(3).zip(packet[9..].chunks_exact_mut(4)) {
-            target[..3].copy_from_slice(source);
+    // Producers write large frames as raw packets themselves (`takes_raw`);
+    // this covers a frame converted just before an encoder joined.
+    if raw_size(width, height) {
+        let mut packet = raw_packet(RGBX, width, height);
+        for source in rgb.chunks_exact(3) {
+            packet.extend_from_slice(&[source[0], source[1], source[2], 255]);
         }
         return Ok(Bytes::from(packet));
     }
@@ -399,6 +479,30 @@ mod tests {
         assert_eq!(video.encoder_gap(), Some(Duration::from_micros(13_332)));
         drop(party);
         assert_eq!(video.encoder_gap(), None);
+    }
+
+    #[test]
+    fn raw_packets_are_sent_as_is_and_phones_still_get_rgb() {
+        let video = Video::default();
+        assert!(!video.takes_raw(1280, 720));
+        let mut party = video.subscribe_party();
+        let mut phone = video.subscribe(View::default());
+        assert!(video.takes_raw(1280, 720));
+        assert!(!video.takes_raw(640, 480));
+        let mut packet = raw_packet(BGRX, 1280, 720);
+        for _ in 0..1280 * 720 {
+            packet.extend_from_slice(&[10, 20, 250, 0]);
+        }
+        let pointer = packet[PACKET_HEADER..].as_ptr();
+        video.publish_packet(packet, 75).unwrap();
+        let sent = party.try_recv().unwrap();
+        assert_eq!(sent[0], BGRX);
+        assert_eq!(sent[PACKET_HEADER..].as_ptr(), pointer);
+        let jpeg = phone.try_recv().unwrap();
+        let decoded = image::load_from_memory(&jpeg[1..]).unwrap().to_rgb8();
+        assert_eq!(decoded.dimensions(), (640, 360));
+        let pixel = decoded.get_pixel(320, 180);
+        assert!(pixel[0] > 230 && pixel[2] < 30, "{pixel:?}");
     }
 
     #[test]

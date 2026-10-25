@@ -188,7 +188,7 @@ pub async fn list_save_states(app: tauri::AppHandle, id: String) -> Result<Vec<S
     .map_err(error)?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_save_state(app: tauri::AppHandle, id: String, slot: i32) -> Result<()> {
     if crate::in_game::in_game_status(app.clone())?.is_some_and(|session| session.id() == id) {
         return Err("Encerre o jogo antes de apagar um estado salvo.".into());

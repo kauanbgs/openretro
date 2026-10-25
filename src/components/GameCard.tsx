@@ -7,11 +7,14 @@ export function GameCard({
   game,
   item,
   downloadAvailable = false,
+  note,
   onClick,
 }: {
   game: GameMetadata;
   item?: LibraryItem;
   downloadAvailable?: boolean;
+  /** A short line under the title, such as why the game is suggested. */
+  note?: string;
   onClick: () => void;
 }) {
   return (
@@ -22,6 +25,7 @@ export function GameCard({
           <p>{game.title}</p>
           <span>{platformById(game.platformId)?.shortName}</span>
         </div>
+        {note && <small className="game-card-note">{note}</small>}
         <div className="game-card-specifics">
           {game.year > 0 && (
             <span>

@@ -155,6 +155,7 @@ pub fn start(app: &tauri::AppHandle) {
         if let Ok(mut slot) = app.state::<LaunchboxCatalog>().conn.lock() {
             *slot = Some(conn);
         }
+        crate::recommendations::Snapshot::warm_up(dir.join("launchbox.sqlite"));
         set_status(app, |s| {
             *s = CatalogStatus {
                 state: "ready".into(),
@@ -373,6 +374,7 @@ fn build(app: &tauri::AppHandle) -> Result<()> {
     }
     *slot = Some(Connection::open(&index).map_err(error)?);
     drop(slot);
+    crate::recommendations::Snapshot::warm_up(index);
     set_status(app, |s| {
         *s = CatalogStatus {
             state: "ready".into(),
@@ -622,7 +624,10 @@ fn fold(c: char) -> char {
     }
 }
 
-fn with_index<T>(app: &tauri::AppHandle, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+pub(crate) fn with_index<T>(
+    app: &tauri::AppHandle,
+    f: impl FnOnce(&Connection) -> Result<T>,
+) -> Result<T> {
     let state = app.state::<LaunchboxCatalog>();
     let conn = state.conn.lock().map_err(error)?;
     let conn = conn
@@ -718,7 +723,7 @@ fn game_json(row: &rusqlite::Row) -> rusqlite::Result<Value> {
     }))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn catalog_status(app: tauri::AppHandle) -> Result<CatalogStatus> {
     Ok(app
         .state::<LaunchboxCatalog>()
@@ -931,6 +936,31 @@ pub async fn catalog_game(app: tauri::AppHandle, id: i64) -> Result<Value> {
     })
     .await
     .map_err(error)?
+}
+
+/// Catalog games by LaunchBox id, in the same shape the catalog pages use.
+/// Recommendations pick games in memory and fetch only the ones they show.
+pub(crate) fn games_by_ids(conn: &Connection, ids: &[i64]) -> Result<HashMap<i64, Value>> {
+    let mut games = HashMap::with_capacity(ids.len());
+    for chunk in ids.chunks(500) {
+        let sql = format!(
+            "SELECT {GAME_COLUMNS}, {}, {} FROM games g WHERE g.id IN ({})",
+            cover_sql(),
+            background_sql(),
+            vec!["?"; chunk.len()].join(",")
+        );
+        let mut stmt = conn.prepare(&sql).map_err(error)?;
+        let rows = stmt
+            .query_map(params_from_iter(chunk.iter()), |row| {
+                Ok((row.get::<_, i64>(0)?, game_json(row)?))
+            })
+            .map_err(error)?;
+        for row in rows {
+            let (id, game) = row.map_err(error)?;
+            games.insert(id, game);
+        }
+    }
+    Ok(games)
 }
 
 /// Best catalog entry for a file or title on a console, preferring the

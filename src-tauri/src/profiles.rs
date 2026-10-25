@@ -50,9 +50,9 @@ pub fn active(conn: &Connection) -> Result<String> {
     .map_err(error)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_profiles(db: State<Database>) -> Result<Profiles> {
-    let conn = db.0.lock().map_err(error)?;
+    let conn = db.read()?;
     let mut stmt = conn
         .prepare("SELECT id,name,avatar,color FROM player_profiles ORDER BY rowid")
         .map_err(error)?;
@@ -74,7 +74,7 @@ pub fn list_profiles(db: State<Database>) -> Result<Profiles> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_profile(name: String, db: State<Database>) -> Result<()> {
     let name = name.trim();
     let conn = db.0.lock().map_err(error)?;
@@ -91,7 +91,7 @@ pub fn create_profile(name: String, db: State<Database>) -> Result<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_profile(
     id: String,
     name: String,
@@ -115,7 +115,7 @@ pub fn update_profile(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn select_profile(id: String, db: State<Database>) -> Result<()> {
     let conn = db.0.lock().map_err(error)?;
     if conn

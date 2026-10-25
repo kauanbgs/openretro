@@ -304,9 +304,9 @@ fn fetch_document(url: &str) -> Result<SourceDocument> {
         .map_err(|_| "Source must be UTF-8 JSON.")?;
     parse_document(&text)
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_download_sources(db: State<Database>) -> Result<Vec<SourceSummary>> {
-    let conn = db.0.lock().map_err(error)?;
+    let conn = db.read()?;
     let mut stmt = conn.prepare("SELECT id,name,url,enabled,updated_at,json_array_length(document,'$.downloads') FROM download_sources ORDER BY name").map_err(error)?;
     let rows = stmt
         .query_map([], |r| {
@@ -341,7 +341,7 @@ pub async fn save_download_source(
         Ok(())
     }).await.map_err(error)?
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_download_source(
     app: tauri::AppHandle,
     id: String,
@@ -358,7 +358,7 @@ pub fn set_download_source(
     invalidate(&app);
     Ok(())
 }
-#[tauri::command]
+#[tauri::command(async)]
 pub fn remove_download_source(
     app: tauri::AppHandle,
     id: String,

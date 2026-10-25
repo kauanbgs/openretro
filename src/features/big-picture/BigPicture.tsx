@@ -1049,10 +1049,6 @@ export function BigPicture({
         <main ref={content} className="tv-content" key={section}>
           {(section === "catalog" || section === "home") && (
             <BigPictureCatalog
-              onPeople={() => {
-                selectSection("friends");
-                setWorkspace({ page: "friends", people: true });
-              }}
               onFriends={() => selectSection("friends")}
               onPhone={() => setPhoneOpen(true)}
               onParty={() => setPartyOpen(true)}
