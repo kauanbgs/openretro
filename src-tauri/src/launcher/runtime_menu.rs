@@ -185,6 +185,26 @@ fn screen_config(stretch: bool) -> &'static str {
     }
 }
 
+/// N64 renderer for the runtime's video driver. GLideN64 needs OpenGL; where
+/// OpenGL failed and the runtime uses Direct3D 11, Angrylion draws on the CPU
+/// and hands over plain frames, which any driver shows. It is heavier on the
+/// processor, so it uses every thread, and needs a low-level RSP.
+pub fn n64_options(direct3d: bool) -> [(&'static str, &'static str); 3] {
+    if direct3d {
+        [
+            ("mupen64plus-rdp-plugin", "angrylion"),
+            ("mupen64plus-rsp-plugin", "parallel"),
+            ("mupen64plus-angrylion-multithread", "all threads"),
+        ]
+    } else {
+        [
+            ("mupen64plus-rdp-plugin", "gliden64"),
+            ("mupen64plus-rsp-plugin", "hle"),
+            ("mupen64plus-angrylion-multithread", "all threads"),
+        ]
+    }
+}
+
 /// The PS2 core's internal resolution values, keyed by OpenRetro's setting.
 /// Unknown or missing settings use 2x, which stays sharp on any GPU.
 pub fn ps2_upscale(setting: Option<&str>) -> &'static str {
@@ -508,6 +528,10 @@ mod tests {
         );
         assert_eq!(ps2_upscale(Some("1x")), "1x (Native)");
         assert_eq!(ps2_upscale(Some("bogus")), "2x");
+        // Without OpenGL, N64 draws in software with a low-level RSP.
+        assert!(n64_options(true).contains(&("mupen64plus-rdp-plugin", "angrylion")));
+        assert!(n64_options(true).contains(&("mupen64plus-rsp-plugin", "parallel")));
+        assert!(n64_options(false).contains(&("mupen64plus-rdp-plugin", "gliden64")));
         std::fs::remove_dir_all(root).unwrap();
     }
     #[test]

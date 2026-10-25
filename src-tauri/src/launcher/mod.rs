@@ -226,6 +226,9 @@ pub async fn launch_game(
     // OpenGL by default; Direct3D 11 once OpenGL failed on this PC.
     let video=diagnosis::video_driver(&*db.read()?);
     std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?.write_all(format!("video_driver = \"{video}\"\n").as_bytes()).map_err(error)?;
+    if entry.item.platform_id=="n64" {
+       runtime_menu::set_core_options(executable.parent().ok_or("Invalid RetroArch directory.")?, "Mupen64Plus-Next", &runtime_menu::n64_options(video==diagnosis::DIRECT3D11))?;
+    }
     let log=diagnosis::session_log(&data)?;
     // The log file comes first: verbose logging without one opens a console
     // window, which OpenRetro would take for the game window.
