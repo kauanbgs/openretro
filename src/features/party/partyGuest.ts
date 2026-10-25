@@ -1,5 +1,6 @@
 import { t } from "../../i18n";
 import { neutralPad, PartyPadSender, type PadState } from "./partyInput";
+import { tunePartyReceiver } from "./partyQuality";
 
 export interface GuestRoom {
   code: string;
@@ -211,19 +212,7 @@ export class PartyGuest {
       const stream = new MediaStream();
       pc.ontrack = (event) => {
         if (this.stopped) return;
-        try {
-          const receiver = event.receiver as RTCRtpReceiver & {
-            jitterBufferTarget?: number;
-            playoutDelayHint?: number;
-          };
-          if ("jitterBufferTarget" in receiver) receiver.jitterBufferTarget = 0;
-          else
-            (
-              event.receiver as unknown as { playoutDelayHint: number }
-            ).playoutDelayHint = 0;
-        } catch {
-          /* Older WebViews may expose a read-only delay hint. */
-        }
+        tunePartyReceiver(event.receiver);
         stream.addTrack(event.track);
         this.media(stream);
       };

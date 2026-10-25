@@ -2,6 +2,7 @@ import { bridge } from "../../services/bridge";
 import { invoke, isTauri } from "../../services/transport";
 import { validatePartyServer } from "./partyConfig";
 import { preferH264VideoCodec } from "./partyCodecs";
+import { configurePartyVideo } from "./partyQuality";
 import { socialStore } from "../../services/social";
 import { accountFailure } from "../../services/account";
 import { parsePartyRoster } from "./partyRoster";
@@ -227,7 +228,7 @@ export async function startParty() {
     if (!configuration.url)
       throw new Error("O serviço Party ainda não foi ativado nesta versão.");
     const url = validatePartyServer(configuration.url);
-    context = new AudioContext();
+    context = new AudioContext({ latencyHint: "interactive" });
     await context.resume();
     if (run !== generation) return;
     const audio = context.createMediaStreamDestination();
@@ -242,7 +243,7 @@ export async function startParty() {
       throw new Error(accountFailure(cause).message);
     }
     if (run !== generation) return;
-    // Every frame the server paces at 30 fps becomes a video frame, without
+    // Every frame the server paces up to 60 fps becomes a video frame, without
     // a canvas: a capture capped at that same rate dropped frames that
     // arrived close together and left doubled gaps.
     video = frameTrack(FULL_VIEW);
@@ -387,18 +388,6 @@ export async function startParty() {
                 RTCRtpReceiver.getCapabilities("video"),
               );
           }
-          for (const sender of pc.getSenders()) {
-            if (sender.track?.kind !== "video") continue;
-            const parameters = sender.getParameters();
-            if (parameters.encodings.length) {
-              parameters.encodings[0].maxBitrate = 5_000_000;
-              // A ceiling above the paced rate, for the same reason.
-              parameters.encodings[0].maxFramerate = 60;
-              // Keep gameplay moving if the encoder or connection is overloaded.
-              parameters.degradationPreference = "maintain-framerate";
-              await sender.setParameters(parameters);
-            }
-          }
           channel.onmessage = (input) => {
             try {
               if (typeof input.data !== "string" || input.data.length > 512)
@@ -466,6 +455,11 @@ export async function startParty() {
             }
           };
           await pc.setLocalDescription(await pc.createOffer());
+          // Encodings may be empty before the local description is installed.
+          // Apply limits after negotiation has created the sender's encoding.
+          for (const sender of pc.getSenders())
+            if (sender.track?.kind === "video")
+              await configurePartyVideo(sender);
           send({
             type: "signal",
             id: m.id,

@@ -206,14 +206,14 @@ describe("Party guest lifecycle", () => {
     expect(next.socket.sent).toContain("ping");
     expect(next.guest.state.phase).toBe("error");
   });
-  it("sets zero jitter for audio and video and rejects unrelated data channels", async () => {
+  it("sets a short jitter target and rejects unrelated data channels", async () => {
     const { socket, media, guest } = setup();
     socket.message(accepted);
     await flush();
     for (const kind of ["audio", "video"]) {
-      const receiver = { jitterBufferTarget: 200 };
+      const receiver = { jitterBufferTarget: 200, track: { kind } };
       Peer.last.ontrack({ receiver, track: { kind } });
-      expect(receiver.jitterBufferTarget).toBe(0);
+      expect(receiver.jitterBufferTarget).toBe(kind === "video" ? 20 : 40);
     }
     expect(media).toHaveBeenCalledTimes(2);
     const other = { ...channel(), label: "other" } as RTCDataChannel;

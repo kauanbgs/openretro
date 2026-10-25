@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use tokio::sync::broadcast;
 
-const PARTY_INTERVAL_US: u64 = 33_333;
+const PARTY_INTERVAL_US: u64 = 16_666;
+const DEFAULT_RTC_INTERVAL_US: u64 = 33_333;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,7 +85,7 @@ impl Default for Video {
         Self {
             party: broadcast::channel(2).0,
             rtc: broadcast::channel(2).0,
-            rtc_interval: std::sync::Arc::new(PARTY_INTERVAL_US.into()),
+            rtc_interval: std::sync::Arc::new(DEFAULT_RTC_INTERVAL_US.into()),
             channels: std::sync::Arc::new(
                 views
                     .into_iter()
@@ -113,7 +114,7 @@ impl Video {
         self.party_active() || self.rtc.receiver_count() > 0
     }
 
-    /// Phone play's 30 or 60 fps; Party stays at 30 over the internet.
+    /// Phone play's 30 or 60 fps; Party can follow a 60 fps game.
     pub fn set_rtc_frame_rate(&self, fps: u64) {
         self.rtc_interval
             .store(1_000_000 / fps.clamp(30, 60), Ordering::Relaxed);
@@ -380,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn phones_choose_their_rate_and_party_keeps_thirty() {
+    fn party_preserves_sixty_fps_without_changing_the_phone_default() {
         use std::time::Duration;
         let video = Video::default();
         assert_eq!(video.encoder_gap(), None);
@@ -392,8 +393,11 @@ mod tests {
         video.set_rtc_frame_rate(500);
         assert_eq!(video.encoder_gap(), Some(Duration::from_micros(13_332)));
         let party = video.subscribe_party();
-        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(26_666)));
-        drop((rtc, party));
+        video.set_rtc_frame_rate(30);
+        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(13_332)));
+        drop(rtc);
+        assert_eq!(video.encoder_gap(), Some(Duration::from_micros(13_332)));
+        drop(party);
         assert_eq!(video.encoder_gap(), None);
     }
 

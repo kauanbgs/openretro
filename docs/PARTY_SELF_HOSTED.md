@@ -116,10 +116,40 @@ The token-authenticated loopback `/party-stream` bridge reuses native capture
 and input. It filters media when no compatible runtime session is open. The
 host converts local lossless frames (PNG for small frames, raw RGBA for large
 frames) and game PCM audio into WebRTC tracks. Raw frames avoid a redundant
-PNG encode/decode on the host. The canvas preserves the source aspect ratio,
-with at most 30 fps and
-5 Mbps per guest. WebRTC may reduce resolution to preserve frame rate under
-CPU or network pressure. This does not add detail to low-resolution games.
+PNG encode/decode on the host. Generated video tracks preserve the source
+aspect ratio, with capture up to 60 fps and a ceiling of 8 Mbps per guest.
+WebRTC estimates each guest's available bandwidth; the ceiling is not a
+guaranteed rate. Balanced degradation lets it adapt frame rate and resolution
+under CPU or network pressure. This does not add detail to low-resolution games.
+Sender tuning runs after the local description creates the negotiated encoding,
+with a fallback for WebViews that reject optional tuning. The desktop guest
+requests a short jitter buffer (20 ms video, 40 ms audio); these are preferences,
+not guarantees. Windows browser arguments prevent background timer throttling
+and renderer deprioritization while the embedded game hides the host WebView.
+They apply to the main WebView for its lifetime, so background CPU/power usage
+can increase. Restart the desktop app to pick up browser argument changes.
+
+### Removing the WebView from gameplay
+
+The current media engine still runs in WebView2. A native streaming client is
+the compatible architectural path for guests who should not need the game:
+keep room admission, short-lived invites, ICE/TURN and controller messages;
+move WebRTC reception, hardware video decoding, presentation, audio output and
+controller polling into a native companion window. Moving host encoding into
+the native capture pipeline as well would remove its PNG/RGBA-to-JavaScript
+bridge. This requires a media backend and real interoperability/latency tests;
+these quality changes do not implement that backend.
+
+RetroArch netplay is a different option: each participant emulates locally,
+synchronizing game state/inputs instead of receiving compressed video. It
+requires matching content and core versions and a compatible core. It therefore
+cannot transparently replace Party's guest-without-the-game workflow.
+See the [Libretro netplay FAQ](https://docs.libretro.com/guides/netplay-faq/).
+
+For an end-to-end quality check, use two PCs and a moving 60 fps game. Compare
+motion and HUD clarity, including while the host's launcher WebView is hidden
+by the embedded game, then repeat with multiple guests and constrained upload.
+Automated tests of pacing and WebRTC parameters do not measure these outcomes.
 
 Audio comes directly from the managed game's runtime through a process-specific
 shared-memory ring. Calls, browser playback and notifications are excluded;
