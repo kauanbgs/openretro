@@ -28,7 +28,8 @@ foreach ($forbiddenFlag in @("--enable-menu", "--disable-command", "--disable-dy
   if ($flags -contains $forbiddenFlag) { throw "Incompatible runtime flag: $forbiddenFlag" }
 }
 if ($flags -contains "--disable-slang") {
-  $slangBackends = @("--enable-opengl_core", "--enable-vulkan", "--enable-d3d11", "--enable-d3d12") | Where-Object { $flags -contains $_ }
+  # Direct3D 11 draws with built-in HLSL stock shaders; only shader presets need Slang.
+  $slangBackends = @("--enable-opengl_core", "--enable-vulkan", "--enable-d3d12") | Where-Object { $flags -contains $_ }
   if ($slangBackends) {
     throw "RetroArch requires Slang for these video backends: $($slangBackends -join ', ')."
   }
