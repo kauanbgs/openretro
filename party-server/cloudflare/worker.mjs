@@ -51,6 +51,13 @@ const random = () =>
   [...crypto.getRandomValues(new Uint8Array(32))]
     .map((n) => n.toString(16).padStart(2, "0"))
     .join("");
+// A guest link is one code of six characters (30 bits) that the directory
+// maps to its room. It is short enough to read and trust, a single-use,
+// 30-minute capability, and lookups are rate limited, so it cannot be searched for.
+const linkToken = () =>
+  [...crypto.getRandomValues(new Uint8Array(6))]
+    .map((n) => ALPHABET[n & 31])
+    .join("");
 const code = () =>
   [...crypto.getRandomValues(new Uint8Array(6))]
     .map((n) => ALPHABET[n & 31])
@@ -191,6 +198,23 @@ export default {
         }
         return reply(reservation, 201);
       }
+      if (url.pathname.startsWith("/api/guest-link/")) {
+        if (!allowed) return reply({ error: "Origem não permitida." }, 403);
+        if (request.method !== "GET")
+          return reply({ error: "Método inválido." }, 405);
+        const link = url.pathname.slice("/api/guest-link/".length);
+        if (!/^[A-HJ-NP-Z2-9]{6}$/.test(link))
+          return reply({ error: linkClosed }, 404);
+        const found = await internal(
+          stub(env.DIRECTORY, "directory"),
+          "link-lookup",
+          {
+            link: await hash(link),
+            ip: await hash(request.headers.get("CF-Connecting-IP") || "local"),
+          },
+        );
+        return reply(await found.json(), found.status);
+      }
       if (url.pathname === "/signal") {
         const room = url.searchParams.get("room");
         if (!allowed) return reply({ error: "Origem não permitida." }, 403);
@@ -219,7 +243,7 @@ export default {
       const assetPath =
         url.pathname === "/" ||
         url.pathname === "/party" ||
-        /^\/party\/[A-Z2-9]{6}$/.test(url.pathname)
+        /^(\/party\/[A-Z2-9]{6}|\/[A-HJ-NP-Z2-9]{6})$/.test(url.pathname)
           ? "/index.html"
           : url.pathname === "/privacidade"
             ? "/privacy.html"
@@ -323,9 +347,50 @@ export class PartyDirectory extends DurableObject {
           ? json({ ok: true })
           : json({ error: invalid }, 404);
       }
+      if (path === "/link-lookup") {
+        // Six characters are short, so this lookup is limited more than the others.
+        const key = `glink:${value.ip}`;
+        let attempts = await this.ctx.storage.get(key);
+        if (!attempts || attempts.expires <= now)
+          attempts = { count: 0, expires: now + 60000 };
+        attempts.count++;
+        await this.ctx.storage.put(key, attempts);
+        await this.schedule();
+        if (attempts.count > 20)
+          return json(
+            { error: "Aguarde um instante antes de tentar entrar novamente." },
+            429,
+          );
+        const link = await this.ctx.storage.get(`link:${value.link}`);
+        return link && link.expires > now && rooms.has(`room:${link.room}`)
+          ? json({ room: link.room })
+          : json({ error: linkClosed }, 404);
+      }
       const current = rooms.get(`room:${value.code}`);
       if (!current || current.hostHash !== value.hostHash)
         return json({ error: invalid }, 404);
+      const dropLinks = async () => {
+        for (const [key, link] of await this.ctx.storage.list({
+          prefix: "link:",
+        }))
+          if (link.room === value.code || link.expires <= now)
+            await this.ctx.storage.delete(key);
+      };
+      if (path === "/link-set") {
+        await dropLinks();
+        if (await this.ctx.storage.get(`link:${value.link}`))
+          return json({ error: "taken" }, 409);
+        await this.ctx.storage.put(`link:${value.link}`, {
+          room: value.code,
+          expires: value.expires,
+        });
+        await this.schedule();
+        return json({ ok: true });
+      }
+      if (path === "/link-clear") {
+        await dropLinks();
+        return json({ ok: true });
+      }
       if (path === "/activate") {
         await this.ctx.storage.put(`room:${value.code}`, {
           ...current,
@@ -335,6 +400,7 @@ export class PartyDirectory extends DurableObject {
         return json({ ok: true });
       }
       if (path === "/release") {
+        await dropLinks();
         await this.ctx.storage.delete(`room:${value.code}`);
         return json({ ok: true });
       }
@@ -436,7 +502,7 @@ export class PartyRoom extends DurableObject {
       return;
     }
     // A new link replaces the old one and whoever came in through it.
-    this.closeGuestLink("O anfitrião trocou o link do convite.", false);
+    await this.closeGuestLink("O anfitrião trocou o link do convite.", false);
     const player = this.freeSeat(null);
     if (!player) {
       send(host, {
@@ -446,7 +512,24 @@ export class PartyRoom extends DurableObject {
       await this.ctx.storage.put("room", this.meta);
       return;
     }
-    const token = random();
+    const directory = stub(this.env.DIRECTORY, "directory");
+    let token;
+    for (let attempt = 0; attempt < 5 && !token; attempt++) {
+      const candidate = linkToken();
+      const stored = await internal(directory, "link-set", {
+        code: this.meta.code,
+        hostHash: this.meta.hostHash,
+        link: await hash(candidate),
+        expires: now + GUEST_LINK_MS,
+      });
+      if (stored.ok) token = candidate;
+      else if (stored.status !== 409) break;
+    }
+    if (!token) {
+      send(host, { type: "error", message: safeError });
+      await this.ctx.storage.put("room", this.meta);
+      return;
+    }
     this.meta.guestLink = {
       hash: await hash(token),
       player,
@@ -457,15 +540,19 @@ export class PartyRoom extends DurableObject {
     await this.ctx.storage.put("room", this.meta);
     send(host, {
       type: "guest-link",
-      url: `${this.meta.origin}/party/${this.meta.code}#g=${token}`,
+      url: `${this.meta.origin}/${token}`,
       player,
       expires: this.meta.guestLink.expires,
     });
   }
-  closeGuestLink(message, notify = true) {
+  async closeGuestLink(message, notify = true) {
     for (const ws of this.anonymousGuests()) this.remove(ws, message);
     if (!this.meta.guestLink) return;
     this.meta.guestLink = null;
+    await internal(stub(this.env.DIRECTORY, "directory"), "link-clear", {
+      code: this.meta.code,
+      hostHash: this.meta.hostHash,
+    });
     if (notify) send(this.host(), { type: "guest-link", url: null });
   }
   async anonymousGuest(ws, a, m) {
@@ -477,7 +564,7 @@ export class PartyRoom extends DurableObject {
     if (
       !link ||
       typeof m.guest !== "string" ||
-      !/^[a-f0-9]{64}$/.test(m.guest) ||
+      !/^[A-HJ-NP-Z2-9]{6}$/.test(m.guest) ||
       (await hash(m.guest)) !== link.hash
     )
       return refuse(linkClosed);
@@ -810,7 +897,7 @@ export class PartyRoom extends DurableObject {
           // Removing the link's guest also closes the link, or they could
           // simply come back with it.
           if (guest?.deserializeAttachment().anonymous) {
-            this.closeGuestLink("O anfitrião encerrou sua participação.");
+            await this.closeGuestLink("O anfitrião encerrou sua participação.");
             await this.ctx.storage.put("room", this.meta);
           } else if (guest)
             this.remove(guest, "O anfitrião encerrou sua participação.");
@@ -823,7 +910,7 @@ export class PartyRoom extends DurableObject {
           return;
         }
         if (a.role === "host" && m.type === "guest-link-close") {
-          this.closeGuestLink("O anfitrião fechou o lugar do convite.");
+          await this.closeGuestLink("O anfitrião fechou o lugar do convite.");
           await this.ctx.storage.put("room", this.meta);
           this.roster();
           return;

@@ -245,7 +245,10 @@ test("guest sends a controller change on the next frame and stays quiet otherwis
   assert.equal(packets.length, 2);
 });
 
-function guestPage({ hash = "", storage = new Map() } = {}) {
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+function guestPage({ token = "", storage = new Map() } = {}) {
+  const lookups = [];
+  const path = token ? "/" + token : "/party/ABC234";
   const handlers = new Map(),
     elements = new Map(),
     requests = [],
@@ -288,12 +291,19 @@ function guestPage({ hash = "", storage = new Map() } = {}) {
       addEventListener() {},
     },
     location: {
-      pathname: "/party/ABC234",
-      hash,
-      href: "http://localhost/party/ABC234" + hash,
+      pathname: path,
+      hash: "",
+      href: "http://localhost" + path,
       protocol: "http:",
     },
     history: { replaceState: (_a, _b, url) => historyEntries.push(url) },
+    fetch: async (url) => {
+      lookups.push(String(url));
+      return {
+        ok: true,
+        json: async () => ({ room: "ABC234" }),
+      };
+    },
     sessionStorage: {
       getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
@@ -327,6 +337,7 @@ function guestPage({ hash = "", storage = new Map() } = {}) {
     element,
     requests,
     historyEntries,
+    lookups,
     packets,
     storage,
     submit,
@@ -334,13 +345,18 @@ function guestPage({ hash = "", storage = new Map() } = {}) {
 }
 
 test("a guest link asks only for a name, joins without an account and rejoins after a reload", async () => {
-  const token = "c".repeat(64),
+  const token = "KQ2M9X",
     resume = "d".repeat(64);
-  const page = guestPage({ hash: "#g=" + token });
-  assert.ok(page.historyEntries.every((url) => !url.includes(token)));
+  const page = guestPage({ token });
   assert.equal(page.element("name-field").hidden, false);
   assert.equal(page.element("get-app").hidden, false);
-  assert.equal(page.element("join").disabled, undefined);
+  // The code is looked up first, then the address no longer shows it.
+  assert.equal(page.element("join").disabled, true);
+  assert.deepEqual(page.lookups, ["/api/guest-link/" + token]);
+  await tick();
+  assert.equal(page.element("join").disabled, false);
+  assert.ok(page.historyEntries.every((url) => !url.includes(token)));
+  assert.equal(page.historyEntries.at(-1), "/party/ABC234");
   // No name, no connection.
   page.submit();
   assert.equal(page.requests.length, 0);
@@ -357,14 +373,18 @@ test("a guest link asks only for a name, joins without an account and rejoins af
     `receive({ type: "accepted", player: 2, iceServers: [], policy: "relay", resume: "${resume}" })`,
     page.context,
   );
-  const saved = JSON.parse(page.storage.get("openretro-party-guest:ABC234"));
-  assert.deepEqual({ ...saved }, { token, name: "Streamer", resume });
+  const saved = JSON.parse(page.storage.get("openretro-party-guest"));
+  assert.deepEqual(
+    { ...saved },
+    { token, room: "ABC234", name: "Streamer", resume },
+  );
   // A dropped connection keeps the seat for this tab.
   vm.runInContext('ended("Você desconectou.")', page.context);
   assert.equal(page.element("join").disabled, false);
 
-  // A reload (no hash any more) reconnects on its own with the proof.
+  // A reload (the token left the address) reconnects on its own with the proof.
   const reload = guestPage({ storage: page.storage });
+  assert.equal(reload.lookups.length, 0);
   assert.equal(reload.requests.length, 1);
   vm.runInContext("socket.onopen()", reload.context);
   assert.equal(reload.packets[0].resume, resume);
@@ -378,23 +398,25 @@ test("a guest link asks only for a name, joins without an account and rejoins af
   assert.equal(reload.storage.size, 0);
 });
 
-test("a new guest link replaces what the tab remembered from an old one", () => {
+test("a new guest link replaces what the tab remembered from an old one", async () => {
   const storage = new Map([
     [
-      "openretro-party-guest:ABC234",
+      "openretro-party-guest",
       JSON.stringify({
-        token: "a".repeat(64),
+        token: "HJKLMN",
+        room: "ABC234",
         name: "Old",
         resume: "b".repeat(64),
       }),
     ],
   ]);
-  const page = guestPage({ hash: "#g=" + "e".repeat(64), storage });
+  const page = guestPage({ token: "NPR2XT", storage });
+  await tick();
   // A fresh link never auto-joins and never sends the old proof.
   assert.equal(page.requests.length, 0);
   page.element("name").value = "Nova";
   page.submit();
   vm.runInContext("socket.onopen()", page.context);
-  assert.equal(page.packets[0].guest, "e".repeat(64));
+  assert.equal(page.packets[0].guest, "NPR2XT");
   assert.equal(page.packets[0].resume, undefined);
 });

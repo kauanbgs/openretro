@@ -1736,8 +1736,20 @@ test("a host's guest link seats one named browser guest without an account, apar
         assert.equal(link.player, 2);
         const url = new URL(link.url);
         assert.equal(url.origin, "http://localhost");
-        assert.equal(url.pathname, `/party/${room.code}`);
-        const token = /^#g=([a-f0-9]{64})$/.exec(url.hash)[1];
+        assert.match(
+          url.pathname,
+          /^\/[A-HJ-NP-Z2-9]{6}$/,
+        );
+        assert.equal(url.hash, "");
+        assert.equal((await f.mf.dispatchFetch(url.href)).status, 200);
+        const token = new URL(link.url).pathname.slice(1);
+        // The code alone names the room; a wrong or malformed one names nothing.
+        const resolve = (code) =>
+          f.mf.dispatchFetch(`http://localhost/api/guest-link/${code}`);
+        const found = await resolve(token);
+        assert.deepEqual(await found.json(), { room: room.code });
+        assert.equal((await resolve("ABCDEF")).status, 404);
+        assert.equal((await resolve("short")).status, 404);
 
         // Friends keep joining as before, but not into the reserved seat.
         assert.equal((await room.bind(true)).status, 200);
@@ -1762,7 +1774,7 @@ test("a host's guest link seats one named browser guest without an account, apar
         const nameOnly = await pendingJoin(f, room, undefined, "Visitante");
         sockets.push(nameOnly.ws);
         assert.ok(refused(nameOnly));
-        assert.match(failure(await guestJoin("f".repeat(64), "X")), /expirou/);
+        assert.match(failure(await guestJoin("ABCDEF", "X")), /expirou/);
         assert.match(failure(await guestJoin(token, "  ")), /nome/);
 
         const streamer = await guestJoin(token, "Streamer");
@@ -1813,6 +1825,8 @@ test("a host's guest link seats one named browser guest without an account, apar
         room.host.send({ type: "remove", id: current.id });
         await eventually(() => back.messages.some((m) => m.type === "ended"));
         await eventually(() => latest("guest-link")?.url === null);
+        // Removing the guest also retires the code.
+        assert.equal((await resolve(token)).status, 404);
         assert.match(
           failure(await guestJoin(token, "Streamer", accepted.resume)),
           /expirou/,
@@ -1826,7 +1840,7 @@ test("a host's guest link seats one named browser guest without an account, apar
         room.host.send({ type: "guest-link-close" });
         await eventually(() => latest("guest-link")?.url === null);
         assert.match(
-          failure(await guestJoin(new URL(second.url).hash.slice(3), "Late")),
+          failure(await guestJoin(new URL(second.url).pathname.slice(1), "Late")),
           /expirou/,
         );
       } finally {

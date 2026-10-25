@@ -203,8 +203,23 @@ test("guest links open one reserved seat to a named browser guest until the host
     assert.equal(link.player, 2);
     assert.ok(link.expires > Date.now());
     const url = new URL(link.url);
-    assert.equal(url.pathname, `/party/${room}`);
-    const token = /^#g=([a-f0-9]{64})$/.exec(url.hash)[1];
+    assert.match(url.pathname, /^\/[A-HJ-NP-Z2-9]{6}$/);
+    assert.equal(url.hash, "");
+    // The code alone opens the guest page and resolves to its room.
+    assert.equal(
+      (
+        await fetch(
+          `http://127.0.0.1:${app.http.address().port}${url.pathname}`,
+        )
+      ).status,
+      200,
+    );
+    const token = new URL(link.url).pathname.slice(1);
+    const http = `http://127.0.0.1:${app.http.address().port}`;
+    // The code alone names the room; a wrong or malformed one names nothing.
+    const found = await fetch(`${http}/api/guest-link/${token}`);
+    assert.deepEqual(await found.json(), { room });
+    assert.equal((await fetch(`${http}/api/guest-link/ABCDEF`)).status, 404);
     // The friend asked first, but the link's seat stays reserved.
     let roster = await host.next("roster");
     host.send({ type: "accept", id: roster.guests[0].id });
@@ -212,7 +227,7 @@ test("guest links open one reserved seat to a named browser guest until the host
     assert.equal((await host.next("peer")).player, 3);
 
     const forged = await connect();
-    forged.send({ type: "join", room, name: "X", guest: "0".repeat(64) });
+    forged.send({ type: "join", room, name: "X", guest: "ABCDEF" });
     assert.match((await forged.next("error")).message, /expirou/);
     const nameless = await connect();
     nameless.send({ type: "join", room, name: " \u202e ", guest: token });
@@ -263,6 +278,8 @@ test("guest links open one reserved seat to a named browser guest until the host
     });
     assert.match((await again.next("ended")).message, /encerrou/);
     assert.equal((await host.next("guest-link")).url, null);
+    // Closing the seat also retires the code.
+    assert.equal((await fetch(`${http}/api/guest-link/${token}`)).status, 404);
     const retry = await connect();
     retry.send({
       type: "join",
@@ -284,7 +301,7 @@ test("guest links open one reserved seat to a named browser guest until the host
       type: "join",
       room,
       name: "Late",
-      guest: new URL(second.url).hash.slice(3),
+      guest: new URL(second.url).pathname.slice(1),
     });
     assert.match((await late.next("error")).message, /expirou/);
   } finally {
@@ -337,7 +354,7 @@ test("an unclaimed guest link expires after thirty minutes", async () => {
         type: "join",
         room: code,
         name: "Tarde",
-        guest: new URL(link.url).hash.slice(3),
+        guest: new URL(link.url).pathname.slice(1),
       }),
     );
     assert.match((await fromGuest("error")).message, /expirou/);

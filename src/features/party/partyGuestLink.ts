@@ -20,11 +20,12 @@ export function parsePartyGuestLink(
   if (typeof url !== "string" || url.length > 512)
     throw new Error("Invalid guest link");
   const link = new URL(url);
+  // The link is one short code right on the room server's own address.
   if (
     link.origin !== room.origin ||
-    link.pathname !== room.pathname ||
+    !/^\/[A-HJ-NP-Z2-9]{6}$/.test(link.pathname) ||
     link.search ||
-    !/^#g=[a-f0-9]{64}$/.test(link.hash) ||
+    link.hash ||
     typeof player !== "number" ||
     ![2, 3, 4].includes(player) ||
     typeof expires !== "number" ||

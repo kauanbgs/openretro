@@ -17,6 +17,13 @@ const roomCode = () =>
   );
 
 const secret = () => randomBytes(32).toString("hex");
+// A guest link is one code of six characters (30 bits) that the server maps
+// to its room. It is short enough to read and trust, a single-use, 30-minute
+// capability, and lookups are rate limited, so it cannot be searched for.
+const linkToken = () =>
+  Array.from({ length: 6 }, () => alphabet[randomInt(alphabet.length)]).join(
+    "",
+  );
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 // A guest link opens one seat to someone without an account. Unclaimed, it
 // expires; once claimed it belongs to that browser until the host closes it.
@@ -55,6 +62,9 @@ export function createPartyServer(config = process.env) {
   )
     throw new Error("Invalid Party limits");
   const addresses = new Map();
+  // Guest link codes (hashed) to their room, and lookups per address.
+  const links = new Map();
+  const lookups = new Map();
   const http = createServer(async (req, res) => {
     const path = new URL(req.url, publicUrl).pathname;
     const files = {
@@ -74,8 +84,32 @@ export function createPartyServer(config = process.env) {
       res.end('{"ok":true}');
       return;
     }
+    if (path.startsWith("/api/guest-link/") && req.method === "GET") {
+      const address =
+        config.TRUST_PROXY === "true" &&
+        isIP(req.headers["x-party-client-ip"] || "")
+          ? req.headers["x-party-client-ip"]
+          : req.socket.remoteAddress;
+      let seen = lookups.get(address);
+      if (!seen || Date.now() - seen.since > 60000)
+        lookups.set(address, (seen = { count: 0, since: Date.now() }));
+      const link = links.get(digest(path.slice("/api/guest-link/".length)));
+      const open =
+        ++seen.count <= 20 &&
+        link &&
+        link.expires > Date.now() &&
+        rooms.has(link.room);
+      res.writeHead(seen.count > 20 ? 429 : open ? 200 : 404, {
+        "Content-Type": "application/json",
+      });
+      res.end(
+        JSON.stringify(open ? { room: link.room } : { error: linkClosed }),
+      );
+      return;
+    }
     const file =
-      path === "/party" || /^\/party\/[A-Z2-9]{6}$/.test(path)
+      path === "/party" ||
+      /^(\/party\/[A-Z2-9]{6}|\/[A-HJ-NP-Z2-9]{6})$/.test(path)
         ? files["/"]
         : files[path];
     if (!file || req.method !== "GET") {
@@ -169,6 +203,7 @@ export function createPartyServer(config = process.env) {
   function closeGuestLink(room, message, notify = true) {
     for (const g of room.guests.values()) if (g.anonymous) dismiss(g, message);
     if (!room.guestLink) return;
+    links.delete(room.guestLink.hash);
     room.guestLink = null;
     if (notify) send(room.host, { type: "guest-link", url: null });
   }
@@ -255,7 +290,7 @@ export function createPartyServer(config = process.env) {
               if (
                 !link ||
                 typeof m.guest !== "string" ||
-                !/^[a-f0-9]{64}$/.test(m.guest) ||
+                !/^[A-HJ-NP-Z2-9]{6}$/.test(m.guest) ||
                 digest(m.guest) !== link.hash
               )
                 throw new Error(linkClosed);
@@ -329,17 +364,23 @@ export function createPartyServer(config = process.env) {
           closeGuestLink(room, "O anfitrião trocou o link do convite.", false);
           const player = freeSeat(room, null);
           if (!player) throw new Error("Os três lugares já estão ocupados.");
-          const token = secret();
+          let token;
+          do token = linkToken();
+          while (links.has(digest(token)));
           room.guestLink = {
             hash: digest(token),
             player,
             expires: now + GUEST_LINK_MS,
             resumeHash: null,
           };
+          links.set(room.guestLink.hash, {
+            room: room.id,
+            expires: room.guestLink.expires,
+          });
           room.guestLinkLog = [...recent, now];
           send(ws, {
             type: "guest-link",
-            url: `${publicUrl.origin}/party/${room.id}#g=${token}`,
+            url: `${publicUrl.origin}/${token}`,
             player,
             expires: room.guestLink.expires,
           });
@@ -378,6 +419,7 @@ export function createPartyServer(config = process.env) {
       if (host) {
         limits.rooms--;
         rooms.delete(room.id);
+        if (room.guestLink) links.delete(room.guestLink.hash);
         for (const g of room.guests.values()) {
           send(g.ws, {
             type: "ended",

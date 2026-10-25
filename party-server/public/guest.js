@@ -1,22 +1,24 @@
 const $ = (id) => document.getElementById(id);
-let room = /^\/party\/([A-Z2-9]{6})$/.exec(location.pathname)?.[1];
-const inviteRoom = room;
+// A friend opens /party/ROOM with a ticket in the fragment. A host's guest
+// link is just /CODE: six characters the server maps to the room.
+const address = /^\/(?:party\/([A-Z2-9]{6})|([A-HJ-NP-Z2-9]{6}))$/.exec(
+  location.pathname,
+);
+let room = address?.[1];
+let inviteRoom = room;
+const linkCode = address?.[2] || "";
 let friendInvite =
   typeof location.hash === "string" &&
   /^#t=[A-Za-z0-9_-]+\.[a-f0-9]{64}$/.test(location.hash) &&
   location.hash.length <= 2051
     ? location.hash.slice(3)
     : "";
-const linkToken =
-  typeof location.hash === "string" && /^#g=[a-f0-9]{64}$/.test(location.hash)
-    ? location.hash.slice(3)
-    : "";
 // Remove the bearer capability from browser history before opening any connection.
-if (location.hash)
-  history.replaceState(null, "", location.pathname + (location.search || ""));
+if (location.hash || linkCode)
+  history.replaceState(null, "", linkCode ? "/" : location.pathname);
 // A host's guest link opens one seat without an account. This tab keeps the
 // link (and, once claimed, the proof that it claimed it) so a reload rejoins.
-const visitKey = `openretro-party-guest:${room}`;
+const visitKey = "openretro-party-guest";
 function remember(visit) {
   try {
     if (visit) sessionStorage.setItem(visitKey, JSON.stringify(visit));
@@ -24,13 +26,23 @@ function remember(visit) {
   } catch {}
 }
 let visit = null;
-if (room && !friendInvite) {
+if (!friendInvite) {
   try {
     const saved = JSON.parse(sessionStorage.getItem(visitKey) || "null");
-    if (saved && /^[a-f0-9]{64}$/.test(saved.token)) visit = saved;
+    if (
+      saved &&
+      /^[A-HJ-NP-Z2-9]{6}$/.test(saved.token) &&
+      /^[A-Z2-9]{6}$/.test(saved.room) &&
+      (linkCode ? saved.token === linkCode : saved.room === room)
+    )
+      visit = saved;
   } catch {}
-  if (linkToken && visit?.token !== linkToken) visit = { token: linkToken };
-  remember(visit);
+  // A link this tab has not claimed yet: the server says which room it is for.
+  if (linkCode && !visit) visit = { token: linkCode };
+  if (visit?.room) {
+    room = inviteRoom = visit.room;
+    if (linkCode) history.replaceState(null, "", "/party/" + room);
+  }
 }
 // Otherwise Party is not anonymous: guests arrive from the OpenRetro friends
 // panel with a single-use ticket from their account.
@@ -46,6 +58,34 @@ if (visit) {
   $("name").value = visit.name || "";
   $("join").textContent = "Entrar na partida";
   $("get-app").hidden = false;
+  if (!visit.room) {
+    $("join").disabled = true;
+    $("status").textContent = "Abrindo o convite…";
+    void fetch("/api/guest-link/" + visit.token)
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !/^[A-Z2-9]{6}$/.test(data.room))
+          throw new Error(
+            typeof data.error === "string"
+              ? data.error
+              : "Não foi possível abrir o convite.",
+          );
+        room = inviteRoom = data.room;
+        $("room-code").value = room;
+        remember((visit = { ...visit, room }));
+        history.replaceState(null, "", "/party/" + room);
+        if (window.isSecureContext && window.RTCPeerConnection) {
+          $("join").disabled = false;
+          $("status").textContent = "";
+        }
+      })
+      .catch((error) => {
+        visit = null;
+        remember(null);
+        $("join").disabled = true;
+        $("status").textContent = error.message;
+      });
+  }
 } else if (!friendInvite) {
   $("join").disabled = true;
   $("status").textContent = viaApp;
@@ -150,7 +190,7 @@ if (!window.isSecureContext || !window.RTCPeerConnection) {
 }
 $("join-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  if (joined || (!friendInvite && !visit) || room !== inviteRoom) return;
+  if (joined || (!friendInvite && !visit?.room) || room !== inviteRoom) return;
   if (!window.isSecureContext || !window.RTCPeerConnection) return;
   const name = visit ? $("name").value.trim().slice(0, 24) : "";
   if (visit && !name) {
