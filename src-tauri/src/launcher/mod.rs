@@ -194,6 +194,10 @@ pub async fn launch_game(
  #[cfg(not(windows))]
  if ps3 { return Err("Jogos de PS3 só rodam no Windows por enquanto.".into()); }
  let executable=filesystem::executable(&emulator.executable_path)?;
+ // A Party hosting when a PS3 game starts seats its guests as J2-J4; RPCS3
+ // reads its controllers only at boot.
+ #[cfg(windows)]
+ let party_pads=if ps3 && crate::in_game::party_input(&app) { Some(crate::remote_play::xinput::PartyPads::create()?) } else { None };
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
  if slot.is_some() && !managed_retroarch { return Err("Estados salvos só podem ser abertos pelo OpenRetro Runtime.".into()); }
  if let Some(netplay)=&netplay {
@@ -245,7 +249,7 @@ pub async fn launch_game(
     args
  } else if ps3 {
     #[cfg(windows)]
-    { rpcs3::launch_args(executable.parent().ok_or("Invalid RPCS3 directory.")?, sdl_library.as_deref(), &game_path)? }
+    { rpcs3::launch_args(executable.parent().ok_or("Invalid RPCS3 directory.")?, sdl_library.as_deref(), &game_path, party_pads.is_some())? }
     #[cfg(not(windows))]
     { let _=&sdl_library; unreachable!() }
  } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
@@ -266,6 +270,8 @@ pub async fn launch_game(
  // apps. Above normal, not high: audio and input elsewhere keep their turn.
  #[cfg(windows)]
  if ps3 { use std::os::windows::process::CommandExt; command.creation_flags(0x00008000); } // ABOVE_NORMAL_PRIORITY_CLASS
+ #[cfg(windows)]
+ if let Some(pads)=&party_pads { command.env(crate::remote_play::xinput::ENV,&pads.name); }
  let child=managed_process::ManagedChild::spawn(&mut command);
  let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {

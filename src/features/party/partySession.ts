@@ -9,6 +9,12 @@ import { parsePartyRoster } from "./partyRoster";
 import { parsePartyGuestLink, type PartyGuestLink } from "./partyGuestLink";
 import { isRawPartyFrame } from "./partyFrames";
 import {
+  paintWaiting,
+  WAITING_HEIGHT,
+  WAITING_INTERVAL_MS,
+  WAITING_WIDTH,
+} from "./partyWaiting";
+import {
   canvasSource,
   frameTrack,
   frameTracksSupported,
@@ -151,22 +157,22 @@ const peers = new Map<
   }
 >();
 const canvas = document.createElement("canvas");
-canvas.width = 1280;
-canvas.height = 720;
+canvas.width = WAITING_WIDTH;
+canvas.height = WAITING_HEIGHT;
 const paint = canvas.getContext("2d")!;
 function waiting() {
-  canvas.width = 1280;
-  canvas.height = 720;
-  const theme = getComputedStyle(document.documentElement);
-  paint.fillStyle = theme.getPropertyValue("--bg").trim() || "#121212";
-  paint.fillRect(0, 0, 1280, 720);
-  paint.textAlign = "center";
-  paint.fillStyle = theme.getPropertyValue("--text").trim() || "#e9eaee";
-  paint.font = "700 48px sans-serif";
-  paint.fillText("OpenRetro Party", 640, 330);
-  paint.fillStyle = theme.getPropertyValue("--body").trim() || "#8e919b";
-  paint.font = "26px sans-serif";
-  paint.fillText("Aguardando um jogo no PC…", 640, 390);
+  canvas.width = WAITING_WIDTH;
+  canvas.height = WAITING_HEIGHT;
+  const user = socialStore.snapshot().session.user;
+  paintWaiting(
+    paint,
+    {
+      host: { name: user?.displayName ?? null, avatar: user?.avatar },
+      guests: state.guests,
+      connected: state.connected,
+    },
+    performance.now(),
+  );
   if (frameTracksSupported) show(canvasSource(canvas));
 }
 /** Sends a frame to every guest; the previous one closes once unused. */
@@ -274,7 +280,7 @@ export async function startParty() {
     // A guest who connects while nothing changes still gets a picture.
     refresh = setInterval(() => {
       if (!playing) waiting();
-    }, 1000);
+    }, WAITING_INTERVAL_MS);
     const remote = await bridge.remotePlayStart();
     if (run !== generation) return;
     if (!remote.url)

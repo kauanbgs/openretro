@@ -1,0 +1,17 @@
+[package]
+name = "openretro-xinput-shim"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Built by the app's build script, not as a member of the app's package.
+[workspace]
+
+[lib]
+name = "xinput1_3"
+path = "lib.rs"
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "s"
+panic = "abort"

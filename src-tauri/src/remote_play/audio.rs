@@ -1,5 +1,6 @@
-//! Reads game-only PCM from the managed runtime. Never records a system
-//! output device: calls, notifications and browser audio stay on the host.
+//! Reads game-only PCM from the managed runtime, or RPCS3's own process
+//! sound (`process_audio`). Never records a system output device: calls,
+//! notifications and browser audio stay on the host.
 use axum::body::Bytes;
 use std::{
     ffi::c_void,
@@ -140,20 +141,47 @@ impl AudioCapture {
         let flag = stop.clone();
         std::thread::spawn(move || {
             let (mut mapping, mut pid) = (None::<Mapping>, 0u32);
+            // RPCS3 shares no PCM; its process is captured instead, once
+            // per game: a failure would otherwise repeat every 100 ms.
+            let (mut process, mut tried) = (None::<super::process_audio::ProcessAudio>, 0u32);
             let mut checked = Instant::now() - Duration::from_secs(1);
             while !flag.load(Ordering::Acquire) {
                 if checked.elapsed() >= Duration::from_millis(100) {
                     let running = crate::in_game::runtime_pid(&app).unwrap_or(0);
                     if running != pid {
                         mapping = None;
+                        process = None;
                         pid = running;
                     }
-                    if pid != 0 && mapping.is_none() {
-                        mapping = Mapping::open(pid);
+                    match crate::in_game::unshared_audio_pid(&app) {
+                        Some(game) if game == pid => {
+                            if process.is_none() && tried != pid {
+                                tried = pid;
+                                match super::process_audio::ProcessAudio::start(pid) {
+                                    Ok(capture) => process = Some(capture),
+                                    Err(e) => log::warn!("Game sound capture unavailable: {e}"),
+                                }
+                            }
+                        }
+                        _ if pid != 0 && mapping.is_none() => mapping = Mapping::open(pid),
+                        _ => {}
                     }
                     checked = Instant::now();
                 }
-                if sound.receiver_count() > 0 {
+                if let Some(capture) = process.as_mut() {
+                    // Read even without listeners, so a guest who joins
+                    // hears live sound instead of the buffered past.
+                    match capture.read() {
+                        Ok(Some(packet)) if sound.receiver_count() > 0 => {
+                            let _ = sound.send(packet);
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::warn!("Game sound capture stopped: {e}");
+                            process = None;
+                        }
+                    }
+                } else if sound.receiver_count() > 0 {
                     if let Some(packet) = mapping.as_mut().and_then(Mapping::read) {
                         let _ = sound.send(packet);
                     }

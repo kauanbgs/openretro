@@ -32,10 +32,13 @@ pub struct SessionInfo {
     slot: i32,
     screen_view: ScreenView,
     view_available: bool,
+    /// Shown inside OpenRetro, where Party and phones can capture it.
+    #[serde(skip)]
+    hosted: bool,
 }
 impl SessionInfo {
     pub fn remote_available(&self) -> bool {
-        self.view_available
+        self.hosted
     }
     pub fn id(&self) -> &str {
         &self.id
@@ -134,7 +137,9 @@ impl SessionGuard {
             };
             session.embedded_window = Some(embedded.window);
             session.covered_views = embedded.covered;
+            session.pid = pid;
             session.info.view_available = session.stdin.is_some();
+            session.info.hosted = true;
         }
         Ok(())
     }
@@ -185,6 +190,7 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Resu
             slot,
             screen_view: ScreenView::default(),
             view_available: false,
+            hosted: false,
         },
         stdin: None,
         pid: 0,
@@ -197,6 +203,22 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Resu
         app: app.clone(),
         id: id.into(),
     })
+}
+
+/// Whether a Party is hosting, so a PS3 game seats its guests at launch.
+pub(crate) fn party_input(app: &tauri::AppHandle) -> bool {
+    app.state::<InGameService>()
+        .1
+        .load(std::sync::atomic::Ordering::Acquire)
+}
+
+/// The game's own process when it shares no sound of its own (RPCS3), so
+/// its audio is captured from that process alone.
+pub fn unshared_audio_pid(app: &tauri::AppHandle) -> Option<u32> {
+    let service = app.state::<InGameService>();
+    let guard = service.0.lock().ok()?;
+    let session = guard.as_ref()?;
+    (session.stdin.is_none() && session.info.hosted && session.pid != 0).then_some(session.pid)
 }
 
 pub(crate) fn set_party_input(app: &tauri::AppHandle, enabled: bool) -> Result<()> {
@@ -471,6 +493,7 @@ mod tests {
                 slot: 0,
                 screen_view: super::ScreenView::default(),
                 view_available: false,
+                hosted: false,
             },
             stdin: None,
             pid: 0,

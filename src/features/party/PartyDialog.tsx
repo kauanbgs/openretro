@@ -319,7 +319,7 @@ export function PartyDialog({
             <p>
               {room.game
                 ? "O áudio do PC também é compartilhado."
-                : "Abra um jogo no runtime integrado para começar."}
+                : "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem."}
             </p>
           </div>
         )}

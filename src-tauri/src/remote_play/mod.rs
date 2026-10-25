@@ -2,8 +2,9 @@
 //! watches the game, hears it and plays it. The page reaches the server only
 //! with the pairing token from the QR code. Video is H.264 over WebRTC, encoded
 //! by the PC's webview, or JPEG frames where WebRTC cannot connect; audio is
-//! the game runtime output as PCM, and each phone's buttons go to
-//! the runtime's loopback remote gamepad for the player it picked.
+//! the game runtime output as PCM (RPCS3's own process audio for PS3), and
+//! each phone's buttons go to the runtime's loopback remote gamepad for the
+//! player it picked, or to RPCS3's Party pads (`xinput`).
 use crate::database::{error, Result};
 use serde::Serialize;
 use std::sync::Mutex;
@@ -15,6 +16,10 @@ mod audio;
 mod capture;
 #[cfg(windows)]
 mod frames;
+#[cfg(windows)]
+mod process_audio;
+#[cfg(windows)]
+pub mod xinput;
 mod api;
 mod input;
 mod network;

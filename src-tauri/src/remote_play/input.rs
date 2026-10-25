@@ -1,6 +1,7 @@
 //! Relays a phone's pad to the runtime's remote gamepad. RetroArch reads one
 //! `struct remote_message` per datagram, each changing one button or axis,
 //! so transitions are sent immediately and held states are periodically refreshed.
+//! A PS3 game hosted for a Party reads the same pads through `xinput`.
 use super::REMOTE_PAD_BASE_PORT;
 use std::{
     net::UdpSocket,
@@ -89,6 +90,8 @@ impl Relay {
         } else {
             self.send(changes(self.state, state));
         }
+        #[cfg(windows)]
+        super::xinput::set(self.player, Some(state));
         self.state = state;
     }
 
@@ -97,6 +100,8 @@ impl Relay {
         let player = player.clamp(1, 4);
         if player != self.player {
             self.release();
+            #[cfg(windows)]
+            super::xinput::set(self.player, None);
             self.player = player;
         }
     }
@@ -130,6 +135,8 @@ fn snapshot(state: PadState) -> Vec<[u8; 20]> {
 impl Drop for Relay {
     fn drop(&mut self) {
         self.release();
+        #[cfg(windows)]
+        super::xinput::set(self.player, None);
     }
 }
 

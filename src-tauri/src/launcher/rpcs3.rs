@@ -618,11 +618,14 @@ fn handler(kind: i32) -> Option<(&'static str, &'static str)> {
 
 /// One player per connected controller, the keyboard when there is none.
 /// RPCS3 fills in each handler's default buttons; Cross is explicit so the
-/// first native confirmation dialog has a known binding.
-pub fn input_config(controllers: &[(i32, String)]) -> String {
+/// first native confirmation dialog has a known binding. For a Party, only
+/// the first controller plays on the PC: players 2 to 4 are the guests,
+/// XInput pads 2 to 4 of OpenRetro's shim (`remote_play::xinput`).
+pub fn input_config(controllers: &[(i32, String)], party: bool) -> String {
     let mut config = String::new();
     let mut counts = std::collections::HashMap::<&str, usize>::new();
-    for (player, (kind, name)) in controllers.iter().take(4).enumerate() {
+    let local = if party { 1 } else { 4 };
+    for (player, (kind, name)) in controllers.iter().take(local).enumerate() {
         let (handler, device) = match handler(*kind) {
             Some((handler, prefix)) => {
                 let count = counts.entry(handler).or_default();
@@ -644,6 +647,13 @@ pub fn input_config(controllers: &[(i32, String)]) -> String {
     }
     if config.is_empty() {
         config.push_str("Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n");
+    }
+    if party {
+        for player in 2..=4 {
+            config.push_str(&format!(
+                "Player {player} Input:\n  Handler: XInput\n  Device: \"XInput Pad #{player}\"\n  Config:\n    Cross: A\n"
+            ));
+        }
     }
     config
 }
@@ -717,12 +727,31 @@ fn set_ini(text: &str, section: &str, key: &str, value: &str) -> String {
     lines.join("\n") + "\n"
 }
 
+/// RPCS3 loads xinput1_3.dll from its own folder first. OpenRetro's copy is
+/// there only for a Party; other games use Windows' XInput untouched.
+fn install_party_pads(directory: &Path, party: bool) -> Result<()> {
+    let path = directory.join("xinput1_3.dll");
+    if !party {
+        return match std::fs::remove_file(&path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(error(e)),
+            _ => Ok(()),
+        };
+    }
+    let shim = crate::remote_play::xinput::DLL;
+    if std::fs::read(&path).ok().as_deref() != Some(shim) {
+        std::fs::write(&path, shim)
+            .map_err(|e| format!("Não foi possível preparar os controles do Party: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Arguments that boot `game` with OpenRetro's controller setup and none of
 /// RPCS3's own dialogs, which would open outside OpenRetro.
 pub fn launch_args(
     directory: &Path,
     sdl_library: Option<&Path>,
     game: &Path,
+    party: bool,
 ) -> Result<Vec<String>> {
     let controllers = sdl_library
         .and_then(crate::in_game::sdl::Sdl::load)
@@ -732,9 +761,10 @@ pub fn launch_args(
     std::fs::create_dir_all(&inputs).map_err(error)?;
     std::fs::write(
         inputs.join(format!("{INPUT_CONFIG}.yml")),
-        input_config(&controllers),
+        input_config(&controllers, party),
     )
     .map_err(error)?;
+    install_party_pads(directory, party)?;
     let config_path = directory.join("config/config.yml");
     let config = std::fs::read_to_string(&config_path).unwrap_or_default();
     std::fs::write(&config_path, embedded_config(&config)).map_err(error)?;
@@ -871,12 +901,15 @@ mod tests {
 
     #[test]
     fn controllers_map_to_rpcs3_handlers() {
-        let config = input_config(&[
-            (4, "PS4 Controller".into()),
-            (1, "Xbox 360 Controller".into()),
-            (4, "PS4 Controller".into()),
-            (5, "Nintendo Switch Pro Controller".into()),
-        ]);
+        let config = input_config(
+            &[
+                (4, "PS4 Controller".into()),
+                (1, "Xbox 360 Controller".into()),
+                (4, "PS4 Controller".into()),
+                (5, "Nintendo Switch Pro Controller".into()),
+            ],
+            false,
+        );
         assert_eq!(
             config,
             "Player 1 Input:\n  Handler: SDL\n  Device: \"PS4 Controller 1\"\n  Config:\n    Cross: South\n\
@@ -885,8 +918,30 @@ mod tests {
              Player 4 Input:\n  Handler: SDL\n  Device: \"Nintendo Switch Pro Controller 1\"\n  Config:\n    Cross: South\n"
         );
         assert_eq!(
-            input_config(&[]),
+            input_config(&[], false),
             "Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n"
+        );
+    }
+
+    #[test]
+    fn a_party_keeps_the_first_controller_and_seats_guests_on_the_shim() {
+        let guests = "Player 2 Input:\n  Handler: XInput\n  Device: \"XInput Pad #2\"\n  Config:\n    Cross: A\n\
+             Player 3 Input:\n  Handler: XInput\n  Device: \"XInput Pad #3\"\n  Config:\n    Cross: A\n\
+             Player 4 Input:\n  Handler: XInput\n  Device: \"XInput Pad #4\"\n  Config:\n    Cross: A\n";
+        assert_eq!(
+            input_config(
+                &[(4, "PS4 Controller".into()), (1, "Xbox 360 Controller".into())],
+                true
+            ),
+            format!("Player 1 Input:\n  Handler: SDL\n  Device: \"PS4 Controller 1\"\n  Config:\n    Cross: South\n{guests}")
+        );
+        assert_eq!(
+            input_config(&[(1, "Xbox 360 Controller".into())], true),
+            format!("Player 1 Input:\n  Handler: XInput\n  Device: \"XInput Pad #1\"\n  Config:\n    Cross: A\n{guests}")
+        );
+        assert_eq!(
+            input_config(&[], true),
+            format!("Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n{guests}")
         );
     }
 
