@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import { isIP } from "node:net";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,31 @@ const roomCode = () =>
   Array.from({ length: 6 }, () => alphabet[randomInt(alphabet.length)]).join(
     "",
   );
+
+const secret = () => randomBytes(32).toString("hex");
+const digest = (value) => createHash("sha256").update(value).digest("hex");
+// A guest link opens one seat to someone without an account. Unclaimed, it
+// expires; once claimed it belongs to that browser until the host closes it.
+const GUEST_LINK_MS = 30 * 60 * 1000;
+const GUEST_LINKS_PER_10_MIN = 10;
+const linkClosed =
+  "Este convite expirou ou foi fechado. Peça um novo link ao anfitrião.";
+const linkTaken =
+  "Outra pessoa já entrou por este convite. Peça um novo link ao anfitrião.";
+export const guestName = (value) =>
+  typeof value === "string"
+    ? [
+        ...value
+          .replace(
+            /[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g,
+            "",
+          )
+          .trim(),
+      ]
+        .slice(0, 24)
+        .join("")
+        .trim()
+    : "";
 
 export function createPartyServer(config = process.env) {
   const rooms = new Map();
@@ -112,8 +137,40 @@ export function createPartyServer(config = process.env) {
         id: g.id,
         name: g.name,
         player: g.player,
+        ...(g.anonymous ? { anonymous: true } : {}),
       })),
     });
+  }
+  /** The first free seat; the guest link's seat stays out of reach of others. */
+  function freeSeat(room, reserved = room.guestLink?.player) {
+    return [2, 3, 4].find(
+      (p) =>
+        p !== reserved &&
+        ![...room.guests.values()].some((g) => !g.removed && g.player === p),
+    );
+  }
+  function admit(room, g, player, extra = {}) {
+    g.player = player;
+    send(g.ws, {
+      type: "accepted",
+      player,
+      iceServers: room.ice,
+      policy: room.policy,
+      ...extra,
+    });
+    send(room.host, { type: "peer", id: g.id, player });
+    roster(room);
+  }
+  function dismiss(g, message) {
+    g.removed = true;
+    send(g.ws, { type: "ended", message });
+    g.ws.close();
+  }
+  function closeGuestLink(room, message, notify = true) {
+    for (const g of room.guests.values()) if (g.anonymous) dismiss(g, message);
+    if (!room.guestLink) return;
+    room.guestLink = null;
+    if (notify) send(room.host, { type: "guest-link", url: null });
   }
   wss.on("connection", (ws, limits) => {
     clients.add(ws);
@@ -191,6 +248,48 @@ export function createPartyServer(config = process.env) {
               room = undefined;
               throw new Error("A sala está cheia.");
             }
+            if (m.guest !== undefined) {
+              const target = room;
+              room = undefined;
+              const link = target.guestLink;
+              if (
+                !link ||
+                typeof m.guest !== "string" ||
+                !/^[a-f0-9]{64}$/.test(m.guest) ||
+                digest(m.guest) !== link.hash
+              )
+                throw new Error(linkClosed);
+              const name = guestName(m.name);
+              if (!name) throw new Error("Digite seu nome para entrar.");
+              let resume;
+              if (link.resumeHash) {
+                // Only the browser that claimed the link can come back with it.
+                if (
+                  typeof m.resume !== "string" ||
+                  !/^[a-f0-9]{64}$/.test(m.resume) ||
+                  digest(m.resume) !== link.resumeHash
+                )
+                  throw new Error(linkTaken);
+                for (const g of target.guests.values())
+                  if (g.anonymous)
+                    dismiss(g, "Você entrou de novo em outra janela.");
+              } else {
+                if (link.expires <= Date.now()) throw new Error(linkClosed);
+                resume = secret();
+                link.resumeHash = digest(resume);
+              }
+              if (
+                [...target.guests.values()].some(
+                  (g) => !g.removed && g.player === link.player,
+                )
+              )
+                throw new Error("A sala está cheia.");
+              room = target;
+              guest = { id: id(), name, player: null, anonymous: true, ws };
+              room.guests.set(guest.id, guest);
+              admit(room, guest, link.player, resume ? { resume } : {});
+              return;
+            }
             guest = {
               id: id(),
               name:
@@ -209,28 +308,43 @@ export function createPartyServer(config = process.env) {
         } else if (host && m.type === "accept") {
           const g = room.guests.get(m.id);
           if (!g || g.player !== null) return;
-          const player = [2, 3, 4].find(
-            (p) => ![...room.guests.values()].some((g) => g.player === p),
-          );
+          const player = freeSeat(room);
           if (!player) throw new Error("Os três lugares já estão ocupados.");
-          g.player = player;
-          send(g.ws, {
-            type: "accepted",
-            player,
-            iceServers: room.ice,
-            policy: room.policy,
-          });
-          send(ws, { type: "peer", id: g.id, player });
-          roster(room);
+          admit(room, g, player);
         } else if (host && m.type === "remove") {
           const g = room.guests.get(m.id);
-          if (g) {
-            send(g.ws, {
-              type: "ended",
-              message: "O anfitrião encerrou sua participação.",
-            });
-            g.ws.close();
-          }
+          // Removing the link's guest also closes the link, or they could
+          // simply come back with it.
+          if (g?.anonymous)
+            closeGuestLink(room, "O anfitrião encerrou sua participação.");
+          else if (g) dismiss(g, "O anfitrião encerrou sua participação.");
+        } else if (host && m.type === "guest-link") {
+          const now = Date.now();
+          const recent = (room.guestLinkLog || []).filter(
+            (at) => at > now - 600000,
+          );
+          if (recent.length >= GUEST_LINKS_PER_10_MIN)
+            throw new Error("Você gerou muitos links. Aguarde alguns minutos.");
+          // A new link replaces the old one and whoever came in through it.
+          closeGuestLink(room, "O anfitrião trocou o link do convite.", false);
+          const player = freeSeat(room, null);
+          if (!player) throw new Error("Os três lugares já estão ocupados.");
+          const token = secret();
+          room.guestLink = {
+            hash: digest(token),
+            player,
+            expires: now + GUEST_LINK_MS,
+            resumeHash: null,
+          };
+          room.guestLinkLog = [...recent, now];
+          send(ws, {
+            type: "guest-link",
+            url: `${publicUrl.origin}/party/${room.id}#g=${token}`,
+            player,
+            expires: room.guestLink.expires,
+          });
+        } else if (host && m.type === "guest-link-close") {
+          closeGuestLink(room, "O anfitrião fechou o lugar do convite.");
         } else if (m.type === "signal") {
           const g = host ? room.guests.get(m.id) : guest;
           if (!g?.player) return;

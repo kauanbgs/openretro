@@ -4,10 +4,12 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
-import { LoaderCircle, X } from "lucide-react";
+import { Copy, Link2, LoaderCircle, X } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { isTauri } from "../../services/transport";
 import {
+  closeGuestLink,
+  createGuestLink,
   endParty,
   partyStore,
   removeGuest,
@@ -16,7 +18,7 @@ import {
 } from "./partySession";
 import "./PartyDialog.css";
 import { socialStore } from "../../services/social";
-import { t } from "../../i18n";
+import { locale, t } from "../../i18n";
 import { AccountAvatar } from "../social/accountAvatars";
 
 export function PartyDialog({
@@ -35,6 +37,13 @@ export function PartyDialog({
     socialStore.snapshot,
   );
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const link = room.guestLink;
+  const linkGuest = room.guests.find((g) => g.anonymous);
+  const seatsFull = [2, 3, 4].every((p) =>
+    room.guests.some((g) => g.player === p),
+  );
+  useEffect(() => setCopied(false), [link?.url]);
   const active = room.phase === "open";
   const busy = room.phase === "connecting";
   const signedIn = social.session.hasSession;
@@ -81,6 +90,7 @@ export function PartyDialog({
           {[1, 2, 3, 4].map((player) => {
             const guest = room.guests.find((g) => g.player === player);
             const connected = guest && room.connected.includes(guest.id);
+            const reserved = !guest && link?.player === player;
             return (
               <div
                 className={`party-seat ${player === 1 || guest ? "occupied" : ""}`}
@@ -110,16 +120,18 @@ export function PartyDialog({
                 <strong>
                   {player === 1
                     ? (social.session.user?.displayName ?? t("Você"))
-                    : guest?.name || t("Lugar livre")}
+                    : guest?.name ||
+                      (reserved ? t("Lugar do link") : t("Lugar livre"))}
                 </strong>
                 <small>
                   {player === 1
-                    ? "Anfitrião"
+                    ? t("Anfitrião")
                     : guest
-                      ? connected
-                        ? "Conectado"
-                        : "Conectando…"
-                      : "Aguardando um amigo"}
+                      ? (guest.anonymous ? t("Convidado pelo link · ") : "") +
+                        (connected ? t("Conectado") : t("Conectando…"))
+                      : reserved
+                        ? t("Aguardando quem tem o link")
+                        : t("Aguardando um amigo")}
                 </small>
               </div>
             );
@@ -163,6 +175,87 @@ export function PartyDialog({
                         )
                       : t("Reconectando aos amigos…")}
                 </p>
+              )}
+            </div>
+          )}
+          {active && (
+            <div className="party-link">
+              <div>
+                <strong>{t("Convidar por link")}</strong>
+                <p>
+                  {t(
+                    "Para quem não tem o OpenRetro: a pessoa joga pelo navegador, sem conta e sem instalar nada. O link vale para um lugar.",
+                  )}
+                </p>
+              </div>
+              {link ? (
+                <>
+                  <div className="input-action">
+                    <input
+                      readOnly
+                      value={link.url}
+                      aria-label={t("Link do convite")}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button
+                      className="icon-button"
+                      aria-label={t("Copiar link")}
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText(link.url)
+                          .then(() => setCopied(true))
+                      }
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                  <p className="party-link-status" role="status">
+                    {copied && t("Link copiado. ")}
+                    {linkGuest
+                      ? t(
+                          "O lugar J{player} é de {name}. Se a conexão cair, essa pessoa volta pelo mesmo link.",
+                          { player: link.player, name: linkGuest.name },
+                        )
+                      : t(
+                          "Lugar J{player}. Quem abrir primeiro fica com ele, então não mostre o link na live. Vale até {time} se ninguém entrar.",
+                          {
+                            player: link.player,
+                            time: new Date(link.expires).toLocaleTimeString(
+                              locale(),
+                              { hour: "2-digit", minute: "2-digit" },
+                            ),
+                          },
+                        )}
+                  </p>
+                  <div className="party-link-actions">
+                    <button
+                      className="button secondary"
+                      disabled={room.guestLinkBusy}
+                      onClick={createGuestLink}
+                    >
+                      {t("Gerar novo link")}
+                    </button>
+                    <button
+                      className="button secondary"
+                      onClick={closeGuestLink}
+                    >
+                      {t("Fechar lugar")}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  className="button secondary party-link-create"
+                  disabled={room.guestLinkBusy || seatsFull}
+                  onClick={createGuestLink}
+                >
+                  {room.guestLinkBusy ? (
+                    <LoaderCircle size={16} className="spin" />
+                  ) : (
+                    <Link2 size={16} />
+                  )}
+                  {t("Criar link de convite")}
+                </button>
               )}
             </div>
           )}

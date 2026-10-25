@@ -7,19 +7,52 @@ let friendInvite =
   location.hash.length <= 2051
     ? location.hash.slice(3)
     : "";
+const linkToken =
+  typeof location.hash === "string" && /^#g=[a-f0-9]{64}$/.test(location.hash)
+    ? location.hash.slice(3)
+    : "";
 // Remove the bearer capability from browser history before opening any connection.
 if (location.hash)
   history.replaceState(null, "", location.pathname + (location.search || ""));
-// Party is not anonymous: guests arrive from the OpenRetro friends panel with
-// a single-use ticket from their account. Without one there is nothing to do.
+// A host's guest link opens one seat without an account. This tab keeps the
+// link (and, once claimed, the proof that it claimed it) so a reload rejoins.
+const visitKey = `openretro-party-guest:${room}`;
+function remember(visit) {
+  try {
+    if (visit) sessionStorage.setItem(visitKey, JSON.stringify(visit));
+    else sessionStorage.removeItem(visitKey);
+  } catch {}
+}
+let visit = null;
+if (room && !friendInvite) {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(visitKey) || "null");
+    if (saved && /^[a-f0-9]{64}$/.test(saved.token)) visit = saved;
+  } catch {}
+  if (linkToken && visit?.token !== linkToken) visit = { token: linkToken };
+  remember(visit);
+}
+// Otherwise Party is not anonymous: guests arrive from the OpenRetro friends
+// panel with a single-use ticket from their account.
 const viaApp =
   "Abra o OpenRetro, vá em Amigos e clique em Entrar no Party do seu amigo.";
 $("name").required = false;
 $("room-code").required = false;
-if (!friendInvite) {
+if (visit) {
+  $("lead").textContent =
+    "Você foi convidado para jogar pelo navegador. Não precisa de conta nem de instalar nada.";
+  $("name-field").hidden = false;
+  $("name").required = true;
+  $("name").value = visit.name || "";
+  $("join").textContent = "Entrar na partida";
+  $("get-app").hidden = false;
+} else if (!friendInvite) {
   $("join").disabled = true;
   $("status").textContent = viaApp;
 }
+$("get-app-close").addEventListener("click", () => {
+  $("get-app").hidden = true;
+});
 $("room-code").value = room || "";
 let socket,
   pc,
@@ -81,7 +114,8 @@ function pollPad() {
   requestAnimationFrame(pollPad);
 }
 if (typeof requestAnimationFrame === "function") requestAnimationFrame(pollPad);
-function ended(message) {
+/** `final` is the room's own answer; a dropped connection is not. */
+function ended(message, final = false) {
   clearInterval(heartbeat);
   joined = false;
   clearInput();
@@ -91,10 +125,23 @@ function ended(message) {
   $("screen").srcObject = null;
   $("stage").hidden = true;
   $("lobby").hidden = false;
-  // A ticket works once; joining again needs a new one from the app.
-  $("join").disabled = true;
   $("connection").textContent = "Conexão encerrada";
-  status(`${message} ${viaApp}`);
+  if (visit && !final) {
+    // The claimed link still holds the seat: the same tab can come back.
+    $("join").disabled = false;
+    $("name").disabled = false;
+    $("join").textContent = "Entrar novamente";
+    status(message);
+  } else if (visit) {
+    visit = null;
+    remember(null);
+    $("join").disabled = true;
+    status(message);
+  } else {
+    // A ticket works once; joining again needs a new one from the app.
+    $("join").disabled = true;
+    status(`${message} ${viaApp}`);
+  }
   if (document.fullscreenElement) void document.exitFullscreen();
 }
 if (!window.isSecureContext || !window.RTCPeerConnection) {
@@ -103,8 +150,15 @@ if (!window.isSecureContext || !window.RTCPeerConnection) {
 }
 $("join-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  if (joined || !friendInvite || room !== inviteRoom) return;
+  if (joined || (!friendInvite && !visit) || room !== inviteRoom) return;
   if (!window.isSecureContext || !window.RTCPeerConnection) return;
+  const name = visit ? $("name").value.trim().slice(0, 24) : "";
+  if (visit && !name) {
+    status("Digite seu nome para entrar.");
+    $("name").focus();
+    return;
+  }
+  if (visit) remember((visit = { ...visit, name }));
   history.replaceState(null, "", `/party/${room}`);
   joined = true;
   candidates.length = 0;
@@ -123,8 +177,16 @@ $("join-form").addEventListener("submit", (event) => {
   }, 15000);
   socket.onopen = () => {
     clearTimeout(timer);
-    // The name comes from the account on the server, not from this page.
-    send({ type: "join", room, invite: friendInvite });
+    if (visit)
+      send({
+        type: "join",
+        room,
+        name,
+        guest: visit.token,
+        ...(visit.resume ? { resume: visit.resume } : {}),
+      });
+    // A friend's name comes from the account on the server, not this page.
+    else send({ type: "join", room, invite: friendInvite });
     friendInvite = "";
     heartbeat = setInterval(() => {
       if (thisSocket.readyState === WebSocket.OPEN) thisSocket.send("ping");
@@ -150,11 +212,13 @@ async function receive(m) {
     $("connection").textContent = "Aguardando o anfitrião";
   }
   if (m.type === "error" || m.type === "ended") {
-    ended(m.message);
+    ended(m.message, true);
     return;
   }
   if (m.type === "accepted") {
     player = m.player;
+    if (visit && typeof m.resume === "string")
+      remember((visit = { ...visit, resume: m.resume }));
     status(`Seu lugar é J${player}. Conectando imagem e som…`);
     pc = new RTCPeerConnection({
       iceServers: m.iceServers,
@@ -292,5 +356,10 @@ window.addEventListener("pagehide", () => {
   socket?.close();
   pc?.close();
 });
-if (friendInvite && room && window.isSecureContext && window.RTCPeerConnection)
+if (
+  (friendInvite || (visit?.resume && visit.name)) &&
+  room &&
+  window.isSecureContext &&
+  window.RTCPeerConnection
+)
   $("join-form").requestSubmit();

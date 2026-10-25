@@ -173,3 +173,178 @@ test("room creation limits replace client secrets and reject repeated requests",
     await app.close();
   }
 });
+
+test("guest links open one reserved seat to a named browser guest until the host closes it", async () => {
+  const app = createPartyServer({
+    PUBLIC_URL: "http://localhost:8787",
+    ALLOW_STUN_ONLY: "true",
+  });
+  await new Promise((resolve) => app.http.listen(0, "127.0.0.1", resolve));
+  const base = `ws://127.0.0.1:${app.http.address().port}/signal`;
+  const sockets = [];
+  const connect = async () => {
+    const ws = new WebSocket(base);
+    sockets.push(ws);
+    const next = inbox(ws);
+    await new Promise((resolve) => ws.once("open", resolve));
+    return { ws, next, send: (m) => ws.send(JSON.stringify(m)) };
+  };
+  try {
+    const host = await connect();
+    host.send({ type: "create" });
+    const { code: room } = await host.next("created");
+    // A guest cannot mint a link for themselves.
+    const friend = await connect();
+    friend.send({ type: "join", room, name: "Amiga" });
+    await friend.next("waiting");
+    friend.send({ type: "guest-link" });
+    host.send({ type: "guest-link" });
+    const link = await host.next("guest-link");
+    assert.equal(link.player, 2);
+    assert.ok(link.expires > Date.now());
+    const url = new URL(link.url);
+    assert.equal(url.pathname, `/party/${room}`);
+    const token = /^#g=([a-f0-9]{64})$/.exec(url.hash)[1];
+    // The friend asked first, but the link's seat stays reserved.
+    let roster = await host.next("roster");
+    host.send({ type: "accept", id: roster.guests[0].id });
+    assert.equal((await friend.next("accepted")).player, 3);
+    assert.equal((await host.next("peer")).player, 3);
+
+    const forged = await connect();
+    forged.send({ type: "join", room, name: "X", guest: "0".repeat(64) });
+    assert.match((await forged.next("error")).message, /expirou/);
+    const nameless = await connect();
+    nameless.send({ type: "join", room, name: " \u202e ", guest: token });
+    assert.match((await nameless.next("error")).message, /nome/);
+
+    const streamer = await connect();
+    streamer.send({ type: "join", room, name: "Streamer\u0007", guest: token });
+    const accepted = await streamer.next("accepted");
+    assert.equal(accepted.player, 2);
+    assert.match(accepted.resume, /^[a-f0-9]{64}$/);
+    assert.equal((await host.next("peer")).player, 2);
+    do roster = await host.next("roster");
+    while (!roster.guests.some((g) => g.anonymous));
+    const anonymous = roster.guests.find((g) => g.anonymous);
+    assert.deepEqual(
+      { name: anonymous.name, player: anonymous.player },
+      { name: "Streamer", player: 2 },
+    );
+    assert.equal(
+      roster.guests.find((g) => g.name === "Amiga").anonymous,
+      undefined,
+    );
+
+    // Single use: someone else with the same link is refused, but the
+    // browser that claimed it can come back.
+    const viewer = await connect();
+    viewer.send({ type: "join", room, name: "Viewer", guest: token });
+    assert.match((await viewer.next("error")).message, /Outra pessoa/);
+    const again = await connect();
+    again.send({
+      type: "join",
+      room,
+      name: "Streamer",
+      guest: token,
+      resume: accepted.resume,
+    });
+    assert.match((await streamer.next("ended")).message, /outra janela/);
+    const back = await again.next("accepted");
+    assert.equal(back.player, 2);
+    assert.equal(back.resume, undefined);
+
+    // Removing the guest closes the link for good.
+    do roster = await host.next("roster");
+    while (!roster.guests.some((g) => g.anonymous && g.player === 2));
+    host.send({
+      type: "remove",
+      id: roster.guests.find((g) => g.anonymous).id,
+    });
+    assert.match((await again.next("ended")).message, /encerrou/);
+    assert.equal((await host.next("guest-link")).url, null);
+    const retry = await connect();
+    retry.send({
+      type: "join",
+      room,
+      name: "Streamer",
+      guest: token,
+      resume: accepted.resume,
+    });
+    assert.match((await retry.next("error")).message, /expirou/);
+
+    // A new link can be closed before anyone uses it.
+    host.send({ type: "guest-link" });
+    const second = await host.next("guest-link");
+    assert.equal(second.player, 2);
+    host.send({ type: "guest-link-close" });
+    assert.equal((await host.next("guest-link")).url, null);
+    const late = await connect();
+    late.send({
+      type: "join",
+      room,
+      name: "Late",
+      guest: new URL(second.url).hash.slice(3),
+    });
+    assert.match((await late.next("error")).message, /expirou/);
+  } finally {
+    sockets.forEach((ws) => ws.terminate());
+    await app.close();
+  }
+});
+
+test("guest links are rate limited per room", async () => {
+  const app = createPartyServer({ ALLOW_STUN_ONLY: "true" });
+  await new Promise((resolve) => app.http.listen(0, "127.0.0.1", resolve));
+  const ws = new WebSocket(`ws://127.0.0.1:${app.http.address().port}/signal`);
+  const next = inbox(ws);
+  try {
+    await new Promise((resolve) => ws.once("open", resolve));
+    ws.send(JSON.stringify({ type: "create" }));
+    await next("created");
+    for (let i = 0; i < 10; i++) {
+      ws.send(JSON.stringify({ type: "guest-link" }));
+      await next("guest-link");
+    }
+    ws.send(JSON.stringify({ type: "guest-link" }));
+    assert.match((await next("error")).message, /muitos links/);
+  } finally {
+    ws.terminate();
+    await app.close();
+  }
+});
+
+test("an unclaimed guest link expires after thirty minutes", async () => {
+  const app = createPartyServer({ ALLOW_STUN_ONLY: "true" });
+  await new Promise((resolve) => app.http.listen(0, "127.0.0.1", resolve));
+  const url = `ws://127.0.0.1:${app.http.address().port}/signal`;
+  const host = new WebSocket(url),
+    guest = new WebSocket(url);
+  const fromHost = inbox(host),
+    fromGuest = inbox(guest);
+  const now = Date.now;
+  try {
+    await Promise.all(
+      [host, guest].map((ws) => new Promise((r) => ws.once("open", r))),
+    );
+    host.send(JSON.stringify({ type: "create" }));
+    const { code } = await fromHost("created");
+    host.send(JSON.stringify({ type: "guest-link" }));
+    const link = await fromHost("guest-link");
+    Date.now = () => now() + 31 * 60 * 1000;
+    guest.send(
+      JSON.stringify({
+        type: "join",
+        room: code,
+        name: "Tarde",
+        guest: new URL(link.url).hash.slice(3),
+      }),
+    );
+    assert.match((await fromGuest("error")).message, /expirou/);
+  } finally {
+    Date.now = now;
+    host.terminate();
+    guest.terminate();
+    await app.close();
+  }
+});

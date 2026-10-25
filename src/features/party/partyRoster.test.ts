@@ -18,6 +18,14 @@ describe("Party profile roster", () => {
         .avatar,
     ).toBe(0);
   });
+  it("marks only guests the server flags as coming from the guest link", () => {
+    const [link, friend] = parsePartyRoster([
+      { id: "link", name: "Streamer", player: 2, anonymous: true },
+      { id: "friend", name: "Marina", player: 3, anonymous: "yes" },
+    ]);
+    expect(link.anonymous).toBe(true);
+    expect(friend.anonymous).toBeUndefined();
+  });
   it("rejects malformed identities, names, seats and avatars", () => {
     const row = { id: "guest", name: "Marina", player: 2, avatar: 4 };
     for (const data of [

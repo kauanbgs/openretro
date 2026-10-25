@@ -1708,3 +1708,133 @@ test("room quotas apply to signed-in hosts", () =>
       MAX_CREATES_PER_10_MIN: "2",
     },
   ));
+
+test("a host's guest link seats one named browser guest without an account, apart from friends", () =>
+  using(
+    async (f) => {
+      const a = await f.login("alice@example.test"),
+        b = await f.login("bob@example.test");
+      await pair(f, a, b);
+      const room = await hostRoom(f, a),
+        sockets = [room.host.ws];
+      const latest = (type) =>
+        room.host.messages.filter((m) => m.type === type).at(-1);
+      const guestJoin = async (guest, name, resume) => {
+        const client = await roomSocket(f, room.code);
+        sockets.push(client.ws);
+        client.send({ type: "join", room: room.code, name, guest, resume });
+        await eventually(() =>
+          client.messages.some((m) => ["accepted", "error"].includes(m.type)),
+        );
+        return client;
+      };
+      const failure = (client) =>
+        client.messages.find((m) => m.type === "error")?.message;
+      try {
+        room.host.send({ type: "guest-link" });
+        const link = await eventually(() => latest("guest-link"));
+        assert.equal(link.player, 2);
+        const url = new URL(link.url);
+        assert.equal(url.origin, "http://localhost");
+        assert.equal(url.pathname, `/party/${room.code}`);
+        const token = /^#g=([a-f0-9]{64})$/.exec(url.hash)[1];
+
+        // Friends keep joining as before, but not into the reserved seat.
+        assert.equal((await room.bind(true)).status, 200);
+        const presence = await publishParty(f, a, room);
+        sockets.push(presence.ws);
+        await eventually(
+          async () =>
+            (await list(f, b)).friends[0].presence.party?.code === room.code,
+        );
+        const friend = await pendingJoin(
+          f,
+          room,
+          (await ticketFor(f, b, a)).invite,
+        );
+        sockets.push(friend.ws);
+        assert.equal(
+          friend.messages.find((m) => m.type === "accepted").player,
+          3,
+        );
+
+        // A name alone or a wrong token is not enough.
+        const nameOnly = await pendingJoin(f, room, undefined, "Visitante");
+        sockets.push(nameOnly.ws);
+        assert.ok(refused(nameOnly));
+        assert.match(failure(await guestJoin("f".repeat(64), "X")), /expirou/);
+        assert.match(failure(await guestJoin(token, "  ")), /nome/);
+
+        const streamer = await guestJoin(token, "Streamer");
+        const accepted = streamer.messages.find((m) => m.type === "accepted");
+        assert.equal(accepted.player, 2);
+        assert.match(accepted.resume, /^[a-f0-9]{64}$/);
+        // The guest learns its seat and the media route, nothing social.
+        assert.deepEqual(
+          Object.keys(accepted).sort(),
+          ["iceServers", "player", "policy", "relay", "resume", "type"].sort(),
+        );
+        const roster = await eventually(() =>
+          room.host.messages.find(
+            (m) => m.type === "roster" && m.guests.some((g) => g.anonymous),
+          ),
+        );
+        const anonymous = roster.guests.find((g) => g.anonymous);
+        assert.deepEqual(
+          {
+            name: anonymous.name,
+            player: anonymous.player,
+            avatar: anonymous.avatar,
+          },
+          { name: "Streamer", player: 2, avatar: 0 },
+        );
+        assert.equal(
+          roster.guests.find((g) => g.name !== "Streamer").anonymous,
+          undefined,
+        );
+
+        // Single use, except for the browser that claimed it.
+        assert.match(failure(await guestJoin(token, "Viewer")), /Outra pessoa/);
+        const back = await guestJoin(token, "Streamer", accepted.resume);
+        assert.equal(
+          back.messages.find((m) => m.type === "accepted").player,
+          2,
+        );
+        await eventually(() =>
+          streamer.messages.some(
+            (m) => m.type === "ended" && /outra janela/.test(m.message),
+          ),
+        );
+
+        // Removing the guest closes the link for good.
+        const current = await eventually(() =>
+          latest("roster")?.guests.find((g) => g.anonymous),
+        );
+        room.host.send({ type: "remove", id: current.id });
+        await eventually(() => back.messages.some((m) => m.type === "ended"));
+        await eventually(() => latest("guest-link")?.url === null);
+        assert.match(
+          failure(await guestJoin(token, "Streamer", accepted.resume)),
+          /expirou/,
+        );
+
+        // A fresh link that the host closes before anyone arrives.
+        room.host.send({ type: "guest-link" });
+        const second = await eventually(
+          () => latest("guest-link")?.url && latest("guest-link"),
+        );
+        room.host.send({ type: "guest-link-close" });
+        await eventually(() => latest("guest-link")?.url === null);
+        assert.match(
+          failure(await guestJoin(new URL(second.url).hash.slice(3), "Late")),
+          /expirou/,
+        );
+      } finally {
+        for (const ws of sockets)
+          try {
+            ws.close();
+          } catch {}
+      }
+    },
+    { PARTY_TICKET_SECRET: INVITE_SECRET },
+  ));

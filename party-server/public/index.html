@@ -20,13 +20,24 @@
       <section id="lobby" class="lobby">
         <form id="join-form" class="ticket">
           <h1>Entre na partida.</h1>
-          <p>
+          <p id="lead">
             O Party é para amigos do OpenRetro.<br />Você entra com a sua conta,
             pelo painel de amigos do app.
           </p>
-          <!-- Guests join with a ticket from their account; no code or name. -->
+          <!-- Friends join with a ticket from their account; no code or name.
+               A host's guest link asks only for a name. -->
           <input id="room-code" name="room-code" type="hidden" />
-          <input id="name" name="name" type="hidden" />
+          <div id="name-field" hidden>
+            <label for="name">Seu nome na partida</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              maxlength="24"
+              autocomplete="nickname"
+              placeholder="Como o anfitrião vai te chamar"
+            />
+          </div>
           <button id="join" type="submit">Entrar no Party</button>
           <p id="status" role="status" aria-live="polite"></p>
           <small
@@ -72,6 +83,18 @@
           Conecte e pressione um botão.
         </p>
       </section>
+      <aside id="get-app" class="get-app" hidden>
+        <p>
+          <strong>Curtiu?</strong> O OpenRetro é grátis para Windows: organize
+          seus jogos e crie a sua própria Party.
+        </p>
+        <a
+          href="https://openretro.com.br"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Baixar o OpenRetro</a
+        ><button id="get-app-close" type="button">Agora não</button>
+      </aside>
     </main>
     <footer>OpenRetro Party</footer>
   </body>

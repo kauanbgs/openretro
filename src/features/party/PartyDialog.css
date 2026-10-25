@@ -258,3 +258,33 @@
 .party-friends-setting > .party-friends-error {
   color: var(--danger);
 }
+.party-link {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0 20px;
+  margin-bottom: 20px;
+}
+.party-link p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 5px 0 0;
+  color: var(--body);
+}
+.party-link .input-action input {
+  font-size: 12px;
+}
+.party-link .party-link-status {
+  margin: 0;
+}
+.party-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.party-link-create {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

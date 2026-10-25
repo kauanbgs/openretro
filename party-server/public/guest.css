@@ -336,3 +336,39 @@ video {
   font-size: 20px;
   text-transform: uppercase;
 }
+.get-app {
+  max-width: 440px;
+  margin: 24px auto 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  font-size: 12px;
+  color: var(--body);
+}
+.get-app p {
+  flex: 1 1 100%;
+  margin: 0;
+  line-height: 1.7;
+}
+.get-app strong {
+  color: var(--text);
+}
+.get-app a {
+  color: var(--accentText);
+  background: var(--muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.get-app button {
+  border: 0;
+  background: none;
+  color: var(--body);
+  font-size: 12px;
+  padding: 8px 4px;
+}

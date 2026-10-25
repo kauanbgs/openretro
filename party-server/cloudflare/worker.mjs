@@ -15,6 +15,28 @@ import { DurableObject } from "cloudflare:workers";
 
 const ROOM_MS = 3 * 60 * 60 * 1000;
 const RESERVATION_MS = 2 * 60 * 1000;
+// A guest link opens one seat to someone without an account. Unclaimed, it
+// expires; once claimed it belongs to that browser until the host closes it.
+const GUEST_LINK_MS = 30 * 60 * 1000;
+const GUEST_LINKS_PER_10_MIN = 10;
+const linkClosed =
+  "Este convite expirou ou foi fechado. Peça um novo link ao anfitrião.";
+const linkTaken =
+  "Outra pessoa já entrou por este convite. Peça um novo link ao anfitrião.";
+const guestName = (value) =>
+  typeof value === "string"
+    ? [
+        ...value
+          .replace(
+            /[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g,
+            "",
+          )
+          .trim(),
+      ]
+        .slice(0, 24)
+        .join("")
+        .trim()
+    : "";
 const CODE = /^[A-HJ-NP-Z2-9]{6}$/;
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const invalid =
@@ -120,8 +142,8 @@ export default {
             { error: "O Party ainda não está disponível. Tente mais tarde." },
             503,
           );
-        // Party is not anonymous: hosts sign in, and guests can only join
-        // with a friend ticket, which needs the ticket secret.
+        // Hosts sign in, and guests join with a friend ticket, which needs
+        // the ticket secret, or through a guest link the host made.
         if (!inviteConfigured(env))
           return reply(
             { error: "O Party ainda não está disponível. Tente mais tarde." },
@@ -370,23 +392,129 @@ export class PartyRoom extends DurableObject {
       type: "roster",
       guests: this.guests().map((ws) => {
         const a = ws.deserializeAttachment();
-        return { id: a.id, name: a.name, player: a.player, avatar: a.avatar ?? 0 };
+        return {
+          id: a.id,
+          name: a.name,
+          player: a.player,
+          avatar: a.avatar ?? 0,
+          ...(a.anonymous ? { anonymous: true } : {}),
+        };
       }),
     });
   }
-  approve(guest) {
-    const member = guest.deserializeAttachment();
-    if (member.player !== null) return false;
-    const player = [2, 3, 4].find(
+  /** The first free seat; the guest link's seat stays out of reach of friends. */
+  freeSeat(reserved = this.meta.guestLink?.player) {
+    return [2, 3, 4].find(
       (p) =>
+        p !== reserved &&
         !this.guests().some((ws) => ws.deserializeAttachment().player === p),
     );
+  }
+  approve(guest, player = this.freeSeat(), extra = {}) {
+    const member = guest.deserializeAttachment();
+    if (member.player !== null) return false;
     if (!player) return false;
     member.player = player;
     guest.serializeAttachment(member);
-    send(guest, { type: "accepted", player, ...this.meta.transport });
+    send(guest, { type: "accepted", player, ...this.meta.transport, ...extra });
     send(this.host(), { type: "peer", id: member.id, player });
     return true;
+  }
+  anonymousGuests() {
+    return this.guests().filter((ws) => ws.deserializeAttachment().anonymous);
+  }
+  async createGuestLink(host) {
+    const now = Date.now();
+    const recent = (this.meta.guestLinkLog || []).filter(
+      (at) => at > now - 600000,
+    );
+    if (recent.length >= GUEST_LINKS_PER_10_MIN) {
+      send(host, {
+        type: "error",
+        message: "Você gerou muitos links. Aguarde alguns minutos.",
+      });
+      return;
+    }
+    // A new link replaces the old one and whoever came in through it.
+    this.closeGuestLink("O anfitrião trocou o link do convite.", false);
+    const player = this.freeSeat(null);
+    if (!player) {
+      send(host, {
+        type: "error",
+        message: "Os três lugares já estão ocupados.",
+      });
+      await this.ctx.storage.put("room", this.meta);
+      return;
+    }
+    const token = random();
+    this.meta.guestLink = {
+      hash: await hash(token),
+      player,
+      expires: now + GUEST_LINK_MS,
+      resumeHash: null,
+    };
+    this.meta.guestLinkLog = [...recent, now];
+    await this.ctx.storage.put("room", this.meta);
+    send(host, {
+      type: "guest-link",
+      url: `${this.meta.origin}/party/${this.meta.code}#g=${token}`,
+      player,
+      expires: this.meta.guestLink.expires,
+    });
+  }
+  closeGuestLink(message, notify = true) {
+    for (const ws of this.anonymousGuests()) this.remove(ws, message);
+    if (!this.meta.guestLink) return;
+    this.meta.guestLink = null;
+    if (notify) send(this.host(), { type: "guest-link", url: null });
+  }
+  async anonymousGuest(ws, a, m) {
+    const refuse = (message) => {
+      send(ws, { type: "error", message });
+      ws.close(1008, "Guest link refused");
+    };
+    const link = this.meta.guestLink;
+    if (
+      !link ||
+      typeof m.guest !== "string" ||
+      !/^[a-f0-9]{64}$/.test(m.guest) ||
+      (await hash(m.guest)) !== link.hash
+    )
+      return refuse(linkClosed);
+    const name = guestName(m.name);
+    if (!name) return refuse("Digite seu nome para entrar.");
+    let resume;
+    if (link.resumeHash) {
+      // Only the browser that claimed the link can come back with it.
+      if (
+        typeof m.resume !== "string" ||
+        !/^[a-f0-9]{64}$/.test(m.resume) ||
+        (await hash(m.resume)) !== link.resumeHash
+      )
+        return refuse(linkTaken);
+      for (const old of this.anonymousGuests())
+        this.remove(old, "Você entrou de novo em outra janela.");
+    } else {
+      if (link.expires <= Date.now()) return refuse(linkClosed);
+      resume = random();
+      link.resumeHash = await hash(resume);
+    }
+    if (
+      this.guests().some(
+        (guest) => guest.deserializeAttachment().player === link.player,
+      )
+    )
+      return refuse("A sala está cheia.");
+    a.role = "guest";
+    a.name = name;
+    a.avatar = 0;
+    a.anonymous = true;
+    a.joined = Date.now();
+    ws.serializeAttachment(a);
+    await this.ctx.storage.put("room", this.meta);
+    this.approve(ws, link.player, resume ? { resume } : {});
+    this.roster();
+    await this.schedule();
   }
   async social(request) {
     return this.ctx.blockConcurrencyWhile(async () => {
@@ -615,7 +743,12 @@ export class PartyRoom extends DurableObject {
               ws.close(1008, "Room full");
               return;
             }
-            // Only friends with a valid ticket from their account join;
+            // The host's guest link: one seat, no account, no social data.
+            if (m.guest !== undefined) {
+              await this.anonymousGuest(ws, a, m);
+              return;
+            }
+            // Otherwise only friends with a valid ticket from their account join;
             // there is no anonymous entry by name.
             const automatic = await this.automaticGuest(m.invite).catch(
               () => null,
@@ -629,14 +762,7 @@ export class PartyRoom extends DurableObject {
               ws.close(1008, "Account required");
               return;
             }
-            if (
-              ![2, 3, 4].some(
-                (p) =>
-                  !this.guests().some(
-                    (guest) => guest.deserializeAttachment().player === p,
-                  ),
-              )
-            ) {
+            if (!this.freeSeat()) {
               send(ws, { type: "error", message: "A sala está cheia." });
               ws.close(1008, "Room full");
               return;
@@ -681,8 +807,24 @@ export class PartyRoom extends DurableObject {
           const guest = this.guests().find(
             (s) => s.deserializeAttachment().id === m.id,
           );
-          if (guest)
+          // Removing the link's guest also closes the link, or they could
+          // simply come back with it.
+          if (guest?.deserializeAttachment().anonymous) {
+            this.closeGuestLink("O anfitrião encerrou sua participação.");
+            await this.ctx.storage.put("room", this.meta);
+          } else if (guest)
             this.remove(guest, "O anfitrião encerrou sua participação.");
+          this.roster();
+          return;
+        }
+        if (a.role === "host" && m.type === "guest-link") {
+          await this.createGuestLink(ws);
+          this.roster();
+          return;
+        }
+        if (a.role === "host" && m.type === "guest-link-close") {
+          this.closeGuestLink("O anfitrião fechou o lugar do convite.");
+          await this.ctx.storage.put("room", this.meta);
           this.roster();
           return;
         }

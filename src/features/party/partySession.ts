@@ -6,6 +6,7 @@ import { configurePartyVideo } from "./partyQuality";
 import { socialStore } from "../../services/social";
 import { accountFailure } from "../../services/account";
 import { parsePartyRoster } from "./partyRoster";
+import { parsePartyGuestLink, type PartyGuestLink } from "./partyGuestLink";
 import { isRawPartyFrame } from "./partyFrames";
 import {
   canvasSource,
@@ -23,6 +24,7 @@ export interface PartyGuest {
   name: string;
   player: number | null;
   avatar?: number;
+  anonymous?: boolean;
 }
 export interface PartyState {
   friendsAllowed: boolean;
@@ -37,6 +39,9 @@ export interface PartyState {
   error: string;
   game: string;
   relay: boolean;
+  /** The open guest link, which holds one seat for a browser guest. */
+  guestLink: PartyGuestLink | null;
+  guestLinkBusy: boolean;
 }
 const initial: PartyState = {
   friendsAllowed: true,
@@ -51,6 +56,8 @@ const initial: PartyState = {
   error: "",
   game: "",
   relay: false,
+  guestLink: null,
+  guestLinkBusy: false,
 };
 let state = initial;
 const listeners = new Set<() => void>();
@@ -212,6 +219,20 @@ export function removeGuest(id: string) {
   dropPeer(id);
   send({ type: "remove", id });
 }
+/** Opens one seat to anyone with the link, from a browser, without an
+ * account. A new link replaces the previous one and its guest. */
+export function createGuestLink() {
+  if (state.phase !== "open") return;
+  update({ guestLinkBusy: true, error: "" });
+  send({ type: "guest-link" });
+}
+/** Closes the link's seat, and removes whoever came in through it. */
+export function closeGuestLink() {
+  if (state.phase !== "open") return;
+  for (const guest of state.guests) if (guest.anonymous) dropPeer(guest.id);
+  update({ guestLink: null, guestLinkBusy: false });
+  send({ type: "guest-link-close" });
+}
 export async function startParty() {
   endParty();
   const run = generation;
@@ -350,9 +371,14 @@ export async function startParty() {
           syncFriendsAccess();
         }
         if (m.type === "roster") update({ guests: parsePartyRoster(m.guests) });
+        if (m.type === "guest-link")
+          update({
+            guestLink: parsePartyGuestLink(m, state.url),
+            guestLinkBusy: false,
+          });
         if (m.type === "error") {
           if (state.phase === "connecting") fail(m.message);
-          else update({ error: m.message });
+          else update({ error: m.message, guestLinkBusy: false });
         }
         if (m.type === "left") dropPeer(m.id);
         if (m.type === "peer") {

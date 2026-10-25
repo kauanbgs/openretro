@@ -3,6 +3,8 @@ export interface PartyMember {
   name: string;
   player: number | null;
   avatar?: number;
+  /** Came in through the host's guest link, without an account. */
+  anonymous?: boolean;
 }
 export function parsePartyRoster(value: unknown): PartyMember[] {
   if (!Array.isArray(value) || value.length > 3)
@@ -33,6 +35,7 @@ export function parsePartyRoster(value: unknown): PartyMember[] {
       name: row.name,
       player: row.player,
       avatar: row.avatar ?? 0,
+      ...(row.anonymous === true ? { anonymous: true } : {}),
     };
   });
 }

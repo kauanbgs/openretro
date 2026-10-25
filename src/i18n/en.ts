@@ -1145,6 +1145,26 @@ export const en: Record<string, string> = {
   "Seus amigos veem o Party no painel e entram com um clique. Desligue para fechar a sala para novas entradas.":
     "Your friends see the Party in their panel and join in one click. Turn this off to close the room to new players.",
   "Sala aberta": "Room open",
+  "Convidar por link": "Invite with a link",
+  "Para quem não tem o OpenRetro: a pessoa joga pelo navegador, sem conta e sem instalar nada. O link vale para um lugar.":
+    "For people without OpenRetro: they play in their browser, with no account and nothing to install. The link is good for one seat.",
+  "Link do convite": "Invite link",
+  "Copiar link": "Copy link",
+  "Link copiado. ": "Link copied. ",
+  "O lugar J{player} é de {name}. Se a conexão cair, essa pessoa volta pelo mesmo link.":
+    "Seat P{player} belongs to {name}. If their connection drops, they come back with the same link.",
+  "Lugar J{player}. Quem abrir primeiro fica com ele, então não mostre o link na live. Vale até {time} se ninguém entrar.":
+    "Seat P{player}. Whoever opens it first gets the seat, so keep the link off your stream. It works until {time} if nobody joins.",
+  "Gerar novo link": "New link",
+  "Fechar lugar": "Close seat",
+  "Criar link de convite": "Create invite link",
+  "Lugar do link": "Link seat",
+  "Lugar livre": "Free seat",
+  Anfitrião: "Host",
+  "Conectando…": "Connecting…",
+  "Aguardando um amigo": "Waiting for a friend",
+  "Convidado pelo link · ": "Invited by link · ",
+  "Aguardando quem tem o link": "Waiting for whoever has the link",
   "Até três amigos podem entrar": "Up to three friends can join",
   "Crie uma sala para seus amigos.": "Create a room for your friends.",
   "Ela aparece no painel de amigos, e cada um ganha um lugar na partida ao entrar.":
