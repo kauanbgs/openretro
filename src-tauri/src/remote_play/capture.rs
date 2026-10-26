@@ -3,7 +3,8 @@
 //! whose runtime shares no frames; the runtime's shared frames take over as
 //! soon as they arrive. The runtime draws with OpenGL into a child of
 //! OpenRetro's window, which window capture leaves out, so this captures the
-//! monitor and crops the game's area (or OpenRetro's window) on the GPU.
+//! monitor and crops the game's area (or OpenRetro's window) on the GPU. It
+//! sends nothing while another app is in front, which the crop would show.
 use std::{
     ffi::c_void,
     sync::{
@@ -59,8 +60,19 @@ extern "system" {
     fn IsIconic(window: *mut c_void) -> i32;
     fn MonitorFromWindow(window: *mut c_void, flags: u32) -> *mut c_void;
     fn GetMonitorInfoW(monitor: *mut c_void, info: *mut MonitorInfo) -> i32;
+    fn GetForegroundWindow() -> *mut c_void;
+    fn GetWindowThreadProcessId(window: *mut c_void, pid: *mut u32) -> u32;
 }
 const MONITOR_DEFAULTTONEAREST: u32 = 2;
+
+/// Whether OpenRetro or the game is the window in front. The monitor shows
+/// whatever covers OpenRetro's area, so with another app in front a frame
+/// would send the PC's desktop and other apps to guests and phones.
+fn in_front(runtime: Option<u32>) -> bool {
+    let mut pid = 0;
+    unsafe { GetWindowThreadProcessId(GetForegroundWindow(), &mut pid) };
+    pid != 0 && (pid == std::process::id() || Some(pid) == runtime)
+}
 
 /// A window's client area in screen pixels, or None while minimized.
 fn client_on_screen(window: isize) -> Option<Rect> {
@@ -179,6 +191,9 @@ impl GraphicsCaptureApiHandler for Handler {
             })
             || super::frames::now_ms().saturating_sub(shared) < 500
         {
+            return Ok(());
+        }
+        if !in_front(crate::in_game::runtime_pid(&self.target.app)) {
             return Ok(());
         }
         let shown = crate::in_game::embedded_window(&self.target.app).unwrap_or(self.target.main);
