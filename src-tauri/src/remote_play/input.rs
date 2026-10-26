@@ -60,6 +60,8 @@ pub struct Relay {
     state: PadState,
     synced: Instant,
     base_port: u16,
+    /// A real pad message arrived for this player: a PS3 game sees its pad.
+    plugged: bool,
 }
 
 impl Relay {
@@ -70,6 +72,7 @@ impl Relay {
             state: PadState::default(),
             synced: Instant::now() - Duration::from_secs(1),
             base_port: REMOTE_PAD_BASE_PORT,
+            plugged: false,
         })
     }
 
@@ -81,7 +84,17 @@ impl Relay {
         }
     }
 
+    /// A pad's state, as the phone reported it.
     pub fn update(&mut self, state: PadState) {
+        self.apply(state);
+        #[cfg(windows)]
+        if self.has_pads() {
+            super::xinput::set(self.player, Some(state));
+            self.plugged = true;
+        }
+    }
+
+    fn apply(&mut self, state: PadState) {
         if state != PadState::default() && self.synced.elapsed() >= Duration::from_millis(100) {
             // UDP has no acknowledgement. Repeating only diffs permanently
             // loses a held press if it was sent before the runtime listened.
@@ -90,8 +103,6 @@ impl Relay {
         } else {
             self.send(changes(self.state, state));
         }
-        #[cfg(windows)]
-        super::xinput::set(self.player, Some(state));
         self.state = state;
     }
 
@@ -100,14 +111,33 @@ impl Relay {
         let player = player.clamp(1, 4);
         if player != self.player {
             self.release();
-            #[cfg(windows)]
-            super::xinput::set(self.player, None);
+            self.unplug();
             self.player = player;
         }
     }
 
+    /// Lets go of every button; a pad that was never touched stays unplugged,
+    /// so the PC's own controller keeps player 1.
     pub fn release(&mut self) {
-        self.update(PadState::default());
+        self.apply(PadState::default());
+        #[cfg(windows)]
+        if self.plugged {
+            super::xinput::set(self.player, Some(PadState::default()));
+        }
+    }
+
+    /// Only the real runtime's relay owns PS3 pads; tests aim at their own port.
+    #[cfg(windows)]
+    fn has_pads(&self) -> bool {
+        self.base_port == REMOTE_PAD_BASE_PORT
+    }
+
+    fn unplug(&mut self) {
+        #[cfg(windows)]
+        if self.plugged {
+            super::xinput::set(self.player, None);
+            self.plugged = false;
+        }
     }
 }
 
@@ -135,8 +165,7 @@ fn snapshot(state: PadState) -> Vec<[u8; 20]> {
 impl Drop for Relay {
     fn drop(&mut self) {
         self.release();
-        #[cfg(windows)]
-        super::xinput::set(self.player, None);
+        self.unplug();
     }
 }
 

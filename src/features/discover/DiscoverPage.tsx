@@ -1,11 +1,25 @@
 import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   useInfiniteQuery,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Download, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import {
+  ArrowUpDown,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Gamepad2,
+  Handshake,
+  LoaderCircle,
+  PartyPopper,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Users,
+} from "lucide-react";
 import {
   metadataProvider,
   catalogStatus,
@@ -109,6 +123,8 @@ export function DiscoverPage({
   );
   const selectedGenre = taxonomy.data?.genres.find((g) => g.id === genre)?.name;
   const selectedPlayers = playersFilters.find((p) => p.id === players)?.name;
+  const activeFilters =
+    Number(platform !== "all") + Number(genre !== null) + Number(players !== null);
   const availableDownloads = useDownloadAvailability(games);
   async function retry() {
     try {
@@ -253,90 +269,182 @@ export function DiscoverPage({
             </p>
           </div>
           <aside className="catalogue-filters" aria-label={t("Filtros")}>
+            <div className="filters-head">
+              <SlidersHorizontal size={15} />
+              <strong>{t("Filtros")}</strong>
+              {activeFilters > 0 && <em>{activeFilters}</em>}
+              {activeFilters > 0 && (
+                <button
+                  type="button"
+                  className="filter-clear"
+                  onClick={() => {
+                    setGenre(null);
+                    setPlayers(null);
+                    setPlatform("all");
+                  }}
+                >
+                  {t("Limpar tudo")}
+                </button>
+              )}
+            </div>
             <section>
               <h3>{t("Ordenar por")}</h3>
-              <select
-                aria-label={t("Ordenar jogos")}
-                disabled={Boolean(debounced)}
-                value={sort}
-                onChange={(e) =>
-                  setSort(e.target.value as NonNullable<CatalogRequest["sort"]>)
-                }
-              >
-                <option value="popular">
-                  {debounced ? t("Relevância") : t("Mais avaliados")}
-                </option>
-                <option value="rating">{t("Melhor avaliados")}</option>
-                <option value="title">{t("Título")}</option>
-                <option value="newest">{t("Mais recentes")}</option>
-                <option value="oldest">{t("Mais antigos")}</option>
-              </select>
+              <div className="filter-select">
+                <ArrowUpDown size={14} />
+                <select
+                  aria-label={t("Ordenar jogos")}
+                  disabled={Boolean(debounced)}
+                  value={sort}
+                  onChange={(e) =>
+                    setSort(
+                      e.target.value as NonNullable<CatalogRequest["sort"]>,
+                    )
+                  }
+                >
+                  <option value="popular">
+                    {debounced ? t("Relevância") : t("Mais avaliados")}
+                  </option>
+                  <option value="rating">{t("Melhor avaliados")}</option>
+                  <option value="title">{t("Título")}</option>
+                  <option value="newest">{t("Mais recentes")}</option>
+                  <option value="oldest">{t("Mais antigos")}</option>
+                </select>
+              </div>
             </section>
-            <section>
-              <h3>{t("Consoles")}</h3>
-              <ul className="filter-list">
-                {[{ id: "all", name: t("Todos os consoles") }, ...consoles].map(
-                  (p) => (
-                    <li key={p.id}>
-                      <label>
-                        <input
-                          type="radio"
-                          name="catalogue-console"
-                          checked={platform === p.id}
-                          onChange={() => setPlatform(p.id)}
-                        />
-                        {p.name}
-                      </label>
-                    </li>
-                  ),
-                )}
-              </ul>
-            </section>
-            <section>
-              <h3>{t("Jogadores")}</h3>
-              <ul className="filter-list">
-                {[
-                  { id: null, name: t("Qualquer número") },
-                  ...playersFilters,
-                ].map((p) => (
-                  <li key={p.id ?? "all"}>
-                    <label>
-                      <input
-                        type="radio"
-                        name="catalogue-players"
-                        checked={players === p.id}
-                        onChange={() => setPlayers(p.id)}
-                      />
-                      {p.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>{t("Gêneros")}</h3>
-              <ul className="filter-list">
-                {[
-                  { id: null, name: t("Todos os gêneros") },
-                  ...(taxonomy.data?.genres ?? []),
-                ].map((g) => (
-                  <li key={g.id ?? "all"}>
-                    <label>
-                      <input
-                        type="radio"
-                        name="catalogue-genre"
-                        checked={genre === g.id}
-                        onChange={() => setGenre(g.id)}
-                      />
-                      {g.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <FilterGroup
+              title={t("Consoles")}
+              name="catalogue-console"
+              options={[
+                {
+                  id: "all",
+                  name: t("Todos os consoles"),
+                  icon: <Gamepad2 size={13} />,
+                },
+                ...consoles.map((p) => ({ ...p, badge: p.shortName })),
+              ]}
+              value={platform}
+              onChange={setPlatform}
+              limit={8}
+            />
+            <FilterGroup
+              title={t("Jogadores")}
+              name="catalogue-players"
+              options={[
+                { id: null, name: t("Qualquer número") },
+                ...playersFilters.map((p) => ({
+                  ...p,
+                  icon: playerIcons[p.id],
+                })),
+              ]}
+              value={players}
+              onChange={setPlayers}
+              chips
+            />
+            <FilterGroup
+              title={t("Gêneros")}
+              name="catalogue-genre"
+              options={[
+                { id: null, name: t("Todos os gêneros") },
+                ...(taxonomy.data?.genres ?? []),
+              ]}
+              value={genre}
+              onChange={setGenre}
+              limit={11}
+              chips
+            />
           </aside>
         </div>
       )}
     </div>
+  );
+}
+
+const playerIcons: Record<PlayersFilter, ReactNode> = {
+  multi: <Users size={13} />,
+  coop: <Handshake size={13} />,
+  party: <PartyPopper size={13} />,
+};
+interface FilterOption<T> {
+  id: T;
+  name: string;
+  badge?: string;
+  icon?: ReactNode;
+}
+interface FilterGroupProps<T> {
+  title: string;
+  name: string;
+  /** The first option is the "any" choice the Clear button returns to. */
+  options: FilterOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  limit?: number;
+  chips?: boolean;
+}
+function FilterGroup<T extends string | number | null>({
+  title,
+  name,
+  options,
+  value,
+  onChange,
+  limit,
+  chips,
+}: FilterGroupProps<T>) {
+  const [expanded, setExpanded] = useState(false);
+  const all = options[0]?.id;
+  const collapsible = limit !== undefined && options.length > limit + 1;
+  let shown = options;
+  if (collapsible && !expanded) {
+    shown = options.slice(0, limit);
+    // Keep the active choice visible even when it sits past the cut.
+    const active = options.find((o) => o.id === value);
+    if (active && !shown.includes(active)) shown = [...shown, active];
+  }
+  return (
+    <section className="filter-group">
+      <header>
+        <h3>{title}</h3>
+        {value !== all && (
+          <button
+            type="button"
+            className="filter-clear"
+            onClick={() => onChange(all as T)}
+          >
+            {t("Limpar")}
+          </button>
+        )}
+      </header>
+      <ul className={chips ? "filter-list chips" : "filter-list"}>
+        {shown.map((o) => (
+          <li key={o.id ?? "all"}>
+            <label>
+              <input
+                type="radio"
+                name={name}
+                checked={value === o.id}
+                onChange={() => onChange(o.id)}
+              />
+              {!chips && (
+                <i className="filter-badge">{o.badge ?? o.icon}</i>
+              )}
+              {chips && o.icon}
+              <span>{o.name}</span>
+              {!chips && value === o.id && <Check size={14} />}
+            </label>
+          </li>
+        ))}
+      </ul>
+      {collapsible && (
+        <button
+          type="button"
+          className="filter-more"
+          onClick={() => setExpanded((e) => !e)}
+        >
+          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          {expanded
+            ? t("Mostrar menos")
+            : t("Mostrar todos ({count})", { count: options.length - 1 })}
+        </button>
+      )}
+    </section>
   );
 }

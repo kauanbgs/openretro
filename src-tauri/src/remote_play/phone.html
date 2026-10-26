@@ -543,6 +543,8 @@
     // When the game closes, return to OpenRetro's interface.
     if (game && !message.game) return void location.assign("/");
     game = message.game; library = message.library || [];
+    // PS3 has no OpenRetro save states.
+    document.querySelectorAll('[data-action="save"], [data-action="load"]').forEach((b) => { b.hidden = message.states === false; });
     gameId = message.gameId || null;
     taken = message.taken || [];
     renderWho();

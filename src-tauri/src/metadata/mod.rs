@@ -757,6 +757,48 @@ pub async fn catalog_genres(app: tauri::AppHandle) -> Result<Vec<Value>> {
     .map_err(error)?
 }
 
+/// Title suggestions while typing: titles that start with the text first, then
+/// titles with a word that starts with it, the most rated first.
+fn suggest(conn: &Connection, query: &str) -> Result<Vec<Value>> {
+    let query = normalize(query);
+    if query.is_empty() || query.chars().count() > 120 {
+        return Ok(vec![]);
+    }
+    let sql = format!(
+        "SELECT g.id, g.platform, g.name, g.year, {} FROM games g JOIN \
+           (SELECT id, MIN(CASE WHEN norm=?1 THEN 0 WHEN norm LIKE ?2 THEN 1 ELSE 2 END) AS rank \
+            FROM names WHERE norm LIKE ?2 OR norm LIKE ?3 GROUP BY id) n ON n.id=g.id \
+         WHERE IFNULL(g.release_type,'') NOT IN {HIDDEN_RELEASES} \
+         ORDER BY n.rank, g.rating_count DESC LIMIT 8",
+        cover_sql()
+    );
+    let mut stmt = conn.prepare(&sql).map_err(error)?;
+    let rows = stmt
+        .query_map(
+            params![query, format!("{query}%"), format!("% {query}%")],
+            |r| {
+                let id: i64 = r.get(0)?;
+                let cover: Option<String> = r.get(4)?;
+                Ok(json!({
+                    "id": format!("lb-{id}"),
+                    "platformId": r.get::<_, String>(1)?,
+                    "title": r.get::<_, String>(2)?,
+                    "year": r.get::<_, Option<i64>>(3)?,
+                    "coverUrl": cover.map(|f| format!("{IMAGE_BASE}{f}")),
+                }))
+            },
+        )
+        .map_err(error)?;
+    rows.collect::<std::result::Result<_, _>>().map_err(error)
+}
+
+#[tauri::command]
+pub async fn catalog_suggest(app: tauri::AppHandle, query: String) -> Result<Vec<Value>> {
+    tauri::async_runtime::spawn_blocking(move || with_index(&app, |conn| suggest(conn, &query)))
+        .await
+        .map_err(error)?
+}
+
 #[tauri::command]
 pub async fn catalog_browse(
     app: tauri::AppHandle,
@@ -776,6 +818,7 @@ pub async fn catalog_browse(
         }
         let mut conditions = vec![format!("IFNULL(g.release_type,'') NOT IN {HIDDEN_RELEASES}")];
         let mut values: Vec<rusqlite::types::Value> = vec![];
+        let mut from = String::from("games g");
         if let Some(platform) = &platform {
             conditions.push("g.platform=?".into());
             values.push(platform.clone().into());
@@ -808,19 +851,23 @@ pub async fn catalog_browse(
             if query.chars().count() > 120 {
                 return Err("A busca deve ter no máximo 120 caracteres.".into());
             }
-            conditions.push("g.id IN (SELECT id FROM names WHERE norm LIKE ?)".into());
-            values.push(format!("%{query}%").into());
             // Exact titles first, then titles starting with the search, then the rest.
-            values.push(query.clone().into());
-            values.push(format!("{query}%").into());
-            "(SELECT MIN(CASE WHEN n.norm=? THEN 0 WHEN n.norm LIKE ? THEN 1 ELSE 2 END) FROM names n WHERE n.id=g.id), \
-             g.rating_count DESC"
-                .to_string()
+            // Ranked in one pass over names: names has no id index, so a
+            // per-game subquery rescanned the whole table for every match.
+            from.push_str(
+                " JOIN (SELECT id, MIN(CASE WHEN norm=? THEN 0 WHEN norm LIKE ? THEN 1 ELSE 2 END) AS rank \
+                 FROM names WHERE norm LIKE ? GROUP BY id) m ON m.id=g.id",
+            );
+            values.splice(
+                0..0,
+                [query.clone(), format!("{query}%"), format!("%{query}%")].map(Into::into),
+            );
+            "m.rank, g.rating_count DESC".to_string()
         };
         values.push((PAGE_SIZE + 1).into());
         values.push(((page - 1) * PAGE_SIZE).into());
         let sql = format!(
-            "SELECT {GAME_COLUMNS}, {}, {} FROM games g WHERE {} ORDER BY {order} LIMIT ? OFFSET ?",
+            "SELECT {GAME_COLUMNS}, {}, {} FROM {from} WHERE {} ORDER BY {order} LIMIT ? OFFSET ?",
             cover_sql(),
             background_sql(),
             conditions.join(" AND ")
@@ -1176,6 +1223,37 @@ mod tests {
             "Indexed {games} games; matched Super Metroid and {}",
             nfs["title"]
         );
+    }
+
+    #[test]
+    fn suggests_title_prefixes_before_word_prefixes() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(INDEX_SCHEMA).unwrap();
+        for (id, name, count) in [
+            (1, "Sonic the Hedgehog", 50),
+            (2, "Super Sonic Racing", 900),
+            (3, "Sonic Spinball", 10),
+            (4, "Sonic Hack", 999),
+        ] {
+            conn.execute(
+                "INSERT INTO games(id, platform, name, rating_count, release_type) VALUES (?1, 'genesis', ?2, ?3, ?4)",
+                params![id, name, count, (id == 4).then_some("ROM Hack")],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO names(id, platform, norm, canonical) VALUES (?1, 'genesis', ?2, 1)",
+                params![id, normalize(name)],
+            )
+            .unwrap();
+        }
+        let titles: Vec<String> = suggest(&conn, "Sonic")
+            .unwrap()
+            .iter()
+            .map(|g| g["title"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(titles, ["Sonic the Hedgehog", "Sonic Spinball", "Super Sonic Racing"]);
+        assert!(suggest(&conn, "  ").unwrap().is_empty());
+        assert!(suggest(&conn, "onic").unwrap().is_empty());
     }
 
     #[test]

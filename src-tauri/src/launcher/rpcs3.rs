@@ -616,15 +616,24 @@ fn handler(kind: i32) -> Option<(&'static str, &'static str)> {
     }
 }
 
+/// Whether a phone can play as player 1: the PC has no controller, or the
+/// first one is XInput (see `input_config`).
+pub fn phones_take_first(controllers: &[(i32, String)], phones: bool) -> bool {
+    phones && controllers.first().map_or(true, |(kind, _)| handler(*kind).is_some())
+}
+
 /// One player per connected controller, the keyboard when there is none.
 /// RPCS3 fills in each handler's default buttons; Cross is explicit so the
-/// first native confirmation dialog has a known binding. For a Party, only
-/// the first controller plays on the PC: players 2 to 4 are the guests,
-/// XInput pads 2 to 4 of OpenRetro's shim (`remote_play::xinput`).
-pub fn input_config(controllers: &[(i32, String)], party: bool) -> String {
+/// first native confirmation dialog has a known binding. With remote players
+/// (a Party or phone play), only the first controller plays on the PC:
+/// players 2 to 4 are XInput pads 2 to 4 of OpenRetro's shim
+/// (`remote_play::xinput`). With phones and no controller, player 1 is an
+/// XInput pad too, which a phone takes over; a PC controller that is not
+/// XInput keeps J1 and phones play from J2.
+pub fn input_config(controllers: &[(i32, String)], remote: bool, phones: bool) -> String {
     let mut config = String::new();
     let mut counts = std::collections::HashMap::<&str, usize>::new();
-    let local = if party { 1 } else { 4 };
+    let local = if remote { 1 } else { 4 };
     for (player, (kind, name)) in controllers.iter().take(local).enumerate() {
         let (handler, device) = match handler(*kind) {
             Some((handler, prefix)) => {
@@ -646,9 +655,13 @@ pub fn input_config(controllers: &[(i32, String)], party: bool) -> String {
         ));
     }
     if config.is_empty() {
-        config.push_str("Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n");
+        config.push_str(if phones_take_first(controllers, phones) {
+            "Player 1 Input:\n  Handler: XInput\n  Device: \"XInput Pad #1\"\n  Config:\n    Cross: A\n"
+        } else {
+            "Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n"
+        });
     }
-    if party {
+    if remote {
         for player in 2..=4 {
             config.push_str(&format!(
                 "Player {player} Input:\n  Handler: XInput\n  Device: \"XInput Pad #{player}\"\n  Config:\n    Cross: A\n"
@@ -728,10 +741,10 @@ fn set_ini(text: &str, section: &str, key: &str, value: &str) -> String {
 }
 
 /// RPCS3 loads xinput1_3.dll from its own folder first. OpenRetro's copy is
-/// there only for a Party; other games use Windows' XInput untouched.
-fn install_party_pads(directory: &Path, party: bool) -> Result<()> {
+/// there only with remote players; other games use Windows' XInput untouched.
+fn install_party_pads(directory: &Path, remote: bool) -> Result<()> {
     let path = directory.join("xinput1_3.dll");
-    if !party {
+    if !remote {
         return match std::fs::remove_file(&path) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(error(e)),
             _ => Ok(()),
@@ -751,20 +764,22 @@ pub fn launch_args(
     directory: &Path,
     sdl_library: Option<&Path>,
     game: &Path,
-    party: bool,
+    remote: bool,
+    phones: bool,
 ) -> Result<Vec<String>> {
     let controllers = sdl_library
         .and_then(crate::in_game::sdl::Sdl::load)
         .map(|sdl| sdl.controller_types())
         .unwrap_or_default();
+    crate::remote_play::xinput::set_pc_first(remote && !phones_take_first(&controllers, phones));
     let inputs = directory.join("config/input_configs/global");
     std::fs::create_dir_all(&inputs).map_err(error)?;
     std::fs::write(
         inputs.join(format!("{INPUT_CONFIG}.yml")),
-        input_config(&controllers, party),
+        input_config(&controllers, remote, phones),
     )
     .map_err(error)?;
-    install_party_pads(directory, party)?;
+    install_party_pads(directory, remote)?;
     let config_path = directory.join("config/config.yml");
     let config = std::fs::read_to_string(&config_path).unwrap_or_default();
     std::fs::write(&config_path, embedded_config(&config)).map_err(error)?;
@@ -909,6 +924,7 @@ mod tests {
                 (5, "Nintendo Switch Pro Controller".into()),
             ],
             false,
+            false,
         );
         assert_eq!(
             config,
@@ -918,7 +934,7 @@ mod tests {
              Player 4 Input:\n  Handler: SDL\n  Device: \"Nintendo Switch Pro Controller 1\"\n  Config:\n    Cross: South\n"
         );
         assert_eq!(
-            input_config(&[], false),
+            input_config(&[], false, false),
             "Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n"
         );
     }
@@ -931,17 +947,28 @@ mod tests {
         assert_eq!(
             input_config(
                 &[(4, "PS4 Controller".into()), (1, "Xbox 360 Controller".into())],
-                true
+                true,
+                false
             ),
             format!("Player 1 Input:\n  Handler: SDL\n  Device: \"PS4 Controller 1\"\n  Config:\n    Cross: South\n{guests}")
         );
         assert_eq!(
-            input_config(&[(1, "Xbox 360 Controller".into())], true),
+            input_config(&[(1, "Xbox 360 Controller".into())], true, false),
             format!("Player 1 Input:\n  Handler: XInput\n  Device: \"XInput Pad #1\"\n  Config:\n    Cross: A\n{guests}")
         );
         assert_eq!(
-            input_config(&[], true),
+            input_config(&[], true, false),
             format!("Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n{guests}")
+        );
+        // Phone play without a controller: a phone can be player 1.
+        assert_eq!(
+            input_config(&[], true, true),
+            format!("Player 1 Input:
+  Handler: XInput
+  Device: \"XInput Pad #1\"
+  Config:
+    Cross: A
+{guests}")
         );
     }
 

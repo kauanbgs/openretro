@@ -393,8 +393,27 @@ pub fn remote_action(app: &tauri::AppHandle, action: &str) -> Result<()> {
     let service = app.state::<InGameService>();
     let mut guard = service.0.lock().map_err(error)?;
     let session = guard.as_mut().ok_or("Nenhum jogo em execução.")?;
+    // RPCS3 takes no commands: quitting closes its window, and OpenRetro
+    // stops the process once it has had time to save.
+    if session.stdin.is_none() && session.info.hosted {
+        #[cfg(windows)]
+        if action == "quit" && session.embedded_window.is_some_and(host::close) {
+            return Ok(());
+        }
+        return Err("Este console não tem estados salvos pelo OpenRetro.".into());
+    }
     let command = command_for(action, session.info.slot)?;
     write_command(session, command)
+}
+
+/// Whether save, load and reset reach the running game. RPCS3 has none.
+pub fn states_available(app: &tauri::AppHandle) -> bool {
+    app.state::<InGameService>()
+        .0
+        .lock()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|session| session.stdin.is_some()))
+        .unwrap_or(true)
 }
 
 #[tauri::command]

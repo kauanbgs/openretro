@@ -97,6 +97,14 @@ pub fn remote_play_network_settings(app: tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// Whether phone play is serving, so a PS3 game seats phones at launch.
+pub fn running(app: &tauri::AppHandle) -> bool {
+    app.state::<RemotePlay>()
+        .0
+        .lock()
+        .is_ok_and(|running| running.is_some())
+}
+
 #[tauri::command]
 pub fn remote_play_status(app: tauri::AppHandle) -> Result<RemotePlayStatus> {
     let state = app.state::<RemotePlay>();

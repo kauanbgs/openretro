@@ -1,8 +1,9 @@
 //! OpenRetro's xinput1_3.dll for RPCS3, which loads it from its own folder
 //! before Windows' copy. Every call goes to the system's XInput, except while
-//! OpenRetro hosts a Party: then pads 2 to 4 are the guests' controllers,
-//! which OpenRetro writes into the shared memory named by
-//! `OPENRETRO_PARTY_PADS`. Pad 1 stays the PC's own controller.
+//! OpenRetro hosts a Party or phone play: then pads 2 to 4 are the remote
+//! players' controllers, which OpenRetro writes into the shared memory named
+//! by `OPENRETRO_PARTY_PADS`. Pad 1 is the PC's own controller, unless a
+//! phone is playing as player 1; it gets the pad while it is connected.
 #![allow(non_snake_case)]
 use std::{
     ffi::c_void,
@@ -13,7 +14,7 @@ use std::{
 };
 
 const MAGIC: u32 = 0x3150_524f;
-const SIZE: usize = 64;
+const SIZE: usize = 128;
 const GUESTS: u32 = 3;
 const ERROR_SUCCESS: u32 = 0;
 const ERROR_DEVICE_NOT_CONNECTED: u32 = 1167;
@@ -62,6 +63,68 @@ extern "system" {
         low: u32,
         size: usize,
     ) -> *mut c_void;
+}
+
+static MODULE: AtomicU64 = AtomicU64::new(0);
+static NOTED: AtomicU64 = AtomicU64::new(0);
+
+/// Appends a line to openretro-xinput.log next to this DLL.
+fn note(line: &str) {
+    let mut name = [0u16; 520];
+    let module = MODULE.load(Ordering::Relaxed) as *mut c_void;
+    let length =
+        unsafe { GetModuleFileNameW(module, name.as_mut_ptr(), name.len() as u32) } as usize;
+    if length == 0 || length >= name.len() {
+        return;
+    }
+    let path = String::from_utf16_lossy(&name[..length]);
+    let log = std::path::Path::new(&path).with_file_name("openretro-xinput.log");
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .and_then(|mut file| {
+            std::io::Write::write_all(
+                &mut file,
+                format!(
+                    "{line}
+"
+                )
+                .as_bytes(),
+            )
+        });
+}
+
+/// Says once per pad and outcome what the game asked of it.
+fn noted(index: u32, what: &str) {
+    let bit = (index.min(7) * 2 + u32::from(what == "remote")) as u64;
+    if NOTED.fetch_or(1 << bit, Ordering::Relaxed) & (1 << bit) == 0 {
+        note(&format!("pad {index}: {what}"));
+    }
+}
+
+#[link(name = "kernel32")]
+extern "system" {
+    fn GetModuleFileNameW(module: *mut c_void, name: *mut u16, size: u32) -> u32;
+}
+
+/// Leaves a line next to this DLL each time a process loads it, so a Party
+/// that does not reach the game can be told from one RPCS3 never loaded.
+#[no_mangle]
+pub unsafe extern "system" fn DllMain(module: *mut c_void, reason: u32, _: *mut c_void) -> i32 {
+    if reason == 1 {
+        MODULE.store(module as u64, Ordering::Relaxed);
+        note(&format!(
+            "loaded by {}, pads {}",
+            std::env::current_exe().map_or_else(|_| "?".into(), |e| e.display().to_string()),
+            if std::env::var_os("OPENRETRO_PARTY_PADS").is_some() {
+                "remote"
+            } else {
+                "none"
+            },
+        ));
+    }
+    1
 }
 
 type GetState = unsafe extern "system" fn(u32, *mut State) -> u32;
@@ -158,10 +221,16 @@ fn guests() -> Option<&'static Guests> {
         .as_ref()
 }
 
-/// A guest's pad: buttons, triggers and left stick, then the right stick,
+/// A remote pad: buttons, triggers and left stick, then the right stick,
 /// a write sequence (odd while OpenRetro writes) and whether it is connected.
-fn guest(view: &Guests, slot: u32) -> Option<State> {
-    let words = unsafe { view.0.add(1 + slot as usize * 2) };
+/// Pads 2 to 4 are words 1 to 6; pad 1 follows them.
+fn guest(view: &Guests, index: u32) -> Option<State> {
+    let first = if index == 0 {
+        7
+    } else {
+        1 + (index as usize - 1) * 2
+    };
+    let words = unsafe { view.0.add(first) };
     for _ in 0..8 {
         let (state, extra) = unsafe { (&*words, &*words.add(1)) };
         let before = extra.load(Ordering::Acquire);
@@ -190,20 +259,36 @@ fn guest(view: &Guests, slot: u32) -> Option<State> {
     None
 }
 
-/// Which guest slot a pad index is during a Party: pads 2 to 4.
+/// The remote pads' memory when this pad index is theirs: pads 2 to 4 always
+/// are, pad 1 only while a phone holds it.
 fn slot(index: u32) -> Option<&'static Guests> {
-    guests().filter(|_| (1..=GUESTS).contains(&index))
+    guests()
+        .filter(|view| (1..=GUESTS).contains(&index) || (index == 0 && guest(view, 0).is_some()))
 }
 
 unsafe fn read(index: u32, state: *mut State, call: Option<GetState>) -> u32 {
     if let Some(view) = slot(index) {
-        return match guest(view, index - 1) {
+        return match guest(view, index) {
             Some(guest) if !state.is_null() => {
+                noted(index, "remote");
                 state.write(guest);
                 ERROR_SUCCESS
             }
-            _ => ERROR_DEVICE_NOT_CONNECTED,
+            _ => {
+                noted(index, "remote, nobody connected");
+                ERROR_DEVICE_NOT_CONNECTED
+            }
         };
+    }
+    if index < 4 {
+        noted(
+            index,
+            if guests().is_some() {
+                "the PC's"
+            } else {
+                "the PC's, no remote pads"
+            },
+        );
     }
     match call {
         Some(call) => call(index, state),
@@ -225,7 +310,7 @@ pub unsafe extern "system" fn XInputGetStateEx(index: u32, state: *mut State) ->
 pub unsafe extern "system" fn XInputSetState(index: u32, vibration: *mut c_void) -> u32 {
     if let Some(view) = slot(index) {
         // Guests' rumble stays on their own device, if any.
-        return if guest(view, index - 1).is_some() {
+        return if guest(view, index).is_some() {
             ERROR_SUCCESS
         } else {
             ERROR_DEVICE_NOT_CONNECTED
@@ -244,7 +329,7 @@ pub unsafe extern "system" fn XInputGetCapabilities(
     capabilities: *mut Capabilities,
 ) -> u32 {
     if let Some(view) = slot(index) {
-        if guest(view, index - 1).is_none() || capabilities.is_null() {
+        if guest(view, index).is_none() || capabilities.is_null() {
             return ERROR_DEVICE_NOT_CONNECTED;
         }
         capabilities.write(Capabilities {
@@ -299,7 +384,7 @@ pub unsafe extern "system" fn XInputGetBatteryInformation(
     battery: *mut Battery,
 ) -> u32 {
     if let Some(view) = slot(index) {
-        if guest(view, index - 1).is_none() || battery.is_null() {
+        if guest(view, index).is_none() || battery.is_null() {
             return ERROR_DEVICE_NOT_CONNECTED;
         }
         // BATTERY_TYPE_WIRED, BATTERY_LEVEL_FULL: nothing to warn about.

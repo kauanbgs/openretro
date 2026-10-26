@@ -103,6 +103,7 @@ pub fn run() {
             metadata::catalog_refresh,
             metadata::catalog_genres,
             metadata::catalog_browse,
+            metadata::catalog_suggest,
             metadata::catalog_game,
             metadata::catalog_match,
             metadata::catalog_players,

@@ -27,6 +27,8 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { PageLoading } from "./components/PageLoading";
+import { SearchSuggestions } from "./components/SearchSuggestions";
+import { metadataProvider } from "./providers/metadata/LaunchboxMetadataProvider";
 import {
   activeTransferStates,
   downloadPollInterval,
@@ -196,6 +198,7 @@ export function App() {
   const { data: emulators = [] } = useEmulators();
   const refresh = useRefresh();
   const libraryRef = useRef(library);
+  const searchInput = useRef<HTMLInputElement>(null);
   libraryRef.current = library;
   const notify = useCallback((s: string) => setToast(s), []);
   useEffect(() => startSocialClient(notify), [notify]);
@@ -604,36 +607,60 @@ export function App() {
                 <Search size={20} />
               </button>
             )}
-            <label
-              className={`header-search ${isRemote && !searchOpen ? "collapsed" : ""}`}
-            >
-              <Search size={16} />
-              <input
-                id="global-search"
-                autoFocus={isRemote && searchOpen}
-                aria-label={t("Buscar jogos")}
-                placeholder={
-                  page === "Library"
-                    ? t("Buscar na biblioteca")
-                    : t("Buscar jogos")
-                }
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  if (page !== "Library") setPage("Discover");
+            <div className="header-search-wrap">
+              <label
+                className={`header-search ${isRemote && !searchOpen ? "collapsed" : ""}`}
+              >
+                <Search size={16} />
+                <input
+                  id="global-search"
+                  ref={searchInput}
+                  autoComplete="off"
+                  autoFocus={isRemote && searchOpen}
+                  aria-label={t("Buscar jogos")}
+                  placeholder={
+                    page === "Library"
+                      ? t("Buscar na biblioteca")
+                      : t("Buscar jogos")
+                  }
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    if (page !== "Library") setPage("Discover");
+                    setSelected(undefined);
+                  }}
+                />
+                {query && (
+                  <button
+                    className="icon-button"
+                    aria-label={t("Limpar busca")}
+                    onClick={() => setQuery("")}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </label>
+              <SearchSuggestions
+                input={searchInput}
+                query={query}
+                enabled={page !== "Library"}
+                onPick={(suggestion) => {
+                  searchInput.current?.blur();
+                  metadataProvider
+                    .getGame(suggestion.id)
+                    .then((game) => {
+                      setProfileId(undefined);
+                      setSelected(game);
+                    })
+                    .catch((e) => notify(String(e)));
+                }}
+                onSeeAll={() => {
+                  searchInput.current?.blur();
                   setSelected(undefined);
+                  setPage("Discover");
                 }}
               />
-              {query && (
-                <button
-                  className="icon-button"
-                  aria-label={t("Limpar busca")}
-                  onClick={() => setQuery("")}
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </label>
+            </div>
             {isRemote && searchOpen && (
               <button
                 className="text-button"

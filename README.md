@@ -48,14 +48,18 @@ multi-core CPU and a Vulkan GPU, and compatibility varies per game (see
 <https://rpcs3.net/compatibility>). Save states and online play are not
 available for PS3.
 
-Party works with PS3 games. Their picture is captured from the OpenRetro
+Party and phone play work with PS3 games. Their picture is captured from the OpenRetro
 window and their sound from the RPCS3 process alone (Windows 10 version 2004
 or later). RPCS3 has no remote gamepad, so for a Party OpenRetro writes its own
 `xinput1_3.dll` (`src-tauri/xinput-shim`) next to `rpcs3.exe`: RPCS3 loads it
 before Windows' copy, and it shows guests J2–J4 as XInput pads 2–4 while
 passing pad 1 through to Windows. RPCS3 reads its controllers only at boot, so
-guests play when the room is already open as the PS3 game starts; then only
-the PC's first controller plays locally. Without a Party the DLL is removed.
+guests and phones play when the room or phone play is already open as the PS3
+game starts; then only the PC's first controller plays locally. A phone can
+play as J1 when the PC has no controller (or an Xbox one); with another kind of
+controller on the PC, phones play from J2. Phones have no save or load for PS3,
+and "Sair do jogo" closes RPCS3's window. Without remote players the DLL is
+removed.
 
 The managed emulator exits when the game ends. On Windows it also belongs to
 an OpenRetro-owned process job, so closing or crashing the launcher does not

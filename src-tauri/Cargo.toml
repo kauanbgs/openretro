@@ -1,6 +1,6 @@
 [package]
 name = "openretro"
-version = "0.8.0"
+version = "0.9.0"
 description = "An open home for your classic games"
 authors = ["OpenRetro contributors"]
 edition = "2021"
@@ -99,6 +99,10 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.sevenz-rust2]
+opt-level = 3
+
+# The catalog search runs on bundled SQLite; unoptimized it is several times slower.
+[profile.dev.package.libsqlite3-sys]
 opt-level = 3
 
 # Keep worker-thread AppHandle clones from touching Tao's non-atomic Rc counts.

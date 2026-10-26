@@ -291,6 +291,16 @@ pub fn focus(window: isize) -> bool {
     true
 }
 
+/// Asks the game window to close, as its close button would.
+pub fn close(window: isize) -> bool {
+    #[link(name = "user32")]
+    extern "system" {
+        fn PostMessageW(window: *mut c_void, message: u32, wparam: usize, lparam: isize) -> i32;
+    }
+    const WM_CLOSE: u32 = 0x0010;
+    is_open(window) && unsafe { PostMessageW(window as *mut c_void, WM_CLOSE, 0, 0) } != 0
+}
+
 pub fn is_open(window: isize) -> bool {
     window != 0 && unsafe { IsWindow(window as *mut c_void) } != 0
 }

@@ -650,7 +650,7 @@ fn status(app: &tauri::AppHandle) -> Value {
         && session
             .as_ref()
             .is_some_and(|session| session.remote_available());
-    json!({ "type": "status", "game": game, "gameId": game_id, "layout": layout, "library": library, "partyAvailable": party_available })
+    json!({ "type": "status", "game": game, "gameId": game_id, "layout": layout, "library": library, "partyAvailable": party_available, "states": crate::in_game::states_available(app) })
 }
 
 fn current_layout(app: &tauri::AppHandle) -> Layout {
@@ -841,6 +841,7 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool, media:
     };
     let mut last_status = Value::Null;
     let mut last_pad = std::time::Instant::now();
+    let mut last_locked = None::<std::time::Instant>;
     let mut tick = tokio::time::interval(std::time::Duration::from_millis(1000));
     loop {
         let outgoing = tokio::select! {
@@ -860,7 +861,17 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool, media:
                     if let Some(relay) = relay.as_mut() { relay.release(); }
                 }
                 let mut now = status(&shared.app);
-                now["taken"] = json!(shared.taken_by_others(connection));
+                #[cfg_attr(not(windows), allow(unused_mut))]
+                let mut taken = shared.taken_by_others(connection);
+                // A PS3 game's player 1 can belong to the PC's own controller.
+                #[cfg(windows)]
+                for player in super::xinput::locked() {
+                    if !taken.contains(&player) {
+                        taken.push(player);
+                    }
+                }
+                taken.sort_unstable();
+                now["taken"] = json!(taken);
                 active_layout = serde_json::from_value(now["layout"].clone()).unwrap_or_default();
                 if !party {
                     phone.select(&shared, choice.view(active_layout));
@@ -881,6 +892,19 @@ async fn session(shared: Arc<Shared>, mut socket: WebSocket, party: bool, media:
                         }
                         if matches!(message, Incoming::Pad { .. }) { last_pad = std::time::Instant::now(); }
                         let layout_changed = matches!(message, Incoming::Layout { .. });
+                        // A PS3 game's player 1 can belong to the PC's own
+                        // controller; say so instead of pressing nothing.
+                        #[cfg(windows)]
+                        if let Incoming::Pad { player, .. } = message {
+                            if super::xinput::locked().contains(&player) {
+                                if last_locked.is_none_or(|at| at.elapsed() > std::time::Duration::from_secs(4)) {
+                                    last_locked = Some(std::time::Instant::now());
+                                    let text = json!({"type":"error","message":"O J1 deste jogo é o controle do PC. Escolha o J2."}).to_string();
+                                    if socket.send(Message::Text(text.into())).await.is_err() { break; }
+                                }
+                                continue;
+                            }
+                        }
                         if let Incoming::Pad { player, .. } = message {
                             if let Ok(mut players) = shared.players.lock() {
                                 players.insert(connection, player.clamp(1, 4));

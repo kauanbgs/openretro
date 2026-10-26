@@ -29,6 +29,20 @@ export async function catalogStatus(): Promise<CatalogStatus> {
 export async function catalogRefresh() {
   if (desktop()) await invoke("catalog_refresh");
 }
+export interface CatalogSuggestion {
+  id: string;
+  platformId: string;
+  title: string;
+  year: number | null;
+  coverUrl: string | null;
+}
+/** Up to eight titles for the search box, best matches first. */
+export async function catalogSuggest(
+  query: string,
+): Promise<CatalogSuggestion[]> {
+  if (!desktop() || query.trim().length < 2) return [];
+  return invoke("catalog_suggest", { query });
+}
 export function isCatalogGame(game: GameMetadata) {
   return (
     game.metadataProvider === "launchbox" || game.metadataProvider === "igdb"

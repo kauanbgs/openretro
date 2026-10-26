@@ -61,7 +61,7 @@ export function SourceManager() {
     setEditing(source);
     setUrl(source?.url ?? "");
     setText("");
-    setMode(source?.url ? "url" : "json");
+    setMode(source && !source.url ? "json" : "url");
     setError("");
   }
   async function syncAll() {
