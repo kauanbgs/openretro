@@ -217,6 +217,14 @@ export class SocialHub extends DurableObject {
       await this.broadcast(id);
       return new Response(null, { status: 204 });
     }
+    if (path === "/message") {
+      // A conversation changed; the app fetches it with its own session.
+      if (!/^[a-f0-9-]{36}$/.test(body.peer))
+        return new Response(null, { status: 400 });
+      for (const { ws } of await this.live())
+        send(ws, { type: "message", peer: body.peer });
+      return new Response(null, { status: 204 });
+    }
     if (path === "/deliver") {
       // Recheck on receipt: a block/removal committed while fanout was in flight wins.
       const db = primary(this.env);

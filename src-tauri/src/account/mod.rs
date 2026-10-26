@@ -1,4 +1,5 @@
 //! Optional accounts. Bearer tokens are held by Rust and the OS vault only.
+pub mod messages;
 pub mod people;
 mod history;
 pub mod social;

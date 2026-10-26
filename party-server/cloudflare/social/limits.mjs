@@ -10,6 +10,7 @@ export async function quota(
   max,
   now,
   duration = QUOTA_MS,
+  message = "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.",
 ) {
   const key = await hmac(
     pepper,
@@ -29,10 +30,22 @@ export async function quota(
   if (row.count > max)
     throw new AccountError(
       429,
-      "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.",
+      message,
       Math.max(1, Math.ceil((row.expires_at - now) / 1000)),
     );
 }
+// Per-account quotas, exported with the account and removed when it is deleted.
+export const USER_QUOTA_SCOPES = [
+  "friend-actions",
+  "friend-requests-day",
+  "party-host",
+  "party-invites",
+  "people-read",
+  "history-write",
+  "messages-burst",
+  "messages-hour",
+  "messages-read",
+];
 export const emailQuotaKey = (pepper, email) =>
   hmac(pepper, JSON.stringify(["auth-quota", "start-email", email]));
 export async function cleanupSocial(db, now = Date.now()) {

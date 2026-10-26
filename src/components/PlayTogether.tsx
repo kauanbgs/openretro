@@ -7,6 +7,7 @@ import { t } from "../i18n";
 import "./PlayTogether.css";
 import { socialStore, sortFriends } from "../services/social";
 import { AccountAvatar } from "../features/social/accountAvatars";
+import { messagesStore, unreadTotal } from "../services/messages";
 
 export function usePlayTogether() {
   const party = useSyncExternalStore(partyStore.subscribe, partyStore.snapshot);
@@ -22,7 +23,12 @@ export function usePlayTogether() {
     refetchIntervalInBackground: false,
   });
   const devices = phone.data?.devices ?? 0;
+  const messages = useSyncExternalStore(
+    messagesStore.subscribe,
+    messagesStore.snapshot,
+  );
   return {
+    unreadMessages: unreadTotal(messages.conversations),
     party,
     account: social.session.user,
     friends: sortFriends(social.friends).filter(
@@ -114,11 +120,16 @@ export function PlayTogether({
                 : t("{count} amigos online", { count: state.friends.length })}
             </strong>
             <small>
-              {state.friends.filter((f) => f.presence?.party?.joinable).length
-                ? t("Tem Party aberto. Entre para jogar junto!")
-                : state.friends.some((f) => f.presence?.playing)
-                  ? t("Veja o que seus amigos estão jogando")
-                  : t("Encontre sua próxima companhia de jogo")}
+              {state.unreadMessages
+                ? t("{count} mensagens não lidas", {
+                    count: state.unreadMessages,
+                  })
+                : state.friends.filter((f) => f.presence?.party?.joinable)
+                      .length
+                  ? t("Tem Party aberto. Entre para jogar junto!")
+                  : state.friends.some((f) => f.presence?.playing)
+                    ? t("Veja o que seus amigos estão jogando")
+                    : t("Encontre sua próxima companhia de jogo")}
             </small>
           </span>
           <b>{t("Ver amigos")}</b>

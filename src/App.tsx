@@ -50,6 +50,8 @@ import { partyOwnsInput } from "./features/party/partyInput";
 import type { Friend } from "./services/social";
 import { AccountAvatar } from "./features/social/accountAvatars";
 import { socialStore, startSocialClient } from "./services/social";
+import { startMessages } from "./services/messages";
+import { ChatUnreadBadge } from "./features/social/Messages";
 import { useEmulators, useLibrary, useRefresh } from "./hooks/useLibrary";
 import { bridge, isDesktop, isRemote } from "./services/bridge";
 import { invoke, isTauri } from "./services/transport";
@@ -202,6 +204,7 @@ export function App() {
   libraryRef.current = library;
   const notify = useCallback((s: string) => setToast(s), []);
   useEffect(() => startSocialClient(notify), [notify]);
+  useEffect(() => startMessages(notify), [notify]);
   const { data: settings = defaultSettings, isSuccess: settingsLoaded } =
     useQuery({
       queryKey: ["settings"],
@@ -416,6 +419,7 @@ export function App() {
               <b className="sidebar-profile-badge">{social.incoming.length}</b>
             )}
             <SocialUnreadBadge />
+            <ChatUnreadBadge />
             <span>
               <strong>{account?.displayName ?? t("Sem conta")}</strong>
               <small>

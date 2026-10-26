@@ -6,6 +6,7 @@ import { partyRoute } from "./invites.mjs";
 import { FRIEND_CODE } from "./friend-code.mjs";
 import { peopleRoute } from "./people.mjs";
 import { historyRoute } from "./history.mjs";
+import { messagesRoute } from "./messages.mjs";
 
 export const friendView = (row) => ({
   id: row.id,
@@ -42,6 +43,11 @@ export async function friendsRoute(request, env, url) {
     url.pathname.startsWith("/api/friends/people/")
   )
     return peopleRoute(request, env, url, { db, user, now });
+  if (
+    url.pathname === "/api/friends/messages" ||
+    url.pathname.startsWith("/api/friends/messages/")
+  )
+    return messagesRoute(request, env, url, { db, user, now });
   if (url.pathname.startsWith("/api/friends/party/"))
     return partyRoute(request, env, url, { db, user, session, now });
   if (url.pathname === "/social") {
@@ -249,6 +255,19 @@ export async function friendsRoute(request, env, url) {
             "INSERT OR IGNORE INTO blocks SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM users WHERE id=?)",
           )
           .bind(user.id, id, now, id),
+      );
+      // Blocking erases the conversation for both sides.
+      statements.push(
+        db
+          .prepare(
+            "DELETE FROM direct_messages WHERE (sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)",
+          )
+          .bind(user.id, id, id, user.id),
+        db
+          .prepare(
+            "DELETE FROM message_reads WHERE (user_id=? AND peer_id=?) OR (user_id=? AND peer_id=?)",
+          )
+          .bind(user.id, id, id, user.id),
       );
     }
     await db.batch(statements);

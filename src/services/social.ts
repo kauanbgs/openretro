@@ -243,10 +243,17 @@ async function syncAccount() {
       update({ loading: false, error: accountFailure(cause).message });
   }
 }
+interface SocialEventPayload {
+  type: string;
+  id?: string;
+  presence?: Presence;
+  /** A conversation with this player changed. */
+  peer?: string;
+}
 export function startSocialClient(onNotify: (message: string) => void) {
   if (!isTauri || isRemote || enabled) return () => {};
   enabled = true;
-  const unlisten = listen<{ type: string; id?: string; presence?: Presence }>(
+  const unlisten = listen<SocialEventPayload>(
     "social-event",
     ({ payload: event }) => {
       if (!enabled) return;
@@ -265,6 +272,10 @@ export function startSocialClient(onNotify: (message: string) => void) {
         });
       } else if (event.type === "expired") void syncAccount();
       else if (event.type === "changed") void refreshFriends(true);
+      else if (event.type === "message" && event.peer)
+        window.dispatchEvent(
+          new CustomEvent("openretro-message", { detail: event.peer }),
+        );
       else if (event.type === "presence" && event.id && event.presence) {
         const old = state.friends.find((friend) => friend.id === event.id);
         if (old && presenceReady)

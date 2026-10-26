@@ -1852,3 +1852,176 @@ test("a host's guest link seats one named browser guest without an account, apar
     },
     { PARTY_TICKET_SECRET: INVITE_SECRET },
   ));
+
+const say = (f, who, peer, body, clientId = crypto.randomUUID()) =>
+  f.call(`/api/friends/messages/${peer}`, { body, clientId }, { token: who.token });
+const inbox = async (f, who) =>
+  (await f.call("/api/friends/messages", undefined, { token: who.token })).json();
+const thread = (f, who, peer, query = "") =>
+  f.call(`/api/friends/messages/${peer}${query}`, undefined, { token: who.token });
+const markRead = (f, who, peer, lastId) =>
+  f.call(`/api/friends/messages/${peer}/read`, { lastId }, { token: who.token });
+test("direct messages reach only the two friends, in near real time, with unread counts", () =>
+  using(async (f) => {
+    const a = await f.login("alice@example.test"),
+      b = await f.login("bob@example.test"),
+      c = await f.login("carol@example.test");
+    assert.equal((await f.call("/api/friends/messages")).status, 401);
+    assert.equal((await say(f, a, b.user.id, "Oi")).status, 403);
+    await pair(f, a, b);
+    const sb = await socialSocket(f, b),
+      sa = await socialSocket(f, a),
+      sc = await socialSocket(f, c);
+    try {
+      const sent = await say(f, a, b.user.id, "  Bora jogar\r\n\n\n\nMario Kart?  ");
+      assert.equal(sent.status, 201);
+      const message = await sent.json();
+      assert.deepEqual(Object.keys(message).sort(), ["body", "createdAt", "id", "senderId"]);
+      assert.equal(message.body, "Bora jogar\n\nMario Kart?");
+      // Sockets carry only which conversation changed, never the text.
+      const nudge = await eventually(() => sb.messages.find((m) => m.type === "message"));
+      assert.deepEqual(nudge, { type: "message", peer: a.user.id });
+      await eventually(() => sa.messages.find((m) => m.type === "message" && m.peer === b.user.id));
+      assert.equal(sc.messages.some((m) => m.type === "message"), false);
+      let rows = (await inbox(f, b)).conversations;
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].peer.id, a.user.id);
+      assert.equal(rows[0].unread, 1);
+      assert.equal(rows[0].canSend, true);
+      assert.equal(rows[0].last.body, message.body);
+      assert.ok(!JSON.stringify(rows).includes("@example.test"));
+      assert.equal((await inbox(f, a)).conversations[0].unread, 0);
+      // A stranger sees neither the conversation nor its messages.
+      assert.deepEqual((await inbox(f, c)).conversations, []);
+      const stranger = await (await thread(f, c, a.user.id)).json();
+      assert.deepEqual(stranger.messages, []);
+      assert.equal(stranger.canSend, false);
+      assert.equal((await say(f, c, a.user.id, "Oi")).status, 403);
+      const read = await (await thread(f, b, a.user.id)).json();
+      assert.equal(read.messages.length, 1);
+      assert.equal(read.peer.id, a.user.id);
+      sa.messages.length = 0;
+      // Marking past the newest message cannot pre-read future ones.
+      assert.equal((await markRead(f, b, a.user.id, message.id + 1000)).status, 204);
+      await eventually(() => sb.messages.filter((m) => m.type === "message").length > 1);
+      rows = (await inbox(f, b)).conversations;
+      assert.equal(rows[0].unread, 0);
+      await say(f, a, b.user.id, "Ainda aí?");
+      assert.equal((await inbox(f, b)).conversations[0].unread, 1);
+      assert.equal((await markRead(f, c, a.user.id, 1)).status, 204);
+      for (const bad of [0, -1, "1", 1.5])
+        assert.equal((await markRead(f, b, a.user.id, bad)).status, 400);
+      assert.equal(
+        (await f.call(`/api/friends/messages/${a.user.id}/read`, undefined, { token: b.token })).status,
+        405,
+      );
+    } finally {
+      for (const s of [sa, sb, sc]) s.ws.close();
+    }
+  }));
+test("direct messages validate text, deduplicate retries, page history and limit their rate", () =>
+  using(async (f) => {
+    const a = await f.login("alice@example.test"),
+      b = await f.login("bob@example.test");
+    await pair(f, a, b);
+    for (const body of ["", "   ", "x".repeat(401), "a‮b", "a\u0000b", "a\n".repeat(13), 12, null])
+      assert.equal((await say(f, a, b.user.id, body)).status, 400, JSON.stringify(body));
+    assert.equal((await say(f, a, b.user.id, "😀".repeat(400))).status, 201);
+    assert.equal((await say(f, a, b.user.id, "Oi", "not-a-uuid")).status, 400);
+    assert.equal(
+      (
+        await f.call(
+          `/api/friends/messages/${b.user.id}`,
+          { body: "Oi", clientId: crypto.randomUUID(), to: "x" },
+          { token: a.token },
+        )
+      ).status,
+      400,
+    );
+    assert.equal((await say(f, a, a.user.id, "Eu")).status, 400);
+    assert.equal((await thread(f, a, "not-a-user")).status, 400);
+    assert.equal((await thread(f, a, b.user.id, "?before=abc")).status, 400);
+    assert.equal((await thread(f, a, b.user.id, "?after=1")).status, 400);
+    const id = crypto.randomUUID();
+    const first = await (await say(f, a, b.user.id, "Uma vez", id)).json();
+    const retry = await say(f, a, b.user.id, "Uma vez", id);
+    assert.equal(retry.status, 200);
+    assert.equal((await retry.json()).id, first.id);
+    assert.equal((await say(f, a, b.user.id, "Outra", id)).status, 409);
+    // The burst limit allows eight sends per ten seconds.
+    const burst = await Promise.all(
+      Array.from({ length: 8 }, (_, i) => say(f, b, a.user.id, `m${i}`)),
+    );
+    assert.deepEqual([...new Set(burst.map((r) => r.status))], [201]);
+    const limited = await say(f, b, a.user.id, "demais");
+    assert.equal(limited.status, 429);
+    assert.match((await limited.json()).error, /rápido demais/);
+    const now = Date.now();
+    await f.db.batch(
+      Array.from({ length: 520 }, (_, i) =>
+        f.db
+          .prepare(
+            "INSERT INTO direct_messages (sender_id,receiver_id,client_id,body,created_at) VALUES (?,?,?,?,?)",
+          )
+          .bind(a.user.id, b.user.id, crypto.randomUUID(), `h${i}`, now),
+      ),
+    );
+    const page = await (await thread(f, b, a.user.id)).json();
+    assert.equal(page.messages.length, 50);
+    assert.equal(page.more, true);
+    assert.equal(page.messages.at(-1).body, "h519");
+    assert.ok(page.messages[0].id < page.messages.at(-1).id);
+    const older = await (
+      await thread(f, b, a.user.id, `?before=${page.messages[0].id}`)
+    ).json();
+    assert.equal(older.messages.length, 50);
+    assert.equal(older.messages.at(-1).id < page.messages[0].id, true);
+    // Each conversation keeps only its newest 500 messages.
+    await f.db.prepare("DELETE FROM auth_rate_limits").run();
+    assert.equal((await say(f, a, b.user.id, "fim")).status, 201);
+    const kept = await f.db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM direct_messages WHERE (sender_id=?1 AND receiver_id=?2) OR (sender_id=?2 AND receiver_id=?1)",
+      )
+      .bind(a.user.id, b.user.id)
+      .first();
+    assert.equal(kept.n, 500);
+  }));
+test("removing a friend keeps history read-only; blocking and deletion erase the conversation", () =>
+  using(async (f) => {
+    const a = await f.login("alice@example.test"),
+      b = await f.login("bob@example.test");
+    await pair(f, a, b);
+    await say(f, a, b.user.id, "Oi");
+    await say(f, b, a.user.id, "Olá");
+    const exported = await (
+      await f.call("/api/account/export", undefined, { token: a.token })
+    ).json();
+    assert.equal(exported.directMessages.length, 2);
+    // Two friend quotas (request, daily request) and two message quotas.
+    assert.equal(exported.friendQuota.length, 4);
+    await action(f, a, "remove", b.user.id);
+    const old = await (await thread(f, b, a.user.id)).json();
+    assert.equal(old.messages.length, 2);
+    assert.equal(old.canSend, false);
+    assert.equal((await inbox(f, b)).conversations[0].canSend, false);
+    assert.equal((await say(f, b, a.user.id, "Volta")).status, 403);
+    await pair(f, a, b);
+    await action(f, b, "block", a.user.id);
+    assert.equal((await thread(f, a, b.user.id)).status, 404);
+    assert.deepEqual((await inbox(f, a)).conversations, []);
+    assert.equal(
+      (await f.db.prepare("SELECT COUNT(*) AS n FROM direct_messages").first()).n,
+      0,
+    );
+    await action(f, b, "unblock", a.user.id);
+    await pair(f, a, b);
+    await say(f, a, b.user.id, "De novo");
+    await markRead(f, b, a.user.id, 1e9);
+    await f.call("/api/account", undefined, { token: a.token, method: "DELETE" });
+    for (const table of ["direct_messages", "message_reads"])
+      assert.equal(
+        (await f.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n,
+        0,
+      );
+  }));

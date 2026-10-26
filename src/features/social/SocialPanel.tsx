@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   Ellipsis,
+  MessageCircle,
   Search,
   Settings,
   UserPlus,
@@ -30,6 +31,8 @@ import { SocialActivity } from "./SocialActivity";
 import { socialActivityStore } from "../../services/socialActivity";
 import { UserProfile } from "./UserProfile";
 import { PeopleDirectory } from "./PeopleDirectory";
+import { Messages } from "./Messages";
+import { messagesStore, unreadTotal } from "../../services/messages";
 
 type Kind = "friend" | "incoming" | "outgoing" | "blocked";
 
@@ -55,7 +58,7 @@ export function SocialPanel({
   layout?: "popover" | "page";
   onClose?: () => void;
   onJoinParty: (friend: Friend) => void;
-  initialView?: "friends" | "activity" | "people";
+  initialView?: "friends" | "activity" | "people" | "messages";
   onProfile?: (id: string) => void;
 }) {
   const state = useSyncExternalStore(
@@ -66,9 +69,15 @@ export function SocialPanel({
   const openProfile = onProfile ?? setProfileId;
   const user = state.session.user;
   const [view, setView] = useState<
-    "friends" | "account" | "activity" | "people"
+    "friends" | "account" | "activity" | "people" | "messages"
   >(initialView);
   useEffect(() => setView(initialView), [initialView]);
+  const [chatPeer, setChatPeer] = useState<string>();
+  const messages = useSyncExternalStore(
+    messagesStore.subscribe,
+    messagesStore.snapshot,
+  );
+  const unreadMessages = unreadTotal(messages.conversations);
   const activity = useSyncExternalStore(
     socialActivityStore.subscribe,
     socialActivityStore.snapshot,
@@ -137,6 +146,16 @@ export function SocialPanel({
             {t("Amigos")}
           </button>
           <button
+            aria-pressed={view === "messages"}
+            onClick={() => {
+              setView("messages");
+              setChatPeer(undefined);
+            }}
+          >
+            {t("Conversas")}
+            {unreadMessages > 0 && <b>{unreadMessages}</b>}
+          </button>
+          <button
             aria-pressed={view === "activity"}
             onClick={() => setView("activity")}
           >
@@ -174,12 +193,22 @@ export function SocialPanel({
           <SocialActivity />
         ) : view === "people" ? (
           <PeopleDirectory onProfile={openProfile} />
+        ) : view === "messages" ? (
+          <Messages
+            peer={chatPeer}
+            onPeer={setChatPeer}
+            onProfile={openProfile}
+          />
         ) : (
           <Friends
             notify={notify}
             onProfile={openProfile}
             onAccount={() => setView("account")}
             onJoinParty={onJoinParty}
+            onMessage={(id) => {
+              setChatPeer(id);
+              setView("messages");
+            }}
           />
         )}
       </div>
@@ -192,11 +221,13 @@ function Friends({
   onProfile,
   onAccount,
   onJoinParty,
+  onMessage,
 }: {
   notify: (message: string) => void;
   onProfile: (id: string) => void;
   onAccount: () => void;
   onJoinParty: (friend: Friend) => void;
+  onMessage: (id: string) => void;
 }) {
   const state = useSyncExternalStore(
     socialStore.subscribe,
@@ -388,6 +419,16 @@ function Friends({
               onClick={() => void join(friend)}
             >
               {t("Entrar")}
+            </button>
+          )}
+          {kind === "friend" && (
+            <button
+              className="icon-button"
+              aria-label={t("Conversar com {name}", { name })}
+              title={t("Conversar com {name}", { name })}
+              onClick={() => onMessage(friend.id)}
+            >
+              <MessageCircle size={17} />
             </button>
           )}
           {kind === "incoming" && (

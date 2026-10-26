@@ -170,6 +170,16 @@ Users never enter server addresses or keys. The operator configures TURN once
 with `npm run turn:configure --prefix party-server`.
 See [Party setup and validation](docs/PARTY.md).
 
+## Chat
+
+Friends can send each other direct messages from the **Conversas** tab of the
+friends panel, or from the chat button beside a friend. Only friends can write,
+and only the two people in a conversation can read it. New messages arrive over
+the same connection that carries presence, with an unread count on the account
+button. Messages have up to 400 characters, each conversation keeps its newest
+500, and the server limits how fast an account can send. Removing a friend
+leaves the conversation read-only; blocking deletes it for both.
+
 ## Play on your phone
 
 **Celular → Ativar** in the header shows a QR code. A phone on the same Wi-Fi

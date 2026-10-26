@@ -14,7 +14,7 @@ import {
   readJson,
   unavailable,
 } from "./http.mjs";
-import { emailQuotaKey, quota } from "./limits.mjs";
+import { USER_QUOTA_SCOPES, emailQuotaKey, quota } from "./limits.mjs";
 import { sendLoginEmail } from "./email.mjs";
 import { notifyUsers } from "./friends.mjs";
 import {
@@ -319,16 +319,9 @@ async function exportAccount(db, user, now, pepper) {
     ],
     [
       "friendQuota",
-      "SELECT count, expires_at FROM auth_rate_limits WHERE key IN (?,?,?,?,?,?)",
+      `SELECT count, expires_at FROM auth_rate_limits WHERE key IN (${USER_QUOTA_SCOPES.map(() => "?").join(",")})`,
       await Promise.all(
-        [
-          "friend-actions",
-          "friend-requests-day",
-          "party-host",
-          "party-invites",
-          "people-read",
-          "history-write",
-        ].map((scope) =>
+        USER_QUOTA_SCOPES.map((scope) =>
           hmac(pepper, JSON.stringify(["auth-quota", scope, user.id])),
         ),
       ),
@@ -351,6 +344,16 @@ async function exportAccount(db, user, now, pepper) {
     [
       "blocks",
       "SELECT user_id, blocked_id, created_at FROM blocks WHERE user_id = ?",
+      [user.id],
+    ],
+    [
+      "directMessages",
+      "SELECT id, sender_id, receiver_id, body, created_at FROM direct_messages WHERE sender_id = ? OR receiver_id = ? ORDER BY id",
+      [user.id, user.id],
+    ],
+    [
+      "messageReads",
+      "SELECT peer_id, last_read_id FROM message_reads WHERE user_id = ?",
       [user.id],
     ],
   ];
@@ -544,14 +547,7 @@ export async function accountRoute(request, env, url) {
     .bind(user.id)
     .all();
   const quotaKeys = await Promise.all(
-    [
-      "friend-actions",
-      "friend-requests-day",
-      "party-host",
-      "party-invites",
-      "people-read",
-      "history-write",
-    ].map((scope) =>
+    USER_QUOTA_SCOPES.map((scope) =>
       hmac(env.AUTH_PEPPER, JSON.stringify(["auth-quota", scope, user.id])),
     ),
   );
@@ -564,7 +560,9 @@ export async function accountRoute(request, env, url) {
       .bind(await emailQuotaKey(env.AUTH_PEPPER, user.email)),
     db.prepare("DELETE FROM users WHERE id = ?").bind(user.id),
     db
-      .prepare("DELETE FROM auth_rate_limits WHERE key IN (?,?,?,?,?,?)")
+      .prepare(
+        `DELETE FROM auth_rate_limits WHERE key IN (${quotaKeys.map(() => "?").join(",")})`,
+      )
       .bind(...quotaKeys),
   ]);
   await notifyUsers(env, [

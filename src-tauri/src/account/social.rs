@@ -476,6 +476,9 @@ async fn run(app: tauri::AppHandle, mut wanted: watch::Receiver<Value>) {
                                                     if uuid::Uuid::parse_str(id).is_ok() && presence.valid(){emit(&app,json!({"type":"presence","id":id,"presence":presence}));}
                                                 }
                                             }
+                                            Some("message")=>{
+                                                if let Some(peer)=value["peer"].as_str().filter(|id|uuid::Uuid::parse_str(id).is_ok()) {emit(&app,json!({"type":"message","peer":peer}));}
+                                            }
                                             Some("changed")=>{
                                                 let reason=value["reason"].as_str().filter(|v|["request","accepted","changed"].contains(v)).unwrap_or("changed");
                                                 emit(&app,json!({"type":"changed","reason":reason}));

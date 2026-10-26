@@ -1967,4 +1967,40 @@ export const en: Record<string, string> = {
     "Social features are not available yet.",
   "Você atingiu o limite de 200 bloqueios.":
     "You have reached the limit of 200 blocked players.",
+  // Direct messages
+  "Escreva uma mensagem.": "Write a message.",
+  "A mensagem pode ter até {max} caracteres.":
+    "A message can have up to {max} characters.",
+  "A mensagem pode ter até 400 caracteres.":
+    "A message can have up to 400 characters.",
+  "Mensagem inválida.": "Invalid message.",
+  "Nova mensagem de {name}": "New message from {name}",
+  Conversas: "Chats",
+  Você: "You",
+  "{count} mensagens não lidas": "{count} unread messages",
+  "Começar conversa": "Start a chat",
+  "Nenhuma conversa ainda": "No chats yet",
+  "Adicione amigos pelo código para conversar com eles por aqui.":
+    "Add friends by their code to chat with them here.",
+  Conversa: "Chat",
+  "Voltar às conversas": "Back to chats",
+  "Mensagens com {name}": "Messages with {name}",
+  "Carregar mensagens anteriores": "Load earlier messages",
+  "Diga oi para {name}!": "Say hi to {name}!",
+  "Não enviada. Tentar de novo": "Not sent. Try again",
+  "Enviando…": "Sending…",
+  "Mensagem para {name}": "Message to {name}",
+  "Escreva uma mensagem": "Write a message",
+  "Enviar mensagem": "Send message",
+  "Vocês não são mais amigos. A conversa fica disponível só para leitura.":
+    "You are no longer friends. This chat is now read-only.",
+  "Conversar com {name}": "Chat with {name}",
+  "Você está enviando mensagens rápido demais. Aguarde um pouco.":
+    "You are sending messages too quickly. Wait a moment.",
+  "Vocês precisam ser amigos para trocar mensagens.":
+    "You need to be friends to send messages.",
+  "Esta mensagem já foi enviada.": "This message was already sent.",
+  "Consulta de mensagens inválida.": "Invalid message request.",
+  "Esta conversa não está disponível.": "This chat is not available.",
+  "Dados de leitura inválidos.": "Invalid read receipt.",
 };
