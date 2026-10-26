@@ -1,4 +1,5 @@
 mod account;
+mod achievements;
 mod commands;
 mod database;
 mod discord;
@@ -74,6 +75,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            achievements::achievements_account,
+            achievements::achievements_sign_in,
+            achievements::achievements_sign_out,
+            achievements::game_achievements,
             account::account_session,
             account::account_start,
             account::account_verify,

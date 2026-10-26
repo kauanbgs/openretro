@@ -37,6 +37,12 @@ export const en: Record<string, string> = {
   "Sincronizando…": "Syncing…",
   "Fontes sincronizadas.": "Sources synced.",
   "Remover todas": "Remove all",
+  "Fontes ativas": "Active sources",
+  "Downloads disponíveis": "Available downloads",
+  downloads: "downloads",
+  "Copiar URL": "Copy URL",
+  "URL copiada.": "URL copied.",
+  "Não foi possível copiar a URL.": "Could not copy the URL.",
   "Nenhuma fonte adicionada. Adicione a URL de uma fonte para encontrar downloads dos jogos.":
     "No sources yet. Add a source URL to find game downloads.",
   "Desativar fonte": "Disable source",
@@ -2003,4 +2009,79 @@ export const en: Record<string, string> = {
   "Consulta de mensagens inválida.": "Invalid message request.",
   "Esta conversa não está disponível.": "This chat is not available.",
   "Dados de leitura inválidos.": "Invalid read receipt.",
+  Conquistas: "Achievements",
+  "Sua conta do RetroAchievements e o modo hardcore.":
+    "Your RetroAchievements account and hardcore mode.",
+  RetroAchievements: "RetroAchievements",
+  "Como jogar": "How you play",
+  "Modo hardcore": "Hardcore mode",
+  "Conquistas contam no ranking principal do RetroAchievements, mas não dá para carregar estados salvos nem continuar de onde parou. Salvar estados continua funcionando. Partidas online jogam sempre em softcore.":
+    "Achievements count toward RetroAchievements' main ranking, but you cannot load save states or resume where you left off. Saving states still works. Online sessions always play in softcore.",
+  "Onde aparecem": "Where they show up",
+  "Durante o jogo, cada conquista aparece num aviso na tela. Depois, a página do jogo mostra todas, com o seu progresso. Jogos de PS3 não têm conquistas.":
+    "While you play, each achievement shows up in an on-screen notice. Afterwards, the game page lists them all with your progress. PS3 games have no achievements.",
+  "Conectado ao RetroAchievements como {name}.":
+    "Signed in to RetroAchievements as {name}.",
+  "Verificando sua conta…": "Checking your account…",
+  "{hardcore} pontos hardcore · {softcore} softcore":
+    "{hardcore} hardcore points · {softcore} softcore",
+  "Ver perfil": "View profile",
+  "Entre com sua conta do RetroAchievements para ganhar conquistas nos clássicos. A senha só é usada para entrar: o OpenRetro guarda apenas a sessão, no Gerenciador de Credenciais do Windows.":
+    "Sign in with your RetroAchievements account to earn achievements in the classics. Your password is only used to sign in: OpenRetro keeps just the session, in Windows Credential Manager.",
+  Usuário: "Username",
+  Senha: "Password",
+  "Entrando…": "Signing in…",
+  "Ainda não tem conta?": "No account yet?",
+  "Crie uma no site do RetroAchievements":
+    "Create one on the RetroAchievements website",
+  "Abra o aplicativo desktop para entrar.": "Open the desktop app to sign in.",
+  Progressão: "Progression",
+  Final: "Win condition",
+  Perdível: "Missable",
+  "Carregando conquistas…": "Loading achievements…",
+  "Entre na sua conta do RetroAchievements em Configurações › Conquistas para ver e ganhar as conquistas deste jogo.":
+    "Sign in to RetroAchievements in Settings › Achievements to see and earn this game's achievements.",
+  "Este console não tem conquistas no RetroAchievements pelo OpenRetro.":
+    "This console has no RetroAchievements in OpenRetro.",
+  "O OpenRetro descobre as conquistas deste jogo na primeira vez que você jogar.":
+    "OpenRetro finds this game's achievements the first time you play it.",
+  "Este jogo não tem conquistas no RetroAchievements, ou esta versão do arquivo não é reconhecida.":
+    "This game has no RetroAchievements, or this version of the file is not recognized.",
+  "{unlocked} de {total} conquistas": "{unlocked} of {total} achievements",
+  "{earned} de {points} pontos": "{earned} of {points} points",
+  "Modo hardcore ligado": "Hardcore mode on",
+  "Modo softcore": "Softcore mode",
+  "Ver no RetroAchievements": "View on RetroAchievements",
+  Filtrar: "Filter",
+  Todas: "All",
+  Desbloqueadas: "Unlocked",
+  Bloqueadas: "Locked",
+  Hardcore: "Hardcore",
+  "{percent}% dos jogadores": "{percent}% of players",
+  "{points} pts": "{points} pts",
+  "Você desbloqueou 1 conquista em {title} (+{points} pontos).":
+    "You unlocked 1 achievement in {title} (+{points} points).",
+  "Você desbloqueou {count} conquistas em {title} (+{points} pontos).":
+    "You unlocked {count} achievements in {title} (+{points} points).",
+  "Sua sessão do RetroAchievements expirou. Entre de novo em Configurações.":
+    "Your RetroAchievements session expired. Sign in again in Settings.",
+  "Jogo pausado · RetroAchievements hardcore":
+    "Game paused · RetroAchievements hardcore",
+  "Não foi possível falar com o RetroAchievements. Confira sua conexão.":
+    "Could not reach RetroAchievements. Check your connection.",
+  "O RetroAchievements recusou o pedido. Tente de novo mais tarde.":
+    "RetroAchievements refused the request. Try again later.",
+  "O RetroAchievements respondeu sem uma sessão válida.":
+    "RetroAchievements answered without a valid session.",
+  "Digite seu usuário e sua senha do RetroAchievements.":
+    "Enter your RetroAchievements username and password.",
+  "Usuário ou senha incorretos.": "Wrong username or password.",
+  "Não foi possível guardar a sessão do RetroAchievements no Windows.":
+    "Could not store the RetroAchievements session in Windows.",
+  "O RetroAchievements só funciona no Windows por enquanto.":
+    "RetroAchievements only works on Windows for now.",
+  "No modo hardcore do RetroAchievements não dá para carregar estados.":
+    "RetroAchievements hardcore mode does not allow loading states.",
+  "No modo hardcore do RetroAchievements não dá para abrir estados salvos. Desligue o hardcore em Configurações para usar estados.":
+    "RetroAchievements hardcore mode does not allow opening save states. Turn hardcore off in Settings to use states.",
 };

@@ -829,27 +829,50 @@ html.remote .recommendation-row {
   gap: 10px;
 }
 
-/* Download sources page */
+/* Download sources page: a summary strip over a compact list. */
 .source-manager {
   display: grid;
   gap: 16px;
-  max-width: 1100px;
+  max-width: 1000px;
   min-width: 0;
 }
-.source-intro {
-  color: var(--body);
-  font-size: 14px;
-  line-height: 1.6;
-}
-.source-toolbar,
-.source-toolbar > div {
+.source-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.source-toolbar {
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 16px;
+}
+.source-stats {
+  display: flex;
+  gap: 32px;
+  margin: 0;
+}
+.source-stats dt {
+  color: var(--quiet);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.source-stats dd {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.source-stats dd small {
+  color: var(--quiet);
+  font-size: 16px;
+  font-weight: 600;
+}
+.source-head-actions {
+  display: flex;
+  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .source-status {
   color: var(--success);
@@ -865,75 +888,153 @@ html.remote .recommendation-row {
   color: var(--body);
   text-align: center;
 }
-.source-cards {
-  display: grid;
-  gap: 16px;
-}
-.source-card {
-  display: grid;
-  justify-items: start;
-  gap: 8px;
-  min-width: 0;
-  padding: 18px 16px;
+.source-list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 12px;
   background: var(--panel);
+  list-style: none;
 }
-.source-card.disabled {
-  opacity: 0.65;
+.source-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  transition: background 0.15s;
 }
-.source-card header {
+.source-row + .source-row {
+  border-top: 1px solid var(--border);
+}
+.source-row:hover {
+  background: #ffffff08;
+}
+.source-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--panel2);
+  color: var(--muted);
+}
+.source-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.source-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
+  gap: 10px;
+  min-width: 0;
 }
-.source-card h3 {
+.source-title h3 {
   overflow: hidden;
   color: var(--text);
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 650;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.source-badge {
-  padding: 3px 8px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-small);
-  background: #ffffff14;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-.source-count {
-  color: var(--muted);
+.source-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--body);
   font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
-.source-url {
-  display: grid;
-  gap: 8px;
-  width: 100%;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 14px;
+.source-state::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  content: "";
 }
-.source-url > div {
+.source-meta {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+  color: var(--quiet);
+  font-size: 12px;
 }
-.source-url input {
-  flex: 1;
-  min-width: 0;
+.source-meta span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.source-url .button {
+.source-meta span + span {
   flex: none;
 }
-@media (max-width: 560px) {
-  .source-url > div {
+.source-meta span + span::before {
+  margin-right: 6px;
+  content: "·";
+}
+.source-total {
+  display: grid;
+  justify-items: end;
+  color: var(--quiet);
+  font-size: 11px;
+}
+.source-total strong {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.source-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.source-row-actions .switch {
+  margin-left: 10px;
+}
+.source-row-actions .icon-button:disabled {
+  opacity: 0.4;
+}
+.source-remove:hover:not(:disabled) {
+  color: var(--danger);
+}
+.source-row.off .source-mark,
+.source-row.off .source-info,
+.source-row.off .source-total {
+  opacity: 0.5;
+}
+.source-row.off .source-state::before {
+  background: var(--quiet);
+}
+.source-foot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.source-foot p {
+  max-width: 620px;
+}
+.source-remove-all {
+  flex: none;
+  color: var(--danger);
+  font-size: 12px;
+}
+.source-remove-all:hover:not(:disabled) {
+  color: var(--danger);
+}
+@media (max-width: 640px) {
+  .source-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .source-total {
+    display: none;
+  }
+  .source-foot {
     flex-direction: column;
   }
 }
@@ -1224,7 +1325,8 @@ html.remote .recommendation-row {
   padding: 0 14px 6px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: linear-gradient(
+  background:
+    linear-gradient(
       180deg,
       color-mix(in srgb, var(--text) 3%, transparent),
       transparent 160px

@@ -18,7 +18,7 @@ pub mod rpcs3;
 pub mod runtime_menu;
 pub mod save_states;
 
-fn core_name(platform: &str) -> Option<&'static str> {
+pub(crate) fn core_name(platform: &str) -> Option<&'static str> {
     Some(match platform {
         "nes" => "mesen_libretro.dll",
         "snes" => "snes9x_libretro.dll",
@@ -156,7 +156,7 @@ pub async fn launch_game(
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library) = {
+ let (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
@@ -168,7 +168,8 @@ pub async fn launch_game(
   let stretch=settings.as_ref().map_or(true,|v|v["gameScreenMode"]!="original");
   // The runtime's SDL2 tells which controllers are connected.
   let sdl_library=database::emulators(&conn)?.into_iter().find(|e|e.id=="openretro-retroarch").and_then(|e|std::path::Path::new(&e.executable_path).parent().map(|dir|dir.join("SDL2.dll")));
-  (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library)
+  let hardcore_wanted=crate::achievements::hardcore_enabled(&conn);
+  (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted)
  };
  // The selected translation or hack plays instead of the original file.
  let variant=entry.item.active_variant.clone();
@@ -214,6 +215,14 @@ pub async fn launch_game(
  // exit would then store that black state; its states load from the game menu.
  let boot_states=!boots_without_states(&entry.item.platform_id);
  if slot.is_some() && !boot_states { return Err("No PS2, carregue o estado pelo menu do jogo depois que ele abrir.".into()); }
+ // Signed in to RetroAchievements, the runtime awards achievements. Online
+ // sessions play in softcore: RetroArch pauses hardcore during netplay.
+ let achievements=if managed_retroarch { crate::achievements::runtime_config(&app.path().app_data_dir().map_err(error)?, hardcore_wanted && netplay.is_none())? } else { None };
+ let achievements_session=achievements.is_some();
+ let hardcore=achievements_session && hardcore_wanted && netplay.is_none();
+ // Hardcore never loads a state: not the automatic one, nor a chosen slot.
+ if hardcore && slot.is_some() { return Err("No modo hardcore do RetroAchievements não dá para abrir estados salvos. Desligue o hardcore em Configurações para usar estados.".into()); }
+ if let Some(session)=&runtime_session { session.set_hardcore(hardcore); }
  if managed_retroarch && bios::required(&entry.item.platform_id) && !bios::installed(&bios::system_dir(&app.path().app_data_dir().map_err(error)?), &entry.item.platform_id) { return Err("Este console precisa da BIOS. Selecione o arquivo da BIOS na página do jogo ou em Emuladores.".into()); }
  // An app update can ship a newer runtime; copy it before launching so the in-game menu matches it.
  #[cfg(windows)]
@@ -227,8 +236,10 @@ pub async fn launch_game(
  let mut args:Vec<String>=if managed_retroarch {
     let data=app.path().app_data_dir().map_err(error)?;
     let variant_saves=variant.as_ref().map(|v|crate::mods::variant_saves(&data,v)).transpose()?;
-    let config=runtime_menu::prepare_game(&data, &executable, &entry.item.sha256, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)))?;
-    let mut args:Vec<String>=vec!["--appendconfig".into(),config.to_string_lossy().into_owned()];
+    let config=runtime_menu::prepare_game(&data, &executable, &entry.item.sha256, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining && !hardcore, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)))?;
+    // RetroArch reads several appended configs separated by "|".
+    let appended=match &achievements { Some(extra)=>format!("{}|{}",config.display(),extra.path().display()), None=>config.to_string_lossy().into_owned() };
+    let mut args:Vec<String>=vec!["--appendconfig".into(),appended];
     // OpenGL by default; Direct3D 11 once OpenGL failed on this PC.
     let video=diagnosis::video_driver(&*db.read()?);
     std::fs::OpenOptions::new().append(true).open(&config).map_err(error)?.write_all(format!("video_driver = \"{video}\"\n").as_bytes()).map_err(error)?;
@@ -286,6 +297,8 @@ pub async fn launch_game(
       return Err(match &runtime_log { Some(log)=>diagnosis::explain(&conn,log,code,message), None=>message });
     }
  }
+ // The runtime read its settings before opening the game window; the token goes now.
+ drop(achievements);
  {
  let conn=db.0.lock().map_err(error)?;
  conn.execute("UPDATE library_items SET last_played_at=?1 WHERE id=?2",params![started,id]).map_err(error)?;
@@ -320,6 +333,7 @@ pub async fn launch_game(
  tx.execute("UPDATE play_sessions SET finished_at=?1,duration=?2,exit_code=?3 WHERE id=?4",params![chrono::Utc::now().to_rfc3339(),elapsed,status.as_ref().ok().and_then(|s|s.code()),session]).map_err(error)?;
  tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?;
  tx.commit().map_err(error)?; let _=app.emit("game-finished",&id);
+ if let (true,Some(log))=(achievements_session,&runtime_log) { crate::achievements::finish_session(&app,&id,&entry.game.title,variant.is_none(),log); }
  let status=status.map_err(error)?;
  // RPCS3 can report an error code while shutting down after a normal exit.
  if !status.success() && !ps3 {

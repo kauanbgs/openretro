@@ -179,7 +179,40 @@ export interface AppSettings {
   phoneFrameRate?: 30 | 60;
   /** Show the running game in Discord; off unless the player turns it on. */
   discordPresence?: boolean;
+  /** RetroAchievements hardcore: no state loading, unlocks count double. */
+  achievementsHardcore?: boolean;
 }
+/** The signed-in RetroAchievements account. */
+export interface AchievementsAccount {
+  username: string;
+  avatarUrl: string;
+  score: number;
+  softcoreScore: number;
+}
+export interface Achievement {
+  id: number;
+  title: string;
+  description: string;
+  points: number;
+  badgeUrl: string;
+  lockedBadgeUrl: string;
+  rarity: number;
+  rarityHardcore: number;
+  /** "progression", "win_condition", "missable" or empty. */
+  kind: string;
+  unlocked: boolean;
+  unlockedHardcore: boolean;
+}
+export type GameAchievements =
+  | { state: "signedOut" | "unsupported" | "unknown" | "noSet" }
+  | {
+      state: "ready";
+      gameId: number;
+      title: string;
+      iconUrl: string;
+      hardcore: boolean;
+      achievements: Achievement[];
+    };
 export const defaultSettings: AppSettings = {
   autoResume: true,
   theme: "dark",

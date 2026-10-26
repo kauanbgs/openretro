@@ -32,6 +32,8 @@ pub struct SessionInfo {
     slot: i32,
     screen_view: ScreenView,
     view_available: bool,
+    /// RetroAchievements hardcore: states can be saved but never loaded.
+    hardcore: bool,
     /// Shown inside OpenRetro, where Party and phones can capture it.
     #[serde(skip)]
     hosted: bool,
@@ -71,6 +73,13 @@ impl SessionGuard {
         }
         #[cfg(not(windows))]
         false
+    }
+    pub fn set_hardcore(&self, hardcore: bool) {
+        let service = self.app.state::<InGameService>();
+        let Ok(mut guard) = service.0.lock() else { return };
+        if let Some(session) = guard.as_mut().filter(|session| session.info.id == self.id) {
+            session.info.hardcore = hardcore;
+        }
     }
     pub fn attach(&self, stdin: ChildStdin, pid: u32, executable: &std::path::Path) -> Result<()> {
         let service = self.app.state::<InGameService>();
@@ -190,6 +199,7 @@ pub fn reserve(app: &tauri::AppHandle, id: &str, title: &str, slot: i32) -> Resu
             slot,
             screen_view: ScreenView::default(),
             view_available: false,
+            hardcore: false,
             hosted: false,
         },
         stdin: None,
@@ -336,6 +346,9 @@ pub fn in_game_action(app: tauri::AppHandle, action: String) -> Result<SessionIn
             )?;
             session.info.screen_view = view;
         } else {
+            if session.info.hardcore && matches!(action.as_str(), "load" | "undo_load") {
+                return Err("No modo hardcore do RetroAchievements não dá para carregar estados.".into());
+            }
             let command = command_for(&action, session.info.slot)?;
             write_command(session, command)?;
             if action == "slot_next" {
@@ -512,6 +525,7 @@ mod tests {
                 slot: 0,
                 screen_view: super::ScreenView::default(),
                 view_available: false,
+                hardcore: false,
                 hosted: false,
             },
             stdin: None,

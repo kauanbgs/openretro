@@ -11,13 +11,21 @@ import {
   Download,
   Palette,
   Wrench,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { version as appVersion } from "../../../package.json";
 import { adoptLanguage, languages, t } from "../../i18n";
-type Section = "General" | "Games" | "Downloads" | "Appearance" | "Advanced";
+import { AchievementsAccount } from "../achievements/AchievementsAccount";
+type Section =
+  | "General"
+  | "Games"
+  | "Achievements"
+  | "Downloads"
+  | "Appearance"
+  | "Advanced";
 const sections: {
   id: Section;
   label: string;
@@ -35,6 +43,12 @@ const sections: {
     label: t("Jogos"),
     icon: Gamepad2,
     description: t("Como a imagem dos jogos aparece e as atualizações do PS3."),
+  },
+  {
+    id: "Achievements",
+    label: t("Conquistas"),
+    icon: Trophy,
+    description: t("Sua conta do RetroAchievements e o modo hardcore."),
   },
   {
     id: "Downloads",
@@ -416,6 +430,45 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                       void save({ ps3Updates: settings.ps3Updates === false })
                     }
                   />
+                </div>
+              </Group>
+            </>
+          ) : section === "Achievements" ? (
+            <>
+              <Group title={t("RetroAchievements")}>
+                <AchievementsAccount notify={notify} />
+              </Group>
+              <Group title={t("Como jogar")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Modo hardcore")}</strong>
+                    <p>
+                      {t(
+                        "Conquistas contam no ranking principal do RetroAchievements, mas não dá para carregar estados salvos nem continuar de onde parou. Salvar estados continua funcionando. Partidas online jogam sempre em softcore.",
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    label={t("Modo hardcore")}
+                    on={settings.achievementsHardcore === true}
+                    disabled={saving}
+                    onToggle={() =>
+                      void save({
+                        achievementsHardcore:
+                          settings.achievementsHardcore !== true,
+                      })
+                    }
+                  />
+                </div>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Onde aparecem")}</strong>
+                    <p>
+                      {t(
+                        "Durante o jogo, cada conquista aparece num aviso na tela. Depois, a página do jogo mostra todas, com o seu progresso. Jogos de PS3 não têm conquistas.",
+                      )}
+                    </p>
+                  </div>
                 </div>
               </Group>
             </>

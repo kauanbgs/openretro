@@ -1,0 +1,63 @@
+OpenRetro reads these lines from the session log: the achievement set a game
+loaded, each unlock, and a failed sign-in, so the launcher can show them.
+Upstream does not build with achievements and without the menu: the menu
+state reads a menu setting, and without a menu that state never runs.
+
+diff --git a/cheevos/cheevos.c b/cheevos/cheevos.c
+index fd4aabbbac..be2f40c4b8 100644
+--- a/cheevos/cheevos.c
++++ b/cheevos/cheevos.c
+@@ -294,6 +294,11 @@ static void rcheevos_award_achievement(const rc_client_achievement_t* cheevo)
+    if (!cheevo)
+       return;
+ 
++   /* OpenRetro reads this line from the session log to report the unlock. */
++   RARCH_LOG("[OpenRetro] Achievement unlocked: %u %u %d\n",
++         (unsigned)cheevo->id, (unsigned)cheevo->points,
++         rc_client_get_hardcore_enabled(rcheevos_locals.client) ? 1 : 0);
++
+    /* Show the on screen message. */
+    if (settings->bools.cheevos_visibility_unlock)
+    {
+@@ -1351,6 +1356,9 @@ static void rcheevos_client_login_callback(int result,
+       _len += strlcpy(msg + _len, error_message, sizeof(msg) - _len);
+       CHEEVOS_LOG(RCHEEVOS_TAG "%s\n", msg);
+ 
++      /* OpenRetro asks the player to sign in again. */
++      RARCH_LOG("[OpenRetro] Achievements login failed: %d\n", result);
++
+       if (result == RC_EXPIRED_TOKEN || /* token expired */
+           (result == RC_INVALID_CREDENTIALS && settings->arrays.cheevos_token[0])) /* token invalid */
+       {
+@@ -1456,6 +1464,8 @@ static void rcheevos_client_load_game_callback(int result,
+       size_t _len;
+       if (result == RC_NO_GAME_LOADED)
+       {
++         /* OpenRetro remembers that this file has no achievement set. */
++         RARCH_LOG("[OpenRetro] Achievements game: 0\n");
+          CHEEVOS_LOG(RCHEEVOS_TAG "Game not recognized, pausing hardcore\n");
+          rcheevos_pause_hardcore();
+ 
+@@ -1516,6 +1526,10 @@ static void rcheevos_client_load_game_callback(int result,
+       rc_client_set_read_memory_function(client, rcheevos_client_read_memory);
+    }
+ 
++   /* OpenRetro links the library entry to this set for its game page. */
++   RARCH_LOG("[OpenRetro] Achievements game: %u %d\n", (unsigned)game->id,
++         rc_client_get_hardcore_enabled(client) ? 1 : 0);
++
+    rcheevos_finalize_game_load(client);
+ 
+    /* Hardcore is active. we're going to start processing
+diff --git a/runloop.c b/runloop.c
+--- a/runloop.c
++++ b/runloop.c
+@@ -7332,7 +7332,7 @@
+             netplay_driver_ctl(RARCH_NETPLAY_CTL_PAUSE, NULL);
+ #endif
+ 
+-#ifdef HAVE_CHEEVOS
++#if defined(HAVE_CHEEVOS) && defined(HAVE_MENU)
+          if (cheevos_enable)
+          {
+             if (runloop_is_libretro_running(runloop_st, menu_pause_libretro))

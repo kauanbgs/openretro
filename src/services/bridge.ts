@@ -2,9 +2,11 @@ import { invoke, convertFileSrc, hasBackend, isRemote } from "./transport";
 import { open } from "@tauri-apps/plugin-dialog";
 import { detectPlatforms } from "../db/platforms";
 import type {
+  AchievementsAccount,
   AppSettings,
   Emulator,
   EmulatorInstall,
+  GameAchievements,
   GameMetadata,
   ImportCandidate,
   LibraryGame,
@@ -482,6 +484,25 @@ export const bridge = {
   /** Applies the Discord setting at once, during a game too. */
   async discordPresenceSync(): Promise<void> {
     if (isDesktop) return invoke("discord_presence_sync");
+  },
+  async achievementsAccount(): Promise<AchievementsAccount | null> {
+    return isDesktop ? invoke("achievements_account") : null;
+  },
+  async achievementsSignIn(
+    username: string,
+    password: string,
+  ): Promise<AchievementsAccount> {
+    if (!isDesktop)
+      throw new Error(t("Abra o aplicativo desktop para entrar."));
+    return invoke("achievements_sign_in", { username, password });
+  },
+  async achievementsSignOut(): Promise<void> {
+    if (isDesktop) return invoke("achievements_sign_out");
+  },
+  async gameAchievements(id: string): Promise<GameAchievements> {
+    return isDesktop
+      ? invoke("game_achievements", { id })
+      : { state: "unsupported" };
   },
   /** This computer's local network address, shared by the netplay host. */
   async netplayLocalAddress(): Promise<string | null> {

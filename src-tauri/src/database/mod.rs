@@ -57,6 +57,8 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("010_managed_emulators.sql"))
         .map_err(error)?;
+    tx.execute_batch(include_str!("011_achievements.sql"))
+        .map_err(error)?;
     // Old signals say little about today's taste and only grow the file.
     tx.execute(
         "DELETE FROM interest_events WHERE at < ?1",

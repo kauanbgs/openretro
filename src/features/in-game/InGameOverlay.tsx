@@ -28,6 +28,8 @@ interface Session {
   open: boolean;
   slot: number;
   viewAvailable: boolean;
+  /** RetroAchievements hardcore: states save but never load. */
+  hardcore: boolean;
   screenView: {
     layout: "full" | "sideBySide" | "stacked" | "grid";
     region: number;
@@ -73,7 +75,9 @@ export function InGameOverlay() {
             t("Inferior esquerda"),
             t("Inferior direita"),
           ];
-  const actions = [...baseActions];
+  const actions = session?.hardcore
+    ? baseActions.filter(({ id }) => id !== "load" && id !== "undo_load")
+    : [...baseActions];
   if (session?.viewAvailable && view) {
     actions.splice(
       1,
@@ -244,7 +248,11 @@ export function InGameOverlay() {
           </button>
         </header>
         <h1>{session.title}</h1>
-        <p className="game-menu-paused">{t("Jogo pausado")}</p>
+        <p className="game-menu-paused">
+          {session.hardcore
+            ? t("Jogo pausado · RetroAchievements hardcore")
+            : t("Jogo pausado")}
+        </p>
         <div className="game-menu-slot">
           <span>{t("Slot do estado")}</span>
           <button

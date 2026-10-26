@@ -2,8 +2,9 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CirclePlus,
-  CircleMinus,
+  Copy,
   FileJson,
+  Globe,
   Link,
   RefreshCw,
   Trash2,
@@ -73,39 +74,57 @@ export function SourceManager() {
     setSyncing(false);
     if (done) setStatus(t("Fontes sincronizadas."));
   }
+  const active = list.filter((s) => s.enabled);
+  const total = active.reduce((sum, s) => sum + s.gameCount, 0);
+  function host(url: string) {
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  }
+  function copy(url: string) {
+    void navigator.clipboard.writeText(url).then(
+      () => setStatus(t("URL copiada.")),
+      () => setError(t("Não foi possível copiar a URL.")),
+    );
+  }
   return (
     <section className="source-manager">
-      <p className="source-intro">
-        {t(
-          "O OpenRetro procura links de download em todas as fontes ativas. A URL da fonte deve ser um link direto para um arquivo .json com uma lista de links.",
+      <header className="source-head">
+        {list.length > 0 && (
+          <dl className="source-stats">
+            <div>
+              <dt>{t("Fontes ativas")}</dt>
+              <dd>
+                {active.length}
+                <small>/{list.length}</small>
+              </dd>
+            </div>
+            <div>
+              <dt>{t("Downloads disponíveis")}</dt>
+              <dd>{total.toLocaleString(locale())}</dd>
+            </div>
+          </dl>
         )}
-      </p>
-      <div className="source-toolbar">
-        <button
-          className="button outline"
-          disabled={busy || !remote.length}
-          onClick={() => void syncAll()}
-        >
-          <RefreshCw size={16} className={syncing ? "spin" : undefined} />{" "}
-          {syncing ? t("Sincronizando…") : t("Sincronizar")}
-        </button>
-        <div>
-          <button
-            className="button danger"
-            disabled={busy || !list.length}
-            onClick={() => setRemovingAll(true)}
-          >
-            <Trash2 size={16} /> {t("Remover todas")}
-          </button>
+        <div className="source-head-actions">
           <button
             className="button outline"
+            disabled={busy || !remote.length}
+            onClick={() => void syncAll()}
+          >
+            <RefreshCw size={16} className={syncing ? "spin" : undefined} />{" "}
+            {syncing ? t("Sincronizando…") : t("Sincronizar")}
+          </button>
+          <button
+            className="button primary"
             disabled={busy}
             onClick={() => edit(null)}
           >
             <CirclePlus size={16} /> {t("Adicionar fonte")}
           </button>
         </div>
-      </div>
+      </header>
       {sources.error && (
         <p className="error-message" role="alert">
           {String(sources.error)}
@@ -134,94 +153,107 @@ export function SourceManager() {
           </button>
         </div>
       )}
-      <div className="source-cards">
-        {list.map((s) => (
-          <article
-            className={`source-card ${s.enabled ? "" : "disabled"}`}
-            key={s.id}
-          >
-            <header>
-              <h3>{s.name}</h3>
-              <button
-                className={`switch ${s.enabled ? "on" : ""}`}
-                role="switch"
-                aria-label={t("Enable {name}", { name: s.name })}
-                aria-checked={s.enabled}
-                title={s.enabled ? t("Desativar fonte") : t("Ativar fonte")}
-                disabled={busy}
-                onClick={() =>
-                  void run(() => bridge.setDownloadSource(s.id, !s.enabled))
-                }
-              >
-                <span />
-              </button>
-            </header>
-            <span className="source-badge">
-              {!s.enabled
-                ? t("Desativada")
-                : s.url
-                  ? t("Sincronizada")
-                  : t("Importada")}
-            </span>
-            <small
-              className="source-count"
-              title={t("Atualizada em {date}", {
-                date: new Date(s.updatedAt).toLocaleDateString(locale()),
-              })}
-            >
-              {t("{count} downloads na lista", {
-                count: s.gameCount.toLocaleString(locale()),
-              })}
-            </small>
-            {s.url ? (
-              <label className="source-url">
-                <span>{t("URL da fonte")}</span>
-                <div>
-                  <input
-                    readOnly
-                    value={s.url}
-                    onFocus={(e) => e.currentTarget.select()}
-                  />
-                  <button
-                    className="button outline"
-                    aria-label={t("Remove {name}", { name: s.name })}
-                    disabled={busy}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      void run(() => bridge.removeDownloadSource(s.id));
-                    }}
-                  >
-                    <CircleMinus size={16} /> {t("Remover")}
-                  </button>
+      {list.length > 0 && (
+        <ul className="source-list">
+          {list.map((s) => (
+            <li className={`source-row ${s.enabled ? "" : "off"}`} key={s.id}>
+              <span className="source-mark" aria-hidden>
+                {s.url ? <Globe size={18} /> : <FileJson size={18} />}
+              </span>
+              <div className="source-info">
+                <div className="source-title">
+                  <h3 title={s.name}>{s.name}</h3>
+                  <span className="source-state">
+                    {!s.enabled
+                      ? t("Desativada")
+                      : s.url
+                        ? t("Sincronizada")
+                        : t("Importada")}
+                  </span>
                 </div>
-              </label>
-            ) : (
-              <div className="source-url">
-                <span>{t("Arquivo JSON importado neste computador")}</span>
-                <div>
+                <p className="source-meta">
+                  <span title={s.url || undefined}>
+                    {s.url
+                      ? host(s.url)
+                      : t("Arquivo JSON importado neste computador")}
+                  </span>
+                  <span>
+                    {t("Atualizada em {date}", {
+                      date: new Date(s.updatedAt).toLocaleDateString(locale()),
+                    })}
+                  </span>
+                </p>
+              </div>
+              <div className="source-total">
+                <strong>{s.gameCount.toLocaleString(locale())}</strong>
+                <span>{t("downloads")}</span>
+              </div>
+              <div className="source-row-actions">
+                {s.url ? (
                   <button
-                    className="button outline"
+                    className="icon-button"
+                    title={t("Copiar URL")}
+                    aria-label={t("Copiar URL")}
+                    onClick={() => copy(s.url!)}
+                  >
+                    <Copy size={16} />
+                  </button>
+                ) : (
+                  <button
+                    className="icon-button"
+                    title={t("Substituir JSON")}
+                    aria-label={t("Substituir JSON")}
                     disabled={busy}
                     onClick={() => edit(s)}
                   >
-                    <Upload size={16} /> {t("Substituir JSON")}
+                    <Upload size={16} />
                   </button>
-                  <button
-                    className="button outline"
-                    aria-label={t("Remove {name}", { name: s.name })}
-                    disabled={busy}
-                    onClick={() =>
-                      void run(() => bridge.removeDownloadSource(s.id))
-                    }
-                  >
-                    <CircleMinus size={16} /> {t("Remover")}
-                  </button>
-                </div>
+                )}
+                <button
+                  className="icon-button source-remove"
+                  title={t("Remover")}
+                  aria-label={t("Remove {name}", { name: s.name })}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(() => bridge.removeDownloadSource(s.id))
+                  }
+                >
+                  <Trash2 size={16} />
+                </button>
+                <button
+                  className={`switch ${s.enabled ? "on" : ""}`}
+                  role="switch"
+                  aria-label={t("Enable {name}", { name: s.name })}
+                  aria-checked={s.enabled}
+                  title={s.enabled ? t("Desativar fonte") : t("Ativar fonte")}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(() => bridge.setDownloadSource(s.id, !s.enabled))
+                  }
+                >
+                  <span />
+                </button>
               </div>
-            )}
-          </article>
-        ))}
-      </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <footer className="source-foot">
+        <p>
+          {t(
+            "O OpenRetro procura links de download em todas as fontes ativas. A URL da fonte deve ser um link direto para um arquivo .json com uma lista de links.",
+          )}
+        </p>
+        {list.length > 0 && (
+          <button
+            className="text-button source-remove-all"
+            disabled={busy}
+            onClick={() => setRemovingAll(true)}
+          >
+            {t("Remover todas")}
+          </button>
+        )}
+      </footer>
       {removingAll && (
         <Modal
           title={t("Remover todas as fontes?")}

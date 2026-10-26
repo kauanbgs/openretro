@@ -180,6 +180,17 @@ button. Messages have up to 400 characters, each conversation keeps its newest
 500, and the server limits how fast an account can send. Removing a friend
 leaves the conversation read-only; blocking deletes it for both.
 
+## Achievements
+
+Sign in to [RetroAchievements](https://retroachievements.org) in
+**Configurações › Conquistas** to earn achievements in the classics. The
+password is only used to sign in; OpenRetro keeps just the session token, in
+Windows Credential Manager. During play each unlock shows up on screen, and
+the game page's **Conquistas** tab lists the whole set with your progress and
+each achievement's rarity. Hardcore mode counts toward the main ranking but
+does not allow loading states; online sessions always play in softcore. PS3
+games have no achievements.
+
 ## Play on your phone
 
 **Celular → Ativar** in the header shows a QR code. A phone on the same Wi-Fi

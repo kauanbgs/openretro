@@ -47,6 +47,11 @@ import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
 import { NetplayDialog } from "./NetplayDialog";
 import { ModsTab } from "./ModsTab";
+import {
+  AchievementsTab,
+  achievementsProgress,
+  useGameAchievements,
+} from "../achievements/AchievementsTab";
 import { RemoveGameDialog } from "../../components/RemoveGameDialog";
 import { playedSha256 } from "../../services/mods";
 import { formatRelative } from "../../utils/format";
@@ -56,6 +61,7 @@ const tabLabels: Record<string, string> = {
   Overview: t("Visão geral"),
   Saves: "Saves",
   Mods: t("Traduções e mods"),
+  Achievements: t("Conquistas"),
   Screenshots: t("Imagens"),
   Details: t("Detalhes"),
 };
@@ -84,6 +90,12 @@ export function GamePage({
 }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("Overview");
+  const achievementsAvailable = Boolean(entry) && isDesktop && !isRemote;
+  const achievements = useGameAchievements(
+    entry?.item.id,
+    achievementsAvailable,
+  );
+  const achievementsCount = achievementsProgress(achievements.data);
   const details = useQuery({
     queryKey: [
       "game-detail",
@@ -466,6 +478,7 @@ export function GamePage({
                 "Overview",
                 ...(entry ? ["Saves"] : []),
                 ...(isRemote ? [] : ["Mods"]),
+                ...(achievementsAvailable ? ["Achievements"] : []),
                 "Screenshots",
                 "Details",
               ].map((t) => (
@@ -476,6 +489,9 @@ export function GamePage({
                   onClick={() => setTab(t)}
                 >
                   {tabLabels[t]}
+                  {t === "Achievements" && achievementsCount && (
+                    <small className="tab-count">{achievementsCount}</small>
+                  )}
                 </button>
               ))}
             </nav>
@@ -524,6 +540,8 @@ export function GamePage({
                 notify={notify}
                 refresh={refresh}
               />
+            ) : tab === "Achievements" && entry ? (
+              <AchievementsTab id={entry.item.id} />
             ) : tab === "Screenshots" ? (
               details.isFetching || captures.isLoading ? (
                 <div className="catalog-loading">

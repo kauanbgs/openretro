@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Home,
@@ -238,6 +238,51 @@ export function App() {
       void unlisten.then((fn) => fn());
     };
   }, [notify, refresh]);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!isDesktop) return;
+    const unlocked = listen<{
+      libraryItemId: string;
+      title: string;
+      count: number;
+      points: number;
+    }>("achievements-unlocked", ({ payload }) => {
+      notify(
+        payload.count === 1
+          ? t("Você desbloqueou 1 conquista em {title} (+{points} pontos).", {
+              title: payload.title,
+              points: payload.points,
+            })
+          : t(
+              "Você desbloqueou {count} conquistas em {title} (+{points} pontos).",
+              {
+                count: payload.count,
+                title: payload.title,
+                points: payload.points,
+              },
+            ),
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["game-achievements", payload.libraryItemId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["achievements-account"],
+      });
+    });
+    const signedOut = listen("achievements-signed-out", () => {
+      queryClient.setQueryData(["achievements-account"], null);
+      void queryClient.invalidateQueries({ queryKey: ["game-achievements"] });
+      notify(
+        t(
+          "Sua sessão do RetroAchievements expirou. Entre de novo em Configurações.",
+        ),
+      );
+    });
+    return () => {
+      void unlocked.then((unlisten) => unlisten());
+      void signedOut.then((unlisten) => unlisten());
+    };
+  }, [notify, queryClient]);
   useEffect(() => {
     if (!isDesktop) return;
     const started = listen<string>("game-started", ({ payload }) => {

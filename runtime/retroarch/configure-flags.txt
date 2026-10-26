@@ -8,17 +8,18 @@
 --disable-update_cores
 --disable-update_core_info
 --disable-update_assets
-# Networking stays on only for direct-IP netplay and the loopback remote
-# gamepad that relays phone input, both started by OpenRetro.
+# Networking stays on only for direct-IP netplay, the loopback remote
+# gamepad that relays phone input, and RetroAchievements, all started by
+# OpenRetro. RetroAchievements only answers over HTTPS, hence SSL.
 --enable-networking
---disable-ssl
+--enable-ssl
 --enable-networkgamepad
 --disable-netplaydiscovery
 --enable-command
 --disable-ffmpeg
 --disable-ssa
 --disable-qt
---disable-cheevos
+--enable-cheevos
 --disable-cheevos_rvz
 --disable-discord
 --disable-cheats
