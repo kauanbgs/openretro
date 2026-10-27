@@ -23,7 +23,11 @@ fn game_running(app: &tauri::AppHandle) -> bool {
     app.state::<InGameService>()
         .0
         .lock()
-        .is_ok_and(|guard| guard.as_ref().is_some_and(|s| s.stdin.is_some()))
+        .is_ok_and(|guard| {
+            guard
+                .as_ref()
+                .is_some_and(|s| s.stdin.is_some() || s.info.hosted)
+        })
 }
 
 /// Shows or hides the window without activating it, so the game keeps the keyboard.

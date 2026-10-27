@@ -1,0 +1,162 @@
+/* The version's news: a welcome header over a scrolling post. */
+.modal.whats-new {
+  display: flex;
+  flex-direction: column;
+  width: 640px;
+  max-height: min(680px, 90vh);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.whats-new > header {
+  margin: 0;
+  padding: 26px 24px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.whats-new > header h2 {
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -0.3px;
+}
+.whats-new .modal-subtitle {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.whats-new-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 24px 0;
+}
+.whats-new-date {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: var(--panel2);
+  font-size: 14px;
+  font-weight: 750;
+}
+.whats-new-body h3 {
+  margin: 22px 0;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  text-wrap: balance;
+}
+
+/* Two halves on the brand's indigo and blue. */
+.whats-new-banner {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 22px 0 20px;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 85% 0%, #12ace233, transparent 55%),
+    linear-gradient(135deg, #1a1846, #0f3a52 60%, #0d4a5c);
+  color: #f4f1eb;
+}
+.whats-new-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0 22px;
+}
+.whats-new-panel + .whats-new-panel {
+  border-left: 1px solid #ffffff1f;
+}
+.whats-new-panel-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 92px;
+}
+.whats-new-panel-art.logo {
+  gap: 12px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+.whats-new-panel-art .brand-mark {
+  width: 54px;
+  height: 54px;
+}
+.whats-new-panel-art.landscape svg,
+.whats-new-panel-art img {
+  width: 100%;
+  max-width: 220px;
+  height: 92px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 6px 18px #0006;
+}
+.whats-new-panel figcaption {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.whats-new-panel figcaption span {
+  padding-bottom: 8px;
+  border-bottom: 2px solid #12ace2;
+  font-size: 15px;
+}
+.whats-new-panel figcaption b {
+  font-weight: 800;
+}
+.whats-new-panel figcaption small {
+  color: #c9d6e2;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.whats-new-text {
+  margin-top: 24px;
+  font-size: 15px;
+  line-height: 1.65;
+}
+.whats-new-text p + p,
+.whats-new-text ul,
+.whats-new-text ul + p {
+  margin-top: 14px;
+}
+.whats-new-greeting {
+  font-size: 16px;
+  font-weight: 700;
+}
+.whats-new-text ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+  list-style: disc;
+}
+.whats-new-text li::marker {
+  color: var(--accent);
+}
+
+/* The button floats over the post's bottom-right corner, as it scrolls. */
+.whats-new-action {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 -24px;
+  padding: 16px 24px 18px;
+  background: linear-gradient(transparent, var(--panel) 70%);
+  pointer-events: none;
+}
+.whats-new-action .button {
+  pointer-events: auto;
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .whats-new-banner {
+    grid-auto-flow: row;
+    gap: 22px;
+  }
+  .whats-new-panel + .whats-new-panel {
+    border-left: 0;
+  }
+}

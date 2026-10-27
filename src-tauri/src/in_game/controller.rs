@@ -97,23 +97,53 @@ pub fn start(app: tauri::AppHandle) {
                 .and_then(|guard| {
                     guard
                         .as_ref()
-                        .filter(|s| s.stdin.is_some())
+                        // RPCS3 takes no commands, but its window still opens the chat.
+                        .filter(|s| s.stdin.is_some() || s.info.hosted)
                         .map(|s| {
                             (
                                 s.pid,
                                 s.info.open,
                                 s.sdl_library.clone(),
                                 s.embedded_window.is_some(),
+                                s.stdin.is_some(),
                             )
                         })
                 });
-            let Some((pid, open, sdl_library, embedded)) = session else {
+            let Some((pid, open, sdl_library, embedded, commands)) = session else {
                 sdl = None;
                 sdl_pid = 0;
                 previous = false;
+                previous_chat = false;
                 thread::sleep(Duration::from_millis(150));
                 continue;
             };
+            let mut foreground_pid = 0;
+            unsafe {
+                GetWindowThreadProcessId(GetForegroundWindow(), &mut foreground_pid);
+            }
+            // T opens the Party chat while the game, alone or inside OpenRetro, has the keyboard.
+            let game_foreground = foreground_pid == pid
+                || (embedded
+                    && main_window
+                        .is_some_and(|main| main == unsafe { GetForegroundWindow() } as isize));
+            let chat = !open
+                && game_foreground
+                && super::party_chat::active()
+                && unsafe { GetAsyncKeyState(0x54) } < 0;
+            if chat && !previous_chat {
+                let target = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    if let Err(error) = super::party_chat::compose(&target) {
+                        log::warn!("Party chat: {error}");
+                    }
+                });
+            }
+            previous_chat = chat;
+            // Without commands there is no OpenRetro menu to drive.
+            if !commands {
+                thread::sleep(Duration::from_millis(25));
+                continue;
+            }
             if sdl_pid != pid {
                 sdl = sdl_library.as_deref().and_then(super::sdl::Sdl::load);
                 sdl_pid = pid;
@@ -207,31 +237,9 @@ pub fn start(app: tauri::AppHandle) {
                     }
                 }
             }
-            let mut foreground_pid = 0;
-            unsafe {
-                GetWindowThreadProcessId(GetForegroundWindow(), &mut foreground_pid);
-            }
             if foreground_pid == pid || open {
                 pressed |= unsafe { GetAsyncKeyState(0x70) } < 0;
             }
-            // T opens the Party chat while the game, alone or inside OpenRetro, has the keyboard.
-            let game_foreground = foreground_pid == pid
-                || (embedded
-                    && main_window
-                        .is_some_and(|main| main == unsafe { GetForegroundWindow() } as isize));
-            let chat = !open
-                && game_foreground
-                && super::party_chat::active()
-                && unsafe { GetAsyncKeyState(0x54) } < 0;
-            if chat && !previous_chat {
-                let target = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    if let Err(error) = super::party_chat::compose(&target) {
-                        log::warn!("Party chat: {error}");
-                    }
-                });
-            }
-            previous_chat = chat;
             if pressed && !previous && last_toggle.elapsed() > Duration::from_millis(450) {
                 let target = app.clone();
                 let _ = app.run_on_main_thread(move || {

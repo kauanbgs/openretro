@@ -2204,6 +2204,11 @@ export const en: Record<string, string> = {
   "Criar sala e convidar": "Create room and invite",
   "Party aberta · {count}/4 jogadores": "Party open · {count}/4 players",
   "Chat da Party": "Party chat",
+  "Bem-vindo de volta, {name}!": "Welcome back, {name}!",
+  "Que bom ter você aqui!": "Glad to have you here!",
+  "Veja o que chegou na versão {version} do OpenRetro.":
+    "See what's new in OpenRetro {version}.",
+  "Começar a jogar": "Start playing",
   "Mensagem para a Party": "Message to the Party",
   "Mensagem para a Party · Enter envia, Esc fecha":
     "Message to the Party · Enter sends, Esc closes",

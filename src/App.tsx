@@ -38,6 +38,7 @@ import { BrandMark } from "./components/Brand";
 import { TitleBar } from "./components/TitleBar";
 import { PhonePlayDialog } from "./components/PhonePlayDialog";
 import { PartyDialog } from "./features/party/PartyDialog";
+import { WhatsNew } from "./features/whats-new/WhatsNew";
 import { UserProfile } from "./features/social/UserProfile";
 import { SocialPanel } from "./features/social/SocialPanel";
 import {
@@ -839,6 +840,7 @@ export function App() {
           {isDesktop ? "" : t(" · prévia no navegador")}
         </button>
       </footer>
+      <WhatsNew version={appVersion} />
       {partyOpen && (
         <PartyDialog
           onClose={() => setPartyOpen(false)}

@@ -5,12 +5,14 @@ const openModals: HTMLElement[] = [];
 let previousOverflow = "";
 export function Modal({
   title,
+  subtitle,
   children,
   onClose,
   wide = false,
   className = "",
 }: {
   title: string;
+  subtitle?: ReactNode;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
@@ -100,6 +102,7 @@ export function Modal({
         <header>
           <div>
             <h2 id={titleId}>{title}</h2>
+            {subtitle && <p className="modal-subtitle">{subtitle}</p>}
           </div>
           <button
             className="icon-button"
