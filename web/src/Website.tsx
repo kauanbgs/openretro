@@ -64,35 +64,35 @@ const devices = [
   {
     id: "pc",
     icon: Monitor,
-    label: "No seu computador",
+    label: "On your computer",
     detail: "Windows",
-    title: "Ligue. Escolha. Jogue.",
+    title: "Turn it on. Pick. Play.",
     description:
-      "Sua biblioteca em um só lugar, emuladores integrados e um menu que você controla sem sair do sofá.",
-    caption: "Interface no estilo console",
-    button: "Baixar para Windows",
+      "Your whole library in one place, built-in emulators and a menu you can drive without leaving the couch.",
+    caption: "Console-style interface",
+    button: "Download for Windows",
   },
   {
     id: "phone",
     icon: Smartphone,
-    label: "No seu celular",
-    detail: "Pelo navegador",
-    title: "Mais uma tela. Mais um jogador.",
+    label: "On your phone",
+    detail: "In the browser",
+    title: "One more screen. One more player.",
     description:
-      "Pareie o celular com o PC pelo QR code. Receba o jogo pela rede local e use os controles de toque para entrar na partida.",
-    caption: "O jogo roda no seu PC",
-    button: "Ver como funciona",
+      "Pair your phone with your PC using a QR code. Stream the game over your local network and jump in with touch controls.",
+    caption: "The game runs on your PC",
+    button: "See how it works",
   },
   {
     id: "friends",
     icon: Gamepad2,
-    label: "Com seus amigos",
-    detail: "Party pelo navegador",
-    title: "O player 2 pode estar longe.",
+    label: "With your friends",
+    detail: "Party in the browser",
+    title: "Player 2 can be far away.",
     description:
-      "Entre na sua conta, adicione seus amigos e abra um Party. Eles recebem imagem e áudio no navegador e participam com teclado ou controle. O jogo roda no seu PC.",
-    caption: "Seus amigos entram na sua partida",
-    button: "Ver como funciona",
+      "Sign in, add your friends and start a Party. They get video and audio in their browser and play along with a keyboard or controller. The game runs on your PC.",
+    caption: "Your friends join your game",
+    button: "See how it works",
   },
 ];
 
@@ -130,24 +130,24 @@ export function Website() {
   return (
     <div className={`website ${theme ? "soft-screen" : ""}`}>
       <a className="skip-link" href="#main">
-        Pular para o conteúdo
+        Skip to content
       </a>
       <header className="site-header">
         <div className="header-inner">
-          <a className="brand-link" href="#" aria-label="OpenRetro início">
+          <a className="brand-link" href="#" aria-label="OpenRetro home">
             <Brand />
-            <span className="version-tag">Projeto aberto</span>
+            <span className="version-tag">Open project</span>
           </a>
-          <nav aria-label="Principal">
-            <a href="#recursos">Recursos</a>
-            <a href="#dispositivos">Dispositivos</a>
-            <a href="#projeto">Projeto</a>
+          <nav aria-label="Main">
+            <a href="#features">Features</a>
+            <a href="#devices">Devices</a>
+            <a href="#project">Project</a>
           </nav>
           <div className="header-links">
             <button
               onClick={() => setTheme((v) => !v)}
-              aria-label="Alternar brilho da tela"
-              title="Alternar brilho da tela"
+              aria-label="Toggle screen brightness"
+              title="Toggle screen brightness"
             >
               <span aria-hidden="true">☼</span>
             </button>
@@ -161,94 +161,94 @@ export function Website() {
         <section className="landing-hero page-width">
           <div className="hero-content">
             <span className="hero-insert">
-              <span className="status-dot live" /> OpenRetro para Windows
+              <span className="status-dot live" /> OpenRetro for Windows
             </span>
             <h1>
-              Seus clássicos,
+              Your classics,
               <br />
-              em boa companhia.
+              in good company.
             </h1>
             <p>
-              A sua biblioteca no PC. Uma partida no celular. Um amigo no player
-              2. Reúna seus jogos e encontre um novo jeito de voltar a eles.
+              Your library on your PC. A round on your phone. A friend as player
+              2. Bring your games together and find a new way back to them.
             </p>
             <div className="hero-actions">
               <a className="pixel-button primary" href={installerUrl}>
                 <Download size={16} />
-                Baixar OpenRetro
+                Download OpenRetro
               </a>
-              <a className="hero-resource-link" href="#recursos">
-                Conhecer os recursos <ArrowDown size={15} />
+              <a className="hero-resource-link" href="#features">
+                Explore the features <ArrowDown size={15} />
               </a>
             </div>
             <div className="hero-footnote">
-              Gratuito. Código aberto. Feito para jogar.
+              Free. Open source. Made for playing.
             </div>
           </div>
           <div className="adventure-art">
             <div className="adventure-frame">
               <div className="adventure-top">
                 <span>
-                  <i /> Uma nova partida
+                  <i /> A new game
                 </span>
-                <span>J1 + J2</span>
+                <span>P1 + P2</span>
               </div>
               <PixelLandscape />
               <div className="adventure-bottom">
-                <span>É bom estar de volta.</span>
+                <span>Good to be back.</span>
                 <Gamepad2 size={20} />
               </div>
             </div>
             <div className="adventure-sticker">
               <Users size={16} />
               <span>
-                Melhor com
+                Better with
                 <br />
-                companhia.
+                company.
               </span>
             </div>
           </div>
         </section>
 
-        <section className="play-section page-width" id="recursos">
+        <section className="play-section page-width" id="features">
           <div className="section-heading">
             <div>
               <span className="section-kicker">
-                Do primeiro play à próxima fase
+                From the first play to the next level
               </span>
               <h2>
-                O que importa
-                <br />é jogar.
+                What matters
+                <br />is playing.
               </h2>
             </div>
             <p>
-              Seus jogos e seus amigos, por perto.
-              <br />O OpenRetro cuida do caminho até a partida.
+              Your games and your friends, close by.
+              <br />OpenRetro takes care of getting you into the game.
             </p>
           </div>
           <div className="feature-highlights">
             <article>
               <Library />
-              <h3>Uma biblioteca sua</h3>
+              <h3>A library of your own</h3>
               <p>
-                Organize seus jogos com capas, informações e favoritos. Perfis
-                separados guardam o progresso de cada jogador.
+                Organize your games with covers, details and favorites. Separate
+                profiles keep each player's progress.
               </p>
             </article>
             <article>
               <Smartphone />
-              <h3>Mais uma tela para jogar</h3>
+              <h3>One more screen to play on</h3>
               <p>
-                Leia o QR code e jogue no celular pela rede local, com imagem,
-                áudio e controles de toque no navegador.
+                Scan the QR code and play on your phone over your local network,
+                with video, audio and touch controls in the browser.
               </p>
             </article>
             <article>
               <Users />
-              <h3>Chame o player 2</h3>
+              <h3>Call in player 2</h3>
               <p>
-                Abra um Party para seus amigos entrarem pelo navegador. A
-                partida roda no seu PC e a diversão vai mais longe.
+                Start a Party so your friends can join from their browser. The
+                game runs on your PC and the fun goes further.
               </p>
             </article>
           </div>
@@ -256,23 +256,23 @@ export function Website() {
             <div className="preview-toolbar">
               <Brand />
               <span>
-                <Gamepad2 size={14} /> Modo console
+                <Gamepad2 size={14} /> Console mode
               </span>
               <span className="preview-clock">20:42</span>
             </div>
             <div className="preview-scene">
               <img
                 src="./art/mario-kart-scene.png"
-                alt="Super Mario Kart no Super Nintendo"
+                alt="Super Mario Kart on the Super Nintendo"
               />
               <div className="preview-gradient" />
               <div className="preview-copy">
                 <span>Super Nintendo</span>
                 <h3>Super Mario Kart</h3>
-                <p>Seu próximo play começa na linha de largada.</p>
+                <p>Your next play starts at the starting line.</p>
                 <a className="pixel-button primary compact" href={installerUrl}>
                   <Download size={13} />
-                  Baixar OpenRetro
+                  Download OpenRetro
                 </a>
               </div>
             </div>
@@ -292,50 +292,50 @@ export function Website() {
             <div className="preview-bottom">
               <span>
                 <kbd>←</kbd>
-                <kbd>→</kbd> Navegar
+                <kbd>→</kbd> Navigate
               </span>
               <span>
-                <kbd>Enter</kbd> Escolher
+                <kbd>Enter</kbd> Select
               </span>
-              <span>Modo console</span>
+              <span>Console mode</span>
             </div>
           </div>
           <div className="feature-notes">
             <article>
               <Gamepad2 />
-              <h3>Do jeito de um console</h3>
+              <h3>Just like a console</h3>
               <p>
-                Biblioteca em tela cheia e navegação por controle. Escolha o
-                jogo e continue de onde parou nos cores compatíveis.
+                A full-screen library with controller navigation. Pick a game
+                and pick up where you left off on supported cores.
               </p>
             </article>
             <article>
               <Save />
-              <h3>Continue de onde parou</h3>
+              <h3>Pick up where you left off</h3>
               <p>
-                Retome a partida e gerencie seus saves nos cores compatíveis.
-                Cada jogador tem seu próprio progresso.
+                Resume your game and manage your saves on supported cores.
+                Every player keeps their own progress.
               </p>
             </article>
             <article>
               <Download />
-              <h3>Seu jeito de jogar</h3>
+              <h3>Play your way</h3>
               <p>
-                Emuladores integrados, fontes de download, traduções e mods.
-                Prepare seus jogos dentro do próprio aplicativo.
+                Built-in emulators, download sources, translations and mods.
+                Get your games ready right inside the app.
               </p>
             </article>
           </div>
         </section>
 
-        <section className="device-section page-width" id="dispositivos">
+        <section className="device-section page-width" id="devices">
           <div className="section-heading">
             <div>
-              <span className="section-kicker">Seu jogo vai com você</span>
+              <span className="section-kicker">Your game goes with you</span>
               <h2>
-                Uma biblioteca.
+                One library.
                 <br />
-                Mais jeitos de jogar.
+                More ways to play.
               </h2>
             </div>
           </div>
@@ -343,7 +343,7 @@ export function Website() {
             <div
               className="device-tabs"
               role="tablist"
-              aria-label="Jeitos de jogar"
+              aria-label="Ways to play"
               aria-orientation="vertical"
             >
               {devices.map((item, index) => (
@@ -385,9 +385,9 @@ export function Website() {
                 </button>
               ))}
               <span className="device-empty">
-                Sempre tem espaço
+                There's always room
                 <br />
-                para mais um play.
+                for one more player.
               </span>
             </div>
             <div
@@ -414,8 +414,8 @@ export function Website() {
                   {selected.id === "friends" && (
                     <div className="invite-card">
                       <Gamepad2 size={27} />
-                      <span>Partida entre amigos</span>
-                      <b>Convite pronto</b>
+                      <span>Game with friends</span>
+                      <b>Invite ready</b>
                       <Check size={18} />
                     </div>
                   )}
@@ -445,7 +445,7 @@ export function Website() {
               </a>
             </div>
             <footer>
-              <span>↑ ↓ Escolher dispositivo</span>
+              <span>↑ ↓ Choose device</span>
               <span>
                 {device + 1} / {devices.length}
               </span>
@@ -457,43 +457,43 @@ export function Website() {
             🏁
           </div>
           <div>
-            <span className="section-kicker">Pronto em poucos minutos</span>
+            <span className="section-kicker">Ready in a few minutes</span>
             <h2>
-              Um play vale
+              One play is worth
               <br />
-              mais que mil palavras.
+              a thousand words.
             </h2>
             <p>
-              Baixe o OpenRetro, aponte para a sua coleção e conecte o controle.
+              Download OpenRetro, point it at your collection and plug in your controller.
               <br />
-              Gratuito e de código aberto. Jogue localmente sem conta.
+              Free and open source. Play locally without an account.
             </p>
             <a className="pixel-button primary" href={installerUrl}>
               <Download size={15} />
-              Baixar para Windows
+              Download for Windows
             </a>
           </div>
           <div className="callout-cover">
             <img
               src="./art/mario-kart.jpg"
-              alt="Capa de Super Mario Kart"
+              alt="Super Mario Kart cover"
               loading="lazy"
             />
             <span>Super Mario Kart / SNES</span>
           </div>
         </section>
-        <section className="community" id="projeto">
+        <section className="community" id="project">
           <Glyphs />
-          <span className="section-kicker">Feito para quem gosta de jogar</span>
+          <span className="section-kicker">Made for people who love to play</span>
           <h2>
-            O próximo capítulo
+            The next chapter
             <br />
-            também pode ser seu.
+            could be yours too.
           </h2>
           <p>
-            OpenRetro é um projeto aberto.
+            OpenRetro is an open project.
             <br />
-            Traga suas ideias, conte o que faltou ou ajude a construir.
+            Bring your ideas, tell us what's missing or help build it.
           </p>
           <div className="hero-actions">
             <a
@@ -503,7 +503,7 @@ export function Website() {
               rel="noreferrer"
             >
               <Heart size={15} />
-              Compartilhar uma ideia
+              Share an idea
             </a>
             <a
               className="pixel-button"
@@ -512,7 +512,7 @@ export function Website() {
               rel="noreferrer"
             >
               <Github size={16} />
-              Ver o projeto
+              View the project
             </a>
           </div>
         </section>
@@ -521,24 +521,24 @@ export function Website() {
         <div>
           <Brand />
           <p>
-            Os clássicos continuam.
-            <br />O próximo play é seu.
+            The classics live on.
+            <br />The next play is yours.
           </p>
         </div>
         <div>
           <h3>OpenRetro</h3>
-          <a href={installerUrl}>Baixar aplicativo</a>
-          <a href={DOCS}>Documentação</a>
+          <a href={installerUrl}>Download the app</a>
+          <a href={DOCS}>Documentation</a>
         </div>
         <div>
-          <h3>Projeto</h3>
+          <h3>Project</h3>
           <a href={REPO}>GitHub</a>
-          <a href={`${REPO}/issues`}>Reportar um problema</a>
-          <a href="./credits.html">Créditos e licenças</a>
+          <a href={`${REPO}/issues`}>Report a problem</a>
+          <a href="./credits.html">Credits and licenses</a>
         </div>
         <div className="footer-bottom">
-          <span>OpenRetro · Projeto independente de código aberto</span>
-          <span>Ilustrações de jogos pertencem aos respectivos titulares.</span>
+          <span>OpenRetro · Independent open-source project</span>
+          <span>Game artwork belongs to its respective owners.</span>
         </div>
       </footer>
     </div>
