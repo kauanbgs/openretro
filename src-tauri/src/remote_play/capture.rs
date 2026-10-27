@@ -71,7 +71,13 @@ const MONITOR_DEFAULTTONEAREST: u32 = 2;
 fn in_front(runtime: Option<u32>) -> bool {
     let mut pid = 0;
     unsafe { GetWindowThreadProcessId(GetForegroundWindow(), &mut pid) };
-    pid != 0 && (pid == std::process::id() || Some(pid) == runtime)
+    ours(pid, std::process::id(), runtime)
+}
+
+/// Whether the front window's process is OpenRetro or the game runtime.
+/// No window in front (pid 0, as while focus moves) counts as another app.
+fn ours(front: u32, openretro: u32, runtime: Option<u32>) -> bool {
+    front != 0 && (front == openretro || Some(front) == runtime)
 }
 
 /// A window's client area in screen pixels, or None while minimized.
@@ -284,6 +290,16 @@ mod tests {
         assert_eq!(fit(1920, 1080, false), (960, 540));
         assert_eq!(fit(1440, 1080, false), (720, 540));
         assert_eq!(fit(640, 480, false), (640, 480));
+    }
+
+    #[test]
+    fn sends_frames_only_with_openretro_or_the_game_in_front() {
+        assert!(ours(10, 10, None));
+        assert!(ours(20, 10, Some(20)));
+        // A browser, Discord or the desktop would be what the crop shows.
+        assert!(!ours(30, 10, Some(20)));
+        assert!(!ours(30, 10, None));
+        assert!(!ours(0, 10, Some(0)));
     }
 
     #[test]

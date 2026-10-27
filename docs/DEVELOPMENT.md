@@ -243,8 +243,10 @@ time phone play starts. The runtime publishes each frame in shared memory, so
 the picture reaches the phone even with the PC's screen off: frames from
 software cores at the console's own resolution, and frames from GPU-drawn
 games (N64, PSP, PS2) read back only while a phone watches. Screen capture
-shows OpenRetro itself when no game runs. Sound is the PC's output. Phone
-buttons reach the runtime's remote gamepad, which listens on loopback only.
+shows OpenRetro itself when no game runs, and sends nothing while another app
+is in front, so guests and phones never see the rest of the PC. Sound is the
+PC's output. Phone buttons reach the runtime's remote gamepad, which listens
+on loopback only.
 Windows asks once whether OpenRetro may use the network; allow private
 networks. Phones cannot connect while the PC's network is marked as Public:
 the phone dialog then warns about it and opens the Windows page where the
