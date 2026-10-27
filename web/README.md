@@ -1,6 +1,6 @@
 # OpenRetro web
 
-Landing page pixel art do OpenRetro, no mesmo repositório do desktop. Este projeto tem seu próprio build e não carrega o backend Tauri, downloads do aplicativo ou arquivos do usuário.
+Landing page do OpenRetro, feita para levar o visitante ao download, no mesmo repositório do desktop. Este projeto tem seu próprio build e não carrega o backend Tauri, downloads do aplicativo ou arquivos do usuário.
 
 ## Desenvolvimento
 
