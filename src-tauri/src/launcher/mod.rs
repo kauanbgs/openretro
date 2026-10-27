@@ -180,6 +180,7 @@ pub async fn launch_game(
  // Reserve before setup/installations so two launch requests cannot prepare
  // or boot the same managed emulator at the same time.
  let runtime_session=if managed_retroarch || ps3 { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
+ crate::remote_play::input::dpad_as_stick(&entry.game.platform_id);
  #[cfg(windows)]
  if ps3 {
     let ready=rpcs3::prepare(&app).and_then(|_|rpcs3::ensure_disc_key(&app,&game_path));

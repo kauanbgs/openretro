@@ -371,7 +371,6 @@ export function ConsoleHome({
                     <Icon size={34} strokeWidth={1.6} />
                   </span>
                 )}
-                <span className="ps-tile-label">{label}</span>
               </button>
             );
           })}

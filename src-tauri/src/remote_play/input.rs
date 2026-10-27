@@ -5,11 +5,43 @@
 use super::REMOTE_PAD_BASE_PORT;
 use std::{
     net::UdpSocket,
+    sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
 
 const DEVICE_JOYPAD: i32 = 1;
 const DEVICE_ANALOG: i32 = 5;
+
+/// N64 games steer with the analog stick and mostly ignore the D-pad, which
+/// is all a keyboard or a touch pad has. While one runs, remote D-pads move
+/// the left stick instead.
+static DPAD_AS_STICK: AtomicBool = AtomicBool::new(false);
+
+pub fn dpad_as_stick(platform: &str) {
+    DPAD_AS_STICK.store(platform == "n64", Ordering::Relaxed);
+}
+
+const UP: u16 = 1 << 4;
+const DOWN: u16 = 1 << 5;
+const LEFT: u16 = 1 << 6;
+const RIGHT: u16 = 1 << 7;
+
+/// A pad that already moves its stick keeps its D-pad as it is.
+fn stick_from_dpad(state: PadState) -> PadState {
+    let dpad = state.buttons & (UP | DOWN | LEFT | RIGHT);
+    if dpad == 0 || state.axes[0] != 0 || state.axes[1] != 0 {
+        return state;
+    }
+    let axis = |minus: u16, plus: u16| match (dpad & minus != 0, dpad & plus != 0) {
+        (true, false) => -32767,
+        (false, true) => 32767,
+        _ => 0,
+    };
+    PadState {
+        buttons: state.buttons & !dpad,
+        axes: [axis(LEFT, RIGHT), axis(UP, DOWN), state.axes[2], state.axes[3]],
+    }
+}
 
 /// What a phone reports: RetroPad buttons as a bitmask in libretro order
 /// (B, Y, Select, Start, Up, Down, Left, Right, A, X, L, R, L2, R2, L3, R3)
@@ -86,6 +118,11 @@ impl Relay {
 
     /// A pad's state, as the phone reported it.
     pub fn update(&mut self, state: PadState) {
+        let state = if DPAD_AS_STICK.load(Ordering::Relaxed) {
+            stick_from_dpad(state)
+        } else {
+            state
+        };
         self.apply(state);
         #[cfg(windows)]
         if self.has_pads() {
@@ -180,6 +217,26 @@ mod tests {
         assert_eq!(&packet[12..16], &8i32.to_le_bytes());
         assert_eq!(&packet[16..18], &1u16.to_le_bytes());
         assert_eq!(packet.len(), 20);
+    }
+
+    #[test]
+    fn a_dpad_moves_the_stick_unless_the_stick_is_in_use() {
+        let left_up = PadState {
+            buttons: UP | LEFT | 1 << 8,
+            axes: [0; 4],
+        };
+        assert_eq!(
+            stick_from_dpad(left_up),
+            PadState {
+                buttons: 1 << 8,
+                axes: [-32767, -32767, 0, 0],
+            }
+        );
+        let steering = PadState {
+            buttons: RIGHT,
+            axes: [12000, 0, 0, 0],
+        };
+        assert_eq!(stick_from_dpad(steering), steering);
     }
 
     #[test]

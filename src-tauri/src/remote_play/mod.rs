@@ -21,7 +21,7 @@ mod process_audio;
 #[cfg(windows)]
 pub mod xinput;
 mod api;
-mod input;
+pub mod input;
 mod network;
 mod server;
 mod video;

@@ -433,35 +433,10 @@
   border: 1px solid var(--ps-line);
   backdrop-filter: blur(14px);
 }
-.ps-tile-label {
-  position: absolute;
-  left: calc(100% + 24px);
-  bottom: 6px;
-  width: 340px;
-  overflow: hidden;
-  color: #fff;
-  font-size: 22px;
-  font-weight: 500;
-  text-align: left;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
-  opacity: 0;
-  transform: translateX(-8px);
-  transition:
-    opacity 200ms ease,
-    transform 300ms var(--ps-ease);
-  pointer-events: none;
-}
 .ps-console .ps-tile.focused {
   width: 168px;
   height: 168px;
   margin-top: 0;
-  margin-right: 370px;
-}
-.ps-console .ps-tile.focused .ps-tile-label {
-  opacity: 1;
-  transform: none;
 }
 .ps-console .ps-tile:focus-visible,
 .ps-console .ps-tile.focused:focus {
@@ -1003,11 +978,5 @@ html[data-animations="false"] .ps-console *::before {
   .ps-top-tools .fx-clock,
   .ps-pad {
     display: none;
-  }
-  .ps-console .ps-tile.focused {
-    margin-right: 220px;
-  }
-  .ps-tile-label {
-    width: 200px;
   }
 }

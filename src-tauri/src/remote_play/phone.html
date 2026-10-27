@@ -269,7 +269,7 @@
   let chosen = false, taken = [];
   player = Number.isInteger(player) && player >= 1 && player <= 4 ? player : 1;
   let layoutMode = "full", wholeScreen = false, region = null, gameId = null;
-  let touchButtons = 0, dpadBits = 0, padButtons = 0, axes = [0, 0, 0, 0], sent = "";
+  let touchButtons = 0, dpadBits = 0, padButtons = 0, padAxes = [0, 0, 0, 0], touchStick = [0, 0], sent = "";
   let frames = 0, bytes = 0, objectUrl = null, decoding = false, pending = null;
 
   // Always landscape: held upright, the stage is drawn turned a quarter.
@@ -318,9 +318,16 @@
     }
     return false;
   }
+  function stickGame() {
+    const entry = library.find((item) => item.id === gameId);
+    return !!entry && entry.platform === "n64";
+  }
   function sendPad(force) {
     if (!chosen) return;
-    const state = { type: "pad", player, buttons: touchButtons | dpadBits | padButtons, axes };
+    // N64 games steer with the analog stick, so there the touch pad is one.
+    const stick = stickGame();
+    const axes = stick ? [padAxes[0] || touchStick[0], padAxes[1] || touchStick[1], padAxes[2], padAxes[3]] : padAxes;
+    const state = { type: "pad", player, buttons: touchButtons | (stick ? 0 : dpadBits) | padButtons, axes };
     const key = JSON.stringify(state);
     if (force || key !== sent) {
       send(state);
@@ -579,12 +586,23 @@
 
   // Touch: each pointer presses whatever control is under it, sliding included.
   const controls = $("controls"), dpad = $("dpad"), held = new Map(), activePointers = new Set();
-  function dpadFrom(x, y) {
+  function dpadOffset(x, y) {
     const box = dpad.getBoundingClientRect();
     const sx = x - (box.left + box.width / 2), sy = y - (box.top + box.height / 2);
     // On the turned stage, screen down is the game's right and screen left its down.
-    const dx = turned ? sy : sx, dy = turned ? -sx : sy;
-    if (Math.hypot(dx, dy) < box.width * 0.14) return 0;
+    return { dx: turned ? sy : sx, dy: turned ? -sx : sy, size: box.width };
+  }
+  // As a stick, the pad tilts further the further the thumb is from its center.
+  function stickFrom(x, y) {
+    const { dx, dy, size } = dpadOffset(x, y);
+    if (Math.hypot(dx, dy) < size * 0.08) return [0, 0];
+    const reach = size * 0.35;
+    const axis = (v) => Math.round(Math.max(-1, Math.min(1, v / reach)) * 32767);
+    return [axis(dx), axis(dy)];
+  }
+  function dpadFrom(x, y) {
+    const { dx, dy, size } = dpadOffset(x, y);
+    if (Math.hypot(dx, dy) < size * 0.14) return 0;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     let bits = 0;
     if (angle > -157.5 && angle < -22.5) bits |= 1 << 4;
@@ -594,9 +612,9 @@
     return bits;
   }
   function refreshTouch() {
-    touchButtons = 0; dpadBits = 0;
+    touchButtons = 0; dpadBits = 0; touchStick = [0, 0];
     for (const target of held.values()) {
-      if (target.kind === "dpad") dpadBits |= target.bits;
+      if (target.kind === "dpad") { dpadBits |= target.bits; touchStick = target.stick; }
       else touchButtons |= 1 << target.bit;
     }
     controls.querySelectorAll(".btn").forEach((b) => b.classList.toggle("on", [...held.values()].some((t) => t.el === b)));
@@ -606,7 +624,7 @@
   function track(event, initialTarget) {
     const el = initialTarget || document.elementFromPoint(event.clientX, event.clientY);
     const button = el && el.closest && el.closest(".btn");
-    if (el && el.closest && el.closest("#dpad")) held.set(event.pointerId, { kind: "dpad", bits: dpadFrom(event.clientX, event.clientY) });
+    if (el && el.closest && el.closest("#dpad")) held.set(event.pointerId, { kind: "dpad", bits: dpadFrom(event.clientX, event.clientY), stick: stickFrom(event.clientX, event.clientY) });
     else if (button) held.set(event.pointerId, { el: button, bit: Number(button.dataset.bit) });
     else held.delete(event.pointerId);
     refreshTouch();
@@ -626,7 +644,7 @@
     activePointers.delete(e.pointerId); held.delete(e.pointerId); refreshTouch();
   });
   function releaseInput() {
-    activePointers.clear(); held.clear(); padButtons = 0; axes = [0, 0, 0, 0]; refreshTouch();
+    activePointers.clear(); held.clear(); padButtons = 0; padAxes = [0, 0, 0, 0]; refreshTouch();
   }
   window.addEventListener("blur", releaseInput);
   window.addEventListener("pagehide", releaseInput);
@@ -650,7 +668,7 @@
       });
     }
     if (any && !controls.classList.contains("hidden") && !pollGamepads.seen) { pollGamepads.seen = true; controls.classList.add("hidden"); toast("Controle conectado"); }
-    padButtons = buttons; axes = sticks;
+    padButtons = buttons; padAxes = sticks;
     sendPad();
     requestAnimationFrame(pollGamepads);
   }

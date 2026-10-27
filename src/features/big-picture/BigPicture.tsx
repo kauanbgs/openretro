@@ -578,6 +578,7 @@ export function BigPicture({
     { id: "downloads", run: () => openWorkspace({ page: "downloads" }) },
     { id: "friends", run: () => openWorkspace({ page: "friends" }) },
     { id: "settings", run: () => openWorkspace({ page: "settings" }) },
+    { id: "exit", run: () => close() },
   ];
   const topFocused = (id: string) =>
     zone === "top" && topActions[topIndex]?.id === id ? "focused" : "";
@@ -982,6 +983,15 @@ export function BigPicture({
               onClick={() => openWorkspace({ page: "settings" })}
             >
               <Settings size={22} />
+            </button>
+            <button
+              data-top
+              className={topFocused("exit")}
+              aria-label={t("Sair do Big Picture")}
+              title={t("Sair do Big Picture")}
+              onClick={close}
+            >
+              <Power size={22} />
             </button>
             <span
               className={`ps-pad ${connected ? "connected" : ""}`}
