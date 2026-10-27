@@ -74,9 +74,10 @@ describe("controller mapping", () => {
     expect(standard.buttons[1].pressed).toBe(false);
     expect(standard.buttons[12].pressed).toBe(true);
     expect(standard.axes).toEqual([0.5, -0.25, 0, 0]);
-    // Standard 0 (A / ✕) and 12 (up) reach the game like any standard pad.
+    // Standard 0 (bottom: A on Xbox, ✕ on PlayStation) is RetroPad B, as on
+    // the phone and the PC; 12 is up.
     const state = readPartyPad([], standard);
-    expect(state.buttons & (1 << 8)).toBeTruthy();
+    expect(state.buttons & (1 << 0)).toBeTruthy();
     expect(state.buttons & (1 << 4)).toBeTruthy();
   });
 

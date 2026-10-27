@@ -49,7 +49,9 @@ export function readPartyPad(
   const state = neutralPad();
   for (const bit of held) state.buttons |= 1 << bit;
   if (pad?.mapping === "standard") {
-    [8, 0, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7].forEach(
+    // By position, like the web guest and the phone: the bottom button (✕ on
+    // PlayStation) is RetroPad B, which PS3 games see as ✕.
+    [0, 8, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7].forEach(
       (bit, index) => {
         if (pad.buttons[index]?.pressed) state.buttons |= 1 << bit;
       },

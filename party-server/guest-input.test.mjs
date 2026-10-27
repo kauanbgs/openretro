@@ -183,7 +183,7 @@ test("guest releases a controller and keeps it neutral while another app has foc
     'channel = { readyState: "open", bufferedAmount: 0, send: record }; input();',
     context,
   );
-  assert.equal(packets.at(-1).buttons, 1 << 8);
+  assert.equal(packets.at(-1).buttons, 1 << 0);
   assert.equal(packets.at(-1).axes[0], 32767);
   focused = false;
   vm.runInContext("clearInput(); input(); input();", context);
@@ -194,7 +194,7 @@ test("guest releases a controller and keeps it neutral while another app has foc
   assert.equal(polls, 1);
   focused = true;
   vm.runInContext("input();", context);
-  assert.equal(packets.at(-1).buttons, 1 << 8);
+  assert.equal(packets.at(-1).buttons, 1 << 0);
   document.hidden = true;
   vm.runInContext("input();", context);
   assert.equal(packets.at(-1).buttons, 0);
@@ -237,10 +237,11 @@ test("guest sends a controller change on the next frame and stays quiet otherwis
   const frame = () => frames.shift()();
   frame();
   assert.equal(packets.length, 1);
+  assert.equal(element.textContent, "Controle pronto: conectado.");
   pad = { ...pad, buttons: [{ pressed: true }] };
   frame();
   assert.equal(packets.length, 2);
-  assert.equal(packets.at(-1).buttons, 1 << 8);
+  assert.equal(packets.at(-1).buttons, 1 << 0);
   frame();
   assert.equal(packets.length, 2);
 });
@@ -419,4 +420,58 @@ test("a new guest link replaces what the tab remembered from an old one", async 
   vm.runInContext("socket.onopen()", page.context);
   assert.equal(page.packets[0].guest, "NPR2XT");
   assert.equal(page.packets[0].resume, undefined);
+});
+
+test("guest page says why a controller is not playing", () => {
+  let pads = [],
+    focused = true;
+  const frames = [];
+  const note = { textContent: "" };
+  const element = {
+    value: "",
+    addEventListener() {},
+    focus() {},
+    classList: { remove() {} },
+  };
+  const context = vm.createContext({
+    document: {
+      hidden: false,
+      hasFocus: () => focused,
+      getElementById: (id) => (id === "pad-note" ? note : element),
+      querySelectorAll: () => [],
+      addEventListener() {},
+    },
+    location: { pathname: "/party" },
+    window: { addEventListener() {} },
+    navigator: { getGamepads: () => pads },
+    setInterval() {},
+    clearInterval() {},
+    requestAnimationFrame: (fn) => frames.push(fn),
+  });
+  vm.runInContext(
+    readFileSync(new URL("public/guest.js", import.meta.url), "utf8"),
+    context,
+  );
+  const frame = () => frames.shift()();
+  frame();
+  assert.match(note.textContent, /Conecte e pressione um botão/);
+  pads = [
+    null,
+    { id: "Generic USB Joystick", mapping: "", buttons: [], axes: [] },
+  ];
+  frame();
+  assert.match(note.textContent, /não reconhece os botões/);
+  pads = [
+    {
+      id: "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)",
+      mapping: "standard",
+      buttons: [],
+      axes: [0, 0, 0, 0],
+    },
+  ];
+  frame();
+  assert.equal(note.textContent, "Controle pronto: Wireless Controller.");
+  focused = false;
+  frame();
+  assert.match(note.textContent, /clique nesta página/);
 });

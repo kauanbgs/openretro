@@ -333,6 +333,8 @@ pub async fn launch_game(
  tx.execute("UPDATE play_sessions SET finished_at=?1,duration=?2,exit_code=?3 WHERE id=?4",params![chrono::Utc::now().to_rfc3339(),elapsed,status.as_ref().ok().and_then(|s|s.code()),session]).map_err(error)?;
  tx.execute("UPDATE library_items SET playtime=playtime+?1 WHERE id=?2",params![elapsed,id]).map_err(error)?;
  tx.commit().map_err(error)?; let _=app.emit("game-finished",&id);
+ // finish_session writes through the same connection; holding it here deadlocked the app.
+ drop(conn);
  if let (true,Some(log))=(achievements_session,&runtime_log) { crate::achievements::finish_session(&app,&id,&entry.game.title,variant.is_none(),log); }
  let status=status.map_err(error)?;
  // RPCS3 can report an error code while shutting down after a normal exit.

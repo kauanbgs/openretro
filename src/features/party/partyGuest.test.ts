@@ -263,7 +263,7 @@ describe("Party input ownership and transmission", () => {
     expect(readPartyPad([partyKeys.KeyZ, partyKeys.Enter]).buttons).toBe(
       (1 << 0) | (1 << 3),
     );
-    const mapping = [8, 0, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7];
+    const mapping = [0, 8, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7];
     mapping.forEach((bit, i) => {
       expect(
         readPartyPad([], {

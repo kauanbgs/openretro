@@ -125,7 +125,9 @@ function reading(clear) {
       (pad) => pad?.mapping === "standard",
     );
     if (pad) {
-      [8, 0, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7].forEach(
+      // By position, as the phone page and the PC's runtime read a pad: the
+      // bottom button (✕ on PlayStation) is RetroPad B, which PS3 games see as ✕.
+      [0, 8, 1, 9, 10, 11, 12, 13, 2, 3, 14, 15, 4, 5, 6, 7].forEach(
         (bit, index) => {
           if (pad.buttons[index]?.pressed) buttons |= 1 << bit;
         },
@@ -151,7 +153,23 @@ const inputTimer = setInterval(() => input(), 33);
 function pollPad() {
   if (channel?.readyState === "open" && JSON.stringify(reading()) !== lastSent)
     input();
+  showPad();
   requestAnimationFrame(pollPad);
+}
+let padNote = "";
+/** Tells the guest whether their controller plays: the browser may not see
+ * it, may not know its buttons, or this page may not have focus. */
+function showPad() {
+  const pads = [...(navigator.getGamepads?.() || [])].filter(Boolean);
+  const pad = pads.find((pad) => pad.mapping === "standard");
+  const note = !pads.length
+    ? "Controle USB ou Bluetooth também funciona em navegadores compatíveis. Conecte e pressione um botão."
+    : !pad
+      ? "Este navegador não reconhece os botões do seu controle. Tente o Chrome ou o Edge, ou jogue pelo teclado."
+      : !document.hasFocus()
+        ? "Controle pausado: clique nesta página para ele voltar a jogar."
+        : `Controle pronto: ${(pad.id || "").replace(/\s*\(.*$/, "") || "conectado"}.`;
+  if (note !== padNote) $("pad-note").textContent = padNote = note;
 }
 if (typeof requestAnimationFrame === "function") requestAnimationFrame(pollPad);
 /** `final` is the room's own answer; a dropped connection is not. */

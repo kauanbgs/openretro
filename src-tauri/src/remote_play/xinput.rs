@@ -171,6 +171,16 @@ pub fn set(player: u8, state: Option<PadState>) {
     if state.is_some() && LOGGED.fetch_or(bit, Ordering::Relaxed) & bit == 0 {
         log::info!("PS3 pad: player {player} is connected");
     }
+    // And that a press arrived, not only the idle repeats a guest sends.
+    let pressed = bit << 4;
+    if let Some(held) = state.filter(|held| *held != PadState::default()) {
+        if LOGGED.fetch_or(pressed, Ordering::Relaxed) & pressed == 0 {
+            log::info!(
+                "PS3 pad: player {player} pressed buttons {:#06x}",
+                held.buttons
+            );
+        }
+    }
     let (main, extra) = unsafe {
         let first = if player == 1 {
             7

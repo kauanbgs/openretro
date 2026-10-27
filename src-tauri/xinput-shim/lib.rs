@@ -271,6 +271,16 @@ unsafe fn read(index: u32, state: *mut State, call: Option<GetState>) -> u32 {
         return match guest(view, index) {
             Some(guest) if !state.is_null() => {
                 noted(index, "remote");
+                // Proof that a press, not only an idle pad, reached the game.
+                let pressed = 1u64 << (32 + index.min(7));
+                if guest.gamepad.buttons != 0
+                    && NOTED.fetch_or(pressed, Ordering::Relaxed) & pressed == 0
+                {
+                    note(&format!(
+                        "pad {index}: pressed {:#06x}",
+                        guest.gamepad.buttons
+                    ));
+                }
                 state.write(guest);
                 ERROR_SUCCESS
             }
