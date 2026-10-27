@@ -2386,3 +2386,70 @@ test("email alerts reach offline players for requests and quiet conversations, a
       400,
     );
   }));
+test("the Party chat relays seated players' lines to the room and keeps nothing", () =>
+  using(
+    async (f) => {
+      const a = await f.login("chat-host@example.test");
+      await f.call(
+        "/api/account/profile",
+        { displayName: "Anfitriã" },
+        { token: a.token, method: "PATCH" },
+      );
+      const room = await hostRoom(f, a),
+        sockets = [room.host.ws];
+      const lines = (client) =>
+        client.messages.filter((m) => m.type === "chat");
+      try {
+        room.host.send({ type: "guest-link" });
+        const link = await eventually(() =>
+          room.host.messages.find((m) => m.type === "guest-link" && m.url),
+        );
+        // A socket that never joined cannot talk to the room.
+        const stranger = await roomSocket(f, room.code);
+        sockets.push(stranger.ws);
+        stranger.send({ type: "chat", text: "oi" });
+        const guest = await roomSocket(f, room.code);
+        sockets.push(guest.ws);
+        guest.send({
+          type: "join",
+          room: room.code,
+          name: "Convidado",
+          guest: new URL(link.url).pathname.slice(1),
+        });
+        await eventually(() =>
+          guest.messages.some((m) => m.type === "accepted"),
+        );
+        guest.send({ type: "chat", text: "  bora   jogar  " });
+        const line = await eventually(() => lines(room.host)[0]);
+        assert.equal(line.text, "bora jogar");
+        assert.equal(line.name, "Convidado");
+        assert.equal(line.player, 2);
+        await eventually(() => lines(guest).length === 1);
+        room.host.send({ type: "chat", text: "vamos!" });
+        const reply = await eventually(() => lines(guest)[1]);
+        assert.equal(reply.from, "host");
+        assert.equal(reply.name, "Anfitriã");
+        assert.equal(reply.player, 1);
+        // Invisible characters and long lines are dropped, not relayed.
+        guest.send({ type: "chat", text: "a‮b" });
+        guest.send({ type: "chat", text: "x".repeat(201) });
+        guest.send({ type: "chat", text: 5 });
+        // Six lines per ten seconds; the seventh is refused to its sender.
+        for (let i = 0; i < 6; i++) guest.send({ type: "chat", text: `n${i}` });
+        await eventually(() =>
+          guest.messages.some((m) => m.type === "chat-error"),
+        );
+        assert.deepEqual(
+          lines(room.host).map((m) => m.text),
+          ["bora jogar", "vamos!", "n0", "n1", "n2", "n3", "n4"],
+        );
+        assert.equal(lines(stranger).length, 0);
+      } finally {
+        for (const ws of sockets)
+          try {
+            ws.close();
+          } catch {}
+      }
+    },
+    { PARTY_TICKET_SECRET: INVITE_SECRET },
+  ));

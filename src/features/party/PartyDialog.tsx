@@ -16,6 +16,7 @@ import {
   endParty,
   partyStore,
   removeGuest,
+  sendPartyChat,
   startParty,
   setFriendsAllowed,
 } from "./partySession";
@@ -23,6 +24,7 @@ import "./PartyDialog.css";
 import { socialStore } from "../../services/social";
 import { locale, t } from "../../i18n";
 import { AccountAvatar } from "../social/accountAvatars";
+import { PartyChat } from "./PartyChat";
 
 export function PartyDialog({
   onClose,
@@ -356,6 +358,28 @@ export function PartyDialog({
                 : "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem."}
             </p>
           </div>
+        )}
+        {active && (
+          <section
+            className="party-chat-section"
+            aria-label={t("Chat da Party")}
+          >
+            <h3>{t("Chat da Party")}</h3>
+            <p>
+              {room.chat.length
+                ? t("Durante o jogo, aperte T para escrever por cima da tela.")
+                : t(
+                    "Ninguém escreveu ainda. Durante o jogo, aperte T para escrever por cima da tela. Nada fica salvo.",
+                  )}
+            </p>
+            <PartyChat
+              inline
+              open
+              lines={room.chat}
+              onSend={sendPartyChat}
+              onClose={() => {}}
+            />
+          </section>
         )}
         {active && !room.relay && (
           <p className="party-note">

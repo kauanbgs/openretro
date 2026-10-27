@@ -17,6 +17,7 @@ import {
 } from "./partyInput";
 import { loadMapping, pickPad, type PadMapping } from "./partyPadMapping";
 import { PartyPadSetup } from "./PartyPadSetup";
+import { PartyChat } from "./PartyChat";
 import { t } from "../../i18n";
 import "./PartyGuestScreen.css";
 
@@ -56,6 +57,9 @@ export function PartyGuestScreen({
   const setupRef = useRef(false);
   const mappings = useRef(new Map<string, PadMapping | null>());
   const paused = useRef(false);
+  // Typing in the chat keeps playing but sends no press to the game.
+  const [chat, setChat] = useState(false);
+  const chatRef = useRef(false);
   const held = useRef(new Map<string, number>());
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -88,8 +92,34 @@ export function PartyGuestScreen({
     paused.current = false;
     setSetup(false);
   };
-  const actions = useRef({ openMenu, resume, leave, closeSetup });
-  actions.current = { openMenu, resume, leave, closeSetup };
+  const openChat = () => {
+    if (!stateRef.current.player || chatRef.current) return;
+    chatRef.current = true;
+    held.current.clear();
+    guest.current?.setInput(neutralPad());
+    setChat(true);
+  };
+  const closeChat = () => {
+    chatRef.current = false;
+    setChat(false);
+    (document.activeElement as HTMLElement | null)?.blur();
+  };
+  const actions = useRef({
+    openMenu,
+    resume,
+    leave,
+    closeSetup,
+    openChat,
+    closeChat,
+  });
+  actions.current = {
+    openMenu,
+    resume,
+    leave,
+    closeSetup,
+    openChat,
+    closeChat,
+  };
   // A controller unplugged mid-setup must not leave play paused.
   useEffect(() => {
     if (setup && !unmapped) actions.current.closeSetup();
@@ -129,6 +159,16 @@ export function PartyGuestScreen({
   }, [friend.id]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
+      // Keys typed into the chat box are text, not presses.
+      // Capturing them here also keeps the input's own handlers out, so Esc is read here.
+      if (chatRef.current) {
+        event.stopImmediatePropagation();
+        if (event.code === "Escape" && event.type === "keydown") {
+          event.preventDefault();
+          actions.current.closeChat();
+        }
+        return;
+      }
       // Capture every shortcut, including launcher keys that are not game bindings.
       event.stopImmediatePropagation();
       if (event.code === "Escape") {
@@ -172,6 +212,10 @@ export function PartyGuestScreen({
         return;
       }
       event.preventDefault();
+      if (event.type === "keydown" && event.code === "KeyT" && !event.repeat) {
+        actions.current.openChat();
+        return;
+      }
       if (event.type === "keydown" && partyKeys[event.code] !== undefined)
         held.current.set(event.code, partyKeys[event.code]);
       else if (event.type === "keyup") held.current.delete(event.code);
@@ -238,7 +282,7 @@ export function PartyGuestScreen({
         readPartyPad(
           held.current.values(),
           pad,
-          active && !dialog && !exitGesture.latched,
+          active && !dialog && !chatRef.current && !exitGesture.latched,
         ),
       );
     }
@@ -315,10 +359,23 @@ export function PartyGuestScreen({
         >
           {t("Tela cheia")}
         </button>
+        {state.player && (
+          <button className="button secondary" onClick={openChat}>
+            {t("Chat (T)")}
+          </button>
+        )}
         <button className="button secondary" onClick={openMenu}>
           {t("Sair")}
         </button>
       </header>
+      {state.player && !failed && (
+        <PartyChat
+          lines={state.chat ?? []}
+          open={chat && !menu}
+          onSend={(text) => guest.current?.sendChat(text)}
+          onClose={closeChat}
+        />
+      )}
       {play && !failed && (
         <button
           className="button party-guest-play"

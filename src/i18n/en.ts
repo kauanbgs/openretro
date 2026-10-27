@@ -2203,4 +2203,15 @@ export const en: Record<string, string> = {
     "The room comes with an invite link. Your OpenRetro friends also see it in the friends panel.",
   "Criar sala e convidar": "Create room and invite",
   "Party aberta · {count}/4 jogadores": "Party open · {count}/4 players",
+  "Chat da Party": "Party chat",
+  "Mensagem para a Party": "Message to the Party",
+  "Mensagem para a Party · Enter envia, Esc fecha":
+    "Message to the Party · Enter sends, Esc closes",
+  "Chat (T)": "Chat (T)",
+  "Chat da Party · o jogo continua rodando":
+    "Party chat · the game keeps running",
+  "Durante o jogo, aperte T para escrever por cima da tela.":
+    "During the game, press T to type over the screen.",
+  "Ninguém escreveu ainda. Durante o jogo, aperte T para escrever por cima da tela. Nada fica salvo.":
+    "No one has written yet. During the game, press T to type over the screen. Nothing is saved.",
 };

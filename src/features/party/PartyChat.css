@@ -1,0 +1,101 @@
+/* The Party chat sits over the bottom-left corner of the game. */
+.party-chat {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 5;
+  width: min(440px, calc(100% - 32px));
+  pointer-events: none;
+}
+.party-chat.open {
+  pointer-events: auto;
+}
+.party-chat ol {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}
+.party-chat li {
+  justify-self: start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #000000b8;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  animation: party-chat-in 0.18s ease-out;
+}
+.party-chat li.note {
+  color: #ffd27a;
+}
+.party-chat strong {
+  color: #9fd3ff;
+}
+.party-chat input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #ffffff40;
+  background: #000000d9;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.party-chat input:focus {
+  outline: 2px solid #9fd3ff;
+}
+@keyframes party-chat-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .party-chat li {
+    animation: none;
+  }
+}
+/* Over a running game, in the host's transparent window. */
+.party-chat-overlay {
+  position: fixed;
+  inset: 0;
+}
+.party-chat-overlay .party-chat {
+  left: 32px;
+  bottom: 32px;
+}
+.party-chat-overlay-hint {
+  position: absolute;
+  left: 32px;
+  bottom: 8px;
+  margin: 0;
+  color: #fff;
+  font-size: 12px;
+  text-shadow: 0 1px 3px #000;
+}
+/* In the Party window, the chat is a plain list above its box. */
+.party-chat.inline {
+  position: static;
+  width: auto;
+  pointer-events: auto;
+}
+.party-chat.inline ol {
+  max-height: 180px;
+}
+.party-chat.inline li {
+  background: var(--panel2, #1c1c1c);
+  color: inherit;
+  animation: none;
+}
+.party-chat.inline input {
+  background: transparent;
+  color: inherit;
+  border-color: var(--border, #ffffff26);
+}

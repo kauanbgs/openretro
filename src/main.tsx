@@ -16,10 +16,17 @@ const InGameOverlay = lazy(() =>
     default: InGameOverlay,
   })),
 );
-const inGameWindow = Boolean(
-  (window as Window & { __OPENRETRO_GAME_MENU__?: boolean })
-    .__OPENRETRO_GAME_MENU__,
+const PartyChatOverlay = lazy(() =>
+  import("./features/party/PartyChatOverlay").then(({ PartyChatOverlay }) => ({
+    default: PartyChatOverlay,
+  })),
 );
+const flags = window as Window & {
+  __OPENRETRO_GAME_MENU__?: boolean;
+  __OPENRETRO_PARTY_CHAT__?: boolean;
+};
+const partyChatWindow = Boolean(flags.__OPENRETRO_PARTY_CHAT__);
+const inGameWindow = Boolean(flags.__OPENRETRO_GAME_MENU__) || partyChatWindow;
 const client = new QueryClient({
   defaultOptions: {
     queries: {
@@ -42,7 +49,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           )
         }
       >
-        {inGameWindow ? <InGameOverlay /> : <App />}
+        {partyChatWindow ? (
+          <PartyChatOverlay />
+        ) : inGameWindow ? (
+          <InGameOverlay />
+        ) : (
+          <App />
+        )}
       </Suspense>
     </QueryClientProvider>
   </React.StrictMode>,

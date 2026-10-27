@@ -6,6 +6,7 @@ use tauri::{Emitter, Manager};
 mod controller;
 #[cfg(target_os = "windows")]
 mod host;
+pub mod party_chat;
 mod screen_view;
 #[cfg(target_os = "windows")]
 pub(crate) mod sdl;
@@ -449,14 +450,20 @@ pub fn open_steam_controller_settings(app: tauri::AppHandle) -> Result<()> {
     }
 }
 
-pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
+/// A hidden, transparent, full-screen window that floats over the game.
+fn overlay_builder<'a>(
+    app: &'a tauri::AppHandle,
+    label: &str,
+    title: &str,
+    script: &str,
+) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
     let builder = tauri::WebviewWindowBuilder::new(
         app,
-        "game-menu",
+        label,
         tauri::WebviewUrl::App("index.html".into()),
     )
-    .title("OpenRetro · Menu do jogo")
-    .initialization_script("window.__OPENRETRO_GAME_MENU__ = true;")
+    .title(title)
+    .initialization_script(script)
     .visible(false)
     .focused(false)
     .decorations(false)
@@ -480,7 +487,17 @@ pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
         Some(arguments) => builder.additional_browser_args(arguments),
         None => builder,
     };
-    let window = builder.build()?;
+    builder
+}
+
+pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let window = overlay_builder(
+        app,
+        "game-menu",
+        "OpenRetro · Menu do jogo",
+        "window.__OPENRETRO_GAME_MENU__ = true;",
+    )
+    .build()?;
     let target = app.clone();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -494,6 +511,7 @@ pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
             }
         }
     });
+    party_chat::setup(app)?;
     #[cfg(target_os = "windows")]
     controller::start(app.clone());
     Ok(())

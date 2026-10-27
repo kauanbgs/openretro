@@ -51,6 +51,7 @@
           <span id="player">Seu controle</span
           ><span id="input-hint"
             >Setas para mover · Z / X para jogar · Enter para iniciar</span
+          ><button id="chat-open" type="button">Chat (T)</button
           ><button id="fullscreen" type="button">Tela cheia</button
           ><button id="leave" type="button">Sair</button>
         </div>
@@ -59,6 +60,19 @@
           ><button id="play" hidden type="button">
             Toque para ativar imagem e som
           </button>
+          <div id="chat" class="chat" aria-live="polite">
+            <ol id="chat-lines" aria-label="Chat da Party"></ol>
+            <form id="chat-form" hidden>
+              <input
+                id="chat-input"
+                maxlength="200"
+                autocomplete="off"
+                enterkeyhint="send"
+                aria-label="Mensagem para a Party"
+                placeholder="Mensagem para a Party · Enter envia, Esc fecha"
+              />
+            </form>
+          </div>
         </div>
         <div id="touch" aria-label="Controle na tela">
           <div class="dpad">

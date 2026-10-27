@@ -46,6 +46,7 @@ import {
 } from "./features/social/SocialActivity";
 import { usePlayTogether } from "./components/PlayTogether";
 import { PartyGuestScreen } from "./features/party/PartyGuestScreen";
+import { startPartyChatRelay } from "./features/party/partyChatRelay";
 import { partyOwnsInput } from "./features/party/partyInput";
 import type { Friend } from "./services/social";
 import { AccountAvatar } from "./features/social/accountAvatars";
@@ -172,6 +173,8 @@ export function App() {
   }, [titleBar]);
   // Encodes phone play video while phone play runs, from any screen.
   useEffect(() => startPhoneVideoHost(), []);
+  // Shows the host's Party chat over a running game.
+  useEffect(() => startPartyChatRelay(), []);
   const [downloadArrival, setDownloadArrival] = useState<DownloadImported>();
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);

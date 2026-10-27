@@ -9,6 +9,13 @@ import { parsePartyRoster } from "./partyRoster";
 import { parsePartyGuestLink, type PartyGuestLink } from "./partyGuestLink";
 import { isRawPartyFrame } from "./partyFrames";
 import {
+  addChatLine,
+  chatMessage,
+  chatNote,
+  parsePartyChat,
+  type PartyChatLine,
+} from "./partyChatLines";
+import {
   paintWaiting,
   WAITING_HEIGHT,
   WAITING_INTERVAL_MS,
@@ -48,6 +55,8 @@ export interface PartyState {
   /** The open guest link, which holds one seat for a browser guest. */
   guestLink: PartyGuestLink | null;
   guestLinkBusy: boolean;
+  /** The room's temporary chat; it ends with the room. */
+  chat: PartyChatLine[];
 }
 const initial: PartyState = {
   friendsAllowed: true,
@@ -64,6 +73,7 @@ const initial: PartyState = {
   relay: false,
   guestLink: null,
   guestLinkBusy: false,
+  chat: [],
 };
 let state = initial;
 const listeners = new Set<() => void>();
@@ -221,6 +231,10 @@ export function endParty() {
   audioTime = 0;
   update({ ...initial });
 }
+export function sendPartyChat(text: string) {
+  const message = chatMessage(text);
+  if (message && state.phase === "open") send(message);
+}
 export function removeGuest(id: string) {
   dropPeer(id);
   send({ type: "remove", id });
@@ -377,6 +391,12 @@ export async function startParty() {
           syncFriendsAccess();
         }
         if (m.type === "roster") update({ guests: parsePartyRoster(m.guests) });
+        if (m.type === "chat") {
+          const line = parsePartyChat(m);
+          if (line) update({ chat: addChatLine(state.chat, line) });
+        }
+        if (m.type === "chat-error" && typeof m.message === "string")
+          update({ chat: addChatLine(state.chat, chatNote(m.message)) });
         if (m.type === "guest-link")
           update({
             guestLink: parsePartyGuestLink(m, state.url),

@@ -45,6 +45,19 @@ const invalid =
 const safeError = "Não foi possível conectar à sala. Tente novamente.";
 const json = (value, status = 200) =>
   Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
+const CHAT_MAX = 200;
+const CHAT_WINDOW_MS = 10000,
+  CHAT_PER_WINDOW = 6;
+// Invisible and direction-changing characters can disguise a message.
+const CHAT_UNSAFE = /[\p{Cc}\p{Co}\p{Cn}\p{Cs}\p{Zl}\p{Zp}؜‎‏‪-‮⁦-⁩]/u;
+/** A chat line as the room relays it, or null when it cannot be shown. */
+function chatText(value) {
+  if (typeof value !== "string") return null;
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text || [...text].length > CHAT_MAX || CHAT_UNSAFE.test(text))
+    return null;
+  return text;
+}
 const send = (ws, value) => {
   if (ws?.readyState === 1) ws.send(JSON.stringify(value));
 };
@@ -159,8 +172,13 @@ export default {
             { error: "O Party ainda não está disponível. Tente mais tarde." },
             503,
           );
+        let host;
         try {
-          await authenticate(request, database(env, url), Date.now());
+          ({ user: host } = await authenticate(
+            request,
+            database(env, url),
+            Date.now(),
+          ));
         } catch (error) {
           if (!(error instanceof AccountError)) throw error;
           return reply(
@@ -190,6 +208,8 @@ export default {
             code: reservation.code,
             hostHash: await hash(reservation.ticket),
             origin: url.origin,
+            // The name the room's chat shows for the host.
+            hostName: host.display_name || host.friend_code,
           },
         );
         if (!initialized.ok) {
@@ -920,6 +940,40 @@ export class PartyRoom extends DurableObject {
           await this.closeGuestLink("O anfitrião fechou o lugar do convite.");
           await this.ctx.storage.put("room", this.meta);
           this.roster();
+          return;
+        }
+        if (m.type === "chat") {
+          // Seated players talk; nothing is stored, so the chat ends with the room.
+          if (a.role !== "host" && !a.player) return;
+          const text = chatText(m.text);
+          if (!text) return;
+          const now = Date.now();
+          if (now - (a.chatWindow ?? 0) >= CHAT_WINDOW_MS) {
+            a.chatWindow = now;
+            a.chatCount = 0;
+          }
+          if (++a.chatCount > CHAT_PER_WINDOW) {
+            ws.serializeAttachment(a);
+            send(ws, {
+              type: "chat-error",
+              message: "Você está mandando mensagens rápido demais.",
+            });
+            return;
+          }
+          ws.serializeAttachment(a);
+          const line = {
+            type: "chat",
+            id: crypto.randomUUID(),
+            from: a.role === "host" ? "host" : a.id,
+            name:
+              a.role === "host" ? this.meta.hostName || "Anfitrião" : a.name,
+            player: a.role === "host" ? 1 : a.player,
+            text,
+            at: now,
+          };
+          send(this.host(), line);
+          for (const guest of this.guests())
+            if (guest.deserializeAttachment().player) send(guest, line);
           return;
         }
         if (m.type === "signal") {

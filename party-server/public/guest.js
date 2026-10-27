@@ -181,6 +181,11 @@ function ended(message, final = false) {
   pc?.close();
   socket?.close();
   $("screen").srcObject = null;
+  // The room's chat ends with it.
+  chatLines.length = 0;
+  $("chat-form").hidden = true;
+  $("chat-lines").textContent = "";
+  $("chat").classList.remove("open");
   $("stage").hidden = true;
   $("lobby").hidden = false;
   $("connection").textContent = "Conexão encerrada";
@@ -265,6 +270,14 @@ $("join-form").addEventListener("submit", (event) => {
   };
 });
 async function receive(m) {
+  if (m.type === "chat" && typeof m.text === "string") {
+    addChat({ name: String(m.name), player: Number(m.player), text: m.text });
+    return;
+  }
+  if (m.type === "chat-error") {
+    addChat({ text: String(m.message) });
+    return;
+  }
   if (m.type === "waiting") {
     status("Seu amigo recebeu o pedido. Aguarde ele aceitar sua entrada.");
     $("connection").textContent = "Aguardando o anfitrião";
@@ -377,14 +390,80 @@ const keys = {
   KeyQ: 10,
   KeyW: 11,
 };
+// A temporary chat: the room relays it to the seated players and keeps nothing.
+const chatLines = [];
+function showChat() {
+  const open = !$("chat-form").hidden,
+    now = Date.now();
+  const list = $("chat-lines");
+  list.replaceChildren(
+    ...chatLines
+      .filter((line) => open || now - line.shown < 10000)
+      .slice(open ? -30 : -6)
+      .map((line) => {
+        const item = document.createElement("li");
+        if (line.name) {
+          const name = document.createElement("strong");
+          name.textContent = `${line.name} (J${line.player})`;
+          item.append(name, " ");
+        } else item.className = "note";
+        item.append(line.text);
+        return item;
+      }),
+  );
+  list.scrollTop = list.scrollHeight;
+}
+function addChat(line) {
+  chatLines.push({ ...line, shown: Date.now() });
+  if (chatLines.length > 50) chatLines.shift();
+  showChat();
+  setTimeout(showChat, 10100);
+}
+function openChat() {
+  if ($("stage").hidden) return;
+  clearInput();
+  $("chat-form").hidden = false;
+  $("chat").classList.add("open");
+  showChat();
+  $("chat-input").focus();
+}
+function closeChat() {
+  $("chat-form").hidden = true;
+  $("chat").classList.remove("open");
+  $("chat-input").blur();
+  showChat();
+}
+$("chat-open").addEventListener("click", () =>
+  $("chat-form").hidden ? openChat() : closeChat(),
+);
+$("chat-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = $("chat-input").value.trim();
+  if (text) send({ type: "chat", text });
+  $("chat-input").value = "";
+  closeChat();
+});
+$("chat-input").addEventListener("keydown", (event) => {
+  if (event.code === "Escape") {
+    event.preventDefault();
+    closeChat();
+  }
+});
 document.addEventListener("keydown", (event) => {
+  // Typing a message never moves the player.
+  if (event.target === $("chat-input")) return;
+  if (!$("stage").hidden && event.code === "KeyT" && !event.repeat) {
+    event.preventDefault();
+    openChat();
+    return;
+  }
   if ($("stage").hidden || !(event.code in keys)) return;
   event.preventDefault();
   held.set(event.code, keys[event.code]);
   input();
 });
 document.addEventListener("keyup", (event) => {
-  if (!(event.code in keys)) return;
+  if (event.target === $("chat-input") || !(event.code in keys)) return;
   held.delete(event.code);
   input();
 });

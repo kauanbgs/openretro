@@ -325,3 +325,18 @@
     align-self: center;
   }
 }
+.party-chat-section {
+  border-top: 1px solid var(--border);
+  padding-top: 17px;
+  margin-top: 18px;
+}
+.party-chat-section h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.party-chat-section p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--body);
+  margin: 5px 0 10px;
+}

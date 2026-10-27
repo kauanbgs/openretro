@@ -1,6 +1,13 @@
 import { t } from "../../i18n";
 import { neutralPad, PartyPadSender, type PadState } from "./partyInput";
 import { tunePartyReceiver } from "./partyQuality";
+import {
+  addChatLine,
+  chatMessage,
+  chatNote,
+  parsePartyChat,
+  type PartyChatLine,
+} from "./partyChatLines";
 
 export interface GuestRoom {
   code: string;
@@ -21,6 +28,8 @@ export interface GuestState {
   player?: number;
   message?: string;
   connectedOnce: boolean;
+  /** The room's chat since this guest joined. */
+  chat?: PartyChatLine[];
 }
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): value is RecordValue =>
@@ -52,6 +61,8 @@ function iceServers(value: unknown): value is RTCIceServer[] {
 export function validGuestMessage(m: unknown): m is RecordValue {
   if (!record(m)) return false;
   if (m.type === "waiting") return true;
+  if (m.type === "chat") return parsePartyChat(m) !== null;
+  if (m.type === "chat-error") return text(m.message, 512);
   if (m.type === "error" || m.type === "ended") return text(m.message, 4096);
   if (m.type === "accepted")
     return (
@@ -104,6 +115,7 @@ export class PartyGuest {
       message,
       player,
       connectedOnce: this.state.connectedOnce || phase === "connected",
+      chat: this.state.chat,
     };
     this.changed(this.state);
   }
@@ -172,12 +184,31 @@ export class PartyGuest {
     this.input = this.state.phase === "connected" ? state : neutralPad();
     this.sender?.send(this.input);
   }
+  sendChat(value: string) {
+    const message = chatMessage(value);
+    if (message && this.state.player) this.send(message);
+  }
+  private chat(line: PartyChatLine) {
+    this.state = {
+      ...this.state,
+      chat: addChatLine(this.state.chat ?? [], line),
+    };
+    this.changed(this.state);
+  }
   private send(value: unknown) {
     if (!this.stopped && this.socket?.readyState === WebSocket.OPEN)
       this.socket.send(JSON.stringify(value));
   }
   private async receive(m: RecordValue) {
     if (this.stopped) return;
+    if (m.type === "chat") {
+      this.chat(parsePartyChat(m)!);
+      return;
+    }
+    if (m.type === "chat-error") {
+      this.chat(chatNote(m.message as string));
+      return;
+    }
     if (m.type === "error" || m.type === "ended") {
       this.finish(m.type, m.message as string);
       return;
