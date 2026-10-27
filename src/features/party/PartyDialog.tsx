@@ -1,10 +1,13 @@
 import {
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type RefObject,
 } from "react";
-import { Copy, Link2, LoaderCircle, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Check, Copy, Link2, LoaderCircle, X } from "lucide-react";
+import { bridge } from "../../services/bridge";
 import { Modal } from "../../components/Modal";
 import { isTauri } from "../../services/transport";
 import {
@@ -47,6 +50,27 @@ export function PartyDialog({
   const active = room.phase === "open";
   const busy = room.phase === "connecting";
   const signedIn = social.session.hasSession;
+  // An open room always has an invite ready: one press creates both.
+  const autoLink = useRef(false);
+  useEffect(() => {
+    if (!active) {
+      autoLink.current = false;
+      return;
+    }
+    if (autoLink.current || link || room.guestLinkBusy || seatsFull) return;
+    autoLink.current = true;
+    createGuestLink();
+  }, [active, link, room.guestLinkBusy, seatsFull]);
+  const qr = useQuery({
+    queryKey: ["invite-qr", link?.url],
+    queryFn: () => bridge.inviteQr(link!.url),
+    enabled: Boolean(link && isTauri),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const copyLink = () =>
+    link &&
+    void navigator.clipboard.writeText(link.url).then(() => setCopied(true));
   useEffect(() => {
     if (!input) return;
     const handler = (button: string) => {
@@ -82,7 +106,7 @@ export function PartyDialog({
           <h3>{t("Jogue com seus amigos.")}</h3>
           <p>
             {t(
-              "O jogo roda no seu PC. Seus amigos do OpenRetro entram com um clique, pelo painel de amigos.",
+              "O jogo roda no seu PC e seus amigos jogam pela internet, de onde estiverem.",
             )}
           </p>
         </div>
@@ -181,36 +205,42 @@ export function PartyDialog({
           {active && (
             <div className="party-link">
               <div>
-                <strong>{t("Convidar por link")}</strong>
+                <strong>{t("Convide pelo link")}</strong>
                 <p>
                   {t(
-                    "Para quem não tem o OpenRetro: a pessoa joga pelo navegador, sem conta e sem instalar nada. O link vale para um lugar.",
+                    "Mande o link ou mostre o código. A pessoa joga pelo navegador do PC ou do celular, sem conta e sem instalar nada.",
                   )}
                 </p>
               </div>
               {link ? (
                 <>
-                  <div className="input-action">
-                    <input
-                      readOnly
-                      value={link.url}
-                      aria-label={t("Link do convite")}
-                      onFocus={(event) => event.currentTarget.select()}
-                    />
-                    <button
-                      className="icon-button"
-                      aria-label={t("Copiar link")}
-                      onClick={() =>
-                        void navigator.clipboard
-                          .writeText(link.url)
-                          .then(() => setCopied(true))
-                      }
-                    >
-                      <Copy size={16} />
-                    </button>
+                  <div className="party-link-share">
+                    {qr.data && (
+                      <div
+                        className="party-link-qr"
+                        role="img"
+                        aria-label={t("QR code do convite")}
+                        dangerouslySetInnerHTML={{ __html: qr.data }}
+                      />
+                    )}
+                    <div className="party-link-copy">
+                      <input
+                        readOnly
+                        value={link.url}
+                        aria-label={t("Link do convite")}
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                      <button
+                        className="button primary"
+                        autoFocus
+                        onClick={copyLink}
+                      >
+                        {copied ? <Check size={16} /> : <Copy size={16} />}
+                        {copied ? t("Link copiado") : t("Copiar link")}
+                      </button>
+                    </div>
                   </div>
                   <p className="party-link-status" role="status">
-                    {copied && t("Link copiado. ")}
                     {linkGuest
                       ? t(
                           "O lugar J{player} é de {name}. Se a conexão cair, essa pessoa volta pelo mesmo link.",
@@ -233,6 +263,7 @@ export function PartyDialog({
                       disabled={room.guestLinkBusy}
                       onClick={createGuestLink}
                     >
+                      <Link2 size={16} />
                       {t("Gerar novo link")}
                     </button>
                     <button
@@ -254,7 +285,9 @@ export function PartyDialog({
                   ) : (
                     <Link2 size={16} />
                   )}
-                  {t("Criar link de convite")}
+                  {room.guestLinkBusy
+                    ? t("Criando link…")
+                    : t("Criar link de convite")}
                 </button>
               )}
             </div>
@@ -268,19 +301,20 @@ export function PartyDialog({
             </div>
           ) : signedIn ? (
             <>
-              <strong>{t("Crie uma sala para seus amigos.")}</strong>
+              <strong>{t("Um clique e a sala está pronta.")}</strong>
               <p>
                 {t(
-                  "Ela aparece no painel de amigos, e cada um ganha um lugar na partida ao entrar.",
+                  "A sala já sai com um link de convite. Seus amigos do OpenRetro também a veem no painel de amigos.",
                 )}
               </p>
               <button
                 className="button primary party-create"
+                autoFocus
                 disabled={!isTauri || busy}
                 onClick={() => void startParty()}
               >
                 {busy && <LoaderCircle size={16} className="spin" />}
-                {busy ? t("Criando sala…") : t("Criar sala")}
+                {busy ? t("Criando sala…") : t("Criar sala e convidar")}
               </button>
             </>
           ) : (

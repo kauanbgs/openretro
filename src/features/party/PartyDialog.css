@@ -288,3 +288,40 @@
   align-items: center;
   gap: 8px;
 }
+/* The invite: a code to scan beside the link and one button to copy it. */
+.party-link-share {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.party-link-qr {
+  flex-shrink: 0;
+  width: 132px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: #fff;
+  line-height: 0;
+}
+.party-link-qr svg {
+  width: 100%;
+  height: auto;
+}
+.party-link-copy {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+  min-width: 0;
+}
+.party-link-copy .button {
+  justify-content: center;
+  height: 42px;
+}
+@media (max-width: 760px) {
+  .party-link-share {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .party-link-qr {
+    align-self: center;
+  }
+}

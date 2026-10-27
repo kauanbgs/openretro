@@ -7,6 +7,7 @@ import { FRIEND_CODE } from "./friend-code.mjs";
 import { peopleRoute } from "./people.mjs";
 import { historyRoute } from "./history.mjs";
 import { messagesRoute } from "./messages.mjs";
+import { emailAlert } from "./alerts.mjs";
 
 export const friendView = (row) => ({
   id: row.id,
@@ -189,6 +190,13 @@ export async function friendsRoute(request, env, url) {
         409,
         "Já existe uma amizade ou um pedido entre vocês.",
       );
+    await emailAlert(env, db, {
+      kind: "request",
+      sender: user,
+      receiver: id,
+      origin: url.origin,
+      now,
+    });
   } else if (action === "accept") {
     const condition = `EXISTS (SELECT 1 FROM friend_requests WHERE sender_id=? AND receiver_id=?)
       AND NOT EXISTS (SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?))

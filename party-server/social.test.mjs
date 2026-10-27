@@ -14,80 +14,275 @@ const BASE = "https://social.example.test";
 const EMAIL = "player@example.test";
 const PEPPER = "test-only-auth-pepper-not-a-production-secret";
 const INVITE_SECRET = "test-only-invite-secret-not-for-production";
-test("profiles bound game history, preserve newer sessions and restrict it to owner and friends", () => using(async f => {
-  const a = await f.login("history@example.test"), b = await f.login("friend@example.test"), c = await f.login("stranger@example.test");
-  const now = Date.now() - 120000;
-  const game = {title:"Super Mario World",console:"Super Nintendo",cover:null,startedAt:now};
-  const write = (who, value) => f.call("/api/friends/history",value,{token:who.token});
-  const profile = async (who, id=a.user.id) => (await f.call(`/api/friends/people/${id}`,undefined,{token:who.token})).json();
-  assert.equal((await f.call("/api/friends/history",{game,playSeconds:0})).status,401);
-  for (const body of [{game,playSeconds:-1},{game,playSeconds:99999999},{game:{...game,cover:"https://evil.test/image.png"},playSeconds:0},{game:{...game,title:"private\npath"},playSeconds:0},{game,playSeconds:0,userId:b.user.id}])
-    assert.equal((await write(a,body)).status,400);
-  await Promise.all(Array.from({length:12},(_,i) => write(a,{game:{...game,title:`Game ${i}`,startedAt:now+i},playSeconds:10})));
-  let own = await profile(a);
-  assert.equal(own.isSelf,true); assert.equal(own.recentGames.length,10);
-  assert.equal(own.recentGames[0].title,"Game 11");
-  assert.equal(own.recentGames.at(-1).title,"Game 2");
-  await write(a,{game:{...game,title:"Game 11",startedAt:now+11},playSeconds:60});
-  await write(a,{game:{...game,title:"Game 11",startedAt:now+11},playSeconds:0});
-  await write(a,{game:{...game,title:"Game 11",startedAt:now},playSeconds:90});
-  assert.equal((await profile(a)).recentGames[0].playSeconds,60);
-  const stranger = await profile(c);
-  assert.equal(stranger.historyVisible,false); assert.deepEqual(stranger.recentGames,[]);
-  assert.deepEqual(stranger.presence,{status:"offline",playing:null,party:null});
-  assert.ok(!JSON.stringify(stranger).includes("@")); assert.equal(stranger.email,undefined); assert.equal(stranger.token,undefined);
-  await pair(f,a,b);
-  assert.equal((await profile(b)).recentGames.length,10);
-  await f.call("/api/account/profile",{shareHistory:false,discoverable:false},{token:a.token,method:"PATCH"});
-  assert.equal((await profile(b)).historyVisible,false);
-  assert.equal((await profile(a)).recentGames.length,10);
-  assert.equal((await f.call(`/api/friends/people/${a.user.id}`,undefined,{token:c.token})).status,404);
-  assert.equal((await f.call("/api/account/profile",{shareHistory:"true"},{token:a.token,method:"PATCH"})).status,400);
-  const exported = await (await f.call("/api/account/export",undefined,{token:a.token})).json();
-  assert.equal(exported.recentGames.length,10);
-  await action(f,a,"block",b.user.id);
-  assert.equal((await f.call(`/api/friends/people/${a.user.id}`,undefined,{token:b.token})).status,404);
-  assert.equal((await profile(b,b.user.id)).recentGames.length,0);
-  await f.call("/api/account",undefined,{token:a.token,method:"DELETE"});
-  assert.equal((await f.db.prepare("SELECT COUNT(*) AS n FROM recent_games WHERE user_id=?").bind(a.user.id).first()).n,0);
-}));
-test("people discovery is authenticated, paginated, minimal and respects hiding and blocks", () => using(async f => {
-  const a = await f.login("alice@example.test"), b = await f.login("bob@example.test"), c = await f.login("carol@example.test");
-  assert.equal(a.user.discoverable, true);
-  assert.equal((await f.call("/api/friends/people")).status, 401);
-  const people = async () => (await f.call("/api/friends/people", undefined, { token: a.token })).json();
-  let page = await people();
-  assert.equal(page.people.length, 2); assert.equal(page.next, null);
-  for (const row of page.people) assert.deepEqual(Object.keys(row).sort(), ["avatar", "displayName", "friendCode", "id", "relationship"]);
-  assert.ok(!JSON.stringify(page).includes("example.test"));
-  assert.equal((await f.call("/api/friends/people?after=bad", undefined, { token: a.token })).status, 400);
-  assert.equal((await f.call("/api/friends/people?email=private", undefined, { token: a.token })).status, 400);
-  assert.equal((await f.call("/api/friends/people", {}, { token: a.token })).status, 405);
-  await action(f, a, "request", b.user.friendCode);
-  assert.equal((await people()).people.find(p => p.id === b.user.id).relationship, "outgoing");
-  assert.equal((await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: b.token })).json()).relationship, "incoming");
-  await action(f, b, "accept", a.user.id);
-  assert.equal((await people()).people.find(p => p.id === b.user.id).relationship, "friend");
-  assert.equal((await f.call("/api/account/profile", { discoverable: "false" }, { method: "PATCH", token: b.token })).status, 400);
-  await f.call("/api/account/profile", { discoverable: false }, { method: "PATCH", token: b.token });
-  assert.ok(!(await people()).people.some(p => p.id === b.user.id));
-  assert.equal((await f.call(`/api/friends/people/${b.user.id}`, undefined, { token: a.token })).status, 200);
-  assert.equal((await f.call(`/api/friends/people/${b.user.id}`, undefined, { token: c.token })).status, 404);
-  assert.ok((await list(f, a)).friends.some(p => p.id === b.user.id));
-  await f.call("/api/account/profile", { discoverable: true, appearOffline: true, showPlaying: false }, { method: "PATCH", token: b.token });
-  assert.ok((await people()).people.some(p => p.id === b.user.id));
-  await action(f, a, "block", b.user.id);
-  assert.ok(!(await people()).people.some(p => p.id === b.user.id));
-  assert.equal((await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: b.token })).status, 404);
-  await action(f, c, "block", a.user.id);
-  assert.equal((await people()).people.length, 0);
-  const seed = Array.from({ length: 26 }, (_, i) => ({ id: `00000000-0000-4000-8000-${i.toString().padStart(12, "0")}`, code: `player#${i.toString().padStart(4, "0")}` }));
-  await f.db.batch(seed.map(p => f.db.prepare("INSERT INTO users(id,email,display_name,friend_code,created_at) VALUES(?,?,?,?,?)").bind(p.id, `${p.id}@example.test`, "Player", p.code, Date.now())));
-  page = await people(); assert.equal(page.people.length, 24); assert.equal(page.next, page.people.at(-1).id);
-  const last = await (await f.call(`/api/friends/people?after=${page.next}`, undefined, { token: a.token })).json();
-  assert.equal(last.people.length, 2); assert.equal(last.next, null);
-  assert.equal(new Set([...page.people, ...last.people].map(p => p.id)).size, 26);
-}));
+test("profiles bound game history, preserve newer sessions and restrict it to owner and friends", () =>
+  using(async (f) => {
+    const a = await f.login("history@example.test"),
+      b = await f.login("friend@example.test"),
+      c = await f.login("stranger@example.test");
+    const now = Date.now() - 120000;
+    const game = {
+      title: "Super Mario World",
+      console: "Super Nintendo",
+      cover: null,
+      startedAt: now,
+    };
+    const write = (who, value) =>
+      f.call("/api/friends/history", value, { token: who.token });
+    const profile = async (who, id = a.user.id) =>
+      (
+        await f.call(`/api/friends/people/${id}`, undefined, {
+          token: who.token,
+        })
+      ).json();
+    assert.equal(
+      (await f.call("/api/friends/history", { game, playSeconds: 0 })).status,
+      401,
+    );
+    for (const body of [
+      { game, playSeconds: -1 },
+      { game, playSeconds: 99999999 },
+      {
+        game: { ...game, cover: "https://evil.test/image.png" },
+        playSeconds: 0,
+      },
+      { game: { ...game, title: "private\npath" }, playSeconds: 0 },
+      { game, playSeconds: 0, userId: b.user.id },
+    ])
+      assert.equal((await write(a, body)).status, 400);
+    await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        write(a, {
+          game: { ...game, title: `Game ${i}`, startedAt: now + i },
+          playSeconds: 10,
+        }),
+      ),
+    );
+    let own = await profile(a);
+    assert.equal(own.isSelf, true);
+    assert.equal(own.recentGames.length, 10);
+    assert.equal(own.recentGames[0].title, "Game 11");
+    assert.equal(own.recentGames.at(-1).title, "Game 2");
+    await write(a, {
+      game: { ...game, title: "Game 11", startedAt: now + 11 },
+      playSeconds: 60,
+    });
+    await write(a, {
+      game: { ...game, title: "Game 11", startedAt: now + 11 },
+      playSeconds: 0,
+    });
+    await write(a, {
+      game: { ...game, title: "Game 11", startedAt: now },
+      playSeconds: 90,
+    });
+    assert.equal((await profile(a)).recentGames[0].playSeconds, 60);
+    const stranger = await profile(c);
+    assert.equal(stranger.historyVisible, false);
+    assert.deepEqual(stranger.recentGames, []);
+    assert.deepEqual(stranger.presence, {
+      status: "offline",
+      playing: null,
+      party: null,
+    });
+    assert.ok(!JSON.stringify(stranger).includes("@"));
+    assert.equal(stranger.email, undefined);
+    assert.equal(stranger.token, undefined);
+    await pair(f, a, b);
+    assert.equal((await profile(b)).recentGames.length, 10);
+    await f.call(
+      "/api/account/profile",
+      { shareHistory: false, discoverable: false },
+      { token: a.token, method: "PATCH" },
+    );
+    assert.equal((await profile(b)).historyVisible, false);
+    assert.equal((await profile(a)).recentGames.length, 10);
+    assert.equal(
+      (
+        await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+          token: c.token,
+        })
+      ).status,
+      404,
+    );
+    assert.equal(
+      (
+        await f.call(
+          "/api/account/profile",
+          { shareHistory: "true" },
+          { token: a.token, method: "PATCH" },
+        )
+      ).status,
+      400,
+    );
+    const exported = await (
+      await f.call("/api/account/export", undefined, { token: a.token })
+    ).json();
+    assert.equal(exported.recentGames.length, 10);
+    await action(f, a, "block", b.user.id);
+    assert.equal(
+      (
+        await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+          token: b.token,
+        })
+      ).status,
+      404,
+    );
+    assert.equal((await profile(b, b.user.id)).recentGames.length, 0);
+    await f.call("/api/account", undefined, {
+      token: a.token,
+      method: "DELETE",
+    });
+    assert.equal(
+      (
+        await f.db
+          .prepare("SELECT COUNT(*) AS n FROM recent_games WHERE user_id=?")
+          .bind(a.user.id)
+          .first()
+      ).n,
+      0,
+    );
+  }));
+test("people discovery is authenticated, paginated, minimal and respects hiding and blocks", () =>
+  using(async (f) => {
+    const a = await f.login("alice@example.test"),
+      b = await f.login("bob@example.test"),
+      c = await f.login("carol@example.test");
+    assert.equal(a.user.discoverable, true);
+    assert.equal((await f.call("/api/friends/people")).status, 401);
+    const people = async () =>
+      (
+        await f.call("/api/friends/people", undefined, { token: a.token })
+      ).json();
+    let page = await people();
+    assert.equal(page.people.length, 2);
+    assert.equal(page.next, null);
+    for (const row of page.people)
+      assert.deepEqual(Object.keys(row).sort(), [
+        "avatar",
+        "displayName",
+        "friendCode",
+        "id",
+        "relationship",
+      ]);
+    assert.ok(!JSON.stringify(page).includes("example.test"));
+    assert.equal(
+      (
+        await f.call("/api/friends/people?after=bad", undefined, {
+          token: a.token,
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await f.call("/api/friends/people?email=private", undefined, {
+          token: a.token,
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (await f.call("/api/friends/people", {}, { token: a.token })).status,
+      405,
+    );
+    await action(f, a, "request", b.user.friendCode);
+    assert.equal(
+      (await people()).people.find((p) => p.id === b.user.id).relationship,
+      "outgoing",
+    );
+    assert.equal(
+      (
+        await (
+          await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+            token: b.token,
+          })
+        ).json()
+      ).relationship,
+      "incoming",
+    );
+    await action(f, b, "accept", a.user.id);
+    assert.equal(
+      (await people()).people.find((p) => p.id === b.user.id).relationship,
+      "friend",
+    );
+    assert.equal(
+      (
+        await f.call(
+          "/api/account/profile",
+          { discoverable: "false" },
+          { method: "PATCH", token: b.token },
+        )
+      ).status,
+      400,
+    );
+    await f.call(
+      "/api/account/profile",
+      { discoverable: false },
+      { method: "PATCH", token: b.token },
+    );
+    assert.ok(!(await people()).people.some((p) => p.id === b.user.id));
+    assert.equal(
+      (
+        await f.call(`/api/friends/people/${b.user.id}`, undefined, {
+          token: a.token,
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await f.call(`/api/friends/people/${b.user.id}`, undefined, {
+          token: c.token,
+        })
+      ).status,
+      404,
+    );
+    assert.ok((await list(f, a)).friends.some((p) => p.id === b.user.id));
+    await f.call(
+      "/api/account/profile",
+      { discoverable: true, appearOffline: true, showPlaying: false },
+      { method: "PATCH", token: b.token },
+    );
+    assert.ok((await people()).people.some((p) => p.id === b.user.id));
+    await action(f, a, "block", b.user.id);
+    assert.ok(!(await people()).people.some((p) => p.id === b.user.id));
+    assert.equal(
+      (
+        await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+          token: b.token,
+        })
+      ).status,
+      404,
+    );
+    await action(f, c, "block", a.user.id);
+    assert.equal((await people()).people.length, 0);
+    const seed = Array.from({ length: 26 }, (_, i) => ({
+      id: `00000000-0000-4000-8000-${i.toString().padStart(12, "0")}`,
+      code: `player#${i.toString().padStart(4, "0")}`,
+    }));
+    await f.db.batch(
+      seed.map((p) =>
+        f.db
+          .prepare(
+            "INSERT INTO users(id,email,display_name,friend_code,created_at) VALUES(?,?,?,?,?)",
+          )
+          .bind(p.id, `${p.id}@example.test`, "Player", p.code, Date.now()),
+      ),
+    );
+    page = await people();
+    assert.equal(page.people.length, 24);
+    assert.equal(page.next, page.people.at(-1).id);
+    const last = await (
+      await f.call(`/api/friends/people?after=${page.next}`, undefined, {
+        token: a.token,
+      })
+    ).json();
+    assert.equal(last.people.length, 2);
+    assert.equal(last.next, null);
+    assert.equal(
+      new Set([...page.people, ...last.people].map((p) => p.id)).size,
+      26,
+    );
+  }));
 test("players choose four-character tags with case-insensitive, atomic conflict checks", () =>
   using(async (f) => {
     const a = await f.login("alice@example.test"),
@@ -849,11 +1044,23 @@ test("SocialHub sends presence only to friends and applies privacy immediately",
       );
       const row = (await list(f, b)).friends[0];
       assert.equal(row.presence.playing.title, playing.title);
-      const ownProfile = await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: a.token })).json();
+      const ownProfile = await (
+        await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+          token: a.token,
+        })
+      ).json();
       assert.equal(ownProfile.presence.playing.title, playing.title);
-      const friendProfile = await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: b.token })).json();
+      const friendProfile = await (
+        await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+          token: b.token,
+        })
+      ).json();
       assert.equal(friendProfile.presence.playing.title, playing.title);
-      const strangerProfile = await (await f.call(`/api/friends/people/${a.user.id}`, undefined, { token: c.token })).json();
+      const strangerProfile = await (
+        await f.call(`/api/friends/people/${a.user.id}`, undefined, {
+          token: c.token,
+        })
+      ).json();
       assert.equal(strangerProfile.presence.playing, null);
       assert.equal(
         (
@@ -1736,10 +1943,7 @@ test("a host's guest link seats one named browser guest without an account, apar
         assert.equal(link.player, 2);
         const url = new URL(link.url);
         assert.equal(url.origin, "http://localhost");
-        assert.match(
-          url.pathname,
-          /^\/[A-HJ-NP-Z2-9]{6}$/,
-        );
+        assert.match(url.pathname, /^\/[A-HJ-NP-Z2-9]{6}$/);
         assert.equal(url.hash, "");
         assert.equal((await f.mf.dispatchFetch(url.href)).status, 200);
         const token = new URL(link.url).pathname.slice(1);
@@ -1840,7 +2044,9 @@ test("a host's guest link seats one named browser guest without an account, apar
         room.host.send({ type: "guest-link-close" });
         await eventually(() => latest("guest-link")?.url === null);
         assert.match(
-          failure(await guestJoin(new URL(second.url).pathname.slice(1), "Late")),
+          failure(
+            await guestJoin(new URL(second.url).pathname.slice(1), "Late"),
+          ),
           /expirou/,
         );
       } finally {
@@ -1854,13 +2060,25 @@ test("a host's guest link seats one named browser guest without an account, apar
   ));
 
 const say = (f, who, peer, body, clientId = crypto.randomUUID()) =>
-  f.call(`/api/friends/messages/${peer}`, { body, clientId }, { token: who.token });
+  f.call(
+    `/api/friends/messages/${peer}`,
+    { body, clientId },
+    { token: who.token },
+  );
 const inbox = async (f, who) =>
-  (await f.call("/api/friends/messages", undefined, { token: who.token })).json();
+  (
+    await f.call("/api/friends/messages", undefined, { token: who.token })
+  ).json();
 const thread = (f, who, peer, query = "") =>
-  f.call(`/api/friends/messages/${peer}${query}`, undefined, { token: who.token });
+  f.call(`/api/friends/messages/${peer}${query}`, undefined, {
+    token: who.token,
+  });
 const markRead = (f, who, peer, lastId) =>
-  f.call(`/api/friends/messages/${peer}/read`, { lastId }, { token: who.token });
+  f.call(
+    `/api/friends/messages/${peer}/read`,
+    { lastId },
+    { token: who.token },
+  );
 test("direct messages reach only the two friends, in near real time, with unread counts", () =>
   using(async (f) => {
     const a = await f.login("alice@example.test"),
@@ -1873,16 +2091,33 @@ test("direct messages reach only the two friends, in near real time, with unread
       sa = await socialSocket(f, a),
       sc = await socialSocket(f, c);
     try {
-      const sent = await say(f, a, b.user.id, "  Bora jogar\r\n\n\n\nMario Kart?  ");
+      const sent = await say(
+        f,
+        a,
+        b.user.id,
+        "  Bora jogar\r\n\n\n\nMario Kart?  ",
+      );
       assert.equal(sent.status, 201);
       const message = await sent.json();
-      assert.deepEqual(Object.keys(message).sort(), ["body", "createdAt", "id", "senderId"]);
+      assert.deepEqual(Object.keys(message).sort(), [
+        "body",
+        "createdAt",
+        "id",
+        "senderId",
+      ]);
       assert.equal(message.body, "Bora jogar\n\nMario Kart?");
       // Sockets carry only which conversation changed, never the text.
-      const nudge = await eventually(() => sb.messages.find((m) => m.type === "message"));
+      const nudge = await eventually(() =>
+        sb.messages.find((m) => m.type === "message"),
+      );
       assert.deepEqual(nudge, { type: "message", peer: a.user.id });
-      await eventually(() => sa.messages.find((m) => m.type === "message" && m.peer === b.user.id));
-      assert.equal(sc.messages.some((m) => m.type === "message"), false);
+      await eventually(() =>
+        sa.messages.find((m) => m.type === "message" && m.peer === b.user.id),
+      );
+      assert.equal(
+        sc.messages.some((m) => m.type === "message"),
+        false,
+      );
       let rows = (await inbox(f, b)).conversations;
       assert.equal(rows.length, 1);
       assert.equal(rows[0].peer.id, a.user.id);
@@ -1902,8 +2137,13 @@ test("direct messages reach only the two friends, in near real time, with unread
       assert.equal(read.peer.id, a.user.id);
       sa.messages.length = 0;
       // Marking past the newest message cannot pre-read future ones.
-      assert.equal((await markRead(f, b, a.user.id, message.id + 1000)).status, 204);
-      await eventually(() => sb.messages.filter((m) => m.type === "message").length > 1);
+      assert.equal(
+        (await markRead(f, b, a.user.id, message.id + 1000)).status,
+        204,
+      );
+      await eventually(
+        () => sb.messages.filter((m) => m.type === "message").length > 1,
+      );
       rows = (await inbox(f, b)).conversations;
       assert.equal(rows[0].unread, 0);
       await say(f, a, b.user.id, "Ainda aí?");
@@ -1912,7 +2152,11 @@ test("direct messages reach only the two friends, in near real time, with unread
       for (const bad of [0, -1, "1", 1.5])
         assert.equal((await markRead(f, b, a.user.id, bad)).status, 400);
       assert.equal(
-        (await f.call(`/api/friends/messages/${a.user.id}/read`, undefined, { token: b.token })).status,
+        (
+          await f.call(`/api/friends/messages/${a.user.id}/read`, undefined, {
+            token: b.token,
+          })
+        ).status,
         405,
       );
     } finally {
@@ -1924,8 +2168,21 @@ test("direct messages validate text, deduplicate retries, page history and limit
     const a = await f.login("alice@example.test"),
       b = await f.login("bob@example.test");
     await pair(f, a, b);
-    for (const body of ["", "   ", "x".repeat(401), "a‮b", "a\u0000b", "a\n".repeat(13), 12, null])
-      assert.equal((await say(f, a, b.user.id, body)).status, 400, JSON.stringify(body));
+    for (const body of [
+      "",
+      "   ",
+      "x".repeat(401),
+      "a‮b",
+      "a\u0000b",
+      "a\n".repeat(13),
+      12,
+      null,
+    ])
+      assert.equal(
+        (await say(f, a, b.user.id, body)).status,
+        400,
+        JSON.stringify(body),
+      );
     assert.equal((await say(f, a, b.user.id, "😀".repeat(400))).status, 201);
     assert.equal((await say(f, a, b.user.id, "Oi", "not-a-uuid")).status, 400);
     assert.equal(
@@ -2011,17 +2268,121 @@ test("removing a friend keeps history read-only; blocking and deletion erase the
     assert.equal((await thread(f, a, b.user.id)).status, 404);
     assert.deepEqual((await inbox(f, a)).conversations, []);
     assert.equal(
-      (await f.db.prepare("SELECT COUNT(*) AS n FROM direct_messages").first()).n,
+      (await f.db.prepare("SELECT COUNT(*) AS n FROM direct_messages").first())
+        .n,
       0,
     );
     await action(f, b, "unblock", a.user.id);
     await pair(f, a, b);
     await say(f, a, b.user.id, "De novo");
     await markRead(f, b, a.user.id, 1e9);
-    await f.call("/api/account", undefined, { token: a.token, method: "DELETE" });
+    await f.call("/api/account", undefined, {
+      token: a.token,
+      method: "DELETE",
+    });
     for (const table of ["direct_messages", "message_reads"])
       assert.equal(
         (await f.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n,
         0,
       );
+  }));
+test("email alerts reach offline players for requests and quiet conversations, at most two a day", () =>
+  using(async (f) => {
+    const a = await f.login("alerts-a@example.test"),
+      b = await f.login("alerts-b@example.test"),
+      c = await f.login("alerts-c@example.test"),
+      d = await f.login("alerts-d@example.test");
+    const alerts = () =>
+      f.emails.filter((email) => email.headers?.["List-Unsubscribe"]);
+    const say = (from, to, body) =>
+      f.call(
+        `/api/friends/messages/${to.user.id}`,
+        { body, clientId: crypto.randomUUID() },
+        { token: from.token },
+      );
+    assert.equal(a.user.emailAlerts, true);
+    // A friend request emails the receiver without the sender's address.
+    await pair(f, a, b);
+    assert.equal(alerts().length, 1);
+    assert.deepEqual(alerts()[0].to, ["alerts-b@example.test"]);
+    assert.match(alerts()[0].subject, /quer ser seu amigo/);
+    assert.ok(!JSON.stringify(alerts()[0]).includes("alerts-a@"));
+    // The first message emails; the next ones in the conversation do not.
+    assert.equal((await say(b, a, "segredo")).status, 201);
+    assert.equal(alerts().length, 2);
+    assert.match(alerts()[1].subject, /te mandou uma mensagem/);
+    assert.ok(!alerts()[1].text.includes("segredo"));
+    assert.equal((await say(b, a, "de novo")).status, 201);
+    assert.equal(alerts().length, 2);
+    // A conversation quiet for a week emails again.
+    await f.db
+      .prepare("UPDATE direct_messages SET created_at = created_at - ?")
+      .bind(8 * 86400000)
+      .run();
+    assert.equal((await say(b, a, "voltei")).status, 201);
+    assert.equal(alerts().length, 3);
+    // b has caused two alerts today, and a has received two.
+    assert.equal(
+      (await action(f, b, "request", c.user.friendCode)).status,
+      204,
+    );
+    assert.equal(
+      (await action(f, c, "request", a.user.friendCode)).status,
+      204,
+    );
+    assert.equal(alerts().length, 3);
+    assert.equal(
+      (await action(f, c, "request", d.user.friendCode)).status,
+      204,
+    );
+    assert.equal(alerts().length, 4);
+    // Players with the app open are told there instead.
+    await f.db.prepare("DELETE FROM email_alerts").run();
+    const open = await socialSocket(f, d);
+    assert.equal(
+      (await action(f, a, "request", d.user.friendCode)).status,
+      204,
+    );
+    assert.equal(alerts().length, 4);
+    open.ws.close();
+    // The link in the email turns alerts off, and only with a valid token.
+    const link = new URL(alerts()[0].text.match(/https:\/\/\S+/)[0]);
+    assert.equal(link.pathname, "/email/off");
+    assert.equal((await f.mf.dispatchFetch(link.href)).status, 200);
+    const forged = new URL(link);
+    forged.searchParams.set("u", a.user.id);
+    assert.equal(
+      (await f.mf.dispatchFetch(forged.href, { method: "POST" })).status,
+      400,
+    );
+    assert.equal(
+      (await f.mf.dispatchFetch(link.href, { method: "POST" })).status,
+      200,
+    );
+    const session = await (
+      await f.call("/api/auth/session", undefined, { token: b.token })
+    ).json();
+    assert.equal(session.user.emailAlerts, false);
+    assert.equal(
+      (await action(f, d, "request", b.user.friendCode)).status,
+      204,
+    );
+    assert.equal(alerts().length, 4);
+    // The setting goes back on from the app.
+    const patched = await f.call(
+      "/api/account/profile",
+      { emailAlerts: true },
+      { token: b.token, method: "PATCH" },
+    );
+    assert.equal((await patched.json()).user.emailAlerts, true);
+    assert.equal(
+      (
+        await f.call(
+          "/api/account/profile",
+          { emailAlerts: "no" },
+          { token: b.token, method: "PATCH" },
+        )
+      ).status,
+      400,
+    );
   }));

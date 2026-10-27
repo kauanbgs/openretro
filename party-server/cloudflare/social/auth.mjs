@@ -67,6 +67,7 @@ export function publicUser(row) {
     appearOffline: Boolean(row.appear_offline),
     discoverable: Boolean(row.discoverable),
     shareHistory: Boolean(row.share_history),
+    emailAlerts: Boolean(row.email_alerts ?? 1),
     createdAt: row.created_at,
   };
 }
@@ -352,6 +353,11 @@ async function exportAccount(db, user, now, pepper) {
       [user.id, user.id],
     ],
     [
+      "emailAlerts",
+      "SELECT kind, created_at FROM email_alerts WHERE sender_id = ? OR receiver_id = ? ORDER BY id",
+      [user.id, user.id],
+    ],
+    [
       "messageReads",
       "SELECT peer_id, last_read_id FROM message_reads WHERE user_id = ?",
       [user.id],
@@ -422,6 +428,7 @@ export async function accountRoute(request, env, url) {
             "avatar",
             "discoverable",
             "shareHistory",
+            "emailAlerts",
           ].includes(key),
       )
     )
@@ -449,6 +456,7 @@ export async function accountRoute(request, env, url) {
       "appearOffline",
       "discoverable",
       "shareHistory",
+      "emailAlerts",
     ])
       if (key in patch && typeof patch[key] !== "boolean")
         throw new AccountError(400, "Dados do perfil inválidos.");
@@ -470,7 +478,8 @@ export async function accountRoute(request, env, url) {
       .prepare(
         `UPDATE users SET display_name = COALESCE(?, display_name),
       show_playing = COALESCE(?, show_playing), appear_offline = COALESCE(?, appear_offline), friend_code = COALESCE(?, friend_code),
-      avatar = COALESCE(?, avatar), discoverable = COALESCE(?, discoverable), share_history = COALESCE(?, share_history)
+      avatar = COALESCE(?, avatar), discoverable = COALESCE(?, discoverable), share_history = COALESCE(?, share_history),
+      email_alerts = COALESCE(?, email_alerts)
       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM users other WHERE other.friend_code = ? AND other.id <> ?) RETURNING *`,
       )
       .bind(
@@ -481,6 +490,7 @@ export async function accountRoute(request, env, url) {
         "avatar" in patch ? patch.avatar : null,
         "discoverable" in patch ? Number(patch.discoverable) : null,
         "shareHistory" in patch ? Number(patch.shareHistory) : null,
+        "emailAlerts" in patch ? Number(patch.emailAlerts) : null,
         user.id,
         friendCode,
         user.id,

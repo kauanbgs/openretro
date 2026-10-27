@@ -183,6 +183,9 @@ export class SocialHub extends DurableObject {
     // Only the authenticated Worker router or another hub can reach this binding.
     if (!/^[a-f0-9-]{36}$/.test(id)) return new Response(null, { status: 400 });
     if (path === "/presence") return Response.json(await this.current(id));
+    // Whether the app is open at all, even for players who appear offline.
+    if (path === "/online")
+      return Response.json({ online: (await this.live()).length > 0 });
     if (path === "/connect") {
       const active = await this.live();
       if (active.length >= 5)

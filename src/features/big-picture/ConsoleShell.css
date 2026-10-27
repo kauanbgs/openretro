@@ -1,0 +1,1013 @@
+/* Big Picture laid out like a PlayStation 5: a top bar of tabs, a row of
+   game tiles with the focused game's hub below it, a control center at the
+   bottom and a parallax scene behind everything. Loaded after the older
+   console styles, which still dress the catalog, dialogs and workspace. */
+
+.ps-console {
+  --ps-top: 92px;
+  --ps-footer: 50px;
+  --ps-gutter: 4.4vw;
+  --ps-glass: rgba(18, 22, 34, 0.55);
+  --ps-glass-strong: rgba(14, 17, 27, 0.86);
+  --ps-line: rgba(255, 255, 255, 0.14);
+  --ps-ring: 0 0 0 3px #fff, 0 0 28px 4px rgba(120, 190, 255, 0.45);
+  --ps-ease: cubic-bezier(0.2, 0.9, 0.25, 1);
+  /* Focusing a control must never scroll the screen itself. */
+  overflow: clip;
+  background: #04060c;
+  font-family: "Nunito Sans Variable", "Segoe UI", sans-serif;
+}
+
+/* ---------- Backdrop ---------- */
+.ps-backdrop {
+  --px: 0;
+  --py: 0;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #04060c;
+  pointer-events: none;
+}
+.ps-layer {
+  position: absolute;
+  inset: -7%;
+  transform: translate3d(
+    calc(var(--px) * var(--depth) * -42px),
+    calc(var(--py) * var(--depth) * -24px),
+    0
+  );
+  will-change: transform;
+}
+.ps-layer > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ps-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(3, 5, 10, 0.85) 0%,
+      rgba(3, 5, 10, 0.4) 18%,
+      transparent 32%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(3, 5, 10, 0.78) 0%,
+      rgba(3, 5, 10, 0.25) 55%,
+      transparent 80%
+    ),
+    linear-gradient(0deg, rgba(3, 5, 10, 0.85) 0%, transparent 45%);
+}
+.ps-motes {
+  inset: -20%;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(170, 215, 255, 0.7) 0 1.5px, transparent 2px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.5) 0 1px, transparent 1.5px);
+  background-size:
+    230px 230px,
+    370px 370px,
+    510px 510px;
+  background-position:
+    0 0,
+    90px 140px,
+    200px 60px;
+  animation: ps-rise 60s linear infinite;
+}
+
+/* Game art */
+.ps-art-base {
+  background:
+    radial-gradient(90% 80% at 70% 20%, #16306a 0%, transparent 60%),
+    radial-gradient(70% 70% at 10% 90%, #0d1d45 0%, transparent 70%), #050914;
+}
+.ps-art img,
+.ps-picture img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: ps-art-in 900ms var(--ps-ease) both;
+}
+.ps-art img.previous {
+  animation: ps-art-out 900ms ease both;
+}
+.ps-art img.current,
+.ps-picture img {
+  animation:
+    ps-art-in 900ms var(--ps-ease) both,
+    ps-kenburns 40s ease-in-out 900ms infinite alternate;
+}
+
+/* Waves */
+.ps-waves-sky {
+  background:
+    radial-gradient(80% 60% at 75% 10%, #3f8cff 0%, transparent 60%),
+    linear-gradient(180deg, #021446 0%, #0b3b9c 55%, #1764cf 100%);
+}
+.ps-wave svg {
+  width: 200%;
+  height: 72%;
+  inset: auto auto 0 0;
+  animation: ps-wave-slide var(--speed) linear infinite;
+}
+.ps-wave path {
+  fill: rgba(255, 255, 255, 0.07);
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.ps-wave:nth-child(3) path {
+  fill: rgba(110, 180, 255, 0.08);
+}
+.ps-wave:nth-child(4) path {
+  fill: rgba(255, 255, 255, 0.05);
+  stroke: rgba(160, 210, 255, 0.35);
+}
+.ps-wave:nth-child(5) path {
+  fill: rgba(6, 24, 80, 0.35);
+}
+
+/* Pixel valley */
+.ps-pixel svg {
+  image-rendering: pixelated;
+}
+.ps-twinkle {
+  animation: ps-twinkle 3.2s steps(2) infinite;
+}
+.ps-twinkle:nth-child(3n) {
+  animation-delay: -1.4s;
+}
+.ps-twinkle:nth-child(3n + 1) {
+  animation-delay: -2.2s;
+}
+
+/* Real photos and pixel-art game layers */
+.ps-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation:
+    ps-art-in 900ms var(--ps-ease) both,
+    ps-kenburns 40s ease-in-out 900ms infinite alternate;
+}
+.ps-pixel-layer {
+  background-position: 50% 100%;
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  image-rendering: pixelated;
+}
+.ps-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.ps-particles i {
+  position: absolute;
+  top: -6%;
+  left: var(--x);
+  width: var(--size);
+  height: var(--size);
+  animation: ps-fall var(--duration) linear var(--delay) infinite;
+}
+.ps-particles-snow i {
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  opacity: 0.85;
+}
+.ps-particles-leaves i {
+  border-radius: 0 70% 0 70%;
+  background: hsl(calc(4deg + var(--hue)) 78% 48%);
+  opacity: 0.9;
+}
+.ps-particles-embers i {
+  top: auto;
+  bottom: -6%;
+  border-radius: 50%;
+  background: #ffe2a0;
+  box-shadow: 0 0 10px 3px rgba(255, 190, 110, 0.6);
+  animation-name: ps-float-up;
+}
+
+/* Small pictures of each theme, for the picker: mostly the scene itself. */
+.ps-theme-preview {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #0b1020;
+}
+.ps-theme-preview > i {
+  position: absolute;
+  inset: 0;
+}
+.ps-theme-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ps-theme-preview.ps-theme-art {
+  background: linear-gradient(135deg, #1b2c5c, #5a3a2a 60%, #c7863f);
+}
+.ps-theme-preview.ps-theme-art > i {
+  background: linear-gradient(90deg, rgba(3, 5, 10, 0.8), transparent 70%);
+}
+.ps-theme-preview .ps-layer {
+  transform: none;
+}
+/* ---------- Top bar ---------- */
+.ps-topbar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--ps-top);
+  padding: 0 var(--ps-gutter);
+  animation: fx-page-in 600ms var(--ps-ease) both;
+}
+.ps-tabs {
+  display: flex;
+  gap: 8px;
+}
+.ps-console .ps-tabs button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    color 0.2s,
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+.ps-console .ps-tabs button.active {
+  color: #fff;
+}
+.ps-console .ps-tabs button:hover {
+  color: #fff;
+}
+.ps-console .ps-tabs button.focused,
+.ps-console .ps-tabs button:focus-visible {
+  outline: none;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--ps-ring);
+}
+.ps-top-tools {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ps-console .ps-top-tools button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: #e8ecf5;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s var(--ps-ease);
+}
+.ps-console .ps-top-tools button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.ps-console .ps-top-tools button.focused,
+.ps-console .ps-top-tools button:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: var(--ps-ring);
+  transform: scale(1.06);
+}
+/* Party and phone: labeled pills that light up while in use. */
+.ps-console .ps-top-tools button.ps-top-together {
+  display: inline-flex;
+  gap: 8px;
+  width: auto;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+  font-weight: 700;
+}
+.ps-console .ps-top-tools button.ps-top-together.live {
+  background: rgba(28, 201, 120, 0.22);
+  color: #8ff0bf;
+}
+.ps-console .ps-top-tools button.ps-top-together.live::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #33d68a;
+  box-shadow: 0 0 10px #33d68a;
+}
+.ps-console .ps-tile.live::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #0b0f19;
+  border-radius: 50%;
+  background: #33d68a;
+  box-shadow: 0 0 12px #33d68a;
+}
+.ps-top-tools .tv-topbar-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+}
+.ps-top-tools .ps-top-account .account-avatar {
+  pointer-events: none;
+}
+.ps-pad {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.35);
+}
+.ps-pad.connected {
+  color: #fff;
+}
+.ps-top-tools .fx-clock {
+  min-width: 64px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* ---------- Content ---------- */
+.ps-console .ps-content {
+  inset: var(--ps-top) 0 var(--ps-footer) 0;
+  overflow-x: hidden;
+}
+.ps-console .tv-workspace {
+  inset: 0 0 var(--ps-footer) 0;
+}
+.ps-console .tv-workspace-themes {
+  background: linear-gradient(
+    90deg,
+    rgba(4, 6, 12, 0.85),
+    rgba(4, 6, 12, 0.35)
+  );
+}
+.ps-console .tv-workspace-themes .tv-workspace-header {
+  background: rgba(4, 6, 12, 0.4);
+}
+
+/* ---------- Home ---------- */
+.ps-home {
+  padding: 2vh 0 6vh var(--ps-gutter);
+}
+.ps-row-viewport {
+  height: 200px;
+  margin-right: 0;
+}
+.ps-row {
+  /* Every tile before the focused one is small: 112px plus the gap. */
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transform: translateX(calc(var(--index, 0) * -126px));
+  transition: transform 420ms var(--ps-ease);
+}
+.ps-console .ps-tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 112px;
+  height: 112px;
+  margin-top: 28px;
+  padding: 0;
+  border-radius: 18px;
+  background: var(--ps-glass);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transition:
+    width 320ms var(--ps-ease),
+    height 320ms var(--ps-ease),
+    margin 320ms var(--ps-ease),
+    box-shadow 240ms ease,
+    opacity 240ms ease;
+  animation: ps-tile-in 520ms var(--ps-ease) both;
+  animation-delay: calc(var(--i) * 35ms);
+}
+.ps-console .ps-tile > .artwork {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.ps-console .ps-tile > .artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ps-tile-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.04)
+  );
+  border: 1px solid var(--ps-line);
+  backdrop-filter: blur(14px);
+}
+.ps-tile-label {
+  position: absolute;
+  left: calc(100% + 24px);
+  bottom: 6px;
+  width: 340px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition:
+    opacity 200ms ease,
+    transform 300ms var(--ps-ease);
+  pointer-events: none;
+}
+.ps-console .ps-tile.focused {
+  width: 168px;
+  height: 168px;
+  margin-top: 0;
+  margin-right: 370px;
+}
+.ps-console .ps-tile.focused .ps-tile-label {
+  opacity: 1;
+  transform: none;
+}
+.ps-console .ps-tile:focus-visible,
+.ps-console .ps-tile.focused:focus {
+  outline: none;
+  box-shadow:
+    var(--ps-ring),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.ps-console .ps-tile:not(.focused):hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Hub of the focused tile */
+.ps-hub {
+  max-width: min(1100px, 80vw);
+  margin-top: 3vh;
+  animation: ps-hub-in 480ms var(--ps-ease) both;
+}
+.ps-console .ps-hub h1 {
+  color: #fff;
+  font-size: clamp(34px, 3.6vw, 62px);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+.ps-console .ps-hub-meta {
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 17px;
+}
+.ps-hub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 28px;
+}
+.ps-console .ps-primary,
+.ps-console .ps-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 54px;
+  padding: 0 30px;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  transition:
+    transform 220ms var(--ps-ease),
+    box-shadow 220ms ease,
+    background-color 200ms;
+}
+.ps-console .ps-primary {
+  min-width: 190px;
+  background: #fff;
+  color: #0b0f19;
+}
+.ps-console .ps-secondary {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  backdrop-filter: blur(18px);
+}
+.ps-console .ps-secondary.ps-round {
+  width: 54px;
+  padding: 0;
+  border-radius: 50%;
+}
+.ps-console .ps-primary:focus-visible,
+.ps-console .ps-secondary:focus-visible,
+.ps-console .ps-hub-actions button:focus {
+  outline: none;
+  box-shadow: var(--ps-ring);
+  transform: scale(1.04);
+}
+.ps-console .ps-secondary:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.ps-console .ps-primary:disabled {
+  opacity: 0.6;
+}
+.ps-hub-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 30px;
+}
+.ps-hub-cards article {
+  display: grid;
+  align-content: end;
+  gap: 4px;
+  width: 190px;
+  min-height: 128px;
+  padding: 18px;
+  border: 1px solid var(--ps-line);
+  border-radius: 18px;
+  background: var(--ps-glass);
+  backdrop-filter: blur(18px);
+  color: rgba(255, 255, 255, 0.7);
+}
+.ps-hub-cards article > svg {
+  margin-bottom: auto;
+  color: #fff;
+}
+.ps-hub-cards strong {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 600;
+}
+.ps-hub-cards span {
+  font-size: 13px;
+}
+.ps-hub-cards .ps-hub-about {
+  width: min(460px, 100%);
+  align-content: start;
+}
+.ps-hub-about p {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.ps-console .ps-hub-hint {
+  margin-top: 18px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+.ps-together {
+  margin-top: 7vh;
+  padding-right: var(--ps-gutter);
+}
+.ps-console .ps-together h2 {
+  margin-bottom: 16px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 500;
+}
+.ps-console .ps-together .play-together button:focus {
+  outline: none;
+  box-shadow: var(--ps-ring);
+}
+
+/* ---------- Library and catalog ---------- */
+.ps-console .ps-library {
+  padding: 8px var(--ps-gutter) 60px;
+  background: transparent;
+}
+.ps-library-head {
+  margin-bottom: 22px;
+}
+.ps-console .ps-library-head h1 {
+  color: #fff;
+  font-size: clamp(30px, 2.6vw, 44px);
+  font-weight: 300;
+}
+.ps-console .ps-library-head p {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+}
+.ps-library-head strong {
+  color: #fff;
+  font-weight: 600;
+}
+.ps-console .tv-catalog {
+  padding: 8px var(--ps-gutter) 60px;
+}
+.ps-console .tv-catalog-toolbar {
+  background: transparent;
+}
+
+/* ---------- Footer ---------- */
+.ps-console .ps-controls {
+  inset: auto 0 0 0;
+  height: var(--ps-footer);
+  background: linear-gradient(0deg, rgba(3, 5, 10, 0.85), transparent);
+  border-top: 0;
+  backdrop-filter: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+}
+.ps-console .tv-controls b[data-glyph~="menu"] {
+  border-radius: 6px;
+}
+
+/* ---------- Control center ---------- */
+.ps-center-backdrop,
+.ps-options-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: rgba(2, 4, 9, 0.45);
+  animation: fx-fade 220ms ease both;
+}
+.ps-center {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 22px var(--ps-gutter) 26px;
+  border-top: 1px solid var(--ps-line);
+  background: linear-gradient(
+    180deg,
+    rgba(20, 25, 40, 0.88),
+    rgba(8, 10, 18, 0.96)
+  );
+  backdrop-filter: blur(28px);
+  animation: ps-sheet-in 360ms var(--ps-ease) both;
+}
+.ps-center header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  color: #fff;
+}
+.ps-center .fx-clock {
+  font-size: 26px;
+  font-weight: 400;
+}
+.ps-center-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.ps-center-cards {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 8px 4px 10px;
+  scrollbar-width: none;
+}
+.ps-console .ps-center-cards button {
+  position: relative;
+  display: grid;
+  align-content: end;
+  justify-items: start;
+  gap: 4px;
+  flex: 0 0 auto;
+  width: 168px;
+  height: 128px;
+  padding: 16px;
+  border: 1px solid var(--ps-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  text-align: left;
+  transition:
+    transform 220ms var(--ps-ease),
+    background-color 200ms,
+    color 200ms,
+    box-shadow 200ms;
+}
+.ps-console .ps-center-cards button > svg {
+  margin-bottom: auto;
+}
+.ps-console .ps-center-cards strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+.ps-console .ps-center-cards small {
+  overflow: hidden;
+  max-width: 100%;
+  color: inherit;
+  font-size: 12px;
+  opacity: 0.7;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ps-console .ps-center-cards b {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #12ace2;
+  color: #fff;
+  font-size: 12px;
+  line-height: 22px;
+  text-align: center;
+}
+.ps-console .ps-center-cards button.focused,
+.ps-console .ps-options button.focused {
+  outline: none;
+  background: #fff;
+  color: #0b0f19;
+  box-shadow: 0 0 30px 2px rgba(120, 190, 255, 0.4);
+  transform: translateY(-6px);
+}
+.ps-console .ps-center-cards button.danger.focused {
+  background: #ffdfe1;
+}
+.ps-console .ps-center-help {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+/* Options menu of a game */
+.ps-options {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 90vw);
+  padding: 40px 22px;
+  border-left: 1px solid var(--ps-line);
+  background: rgba(10, 13, 22, 0.94);
+  backdrop-filter: blur(28px);
+  animation: ps-panel-in 320ms var(--ps-ease) both;
+}
+.ps-console .ps-options h2 {
+  margin: 0 12px 22px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ps-options > div {
+  display: grid;
+  gap: 6px;
+}
+.ps-console .ps-options button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 52px;
+  padding: 0 16px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  text-align: left;
+  transition:
+    background-color 160ms,
+    color 160ms;
+}
+.ps-console .ps-options button.focused {
+  transform: none;
+}
+.ps-console .ps-options button.danger {
+  color: #ff8d95;
+}
+.ps-console .ps-options button.danger.focused {
+  background: #ff8d95;
+  color: #1a0507;
+}
+
+/* ---------- Theme page ---------- */
+.console-themes {
+  display: grid;
+  gap: 34px;
+  max-width: 1500px;
+  padding: 32px 3vw 64px;
+}
+.console-themes h3 {
+  margin: 0 0 6px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+}
+.console-themes > section > p {
+  margin: 0 0 18px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.console-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
+}
+.console-mode .console-theme-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 10px 14px;
+  border: 1px solid var(--ps-line, #333);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  text-align: left;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
+}
+.console-theme-card strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 16px;
+}
+.console-theme-card small.console-theme-credit {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+.console-theme-card small {
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.console-mode .console-theme-card[aria-pressed="true"] {
+  border-color: #12ace2;
+  background: rgba(18, 172, 226, 0.14);
+}
+.console-mode .console-theme-card:hover,
+.console-mode .console-theme-card[data-console-focus],
+.console-mode .console-theme-remove[data-console-focus] {
+  outline: none;
+  box-shadow: var(--ps-ring, 0 0 0 3px #fff);
+  transform: translateY(-3px);
+}
+.console-theme-picture {
+  display: grid;
+  gap: 8px;
+}
+.console-mode .console-theme-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffb3b8;
+}
+.console-mode .console-theme-add {
+  place-items: center;
+  align-content: center;
+  min-height: 180px;
+  border-style: dashed;
+  text-align: center;
+}
+
+/* ---------- Motion ---------- */
+@keyframes ps-fall {
+  to {
+    transform: translate(var(--sway), 115vh) rotate(var(--spin));
+  }
+}
+@keyframes ps-float-up {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sway), -100vh);
+  }
+}
+@keyframes ps-art-in {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes ps-art-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ps-kenburns {
+  to {
+    transform: scale(1.08) translate(-1.5%, -1%);
+  }
+}
+@keyframes ps-rise {
+  to {
+    background-position:
+      0 -230px,
+      90px -230px,
+      200px -450px;
+  }
+}
+@keyframes ps-wave-slide {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes ps-twinkle {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes ps-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes ps-hub-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes ps-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes ps-panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+html[data-animations="false"] .ps-console *,
+html[data-animations="false"] .ps-console *::before {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ps-console *,
+  .ps-console *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media (max-width: 900px) {
+  .ps-console {
+    --ps-top: 76px;
+  }
+  .ps-console .ps-tabs button {
+    font-size: 17px;
+  }
+  .ps-top-tools .fx-clock,
+  .ps-pad {
+    display: none;
+  }
+  .ps-console .ps-tile.focused {
+    margin-right: 220px;
+  }
+  .ps-tile-label {
+    width: 200px;
+  }
+}

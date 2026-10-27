@@ -26,6 +26,7 @@ import {
   type FilePickerRequest,
 } from "../../services/bridge";
 import { ConsoleFilePicker } from "./ConsoleFilePicker";
+import { ConsoleThemes } from "./ConsoleThemes";
 import "./ConsoleWorkspace.css";
 import { UserProfile } from "../social/UserProfile";
 import { SocialPanel } from "../social/SocialPanel";
@@ -62,6 +63,7 @@ export type WorkspacePage =
   | "import"
   | "profile"
   | "friends"
+  | "themes"
   | "party-guest";
 export interface WorkspaceRoute {
   page: WorkspacePage;
@@ -82,6 +84,7 @@ const titles: Record<WorkspacePage, string> = {
   sources: t("Fontes de download"),
   game: t("Gerenciar jogo"),
   import: t("Adicionar jogos"),
+  themes: t("Tema do fundo"),
 };
 
 export function ConsoleWorkspace({
@@ -439,7 +442,7 @@ export function ConsoleWorkspace({
   return (
     <section
       ref={root}
-      className="tv-workspace"
+      className={`tv-workspace tv-workspace-${route.page}`}
       aria-label={titles[route.page]}
       onPointerDownCapture={(event) => {
         if (
@@ -485,7 +488,7 @@ export function ConsoleWorkspace({
                   : t("Verificar atualizações")}
             </button>
           )}
-          {route.page !== "friends" && route.page !== "profile" && (
+          {!["friends", "profile", "themes"].includes(route.page) && (
             <button onClick={() => setImporting({})}>
               <Plus size={18} />
               {t("Adicionar jogo")}
@@ -530,6 +533,7 @@ export function ConsoleWorkspace({
             />
           )}
           {route.page === "settings" && <SettingsPage notify={notify} />}
+          {route.page === "themes" && <ConsoleThemes notify={notify} />}
           {route.page === "sources" && (
             <div className="page-content">
               <SourceManager />

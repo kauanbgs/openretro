@@ -57,6 +57,10 @@ export interface GameRemoval {
   downloaded: boolean;
   bytes: number;
 }
+export interface ConsoleBackground {
+  path: string;
+  url: string;
+}
 export interface GameCapture {
   name: string;
   takenAt: string;
@@ -469,6 +473,10 @@ export const bridge = {
           network: null,
         };
   },
+  /** An SVG QR code for a Party invite link. */
+  async inviteQr(url: string): Promise<string> {
+    return invoke("invite_qr", { url });
+  },
   async remotePlayStart(): Promise<RemotePlayStatus> {
     if (!isDesktop)
       throw new Error(t("Abra o aplicativo desktop para jogar no celular."));
@@ -549,6 +557,29 @@ export const bridge = {
     if (!isDesktop)
       throw new Error(t("Abra o aplicativo desktop para ver suas capturas."));
     return invoke("open_game_screenshots", { id });
+  },
+  /** Pictures chosen as the Big Picture background, oldest first. */
+  async consoleBackgrounds(): Promise<ConsoleBackground[]> {
+    if (!isDesktop) return [];
+    const paths = await invoke<string[]>("list_console_backgrounds");
+    return paths.map((path) => ({ path, url: convertFileSrc(path) }));
+  },
+  /** Asks for a picture and keeps a copy of it; null when none was chosen. */
+  async addConsoleBackground(): Promise<ConsoleBackground | null> {
+    if (!isDesktop)
+      throw new Error(t("Abra o aplicativo desktop para usar suas imagens."));
+    const source = await pickPath({
+      directory: false,
+      title: t("Escolher imagem de fundo"),
+    });
+    if (!source) return null;
+    const path = await invoke<string>("add_console_background", {
+      path: source,
+    });
+    return { path, url: convertFileSrc(path) };
+  },
+  async removeConsoleBackground(path: string): Promise<void> {
+    if (isDesktop) return invoke("remove_console_background", { path });
   },
   async saveSettings(settings: AppSettings) {
     if (isDesktop) return invoke("save_settings", { settings });

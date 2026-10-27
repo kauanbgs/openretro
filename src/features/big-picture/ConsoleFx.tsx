@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { BrandMark } from "../../components/Brand";
 import { GameArtwork } from "../../components/GameArtwork";
 import type { GameMetadata } from "../../types";
@@ -65,100 +59,6 @@ export function BootSplash() {
       <div className="fx-boot-bar">
         <i />
       </div>
-    </div>
-  );
-}
-
-/**
- * Living background: blurred art of whatever card has focus, drifting aurora,
- * a retro perspective grid and floating particles. Follows focus through DOM
- * events, so grids need no extra wiring.
- */
-export function AmbientBackdrop({
-  root,
-  fallback,
-  watch,
-}: {
-  root: React.RefObject<HTMLElement | null>;
-  fallback?: string;
-  /** Changing it (e.g. the section) re-reads the art from the page. */
-  watch?: string;
-}) {
-  const [layers, setLayers] = useState<{ url: string; id: number }[]>(() =>
-    fallback ? [{ url: fallback, id: 0 }] : [],
-  );
-  const current = useRef(fallback);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const show = (url?: string) => {
-    if (!url || url === current.current) return;
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      current.current = url;
-      setLayers((value) => [...value.slice(-1), { url, id: Date.now() }]);
-    }, 140);
-  };
-  useEffect(() => show(fallback), [fallback]);
-  useEffect(() => {
-    const read = window.setTimeout(
-      () =>
-        show(
-          root.current?.querySelector<HTMLImageElement>(
-            ".tv-hero-image.current img, .tv-game-grid > button.focused img, .tv-catalog-grid > button.focused img",
-          )?.currentSrc || undefined,
-        ),
-      900,
-    );
-    return () => window.clearTimeout(read);
-  }, [watch, root]);
-  useEffect(() => {
-    const element = root.current;
-    if (!element) return;
-    const pick = (event: Event) => {
-      const card = (event.target as Element | null)?.closest?.(cardSelector);
-      show(card?.querySelector("img")?.currentSrc || undefined);
-    };
-    element.addEventListener("focusin", pick);
-    element.addEventListener("mouseover", pick);
-    return () => {
-      clearTimeout(timer.current);
-      element.removeEventListener("focusin", pick);
-      element.removeEventListener("mouseover", pick);
-    };
-  }, [root]);
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 26 }, (_, index) => ({
-        "--x": `${(index * 37 + 11) % 100}%`,
-        "--s": `${2 + (index % 4)}px`,
-        "--d": `${14 + ((index * 7) % 16)}s`,
-        "--delay": `${-((index * 13) % 24)}s`,
-        "--drift": `${((index % 5) - 2) * 18}px`,
-      })),
-    [],
-  );
-  return (
-    <div className="fx-ambient" aria-hidden="true">
-      {layers.map((layer, index) => (
-        <img
-          key={layer.id}
-          className={`fx-ambient-art ${index === layers.length - 1 ? "current" : "previous"}`}
-          src={layer.url}
-          alt=""
-          referrerPolicy="no-referrer"
-          draggable={false}
-        />
-      ))}
-      <i className="fx-aurora a" />
-      <i className="fx-aurora b" />
-      <i className="fx-aurora c" />
-      <div className="fx-grid-floor" />
-      <div className="fx-particles">
-        {particles.map((style, index) => (
-          <i key={index} style={style as CSSProperties} />
-        ))}
-      </div>
-      <div className="fx-vignette" />
-      <div className="fx-scanlines" />
     </div>
   );
 }

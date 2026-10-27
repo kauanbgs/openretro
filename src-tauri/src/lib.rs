@@ -1,5 +1,6 @@
 mod account;
 mod achievements;
+mod backgrounds;
 mod commands;
 mod database;
 mod discord;
@@ -106,6 +107,9 @@ pub fn run() {
             account::social::social_join,
             account::social::social_join_room,
             account::social::social_game_busy,
+            backgrounds::list_console_backgrounds,
+            backgrounds::add_console_background,
+            backgrounds::remove_console_background,
             file_browser::browse_files,
             file_browser::read_source_json,
             metadata::catalog_status,
@@ -157,6 +161,7 @@ pub fn run() {
             launcher::launch_game,
             launcher::netplay::netplay_local_address,
             remote_play::remote_play_status,
+            remote_play::invite_qr,
             remote_play::party_configuration,
             remote_play::remote_play_start,
             remote_play::remote_play_stop,

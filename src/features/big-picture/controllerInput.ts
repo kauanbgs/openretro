@@ -46,6 +46,8 @@ export class ControllerInput {
       y: button(rawSony ? 3 : 3),
       search: button(8),
       menu: button(9),
+      // The PS / Xbox button, where the browser exposes it.
+      home: !rawSony && button(16),
       lb: button(4),
       rb: button(5),
     };

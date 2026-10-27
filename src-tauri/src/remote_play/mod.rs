@@ -56,16 +56,30 @@ pub struct RemotePlayStatus {
     network: Option<network::NetworkProfile>,
 }
 
-fn status_of(running: Option<&server::Running>) -> RemotePlayStatus {
-    let Some(running) = running else {
-        return RemotePlayStatus { running: false, url: None, qr: None, devices: 0, players: vec![], network: None };
-    };
-    let qr = qrcode::QrCode::new(running.url.as_bytes()).ok().map(|code| {
+fn qr_svg(text: &str) -> Option<String> {
+    qrcode::QrCode::new(text.as_bytes()).ok().map(|code| {
         code.render::<qrcode::render::svg::Color>()
             .min_dimensions(220, 220)
             .quiet_zone(true)
             .build()
-    });
+    })
+}
+
+/// A QR code for a Party invite, so a friend in the room scans it instead of
+/// typing the link. Only web links are encoded.
+#[tauri::command]
+pub fn invite_qr(url: String) -> Result<String> {
+    if !url.starts_with("https://") || url.len() > 512 {
+        return Err("Invalid invite link.".into());
+    }
+    qr_svg(&url).ok_or_else(|| "Could not draw the QR code.".into())
+}
+
+fn status_of(running: Option<&server::Running>) -> RemotePlayStatus {
+    let Some(running) = running else {
+        return RemotePlayStatus { running: false, url: None, qr: None, devices: 0, players: vec![], network: None };
+    };
+    let qr = qr_svg(&running.url);
     RemotePlayStatus {
         running: true,
         url: Some(running.url.clone()),

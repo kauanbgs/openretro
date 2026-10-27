@@ -165,6 +165,25 @@ export interface AppSettings {
   developerMode: boolean;
   /** Short sounds when moving and choosing in Big Picture. */
   navigationSounds?: boolean;
+  /** Background of Big Picture: a built-in scene or the player's picture. */
+  consoleTheme?:
+    | "waves"
+    | "aurora"
+    | "teton"
+    | "sunset"
+    | "autumn"
+    | "orbit"
+    | "city-lights"
+    | "cyberpunk"
+    | "forest"
+    | "dusk"
+    | "pixel-space"
+    | "cemetery"
+    | "pixel"
+    | "art"
+    | "custom";
+  /** The picture the custom theme shows, from the backgrounds folder. */
+  consoleBackground?: string;
   /** Download updates in the background and install them on the next start. */
   autoUpdate?: boolean;
   /** Delete a downloaded archive once its game is extracted. */

@@ -10,27 +10,24 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listen } from "../../services/transport";
 import {
-  ChevronLeft,
   Download,
+  FolderPlus,
   Gamepad2,
-  Grid2X2,
   Heart,
-  Clock3,
-  Power,
-  Home,
-  Library,
-  Play,
-  Search,
-  Smartphone,
-  Users,
-  Settings,
-  Trash2,
-  X,
-  Keyboard,
+  HeartOff,
+  Image,
   Info,
+  Keyboard,
   LayoutGrid,
   List,
-  FolderPlus,
+  Play,
+  Power,
+  Search,
+  Settings,
+  Smartphone,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react";
 import type {
   DownloadJob,
@@ -39,6 +36,7 @@ import type {
   GameMetadata,
   DownloadImported,
 } from "../../types";
+import { NETPLAY_PLATFORMS } from "../../types";
 import {
   catalogGameDetails,
   isCatalogGame,
@@ -49,8 +47,8 @@ import { platformById } from "../../db/platforms";
 import { GameArtwork } from "../../components/GameArtwork";
 import "./BigPicture.css";
 import "./BigPictureFx.css";
+import "./ConsoleShell.css";
 import { BigPictureCatalog, type CatalogViewState } from "./BigPictureCatalog";
-import { hasRuntimeMenu } from "../../components/InGameMenuHelp";
 import { ControllerSelect } from "./ControllerSelect";
 import { ControllerInput } from "./controllerInput";
 import { partyOwnsInput } from "../party/partyInput";
@@ -59,35 +57,39 @@ import { playUiSound, setNavigationSounds, soundFor } from "./navigationSounds";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { PhonePlayDialog } from "../../components/PhonePlayDialog";
 import { PartyDialog } from "../party/PartyDialog";
-import { NETPLAY_PLATFORMS } from "../../types";
 import { AccountAvatar } from "../social/accountAvatars";
 import { socialStore } from "../../services/social";
 import { ConsoleWorkspace, type WorkspaceRoute } from "./ConsoleWorkspace";
-import { HeroArtwork } from "./HeroArtwork";
 import {
-  AmbientBackdrop,
   BootSplash,
   ConsoleClock,
   LaunchSequence,
   pulseGlyph,
   useCardTilt,
 } from "./ConsoleFx";
+import { ParallaxBackdrop } from "./ParallaxBackdrop";
+import { usePlayTogether } from "../../components/PlayTogether";
+import { useConsoleTheme } from "./ConsoleThemes";
+import { ConsoleHome, playtimeLabel, type HomeTile } from "./ConsoleHome";
+import {
+  ControlCenter,
+  OptionsMenu,
+  type ConsoleAction,
+} from "./ControlCenter";
 import { t } from "../../i18n";
 
-type Section =
-  "home" | "catalog" | "library" | "downloads" | "system" | "friends";
-const sections: { id: Section; label: string; icon: typeof Home }[] = [
-  { id: "home", label: t("Início"), icon: Home },
-  { id: "catalog", label: t("Catálogo"), icon: Grid2X2 },
-  { id: "library", label: t("Biblioteca"), icon: Library },
-  { id: "downloads", label: "Downloads", icon: Download },
-  { id: "system", label: t("Configurações"), icon: Settings },
-  { id: "friends", label: t("Amigos"), icon: Users },
+type Section = "home" | "library" | "catalog";
+const sections: { id: Section; label: string }[] = [
+  { id: "home", label: t("Jogos") },
+  { id: "library", label: t("Biblioteca") },
+  { id: "catalog", label: t("Explorar") },
 ];
 const activeDownload = (state: string) =>
   ["RESOLVING", "QUEUED", "DOWNLOADING", "VERIFYING", "INSTALLING"].includes(
     state,
   );
+const artOf = (game?: GameMetadata) =>
+  game && (game.backgroundUrl ?? game.screenshots?.[0] ?? game.coverUrl);
 
 export function BigPicture({
   library,
@@ -114,8 +116,9 @@ export function BigPicture({
 }) {
   const [section, setSection] = useState<Section>("home");
   const queryClient = useQueryClient();
-  const [navFocused, setNavFocused] = useState(false);
-  const [navIndex, setNavIndex] = useState(0);
+  // The top bar (tabs and shortcuts) or the screen's content has the focus.
+  const [zone, setZone] = useState<"top" | "content">("content");
+  const [topIndex, setTopIndex] = useState(0);
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [query, setQuery] = useState("");
   const [librarySort, setLibrarySort] = useState("recent");
@@ -128,13 +131,19 @@ export function BigPicture({
   const account = social.session.hasSession ? social.session.user : null;
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
+  const [centerOpen, setCenterOpen] = useState(false);
+  const [optionsFor, setOptionsFor] = useState<LibraryGame>();
   const [workspace, setWorkspace] = useState<WorkspaceRoute>();
   const workspaceInput = useRef<((key: string) => boolean) | null>(null);
+  const overlayInput = useRef<((key: string) => boolean) | null>(null);
+  const homeInput = useRef<((key: string) => boolean) | null>(null);
   const { data: settings } = useQuery({
     queryKey: ["settings"],
     queryFn: bridge.settings,
   });
   setNavigationSounds(settings?.navigationSounds !== false);
+  const { theme, picture } = useConsoleTheme();
+  const together = usePlayTogether();
   const [powerOpen, setPowerOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const keyboardInput = useRef<((key: string) => boolean) | null>(null);
@@ -163,14 +172,19 @@ export function BigPicture({
   );
   const [details, setDetails] = useState<Record<string, GameMetadata>>({});
   const root = useRef<HTMLElement>(null);
+  const top = useRef<HTMLElement>(null);
   const grid = useRef<HTMLDivElement>(null);
   const catalogInput = useRef<((key: string) => boolean) | null>(null);
   const catalogMemory = useRef<CatalogViewState | null>(null);
-  const homeMemory = useRef<CatalogViewState | null>(null);
   const [catalogCount, setCatalogCount] = useState(0);
   const [selected, setSelected] = useState(0);
   const [launching, setLaunching] = useState(false);
   const [launchTarget, setLaunchTarget] = useState<GameMetadata>();
+  const [homeTile, setHomeTile] = useState<{
+    tile: HomeTile;
+    position: number;
+  }>();
+  const [pendingSearch, setPendingSearch] = useState(false);
   useCardTilt(root);
   // Existing notifications are ignored on entry; react to arrivals while this
   // console session is mounted, once the refreshed library contains the game.
@@ -198,14 +212,15 @@ export function BigPicture({
     setKeyboardOpen(false);
     setRemoveTarget(undefined);
     setPowerOpen(false);
+    setCenterOpen(false);
+    setOptionsFor(undefined);
     setWorkspace(undefined);
     setFilter("all");
     setQuery("");
     setLibraryPlatform("all");
     setLibrarySort("recent");
     setSection("library");
-    setNavIndex(sections.findIndex((item) => item.id === "library"));
-    setNavFocused(false);
+    setZone("content");
     setSelected(index);
     feedback(
       t("{title} foi adicionado à biblioteca. Pronto para jogar.", {
@@ -214,9 +229,9 @@ export function BigPicture({
     );
     requestAnimationFrame(() => {
       content.current?.scrollTo({ top: 0, behavior: "instant" });
-      root.current
-        ?.querySelector<HTMLButtonElement>(".tv-play")
-        ?.focus({ preventScroll: true });
+      grid.current
+        ?.querySelectorAll<HTMLButtonElement>("button")
+        [index]?.focus({ preventScroll: true });
     });
   }, [downloadArrival, library, jobs, launching, feedback]);
 
@@ -272,17 +287,20 @@ export function BigPicture({
   );
   const selectedGame =
     visibleGames[Math.min(selected, Math.max(visibleGames.length - 1, 0))];
-  const heroGame = selectedGame ?? games[0];
-  const heroMetadata = heroGame && (details[heroGame.game.id] ?? heroGame.game);
+  // The game the screen is about: the focused home tile or library card.
+  const featured =
+    section === "home"
+      ? homeTile?.tile.kind === "game"
+        ? homeTile.tile.entry
+        : undefined
+      : section === "library"
+        ? selectedGame
+        : undefined;
+  const featuredMetadata =
+    featured && (details[featured.game.id] ?? featured.game);
   useEffect(() => {
-    const game = heroGame?.game;
-    if (
-      section !== "library" ||
-      !game ||
-      !isCatalogGame(game) ||
-      game.backgroundUrl ||
-      details[game.id]
-    )
+    const game = featured?.game;
+    if (!game || !isCatalogGame(game) || game.backgroundUrl || details[game.id])
       return;
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -297,25 +315,39 @@ export function BigPicture({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [heroGame?.game.id, details, section]);
+  }, [featured?.game.id, details]);
+  const focusContent = (next = section) => {
+    setZone("content");
+    requestAnimationFrame(() => {
+      const target =
+        next === "home"
+          ? root.current?.querySelector<HTMLElement>(".ps-tile.focused")
+          : (grid.current?.querySelectorAll<HTMLButtonElement>("button")[
+              Math.max(0, selected)
+            ] ?? grid.current?.querySelector<HTMLButtonElement>("button"));
+      target?.focus({ preventScroll: true });
+    });
+  };
   const selectSection = (next: Section) => {
     positions.current[section] = {
       selected,
       scroll: content.current?.scrollTop ?? 0,
     };
-    setWorkspace(
-      next === "downloads" || next === "friends" ? { page: next } : undefined,
-    );
+    setWorkspace(undefined);
     setSection(next);
-    setNavIndex(sections.findIndex((item) => item.id === next));
     setSelected(positions.current[next]?.selected ?? 0);
-    setNavFocused(false);
+    setZone("content");
     requestAnimationFrame(() =>
       content.current?.scrollTo({
         top: positions.current[next]?.scroll ?? 0,
         behavior: "instant",
       }),
     );
+  };
+  const openWorkspace = (route: WorkspaceRoute) => {
+    setCenterOpen(false);
+    setOptionsFor(undefined);
+    setWorkspace(route);
   };
   const move = (amount: number, size: number) => {
     const next = Math.max(
@@ -324,9 +356,8 @@ export function BigPicture({
     );
     setSelected(next);
     requestAnimationFrame(() => {
-      const card = (
-        grid.current ?? root.current?.querySelector(".tv-system-grid")
-      )?.querySelectorAll<HTMLButtonElement>("button")[next];
+      const card =
+        grid.current?.querySelectorAll<HTMLButtonElement>("button")[next];
       card?.focus({ preventScroll: true });
       card?.scrollIntoView({
         block: "nearest",
@@ -339,16 +370,9 @@ export function BigPicture({
     if (document.fullscreenElement) void document.exitFullscreen();
     onClose();
   };
-  const currentSize = () =>
-    section === "catalog" || section === "home"
-      ? catalogCount
-      : section === "downloads"
-        ? jobs.length
-        : section === "system"
-          ? 7
-          : visibleGames.length;
-  const launch = async (entry = heroGame) => {
+  const launch = async (entry?: LibraryGame) => {
     if (!entry || launching) return;
+    setOptionsFor(undefined);
     setLaunching(true);
     setLaunchTarget(details[entry.game.id] ?? entry.game);
     setPreparing(true);
@@ -366,13 +390,13 @@ export function BigPicture({
       setPreparing(false);
     }
   };
-  const favorite = async () => {
-    if (!selectedGame) return;
+  const favorite = async (entry?: LibraryGame) => {
+    if (!entry) return;
     try {
-      await bridge.favorite(selectedGame.item.id, !selectedGame.item.favorite);
+      await bridge.favorite(entry.item.id, !entry.item.favorite);
       await refresh();
       feedback(
-        selectedGame.item.favorite
+        entry.item.favorite
           ? t("Removido dos favoritos.")
           : t("Adicionado aos favoritos."),
       );
@@ -380,9 +404,9 @@ export function BigPicture({
       feedback(String(error));
     }
   };
-  const remove = async () => {
-    if (!selectedGame) return;
-    setRemoveTarget(selectedGame);
+  const askRemove = (entry: LibraryGame) => {
+    setOptionsFor(undefined);
+    setRemoveTarget(entry);
     setConfirmRemove(false);
   };
   const doRemove = async () => {
@@ -400,42 +424,176 @@ export function BigPicture({
       setRemoving(false);
     }
   };
-  const activate = () => {
-    if (powerOpen) return close();
-    if (navFocused) {
-      if (navIndex === sections.length) return selectSection("catalog");
-      if (navIndex === sections.length + 1) return setPowerOpen(true);
-      return selectSection(sections[navIndex].id);
-    }
-    if (section === "library") return void launch();
-    if (section === "home") return;
-    if (section === "downloads") {
-      return setWorkspace({ page: "downloads" });
-    }
-    if (section === "friends") return setWorkspace({ page: "friends" });
-    const page = [
-      "phone",
-      "party",
-      "Discover",
-      "Settings",
-      "import",
-      "sources",
-      "exit",
-    ][selected];
-    if (page === "phone") return setPhoneOpen(true);
-    if (page === "party") return setPartyOpen(true);
-    page === "exit"
-      ? close()
-      : page === "Discover"
-        ? selectSection("catalog")
-        : setWorkspace({
-            page:
-              page === "import"
-                ? "import"
-                : page === "sources"
-                  ? "sources"
-                  : "settings",
-          });
+  const openSearch = () => {
+    if (section === "library") return setKeyboardOpen(true);
+    if (section !== "catalog") selectSection("catalog");
+    setPendingSearch(true);
+  };
+  useEffect(() => {
+    if (!pendingSearch || section !== "catalog") return;
+    const frame = requestAnimationFrame(() => {
+      catalogInput.current?.("open-search");
+      setPendingSearch(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingSearch, section]);
+  const activeJobs = jobs.filter((job) => activeDownload(job.state)).length;
+  const centerActions: ConsoleAction[] = [
+    {
+      id: "downloads",
+      label: "Downloads",
+      detail: activeJobs
+        ? t("{count} em andamento", { count: activeJobs })
+        : t("Nada baixando"),
+      icon: Download,
+      badge: activeJobs,
+      run: () => openWorkspace({ page: "downloads" }),
+    },
+    {
+      id: "friends",
+      label: t("Amigos"),
+      detail: account?.displayName ?? t("Entrar"),
+      icon: Users,
+      badge: social.incoming.length,
+      run: () => openWorkspace({ page: "friends" }),
+    },
+    {
+      id: "party",
+      label: "OpenRetro Party",
+      detail: t("Jogue online com amigos"),
+      icon: Gamepad2,
+      run: () => {
+        setCenterOpen(false);
+        setPartyOpen(true);
+      },
+    },
+    {
+      id: "phone",
+      label: t("Jogar no celular"),
+      detail: t("Use o celular como tela"),
+      icon: Smartphone,
+      run: () => {
+        setCenterOpen(false);
+        setPhoneOpen(true);
+      },
+    },
+    {
+      id: "themes",
+      label: t("Tema do fundo"),
+      detail: t("Cenas e suas imagens"),
+      icon: Image,
+      run: () => openWorkspace({ page: "themes" }),
+    },
+    {
+      id: "import",
+      label: t("Adicionar jogos"),
+      detail: t("Arquivos ou pasta"),
+      icon: FolderPlus,
+      run: () => openWorkspace({ page: "import" }),
+    },
+    {
+      id: "sources",
+      label: t("Fontes de download"),
+      detail: t("Adicione e gerencie"),
+      icon: Download,
+      run: () => openWorkspace({ page: "sources" }),
+    },
+    {
+      id: "settings",
+      label: t("Configurações"),
+      detail: updateVersion
+        ? t("Atualização {version}", { version: updateVersion })
+        : t("Ajuste a experiência"),
+      icon: Settings,
+      badge: updateVersion ? 1 : 0,
+      run: () => openWorkspace({ page: "settings" }),
+    },
+    {
+      id: "power",
+      label: t("Energia"),
+      detail: t("Sair do Big Picture"),
+      icon: Power,
+      danger: true,
+      run: () => {
+        setCenterOpen(false);
+        setPowerOpen(true);
+      },
+    },
+  ];
+  const optionActions = (entry: LibraryGame): ConsoleAction[] => [
+    {
+      id: "play",
+      label: t("Jogar"),
+      icon: Play,
+      run: () => void launch(entry),
+    },
+    ...(NETPLAY_PLATFORMS.includes(entry.game.platformId)
+      ? [
+          {
+            id: "online",
+            label: t("Jogar online"),
+            icon: Users,
+            run: () =>
+              openWorkspace({ page: "game", game: entry.game, online: true }),
+          },
+        ]
+      : []),
+    {
+      id: "manage",
+      label: t("Gerenciar jogo"),
+      icon: Settings,
+      run: () => openWorkspace({ page: "game", game: entry.game }),
+    },
+    {
+      id: "favorite",
+      label: entry.item.favorite
+        ? t("Remover dos favoritos")
+        : t("Adicionar aos favoritos"),
+      icon: entry.item.favorite ? HeartOff : Heart,
+      run: () => {
+        setOptionsFor(undefined);
+        void favorite(entry);
+      },
+    },
+    {
+      id: "remove",
+      label: t("Remover da biblioteca"),
+      icon: Trash2,
+      danger: true,
+      run: () => askRemove(entry),
+    },
+  ];
+  // The top bar: the tabs, then shortcuts on the right.
+  const topActions: { id: string; run: () => void }[] = [
+    ...sections.map((item) => ({
+      id: item.id,
+      run: () => {
+        selectSection(item.id);
+        focusContent(item.id);
+      },
+    })),
+    { id: "party", run: () => setPartyOpen(true) },
+    { id: "phone", run: () => setPhoneOpen(true) },
+    { id: "search", run: openSearch },
+    { id: "downloads", run: () => openWorkspace({ page: "downloads" }) },
+    { id: "friends", run: () => openWorkspace({ page: "friends" }) },
+    { id: "settings", run: () => openWorkspace({ page: "settings" }) },
+  ];
+  const topFocused = (id: string) =>
+    zone === "top" && topActions[topIndex]?.id === id ? "focused" : "";
+  const enterTop = () => {
+    const index = sections.findIndex((item) => item.id === section);
+    setZone("top");
+    setTopIndex(index);
+    top.current
+      ?.querySelectorAll<HTMLButtonElement>("[data-top]")
+      [index]?.focus({ preventScroll: true });
+  };
+  const switchTab = (step: number) => {
+    const index = sections.findIndex((item) => item.id === section);
+    const next = sections[(index + step + sections.length) % sections.length];
+    selectSection(next.id);
+    focusContent(next.id);
   };
   useEffect(() => {
     void document.documentElement.requestFullscreen?.().catch(() => undefined);
@@ -447,10 +605,7 @@ export function BigPicture({
       // The foreground emulator owns the controller for the entire game session.
       if (launching) return;
       if (selectInput.current?.(key)) return;
-      if (workspace && !navFocused && !powerOpen && !phoneOpen && !partyOpen) {
-        workspaceInput.current?.(key);
-        return;
-      }
+      if (overlayInput.current?.(key)) return;
       if (keyboardOpen) {
         keyboardInput.current?.(key);
         return;
@@ -466,52 +621,79 @@ export function BigPicture({
         }
         return;
       }
+      if (powerOpen) {
+        if (key === "b" || key === "menu") setPowerOpen(false);
+        if (key === "a") close();
+        return;
+      }
+      if (key === "menu" || key === "home") {
+        setCenterOpen(true);
+        return;
+      }
+      if (workspace) {
+        workspaceInput.current?.(key);
+        return;
+      }
       if (preparing) return;
-      if (
-        (section === "catalog" || section === "home") &&
-        (!navFocused || catalogModal.current) &&
-        !powerOpen &&
-        catalogInput.current?.(key)
-      )
-        return;
-      if (key === "b") {
-        if (powerOpen) return setPowerOpen(false);
-        return setNavFocused((value) => !value);
-      }
-      if (powerOpen) return key === "a" ? close() : undefined;
-      if (key === "previous-control" || key === "next-control") return;
-      if (
-        (section === "catalog" || section === "home") &&
-        (key === "lb" || key === "rb")
-      ) {
-        catalogInput.current?.(
-          key === "lb" ? "previous-control" : "next-control",
-        );
+      if (zone === "top") {
+        const items =
+          top.current?.querySelectorAll<HTMLButtonElement>("[data-top]");
+        if (key === "left" || key === "right") {
+          const next = Math.max(
+            0,
+            Math.min(
+              topActions.length - 1,
+              topIndex + (key === "left" ? -1 : 1),
+            ),
+          );
+          setTopIndex(next);
+          items?.[next]?.focus({ preventScroll: true });
+        } else if (key === "a") topActions[topIndex]?.run();
+        else if (key === "down" || key === "b") focusContent();
+        else if (key === "lb" || key === "rb") switchTab(key === "lb" ? -1 : 1);
         return;
       }
-      if (section === "library" && !navFocused) {
-        if (key === "lb" || key === "rb") {
-          setFilter((value) => (value === "all" ? "favorites" : "all"));
-          setSelected(0);
-          return;
+      if (key === "lb" || key === "rb") {
+        if (!catalogModal.current) switchTab(key === "lb" ? -1 : 1);
+        return;
+      }
+      if (key === "search") return openSearch();
+      if (section === "home") {
+        if (homeInput.current?.(key)) return;
+        if (key === "up") enterTop();
+        return;
+      }
+      if (section === "catalog") {
+        if (
+          key === "up" &&
+          !catalogModal.current &&
+          document.activeElement?.closest(".tv-catalog-toolbar")
+        )
+          return enterTop();
+        if (catalogInput.current?.(key)) return;
+        if (key === "b") {
+          selectSection("home");
+          return focusContent("home");
         }
+      }
+      if (section === "library") {
         const control = document.activeElement as HTMLElement | null;
-        if (control?.closest(".tv-library-tools, .tv-hero-actions")) {
+        if (control?.closest(".tv-library-tools, .tv-tabs")) {
           if (key === "a") {
             if (control instanceof HTMLInputElement) setKeyboardOpen(true);
             else if (control instanceof HTMLButtonElement) control.click();
-            else control.blur();
             return;
           }
+          if (key === "up") return enterTop();
           if (key === "down" || key === "b") {
             control.blur();
-            grid.current?.querySelector<HTMLButtonElement>("button")?.focus();
+            move(0, visibleGames.length);
             return;
           }
-          if (key === "up" || key === "left" || key === "right") {
+          if (key === "left" || key === "right") {
             const controls = Array.from(
               root.current?.querySelectorAll<HTMLElement>(
-                ".tv-hero-actions button, .tv-library-tools input, .tv-library-tools button, .tv-library-tools select",
+                ".tv-library-tools input, .tv-library-tools button, .tv-tabs button",
               ) ?? [],
             );
             const index = controls.indexOf(control);
@@ -521,48 +703,25 @@ export function BigPicture({
             ]?.focus();
             return;
           }
+          return;
         }
-      }
-      if (key === "a") return activate();
-      if (key === "search") {
-        if (section === "home") selectSection("catalog");
-        else if (section === "library") setKeyboardOpen(true);
-        else if (section === "catalog") catalogInput.current?.("open-search");
-        return;
-      }
-      if (navFocused) {
-        if (key === "up" || key === "down")
-          setNavIndex(
-            (value) =>
-              (value + (key === "up" ? -1 : 1) + sections.length + 2) %
-              (sections.length + 2),
-          );
-        if (key === "right") {
-          setNavFocused(false);
-          if (section === "home" && !grid.current?.querySelector("button"))
-            root.current
-              ?.querySelector<HTMLButtonElement>(".play-together button")
-              ?.focus();
+        if (key === "b") {
+          selectSection("home");
+          return focusContent("home");
         }
-        return;
+        if (key === "a") return void launch(selectedGame);
+        if (key === "x") return void favorite(selectedGame);
+        if (key === "y") return selectedGame && setOptionsFor(selectedGame);
       }
-      const currentGrid =
-        grid.current ?? root.current?.querySelector(".tv-system-grid");
-      const columns = currentGrid
-        ? getComputedStyle(currentGrid).gridTemplateColumns.split(" ").length
+      const size = section === "catalog" ? catalogCount : visibleGames.length;
+      const columns = grid.current
+        ? getComputedStyle(grid.current).gridTemplateColumns.split(" ").length
         : 1;
-      if (key === "left")
-        return selected % columns === 0
-          ? setNavFocused(true)
-          : move(-1, currentSize());
-      if (key === "right") return move(1, currentSize());
+      if (key === "left") return move(-1, size);
+      if (key === "right") return move(1, size);
       if (key === "up" && selected < columns) {
         if (section === "catalog") catalogInput.current?.("next-control");
-        else if (section === "home")
-          root.current
-            ?.querySelector<HTMLButtonElement>(".tv-home-feature .tv-play")
-            ?.focus();
-        else if (section === "library") {
+        else {
           content.current?.scrollTo({ top: 0, behavior: "smooth" });
           root.current
             ?.querySelector<HTMLInputElement>(".tv-library-tools input")
@@ -570,20 +729,8 @@ export function BigPicture({
         }
         return;
       }
-      if (key === "up") return move(-columns, currentSize());
-      if (key === "down") return move(columns, currentSize());
-      if (
-        key === "x" &&
-        !navFocused &&
-        (section === "home" || section === "library")
-      )
-        void favorite();
-      if (
-        key === "y" &&
-        !navFocused &&
-        (section === "home" || section === "library")
-      )
-        void remove();
+      if (key === "up") return move(-columns, size);
+      if (key === "down") return move(columns, size);
     };
     dispatchInput.current = handle;
     const onKey = (event: KeyboardEvent) => {
@@ -591,11 +738,8 @@ export function BigPicture({
       if (event.key === "Tab") {
         const scope =
           root.current?.querySelector(
-            ".tv-player-dialog, .tv-keyboard, .tv-confirm-dialog, .tv-power-dialog, .tv-catalog-dialog",
-          ) ??
-          (navFocused
-            ? root.current?.querySelector(".tv-side-rail")
-            : root.current);
+            ".tv-player-dialog, .tv-keyboard, .tv-confirm-dialog, .tv-power-dialog, .tv-catalog-dialog, .ps-center, .ps-options",
+          ) ?? root.current;
         const elements = Array.from(
           scope?.querySelectorAll<HTMLElement>(
             "button:not(:disabled), input:not(:disabled), select:not(:disabled)",
@@ -630,7 +774,8 @@ export function BigPicture({
       if (
         event.key === "Enter" &&
         document.activeElement instanceof HTMLButtonElement &&
-        root.current?.contains(document.activeElement)
+        root.current?.contains(document.activeElement) &&
+        !overlayInput.current
       )
         return;
       const keys: Record<string, string> = {
@@ -646,6 +791,10 @@ export function BigPicture({
         y: "y",
         Y: "y",
         "/": "search",
+        m: "menu",
+        M: "menu",
+        PageUp: "lb",
+        PageDown: "rb",
       };
       const key = event.keyCode === 10009 ? "Escape" : event.key;
       if (keys[key]) {
@@ -684,83 +833,50 @@ export function BigPicture({
         return;
       }
       for (const key of device.sample(pad, performance.now())) {
-        const input = key === "menu" ? "b" : key;
-        playUiSound(soundFor(input));
-        dispatchInput.current(input);
+        playUiSound(soundFor(key));
+        dispatchInput.current(key);
       }
     }, 33);
     return () => window.clearInterval(timer);
   }, []);
-  const shelf = (title: string, entries: LibraryGame[]) => (
-    <section className="tv-game-shelf">
-      <div className="tv-section-title">
-        <h2>{title}</h2>
-        <span>
-          {entries.length} {t("jogos")}
-        </span>
-      </div>
-      <div
-        className={`tv-game-grid ${libraryView === "list" ? "tv-library-list" : ""}`}
-        ref={grid}
-      >
-        {entries.map((entry, index) => (
-          <button
-            key={entry.item.id}
-            style={{ "--i": Math.min(index, 14) } as CSSProperties}
-            className={index === selected && !navFocused ? "focused" : ""}
-            onFocus={() => {
-              setSelected(index);
-              setNavFocused(false);
-              requestAnimationFrame(() =>
-                grid.current
-                  ?.querySelectorAll<HTMLButtonElement>("button")
-                  [index]?.scrollIntoView({
-                    block: "nearest",
-                    inline: "nearest",
-                    behavior: "smooth",
-                  }),
-              );
-            }}
-            onMouseEnter={() => {
-              clearTimeout(previewTimer.current);
-              previewTimer.current = setTimeout(() => {
-                setSelected(index);
-                setNavFocused(false);
-              }, 150);
-            }}
-            onMouseLeave={() => clearTimeout(previewTimer.current)}
-            onClick={() => void launch(entry)}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              setSelected(index);
-              setRemoveTarget(entry);
-              setConfirmRemove(false);
-            }}
-            aria-label={t("Jogar {title}", { title: entry.game.title })}
-          >
-            <GameArtwork game={entry.game} />
-            <i className="tv-card-play">
-              <Play size={20} fill="currentColor" /> {t("Jogar")}
-            </i>
-            <span>{entry.game.title}</span>
-            <small>
-              {platformById(entry.game.platformId)?.shortName ??
-                entry.game.platformId}
-            </small>
-          </button>
-        ))}
-      </div>
-    </section>
+  const onHomeTile = useCallback(
+    (tile: HomeTile, position: number) => setHomeTile({ tile, position }),
+    [],
   );
-  const activeJobs = jobs.filter((job) => activeDownload(job.state)).length;
-  const heroPlatform =
-    heroGame &&
-    (platformById(heroGame.game.platformId)?.name ?? heroGame.game.platformId);
+  const accountButton = (
+    <button
+      data-top
+      className={`ps-top-account ${topFocused("friends")}`}
+      aria-label={t("Conta e amigos")}
+      onClick={() => openWorkspace({ page: "friends" })}
+    >
+      <AccountAvatar
+        avatar={account?.avatar}
+        size={34}
+        status={
+          !account
+            ? undefined
+            : account.appearOffline
+              ? "offline"
+              : social.connected
+                ? "online"
+                : "idle"
+        }
+      />
+      <SocialUnreadBadge />
+      {social.incoming.length > 0 && (
+        <b className="tv-topbar-badge">{social.incoming.length}</b>
+      )}
+    </button>
+  );
+  const backdropArt =
+    section === "catalog" ? undefined : artOf(featuredMetadata);
   return (
     <section
       ref={root}
-      className={`console-mode ${navFocused ? "menu-open" : ""}`}
+      className={`console-mode ps-console ${zone === "top" ? "top-focused" : ""}`}
       data-section={workspace ? workspace.page : section}
+      data-console-theme={theme}
       aria-label={t("Modo console do OpenRetro")}
       onClickCapture={(event) => {
         if ((event.target as Element).closest("button:not(:disabled)"))
@@ -769,114 +885,114 @@ export function BigPicture({
       role="dialog"
       aria-modal="true"
     >
-      <AmbientBackdrop
+      <ParallaxBackdrop
+        theme={theme}
+        picture={picture}
         root={root}
+        art={backdropArt}
+        focus={section === "home" ? homeTile?.position : undefined}
         watch={`${section}-${workspace?.page ?? ""}`}
-        fallback={
-          section === "library" && heroMetadata
-            ? (heroMetadata.backgroundUrl ??
-              heroMetadata.screenshots?.[0] ??
-              heroMetadata.coverUrl)
-            : undefined
-        }
       />
       <BootSplash />
       <SocialNotice
-        onOpen={(view) => {
-          selectSection("friends");
-          setWorkspace({ page: "friends", activity: view === "activity" });
-        }}
+        onOpen={(view) =>
+          openWorkspace({ page: "friends", activity: view === "activity" })
+        }
       />
-      {navFocused && (
-        <button
-          className="tv-menu-scrim"
-          aria-label={t("Fechar menu")}
-          onClick={() => setNavFocused(false)}
-        />
-      )}
-      <div
-        className="tv-side-rail"
-        onMouseEnter={() => setNavFocused(true)}
-        onMouseLeave={() => setNavFocused(false)}
-      >
-        <button
-          className="tv-profile"
-          title={t("Abrir menu")}
-          aria-label={t("Abrir menu")}
-          onClick={() => setNavFocused((value) => !value)}
-        >
-          <Gamepad2 size={25} />
-          <i />
-        </button>
-        <nav
-          className={`tv-nav ${navFocused ? "focused" : ""}`}
-          aria-label={t("Navegação principal")}
-        >
-          <span
-            className="tv-nav-cursor"
-            aria-hidden="true"
-            style={{
-              transform: `translateY(${(navFocused ? navIndex : sections.findIndex((item) => item.id === section)) * 52}px)`,
-              opacity: navFocused && navIndex >= sections.length ? 0 : 1,
-            }}
-          />
-          {sections.map((item, index) => (
+      {!workspace && (
+        <header className="ps-topbar" ref={top}>
+          <nav className="ps-tabs" aria-label={t("Navegação principal")}>
+            {sections.map((item, index) => (
+              <button
+                key={item.id}
+                data-top
+                className={`${section === item.id ? "active" : ""} ${zone === "top" && topIndex === index ? "focused" : ""}`}
+                aria-current={section === item.id ? "page" : undefined}
+                onClick={() => selectSection(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div className="ps-top-tools">
             <button
-              key={item.id}
-              style={{ "--i": index } as CSSProperties}
-              className={`${section === item.id ? "active" : ""} ${navFocused && navIndex === index ? "nav-focus" : ""}`}
-              onClick={() => selectSection(item.id)}
-              aria-label={item.label}
+              data-top
+              className={`ps-top-together ${together.partyActive ? "live" : ""} ${topFocused("party")}`}
+              aria-label={
+                together.partyActive
+                  ? t("Party aberta · {count}/4 jogadores", {
+                      count: 1 + together.party.connected.length,
+                    })
+                  : t("Jogar com amigos")
+              }
+              title={t("Jogar com amigos")}
+              onClick={() => setPartyOpen(true)}
             >
-              <item.icon size={21} />
-              <span>{item.label}</span>
-              {item.id === "downloads" && activeJobs > 0 && (
-                <small>{activeJobs}</small>
+              <Users size={21} />
+              <span>
+                {together.partyActive
+                  ? `${1 + together.party.connected.length}/4`
+                  : "Party"}
+              </span>
+            </button>
+            <button
+              data-top
+              className={`ps-top-together ${together.phoneDevices ? "live" : ""} ${topFocused("phone")}`}
+              aria-label={
+                together.phoneDevices
+                  ? t("{count} celulares conectados", {
+                      count: together.phoneDevices,
+                    })
+                  : t("Jogar no celular")
+              }
+              title={t("Jogar no celular")}
+              onClick={() => setPhoneOpen(true)}
+            >
+              <Smartphone size={21} />
+              <span>
+                {together.phoneDevices
+                  ? String(together.phoneDevices)
+                  : t("Celular")}
+              </span>
+            </button>
+            <button
+              data-top
+              className={topFocused("search")}
+              aria-label={t("Pesquisar jogos")}
+              onClick={openSearch}
+            >
+              <Search size={22} />
+            </button>
+            <button
+              data-top
+              className={topFocused("downloads")}
+              aria-label="Downloads"
+              onClick={() => openWorkspace({ page: "downloads" })}
+            >
+              <Download size={22} />
+              {activeJobs > 0 && (
+                <b className="tv-topbar-badge">{activeJobs}</b>
               )}
             </button>
-          ))}
-        </nav>
-        <div className="tv-rail-games">
-          {games.slice(0, 5).map((entry) => (
+            {accountButton}
             <button
-              key={entry.item.id}
-              title={entry.game.title}
-              onClick={() => {
-                setFilter("all");
-                setQuery("");
-                setSelected(games.indexOf(entry));
-                setSection("home");
-                setNavFocused(false);
-              }}
+              data-top
+              className={topFocused("settings")}
+              aria-label={t("Configurações")}
+              onClick={() => openWorkspace({ page: "settings" })}
             >
-              <GameArtwork game={entry.game} />
-              <span>{entry.game.title}</span>
+              <Settings size={22} />
             </button>
-          ))}
-        </div>
-        <div className="tv-rail-bottom">
-          <button
-            className={
-              navFocused && navIndex === sections.length ? "nav-focus" : ""
-            }
-            onClick={() => selectSection("catalog")}
-            aria-label={t("Catálogo")}
-          >
-            <Search size={22} />
-            <span>{t("Catálogo")}</span>
-          </button>
-          <button
-            className={
-              navFocused && navIndex === sections.length + 1 ? "nav-focus" : ""
-            }
-            onClick={() => setPowerOpen(true)}
-            aria-label={t("Energia")}
-          >
-            <Power size={20} />
-            <span>{t("Energia")}</span>
-          </button>
-        </div>
-      </div>
+            <span
+              className={`ps-pad ${connected ? "connected" : ""}`}
+              title={connected ? t("Controle conectado") : t("Teclado e mouse")}
+            >
+              <Gamepad2 size={20} />
+            </span>
+            <ConsoleClock />
+          </div>
+        </header>
+      )}
       {phoneOpen && (
         <PhonePlayDialog
           input={selectInput}
@@ -890,86 +1006,25 @@ export function BigPicture({
           onClose={() => setPartyOpen(false)}
           onSignIn={() => {
             setPartyOpen(false);
-            selectSection("friends");
+            openWorkspace({ page: "friends" });
           }}
         />
       )}
-      {!workspace && (
-        <header className="tv-topbar">
-          <span>
-            <ChevronLeft size={20} />{" "}
-            {section === "home"
-              ? t("Início")
-              : sections.find((item) => item.id === section)?.label}
-          </span>
-          <div>
-            <button
-              aria-label={t("Conta e amigos")}
-              onClick={() => selectSection("friends")}
-            >
-              <AccountAvatar
-                avatar={account?.avatar}
-                size={26}
-                status={
-                  !account
-                    ? undefined
-                    : account.appearOffline
-                      ? "offline"
-                      : social.connected
-                        ? "online"
-                        : "idle"
-                }
-              />
-              {account?.displayName ?? t("Entrar")}
-              <SocialUnreadBadge />
-              {social.incoming.length > 0 && (
-                <b className="tv-topbar-badge">{social.incoming.length}</b>
-              )}
-            </button>
-            <ConsoleClock />
-            <span
-              className="tv-controller-status"
-              title={connected ? t("Controle conectado") : t("Teclado e mouse")}
-            >
-              <Gamepad2 size={17} />
-              <i className={connected ? "connected" : ""} />
-              {connected ? t("Controle conectado") : t("Teclado e mouse")}
-            </span>
-            <button
-              aria-label={t("Pesquisar jogos")}
-              onClick={() =>
-                section === "catalog"
-                  ? catalogInput.current?.("open-search")
-                  : selectSection("catalog")
-              }
-            >
-              <Search size={22} />
-            </button>
-            <button className="tv-exit" onClick={close}>
-              {t("Sair do modo console")}
-            </button>
-          </div>
-        </header>
-      )}
       {workspace && (
         <ConsoleWorkspace
-          key={section}
+          key={workspace.page === "themes" ? "themes" : section}
           route={workspace}
           input={workspaceInput}
-          active={!navFocused && !powerOpen}
-          onContentFocus={() => setNavFocused(false)}
+          active={!powerOpen && !centerOpen}
+          onContentFocus={() => setZone("content")}
           library={library}
           emulators={emulators}
           jobs={jobs}
           refresh={refresh}
           notify={feedback}
           onRoute={setWorkspace}
-          onMenu={() => setNavFocused(true)}
-          onClose={() => {
-            setWorkspace(undefined);
-            if (section === "downloads" || section === "friends")
-              selectSection("home");
-          }}
+          onMenu={() => setWorkspace(undefined)}
+          onClose={() => setWorkspace(undefined)}
           onImported={(game) => {
             setWorkspace(undefined);
             setQuery("");
@@ -998,14 +1053,44 @@ export function BigPicture({
         />
       )}
       {!workspace && (
-        <main ref={content} className="tv-content" key={section}>
-          {(section === "catalog" || section === "home") && (
-            <BigPictureCatalog
-              onFriends={() => selectSection("friends")}
+        <main
+          ref={content}
+          className="tv-content ps-content"
+          key={section}
+          onFocusCapture={() => setZone("content")}
+        >
+          {section === "home" && (
+            <ConsoleHome
+              library={library}
+              emulators={emulators}
+              details={details}
+              input={homeInput}
+              launching={launching}
+              onTile={onHomeTile}
+              onPlay={(entry) => void launch(entry)}
+              onOptions={setOptionsFor}
+              onOnline={(entry) =>
+                openWorkspace({ page: "game", game: entry.game, online: true })
+              }
+              onFavorite={(entry) => void favorite(entry)}
+              onLibrary={() => {
+                selectSection("library");
+                focusContent("library");
+              }}
+              onExplore={() => {
+                selectSection("catalog");
+                focusContent("catalog");
+              }}
+              onSearch={openSearch}
+              onImport={() => openWorkspace({ page: "import" })}
+              onSources={() => openWorkspace({ page: "sources" })}
               onPhone={() => setPhoneOpen(true)}
               onParty={() => setPartyOpen(true)}
-              mode={section === "home" ? "home" : "catalog"}
-              onLibrary={() => selectSection("library")}
+              onFriends={() => openWorkspace({ page: "friends" })}
+            />
+          )}
+          {section === "catalog" && (
+            <BigPictureCatalog
               library={library}
               selected={selected}
               setSelected={setSelected}
@@ -1015,350 +1100,196 @@ export function BigPicture({
               selectInput={selectInput}
               onCount={setCatalogCount}
               onPlay={(entry) => void launch(entry)}
-              onDownloads={() => selectSection("downloads")}
-              onManage={(game) => setWorkspace({ page: "game", game })}
+              onDownloads={() => openWorkspace({ page: "downloads" })}
+              onManage={(game) => openWorkspace({ page: "game", game })}
               notify={feedback}
-              memory={section === "home" ? homeMemory : catalogMemory}
+              memory={catalogMemory}
             />
           )}
           {section === "library" && (
-            <>
-              <section className="tv-hero">
-                {heroMetadata && <HeroArtwork game={heroMetadata} />}
-                <div className="tv-hero-shade" />
-                <div
-                  className="tv-hero-copy"
-                  key={heroGame?.item.id ?? "empty"}
-                >
-                  <h1>
-                    {heroGame?.game.title ?? t("Sua coleção começa aqui")}
-                  </h1>
-                  <p className="tv-kicker">
-                    {heroGame?.item.lastPlayedAt
-                      ? t("Continue jogando")
-                      : t("Pronto para jogar")}
-                  </p>
-                  <p className="tv-hero-meta">
-                    {heroGame
-                      ? `${heroPlatform}  ·  ${heroGame.game.genre || t("Jogo")}`
-                      : t(
-                          "Adicione seus arquivos ou encontre jogos no catálogo.",
-                        )}
-                  </p>
-                  {heroGame ? (
-                    <div className="tv-hero-actions">
-                      <button
-                        className="tv-play"
-                        disabled={launching}
-                        onClick={() => void launch()}
-                      >
-                        <Play size={19} fill="currentColor" />
-                        {launching ? "Iniciando…" : t("Jogar")}
-                      </button>
-                      {NETPLAY_PLATFORMS.includes(heroGame.game.platformId) && (
-                        <button
-                          className="tv-secondary"
-                          onClick={() =>
-                            setWorkspace({
-                              page: "game",
-                              game: heroGame.game,
-                              online: true,
-                            })
-                          }
-                        >
-                          <Users size={18} /> {t("Jogar online")}
-                        </button>
-                      )}
-                      <button
-                        className="tv-secondary"
-                        onClick={() =>
-                          heroGame &&
-                          setWorkspace({ page: "game", game: heroGame.game })
-                        }
-                      >
-                        <Settings size={18} /> {t("Gerenciar")}
-                      </button>
-                      <button
-                        className="tv-secondary"
-                        onClick={() => void favorite()}
-                      >
-                        <Heart
-                          size={18}
-                          fill={
-                            heroGame.item.favorite ? "currentColor" : "none"
-                          }
-                        />
-                        {heroGame.item.favorite
-                          ? t("Favorito")
-                          : t("Favoritar")}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="tv-hero-actions">
-                      <button
-                        className="tv-secondary"
-                        onClick={() => setWorkspace({ page: "import" })}
-                      >
-                        {t("Adicionar jogos")}
-                      </button>
-                      <button
-                        className="tv-play"
-                        onClick={() => selectSection("catalog")}
-                      >
-                        <Search size={19} />
-                        {t("Encontrar jogos")}
-                      </button>
-                    </div>
-                  )}
-                  {hasRuntimeMenu(heroGame, emulators) && (
-                    <p className="tv-runtime-hint">
-                      {t(
-                        "Durante o jogo: PS abre o menu · Share + Options ou F1 como alternativa",
-                      )}
-                    </p>
-                  )}
-                </div>
-                {heroGame && (
-                  <div className="tv-hero-stat">
-                    <Clock3 size={24} />
-                    <strong>
-                      {heroGame.item.playtime
-                        ? `${Math.floor(heroGame.item.playtime / 3600)}h ${Math.floor((heroGame.item.playtime % 3600) / 60)}m`
-                        : "0h"}
-                    </strong>
-                    <span>{t("Tempo jogado")}</span>
-                  </div>
-                )}
-              </section>
-              <section className="tv-library">
-                <div className="tv-library-tools">
-                  <h2>{t("Sua biblioteca")}</h2>
-                  <label className="tv-search">
-                    <Search size={19} />
-                    <input
-                      aria-label={t("Pesquisar biblioteca")}
-                      placeholder={t("Pesquisar biblioteca")}
-                      value={query}
-                      onChange={(event) => {
-                        setQuery(event.target.value);
-                        setSelected(0);
-                      }}
-                    />
-                    <button
-                      className="tv-open-keyboard"
-                      aria-label={t("Buscar biblioteca com controle")}
-                      title={t("Teclado na tela")}
-                      onClick={() => setKeyboardOpen(true)}
-                    >
-                      <Keyboard size={20} />
-                    </button>
-                  </label>
-                  <ControllerSelect
-                    input={selectInput}
-                    label={t("Ordenar biblioteca")}
-                    value={librarySort}
-                    onChange={(value) => {
-                      setLibrarySort(value);
-                      setSelected(0);
-                    }}
-                    options={[
-                      { value: "recent", label: t("Jogado recentemente") },
-                      { value: "title", label: t("Nome") },
-                      { value: "playtime", label: t("Tempo jogado") },
-                    ]}
-                  />
-                  <ControllerSelect
-                    input={selectInput}
-                    label={t("Filtrar biblioteca por console")}
-                    value={libraryPlatform}
-                    onChange={(value) => {
-                      setLibraryPlatform(value);
-                      setSelected(0);
-                    }}
-                    options={[
-                      { value: "all", label: t("Todos os consoles") },
-                      ...[
-                        ...new Set(
-                          library.map((entry) => entry.game.platformId),
-                        ),
-                      ].map((id) => ({
-                        value: id,
-                        label: platformById(id)?.name ?? id,
-                      })),
-                    ]}
-                  />
-                  <div className="tv-library-view">
-                    <button
-                      aria-label={t("Visualização em lista")}
-                      aria-pressed={libraryView === "list"}
-                      onClick={() => setLibraryView("list")}
-                    >
-                      <List size={20} />
-                    </button>
-                    <button
-                      aria-label={t("Visualização em grade")}
-                      aria-pressed={libraryView === "grid"}
-                      onClick={() => setLibraryView("grid")}
-                    >
-                      <LayoutGrid size={20} />
-                    </button>
-                  </div>
-                </div>
-                <div className="tv-tabs">
-                  <button
-                    className={filter === "all" ? "active" : ""}
-                    onClick={() => {
-                      setFilter("all");
-                      setSelected(0);
-                    }}
-                  >
-                    {t("Todos (")}
-                    {games.length})
-                  </button>
-                  <button
-                    className={filter === "favorites" ? "active" : ""}
-                    onClick={() => {
-                      setFilter("favorites");
-                      setSelected(0);
-                    }}
-                  >
-                    {t("Favoritos (")}
-                    {games.filter((entry) => entry.item.favorite).length})
-                  </button>
-                </div>
-                {shelf("", visibleGames)}
-                {!visibleGames.length && (
-                  <p className="tv-empty">
-                    {query
-                      ? t("Nenhum jogo encontrado. Tente outro nome.")
-                      : t("Adicione jogos à sua biblioteca para jogar aqui.")}
+            <section className="tv-library ps-library">
+              <div className="ps-library-head">
+                <h1>{t("Biblioteca de jogos")}</h1>
+                {selectedGame && (
+                  <p>
+                    <strong>{selectedGame.game.title}</strong>
+                    {"  ·  "}
+                    {platformById(selectedGame.game.platformId)?.name ??
+                      selectedGame.game.platformId}
+                    {"  ·  "}
+                    {playtimeLabel(selectedGame.item.playtime)}
                   </p>
                 )}
-              </section>
-            </>
-          )}
-          {section === "system" && (
-            <section className="tv-panel">
-              <div className="tv-section-title">
-                <div>
-                  <h1>{t("Sistema")}</h1>
-                  <p>{t("Ferramentas do OpenRetro.")}</p>
+              </div>
+              <div className="tv-library-tools">
+                <label className="tv-search">
+                  <Search size={19} />
+                  <input
+                    aria-label={t("Pesquisar biblioteca")}
+                    placeholder={t("Pesquisar biblioteca")}
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setSelected(0);
+                    }}
+                  />
+                  <button
+                    className="tv-open-keyboard"
+                    aria-label={t("Buscar biblioteca com controle")}
+                    title={t("Teclado na tela")}
+                    onClick={() => setKeyboardOpen(true)}
+                  >
+                    <Keyboard size={20} />
+                  </button>
+                </label>
+                <ControllerSelect
+                  input={selectInput}
+                  label={t("Ordenar biblioteca")}
+                  value={librarySort}
+                  onChange={(value) => {
+                    setLibrarySort(value);
+                    setSelected(0);
+                  }}
+                  options={[
+                    { value: "recent", label: t("Jogado recentemente") },
+                    { value: "title", label: t("Nome") },
+                    { value: "playtime", label: t("Tempo jogado") },
+                  ]}
+                />
+                <ControllerSelect
+                  input={selectInput}
+                  label={t("Filtrar biblioteca por console")}
+                  value={libraryPlatform}
+                  onChange={(value) => {
+                    setLibraryPlatform(value);
+                    setSelected(0);
+                  }}
+                  options={[
+                    { value: "all", label: t("Todos os consoles") },
+                    ...[
+                      ...new Set(library.map((entry) => entry.game.platformId)),
+                    ].map((id) => ({
+                      value: id,
+                      label: platformById(id)?.name ?? id,
+                    })),
+                  ]}
+                />
+                <div className="tv-library-view">
+                  <button
+                    aria-label={t("Visualização em lista")}
+                    aria-pressed={libraryView === "list"}
+                    onClick={() => setLibraryView("list")}
+                  >
+                    <List size={20} />
+                  </button>
+                  <button
+                    aria-label={t("Visualização em grade")}
+                    aria-pressed={libraryView === "grid"}
+                    onClick={() => setLibraryView("grid")}
+                  >
+                    <LayoutGrid size={20} />
+                  </button>
                 </div>
               </div>
-              <div className="tv-system-grid">
-                {[
-                  [
-                    t("Jogar no celular"),
-                    t("Jogue pelo navegador do celular na mesma rede"),
-                    "phone",
-                    Smartphone,
-                  ] as const,
-                  [
-                    "OpenRetro Party",
-                    t("Abra uma partida e convide seus amigos."),
-                    "party",
-                    Users,
-                  ] as const,
-                  [
-                    t("Encontrar jogos"),
-                    t("Descubra títulos e fontes"),
-                    "Discover",
-                    Search,
-                  ] as const,
-                  [
-                    t("Configurações"),
-                    t("Ajuste a experiência"),
-                    "Settings",
-                    Settings,
-                  ] as const,
-                  [
-                    t("Adicionar jogos"),
-                    t("Importe arquivos ou uma pasta"),
-                    "import",
-                    FolderPlus,
-                  ] as const,
-                  [
-                    t("Fontes de download"),
-                    t("Adicione e gerencie suas fontes"),
-                    "sources",
-                    Download,
-                  ] as const,
-                  [
-                    t("Sair do modo console"),
-                    t("Voltar para o modo desktop"),
-                    "exit",
-                    Power,
-                  ] as const,
-                ].map(([label, description, page, Icon], index) => (
+              <div className="tv-tabs">
+                <button
+                  className={filter === "all" ? "active" : ""}
+                  onClick={() => {
+                    setFilter("all");
+                    setSelected(0);
+                  }}
+                >
+                  {t("Todos (")}
+                  {games.length})
+                </button>
+                <button
+                  className={filter === "favorites" ? "active" : ""}
+                  onClick={() => {
+                    setFilter("favorites");
+                    setSelected(0);
+                  }}
+                >
+                  {t("Favoritos (")}
+                  {games.filter((entry) => entry.item.favorite).length})
+                </button>
+              </div>
+              <div
+                className={`tv-game-grid ps-library-grid ${libraryView === "list" ? "tv-library-list" : ""}`}
+                ref={grid}
+              >
+                {visibleGames.map((entry, index) => (
                   <button
-                    key={label}
-                    style={{ "--i": index } as CSSProperties}
-                    className={
-                      index === selected && !navFocused ? "focused" : ""
-                    }
-                    onClick={() =>
-                      page === "phone"
-                        ? setPhoneOpen(true)
-                        : page === "party"
-                          ? setPartyOpen(true)
-                          : page === "exit"
-                            ? close()
-                            : page === "Discover"
-                              ? selectSection("catalog")
-                              : setWorkspace({
-                                  page:
-                                    page === "sources"
-                                      ? "sources"
-                                      : page === "import"
-                                        ? "import"
-                                        : "settings",
-                                })
-                    }
+                    key={entry.item.id}
+                    style={{ "--i": Math.min(index, 14) } as CSSProperties}
+                    className={index === selected ? "focused" : ""}
+                    onFocus={() => setSelected(index)}
+                    onMouseEnter={() => {
+                      clearTimeout(previewTimer.current);
+                      previewTimer.current = setTimeout(
+                        () => setSelected(index),
+                        150,
+                      );
+                    }}
+                    onMouseLeave={() => clearTimeout(previewTimer.current)}
+                    onClick={() => void launch(entry)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setSelected(index);
+                      setOptionsFor(entry);
+                    }}
+                    aria-label={t("Jogar {title}", { title: entry.game.title })}
                   >
-                    <Icon size={25} />
-                    <strong>{label}</strong>
-                    <span>{description}</span>
+                    <GameArtwork game={entry.game} />
+                    <i className="tv-card-play">
+                      <Play size={20} fill="currentColor" /> {t("Jogar")}
+                    </i>
+                    <span>{entry.game.title}</span>
+                    <small>
+                      {platformById(entry.game.platformId)?.shortName ??
+                        entry.game.platformId}
+                    </small>
                   </button>
                 ))}
               </div>
+              {!visibleGames.length && (
+                <p className="tv-empty">
+                  {query
+                    ? t("Nenhum jogo encontrado. Tente outro nome.")
+                    : t("Adicione jogos à sua biblioteca para jogar aqui.")}
+                </p>
+              )}
             </section>
           )}
         </main>
       )}
-      <footer className="tv-controls">
+      <footer className="tv-controls ps-controls">
         <span>
           <b data-glyph="a">A</b> {t("Selecionar")}
         </span>
         <span>
-          <b data-glyph="b">B</b> {workspace ? t("Voltar / Menu") : t("Menu")}
+          <b data-glyph="b">B</b> {t("Voltar")}
         </span>
-        {workspace ? (
-          <span>
-            <b data-glyph="lb rb">{t("LB / RB")}</b> {t("Campos")}
-          </span>
-        ) : section === "catalog" ? (
-          <span>
-            <b data-glyph="lb rb">{t("LB / RB")}</b> {t("Filtros")}
-          </span>
-        ) : section === "home" ? (
-          <span>
-            <b data-glyph="search">{t("Share / View")}</b> {t("Catálogo")}
-          </span>
-        ) : section === "library" ? (
+        {!workspace && section !== "catalog" && (
           <>
             <span>
               <b data-glyph="x">X</b> {t("Favoritar")}
             </span>
             <span>
-              <b data-glyph="y">Y</b> {t("Remover")}
-            </span>
-            <span>
-              <b data-glyph="search">{t("Share / View")}</b> {t("Buscar")}
+              <b data-glyph="y">Y</b> {t("Opções")}
             </span>
           </>
-        ) : null}
+        )}
+        {!workspace && (
+          <span>
+            <b data-glyph="search">{t("Share / View")}</b> {t("Buscar")}
+          </span>
+        )}
         <span>
-          <b data-glyph="left right up down">← ↑ ↓ →</b> {t("Navegar")}
+          <b data-glyph="lb rb">{t("LB / RB")}</b>{" "}
+          {workspace ? t("Campos") : t("Abas")}
+        </span>
+        <span>
+          <b data-glyph="menu home">{t("Options")}</b> {t("Central")}
         </span>
       </footer>
       {notice && (
@@ -1374,6 +1305,27 @@ export function BigPicture({
         </div>
       )}
       {preparing && <LaunchSequence game={launchTarget} />}
+      {centerOpen && (
+        <ControlCenter
+          actions={centerActions}
+          input={overlayInput}
+          onClose={() => setCenterOpen(false)}
+          account={
+            <span className="ps-center-account">
+              <AccountAvatar avatar={account?.avatar} size={30} />
+              {account?.displayName ?? t("Sem conta")}
+            </span>
+          }
+        />
+      )}
+      {optionsFor && (
+        <OptionsMenu
+          title={optionsFor.game.title}
+          actions={optionActions(optionsFor)}
+          input={overlayInput}
+          onClose={() => setOptionsFor(undefined)}
+        />
+      )}
       {removeTarget && (
         <div
           className="tv-dialog-backdrop"
@@ -1411,7 +1363,7 @@ export function BigPicture({
                 className={`danger ${confirmRemove ? "focused" : ""}`}
                 onClick={() => void doRemove()}
               >
-                {removing ? "Removendo…" : t("Remover da biblioteca")}
+                {removing ? t("Removendo…") : t("Remover da biblioteca")}
               </button>
             </div>
             <small>{t("A confirma a opção selecionada · B cancela")}</small>
@@ -1447,7 +1399,7 @@ export function BigPicture({
             </button>
             <h2>{t("Energia")}</h2>
             <p>{t("Escolha o que fazer com o OpenRetro.")}</p>
-            <button className="tv-power-action" onClick={close}>
+            <button className="tv-power-action" autoFocus onClick={close}>
               <Power size={24} />
               <span>
                 <strong>{t("Sair do Big Picture")}</strong>

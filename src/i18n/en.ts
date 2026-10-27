@@ -209,6 +209,9 @@ export const en: Record<string, string> = {
   "Pedido de amizade enviado": "Friend request sent",
   "Enviando pedido…": "Sending request…",
   "Aparecer em Conheça novas pessoas": "Appear in Meet new people",
+  "Avisos por e-mail": "Email alerts",
+  "Receba um e-mail quando alguém te adicionar ou te mandar a primeira mensagem em dias, se você não estiver no OpenRetro. No máximo 2 por dia.":
+    "Get an email when someone adds you or sends their first message in days, if you are not in OpenRetro. At most 2 a day.",
   "Outros usuários conectados podem ver seu nome, ícone e código de amigo. Desative para se ocultar.":
     "Other signed-in users can see your name, icon and friend code. Turn this off to hide your profile.",
   "Este perfil não está disponível.": "This profile is unavailable.",
@@ -2084,4 +2087,120 @@ export const en: Record<string, string> = {
     "RetroAchievements hardcore mode does not allow loading states.",
   "No modo hardcore do RetroAchievements não dá para abrir estados salvos. Desligue o hardcore em Configurações para usar estados.":
     "RetroAchievements hardcore mode does not allow opening save states. Turn hardcore off in Settings to use states.",
+  Explorar: "Explore",
+  "{count} em andamento": "{count} in progress",
+  "Nada baixando": "Nothing downloading",
+  "Jogue online com amigos": "Play online with friends",
+  "Use o celular como tela": "Use your phone as a screen",
+  "Tema do fundo": "Background theme",
+  "Cenas e suas imagens": "Scenes and your pictures",
+  "Arquivos ou pasta": "Files or a folder",
+  "Adicione e gerencie": "Add and manage",
+  "Atualização {version}": "Update {version}",
+  "Adicionar aos favoritos": "Add to favorites",
+  "Biblioteca de jogos": "Game library",
+  Abas: "Tabs",
+  Central: "Control center",
+  "{count} jogos · {favorites} favoritos":
+    "{count} games · {favorites} favorites",
+  "Encontre clássicos no catálogo do LaunchBox.":
+    "Find classics in the LaunchBox catalog.",
+  "Importe arquivos ou uma pasta do seu computador.":
+    "Import files or a folder from your computer.",
+  "Iniciando…": "Starting…",
+  "Mais opções": "More options",
+  "Abrir biblioteca": "Open library",
+  Nunca: "Never",
+  "Última vez": "Last played",
+  "Central de controle": "Control center",
+  "A escolhe · B ou Options fecha": "A chooses · B or Options closes",
+  "Arte do jogo": "Game art",
+  "O fundo mostra a arte do jogo em destaque.":
+    "The background shows the focused game's art.",
+  Ondas: "Waves",
+  "Ondas de luz azuis, como nos consoles clássicos.":
+    "Blue waves of light, like on classic consoles.",
+  "Imagem adicionada como fundo.": "Picture added as the background.",
+  "Imagem removida.": "Picture removed.",
+  "Minhas imagens": "My pictures",
+  "Fotos e artes suas viram fundo com o mesmo movimento. O OpenRetro guarda uma cópia de cada uma.":
+    "Your photos and art become backgrounds with the same motion. OpenRetro keeps a copy of each one.",
+  "Usar esta imagem como fundo": "Use this picture as the background",
+  "Usar como fundo": "Use as background",
+  "Remover imagem": "Remove picture",
+  "Adicionando…": "Adding…",
+  "Adicionar imagem": "Add picture",
+  "PNG, JPG, WEBP ou GIF até 40 MB": "PNG, JPG, WEBP or GIF up to 40 MB",
+  "Abra o aplicativo desktop para usar suas imagens.":
+    "Open the desktop app to use your pictures.",
+  "Escolher imagem de fundo": "Choose a background picture",
+  "Vale OpenRetro": "OpenRetro Valley",
+  "A paisagem em pixel art do OpenRetro.": "OpenRetro's pixel-art landscape.",
+  "Aurora boreal": "Northern lights",
+  "Aurora sobre o lago Bear, no Alasca.": "The aurora over Bear Lake, Alaska.",
+  "Grand Teton": "Grand Teton",
+  "Picos nevados ao amanhecer, no Wyoming.": "Snowy peaks at dawn, in Wyoming.",
+  "Pôr do sol na montanha": "Mountain sunset",
+  "Raios de sol atrás da cordilheira Teton.":
+    "Sunbeams behind the Teton Range.",
+  "Outono nas montanhas": "Autumn in the mountains",
+  "Folhas de outono nas Great Smoky Mountains.":
+    "Fall leaves in the Great Smoky Mountains.",
+  "Pôr do sol em órbita": "Sunset from orbit",
+  "O horizonte da Terra visto da Estação Espacial.":
+    "Earth's horizon seen from the Space Station.",
+  "Cidade vista do espaço": "City from space",
+  "Nova York à noite, fotografada da Estação Espacial.":
+    "New York at night, photographed from the Space Station.",
+  "Cidade cyberpunk": "Cyberpunk city",
+  "Prédios neon de Warped City 2.": "Neon buildings from Warped City 2.",
+  "Floresta dourada": "Golden forest",
+  "Árvores e raios de luz em camadas.": "Layers of trees and beams of light.",
+  "Montanhas ao anoitecer": "Mountains at dusk",
+  "Cordilheiras e pinheiros sob o céu do fim de tarde.":
+    "Ridges and pines under the evening sky.",
+  "Planetas em pixel": "Pixel planets",
+  "Planetas e estrelas em pixel art.": "Planets and stars in pixel art.",
+  "Cemitério gótico": "Gothic cemetery",
+  "Lua cheia e lápides de Gothicvania.":
+    "Full moon and gravestones from Gothicvania.",
+  Cenas: "Scenes",
+  "O fundo do modo console se move com o controle e o mouse. Escolha uma cena, uma foto ou use suas imagens.":
+    "The console mode background moves with the controller and the mouse. Choose a scene or a photo, or use your own pictures.",
+  "Fotos reais": "Real photos",
+  "Fotografias em domínio público da NASA e dos parques nacionais dos Estados Unidos.":
+    "Public-domain photographs from NASA and the United States national parks.",
+  "Arte de jogos": "Game art",
+  "Cenários em pixel art de jogos independentes, liberados em domínio público (CC0).":
+    "Pixel-art scenery from independent games, released to the public domain (CC0).",
+  "Conecte o celular no mesmo Wi-Fi deste PC.":
+    "Connect the phone to the same Wi-Fi as this PC.",
+  "Aponte a câmera para o código.": "Point the camera at the code.",
+  "Escolha o jogador e jogue.": "Pick a player and play.",
+  "Endereço para o celular": "Address for the phone",
+  Copiado: "Copied",
+  Copiar: "Copy",
+  "Precisa de ajuda?": "Need help?",
+  "O J1 fica com o controle ou teclado deste computador, então dá para jogar um aqui e outro no celular. Até quatro pessoas jogam usando um único PC.":
+    "P1 stays with this computer's controller or keyboard, so one person can play here and another on the phone. Up to four people play on a single PC.",
+  "Na primeira vez, o Windows pergunta se o OpenRetro pode usar a rede. Permita em redes privadas, e prefira o Wi-Fi de 5 GHz.":
+    "The first time, Windows asks whether OpenRetro may use the network. Allow it on private networks, and prefer 5 GHz Wi-Fi.",
+  "Para amigos fora do Wi-Fi, use a Party, que funciona pela internet sem configurar nada.":
+    "For friends outside your Wi-Fi, use Party, which works over the internet with nothing to set up.",
+  "Preparando o código para o celular…": "Preparing the code for your phone…",
+  "Jogue no navegador do celular, com imagem, som e controle na tela, enquanto o jogo roda neste computador.":
+    "Play in your phone's browser, with picture, sound and on-screen controls, while the game runs on this computer.",
+  "O jogo roda no seu PC e seus amigos jogam pela internet, de onde estiverem.":
+    "The game runs on your PC and your friends play over the internet, wherever they are.",
+  "Convide pelo link": "Invite with a link",
+  "Mande o link ou mostre o código. A pessoa joga pelo navegador do PC ou do celular, sem conta e sem instalar nada.":
+    "Send the link or show the code. They play in a PC or phone browser, with no account and nothing to install.",
+  "QR code do convite": "Invite QR code",
+  "Link copiado": "Link copied",
+  "Criando link…": "Creating link…",
+  "Um clique e a sala está pronta.": "One click and the room is ready.",
+  "A sala já sai com um link de convite. Seus amigos do OpenRetro também a veem no painel de amigos.":
+    "The room comes with an invite link. Your OpenRetro friends also see it in the friends panel.",
+  "Criar sala e convidar": "Create room and invite",
+  "Party aberta · {count}/4 jogadores": "Party open · {count}/4 players",
 };

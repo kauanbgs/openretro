@@ -37,11 +37,8 @@ import { GameArtwork } from "../../components/GameArtwork";
 import { useCatalogPagination } from "../../hooks/useCatalogPagination";
 import { ControllerKeyboard } from "./ControllerKeyboard";
 import { ControllerSelect } from "./ControllerSelect";
-import { HeroArtwork } from "./HeroArtwork";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
-import { PlayTogether } from "../../components/PlayTogether";
-import { nextControl, type Direction } from "./workspaceNavigation";
 export interface CatalogViewState {
   query: string;
   platform: string;
@@ -50,11 +47,6 @@ export interface CatalogViewState {
 }
 
 export function BigPictureCatalog({
-  mode = "catalog",
-  onLibrary,
-  onPhone,
-  onParty,
-  onFriends,
   library,
   selected,
   setSelected,
@@ -69,11 +61,6 @@ export function BigPictureCatalog({
   notify,
   memory,
 }: {
-  mode?: "catalog" | "home";
-  onLibrary: () => void;
-  onPhone: () => void;
-  onParty: () => void;
-  onFriends: () => void;
   library: LibraryGame[];
   selected: number;
   setSelected: (index: number) => void;
@@ -163,7 +150,7 @@ export function BigPictureCatalog({
   const taxonomy = useQuery({
     queryKey: ["catalog-taxonomy"],
     queryFn: () => metadataProvider.getTaxonomy(),
-    enabled: mode === "catalog" && status.data?.configured === true,
+    enabled: status.data?.configured === true,
     staleTime: 86400000,
     retry: false,
   });
@@ -185,20 +172,18 @@ export function BigPictureCatalog({
     retry: false,
   });
   const games = useMemo(
-    () =>
-      [
-        ...new Map(
-          (mode === "home"
-            ? (browse.data?.pages[0]?.games ?? [])
-            : (browse.data?.pages.flatMap((page) => page.games) ?? [])
-          ).map((game) => [game.id, game]),
-        ).values(),
-      ].slice(0, mode === "home" ? 12 : undefined),
-    [browse.data, mode],
+    () => [
+      ...new Map(
+        (browse.data?.pages.flatMap((page) => page.games) ?? []).map((game) => [
+          game.id,
+          game,
+        ]),
+      ).values(),
+    ],
+    [browse.data],
   );
   const sentinel = useCatalogPagination(
     Boolean(
-      mode === "catalog" &&
       browse.hasNextPage &&
       !browse.isFetching &&
       !browse.error &&
@@ -283,7 +268,7 @@ export function BigPictureCatalog({
       if (key === "previous-control" || key === "next-control") {
         const controls = Array.from(
           document.querySelectorAll<HTMLElement>(
-            ".tv-home-discover .play-together button, .tv-catalog-toolbar input, .tv-catalog-toolbar button, .tv-catalog-toolbar select:not(:disabled), .tv-catalog-load:not(:disabled)",
+            ".tv-catalog-toolbar input, .tv-catalog-toolbar button, .tv-catalog-toolbar select:not(:disabled), .tv-catalog-load:not(:disabled)",
           ),
         );
         const index = controls.indexOf(document.activeElement as HTMLElement);
@@ -294,138 +279,6 @@ export function BigPictureCatalog({
         return true;
       }
       const control = document.activeElement;
-      if (
-        mode === "home" &&
-        control instanceof HTMLButtonElement &&
-        control.closest(".play-together")
-      ) {
-        if (key === "a") {
-          control.click();
-          return true;
-        }
-        if (["left", "right", "up", "down"].includes(key)) {
-          const buttons = Array.from(
-            control
-              .closest(".play-together")!
-              .querySelectorAll<HTMLButtonElement>("button"),
-          );
-          const index = buttons.indexOf(control);
-          const next = nextControl(
-            buttons.map((button) => button.getBoundingClientRect()),
-            index,
-            key as Direction,
-          );
-          if (next !== index) {
-            buttons[next]?.focus();
-            return true;
-          }
-          if (key === "left") return false;
-          if (key === "right") return true;
-        }
-        if (key === "up") {
-          document
-            .querySelector<HTMLButtonElement>(".tv-home-feature .tv-play")
-            ?.focus();
-          return true;
-        }
-        if (key === "down") {
-          (
-            document.querySelector<HTMLButtonElement>(
-              ".tv-home-recent button",
-            ) ?? grid.current?.querySelector<HTMLButtonElement>("button")
-          )?.focus();
-          setSelected(0);
-          return true;
-        }
-      }
-      if (
-        mode === "home" &&
-        control instanceof HTMLButtonElement &&
-        control.closest(".tv-home-recent")
-      ) {
-        if (key === "a") {
-          control.click();
-          return true;
-        }
-        if (key === "down") {
-          setSelected(0);
-          grid.current?.querySelector<HTMLButtonElement>("button")?.focus();
-          return true;
-        }
-        if (key === "up") {
-          document
-            .querySelector<HTMLButtonElement>(
-              ".tv-home-discover .play-together button",
-            )
-            ?.focus();
-          return true;
-        }
-        if (key === "left" || key === "right") {
-          const recent = Array.from(
-            document.querySelectorAll<HTMLButtonElement>(
-              ".tv-home-recent button",
-            ),
-          );
-          recent[
-            Math.max(
-              0,
-              Math.min(
-                recent.length - 1,
-                recent.indexOf(control) + (key === "left" ? -1 : 1),
-              ),
-            )
-          ]?.focus();
-          return true;
-        }
-      }
-      if (mode === "home" && key === "up") {
-        const columns = grid.current
-          ? getComputedStyle(grid.current).gridTemplateColumns.split(" ").length
-          : 4;
-        if (selected < columns && !control?.closest(".tv-home-feature")) {
-          (
-            document.querySelector<HTMLButtonElement>(
-              ".tv-home-recent button",
-            ) ??
-            document.querySelector<HTMLButtonElement>(
-              ".tv-home-discover .play-together button",
-            )
-          )?.focus();
-          return true;
-        }
-      }
-      if (
-        mode === "home" &&
-        control instanceof HTMLButtonElement &&
-        control.closest(".tv-home-feature")
-      ) {
-        if (key === "a") {
-          control.click();
-          return true;
-        }
-        if (key === "down") {
-          (
-            document.querySelector<HTMLButtonElement>(
-              ".tv-home-discover .play-together button",
-            ) ?? grid.current?.querySelector<HTMLButtonElement>("button")
-          )?.focus();
-          return true;
-        }
-        if (key === "left" || key === "right") {
-          const actions = Array.from(
-            document.querySelectorAll<HTMLButtonElement>(
-              ".tv-home-feature button",
-            ),
-          );
-          actions[
-            (actions.indexOf(control) +
-              (key === "left" ? -1 : 1) +
-              actions.length) %
-              actions.length
-          ]?.focus();
-          return true;
-        }
-      }
       if (
         key === "a" &&
         control instanceof HTMLInputElement &&
@@ -496,7 +349,6 @@ export function BigPictureCatalog({
     sort,
     keyboardOpen,
     busy,
-    mode,
     library,
   ]);
   const openGame = (next: GameMetadata, index: number) => {
@@ -506,197 +358,130 @@ export function BigPictureCatalog({
     setDownloadError("");
   };
   return (
-    <section
-      className={`tv-catalog ${mode === "home" ? "tv-home-discover" : ""}`}
-    >
-      {mode === "home" && games[0] && (
-        <section className="tv-home-feature">
-          <HeroArtwork game={games[0]} />
-          <div className="tv-hero-shade" />
-          <div className="tv-home-feature-copy">
-            <p className="tv-kicker fx-feature-kicker">{t("Em destaque")}</p>
-            <h1>{games[0].title}</h1>
-            <p>{games[0].description || games[0].genre}</p>
-            <div className="tv-hero-actions">
-              <button className="tv-play" onClick={() => openGame(games[0], 0)}>
-                {t("Ver detalhes")}
+    <section className="tv-catalog">
+      <div className="tv-catalog-toolbar tv-compact-toolbar">
+        <div className="tv-catalog-order-label">
+          <strong>
+            {debounced
+              ? t("Resultados para “{query}”", { query: debounced })
+              : t("Ordenado por: {order}", {
+                  order: {
+                    popular: t("Popularidade"),
+                    rating: t("Melhor avaliação"),
+                    title: t("Nome"),
+                    newest: t("Mais recentes"),
+                    oldest: t("Mais antigos"),
+                  }[sort],
+                })}
+          </strong>
+          {(platform !== "all" || genre !== undefined) && (
+            <small>
+              {platformById(platform)?.name}{" "}
+              {taxonomy.data?.genres.find((item) => item.id === genre)?.name}
+            </small>
+          )}
+        </div>
+        <div className="tv-catalog-actions">
+          <button
+            className="tv-filter-toggle"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((value) => !value)}
+          >
+            <SlidersHorizontal size={18} /> {t("Filtros")}
+          </button>
+          <label className="tv-filter-control">
+            <span>{t("Ordenar")}</span>
+            <ControllerSelect
+              input={selectInput}
+              label={t("Ordenar catálogo")}
+              value={sort}
+              disabled={Boolean(debounced)}
+              onChange={(value) => setSort(value as typeof sort)}
+              options={[
+                {
+                  value: "popular",
+                  label: debounced ? t("Relevância") : t("Popularidade"),
+                },
+                { value: "rating", label: t("Melhor avaliação") },
+                { value: "title", label: t("Nome") },
+                { value: "newest", label: t("Mais recentes") },
+                { value: "oldest", label: t("Mais antigos") },
+              ]}
+            />
+          </label>
+        </div>
+        {filtersOpen && (
+          <div className="tv-catalog-filter-panel">
+            <label className="tv-search">
+              <Search size={19} />
+              <input
+                aria-label={t("Pesquisar catálogo")}
+                placeholder={t("Pesquisar jogos")}
+                maxLength={120}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+              <button
+                className="tv-open-keyboard"
+                aria-label={t("Buscar catálogo com controle")}
+                title={t("Teclado na tela")}
+                onClick={() => setKeyboardOpen(true)}
+              >
+                <Keyboard size={20} />
               </button>
-              <button className="tv-secondary" onClick={onLibrary}>
-                {t("Minha biblioteca (")}
-                {library.length})
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-      {mode === "home" && (
-        <PlayTogether
-          onPhone={onPhone}
-          onParty={onParty}
-          onFriends={onFriends}
-        />
-      )}
-      {mode === "catalog" ? (
-        <div className="tv-catalog-toolbar tv-compact-toolbar">
-          <div className="tv-catalog-order-label">
-            <strong>
-              {debounced
-                ? t("Resultados para “{query}”", { query: debounced })
-                : t("Ordenado por: {order}", {
-                    order: {
-                      popular: t("Popularidade"),
-                      rating: t("Melhor avaliação"),
-                      title: t("Nome"),
-                      newest: t("Mais recentes"),
-                      oldest: t("Mais antigos"),
-                    }[sort],
-                  })}
-            </strong>
-            {(platform !== "all" || genre !== undefined) && (
-              <small>
-                {platformById(platform)?.name}{" "}
-                {taxonomy.data?.genres.find((item) => item.id === genre)?.name}
-              </small>
-            )}
-          </div>
-          <div className="tv-catalog-actions">
-            <button
-              className="tv-filter-toggle"
-              aria-expanded={filtersOpen}
-              onClick={() => setFiltersOpen((value) => !value)}
-            >
-              <SlidersHorizontal size={18} /> {t("Filtros")}
-            </button>
+            </label>
             <label className="tv-filter-control">
-              <span>{t("Ordenar")}</span>
+              <span>{t("Console")}</span>
               <ControllerSelect
                 input={selectInput}
-                label={t("Ordenar catálogo")}
-                value={sort}
-                disabled={Boolean(debounced)}
-                onChange={(value) => setSort(value as typeof sort)}
+                label={t("Console")}
+                value={platform}
+                onChange={setPlatform}
                 options={[
-                  {
-                    value: "popular",
-                    label: debounced ? t("Relevância") : t("Popularidade"),
-                  },
-                  { value: "rating", label: t("Melhor avaliação") },
-                  { value: "title", label: t("Nome") },
-                  { value: "newest", label: t("Mais recentes") },
-                  { value: "oldest", label: t("Mais antigos") },
+                  { value: "all", label: t("Todos os consoles") },
+                  ...(taxonomy.data?.platforms ?? []).map((item) => ({
+                    value: item.localId,
+                    label: platformById(item.localId)?.name ?? item.name,
+                  })),
                 ]}
               />
             </label>
-          </div>
-          {filtersOpen && (
-            <div className="tv-catalog-filter-panel">
-              <label className="tv-search">
-                <Search size={19} />
-                <input
-                  aria-label={t("Pesquisar catálogo")}
-                  placeholder={t("Pesquisar jogos")}
-                  maxLength={120}
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
+            <label className="tv-filter-control">
+              <span>{t("Gênero")}</span>
+              <ControllerSelect
+                input={selectInput}
+                label={t("Gênero")}
+                value={genre === undefined ? "all" : String(genre)}
+                onChange={(value) =>
+                  setGenre(value === "all" ? undefined : Number(value))
+                }
+                options={[
+                  { value: "all", label: t("Todos os gêneros") },
+                  ...(taxonomy.data?.genres ?? []).map((item) => ({
+                    value: String(item.id),
+                    label: item.name,
+                  })),
+                ]}
+              />
+            </label>
+            <div className="tv-filter-summary">
+              <span>{t("Filtros por console e gênero")}</span>
+              {(platform !== "all" || genre !== undefined || query) && (
                 <button
-                  className="tv-open-keyboard"
-                  aria-label={t("Buscar catálogo com controle")}
-                  title={t("Teclado na tela")}
-                  onClick={() => setKeyboardOpen(true)}
+                  onClick={() => {
+                    setPlatform("all");
+                    setGenre(undefined);
+                    setQuery("");
+                  }}
                 >
-                  <Keyboard size={20} />
+                  {t("Limpar filtros")}
                 </button>
-              </label>
-              <label className="tv-filter-control">
-                <span>{t("Console")}</span>
-                <ControllerSelect
-                  input={selectInput}
-                  label={t("Console")}
-                  value={platform}
-                  onChange={setPlatform}
-                  options={[
-                    { value: "all", label: t("Todos os consoles") },
-                    ...(taxonomy.data?.platforms ?? []).map((item) => ({
-                      value: item.localId,
-                      label: platformById(item.localId)?.name ?? item.name,
-                    })),
-                  ]}
-                />
-              </label>
-              <label className="tv-filter-control">
-                <span>{t("Gênero")}</span>
-                <ControllerSelect
-                  input={selectInput}
-                  label={t("Gênero")}
-                  value={genre === undefined ? "all" : String(genre)}
-                  onChange={(value) =>
-                    setGenre(value === "all" ? undefined : Number(value))
-                  }
-                  options={[
-                    { value: "all", label: t("Todos os gêneros") },
-                    ...(taxonomy.data?.genres ?? []).map((item) => ({
-                      value: String(item.id),
-                      label: item.name,
-                    })),
-                  ]}
-                />
-              </label>
-              <div className="tv-filter-summary">
-                <span>{t("Filtros por console e gênero")}</span>
-                {(platform !== "all" || genre !== undefined || query) && (
-                  <button
-                    onClick={() => {
-                      setPlatform("all");
-                      setGenre(undefined);
-                      setQuery("");
-                    }}
-                  >
-                    {t("Limpar filtros")}
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          )}
-        </div>
-      ) : (
-        <>
-          {library.length > 0 && (
-            <section className="tv-home-recent">
-              <h2>{t("Continue jogando")}</h2>
-              <div>
-                {[...library]
-                  .sort((a, b) =>
-                    (b.item.lastPlayedAt ?? "").localeCompare(
-                      a.item.lastPlayedAt ?? "",
-                    ),
-                  )
-                  .slice(0, 4)
-                  .map((recent, index) => (
-                    <button
-                      key={recent.item.id}
-                      style={{ "--i": index } as CSSProperties}
-                      onClick={() => onPlay(recent)}
-                    >
-                      <GameArtwork game={recent.game} loading="lazy" />
-                      <span>
-                        <strong>{recent.game.title}</strong>
-                        <small>
-                          {platformById(recent.game.platformId)?.name}
-                        </small>
-                      </span>
-                      <Play size={20} />
-                    </button>
-                  ))}
-              </div>
-            </section>
-          )}
-          <div className="tv-home-shelf-title">
-            <h2>{t("Descubra seu próximo jogo")}</h2>
-            <span>{t("Clássicos populares no LaunchBox")}</span>
           </div>
-        </>
-      )}
+        )}
+      </div>
+
       {!status.isPending && !status.data?.configured ? (
         <CatalogConnection
           status={status.data}
@@ -789,7 +574,7 @@ export function BigPictureCatalog({
               </button>
             </div>
           )}
-          {mode === "catalog" && browse.hasNextPage && (
+          {browse.hasNextPage && (
             <div ref={sentinel} className="tv-catalog-pagination">
               <button
                 className="tv-catalog-load"

@@ -1,6 +1,7 @@
 import { AccountError, readJson } from "./http.mjs";
 import { quota } from "./limits.mjs";
 import { hubCall } from "./hub.mjs";
+import { emailAlert, QUIET_MS } from "./alerts.mjs";
 
 export const MAX_MESSAGE = 400;
 const PAGE = 50,
@@ -139,6 +140,23 @@ export async function messagesRoute(request, env, url, { db, user, now }) {
     )
       throw new AccountError(409, "Esta mensagem já foi enviada.");
     await nudge(env, [peer, user.id], (id) => (id === peer ? user.id : peer));
+    if (inserted.meta.changes) {
+      // Only the first message, or one after a long quiet, becomes an email.
+      const previous = await db
+        .prepare(
+          `SELECT MAX(created_at) AS at FROM direct_messages WHERE ${between} AND id < ?3`,
+        )
+        .bind(user.id, peer, row.id)
+        .first();
+      if (previous?.at == null || now - previous.at >= QUIET_MS)
+        await emailAlert(env, db, {
+          kind: "message",
+          sender: user,
+          receiver: peer,
+          origin: url.origin,
+          now,
+        });
+    }
     return {
       data: messageView(row),
       status: inserted.meta.changes ? 201 : 200,

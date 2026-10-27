@@ -85,8 +85,8 @@ is involved, and nothing happens while Discord is closed.
 
 ## Players, resume and local co-op
 
-Use **Settings → General → Trocar jogador**, or **Big Picture → Sistema →
-Jogadores**, to create and switch local players. Games and downloads are shared;
+Use **Settings → General → Trocar jogador**, or **Big Picture → Central de
+controle → Configurações**, to create and switch local players. Games and downloads are shared;
 favorites, recent activity and playtime belong to the selected player. Existing
 progress stays with Jogador 1. Profile switching is blocked during a running game.
 
@@ -254,21 +254,43 @@ network profile is changed to Private, and the warning clears on its own.
 
 ## Big Picture tools
 
-Big Picture includes the same game details/configuration, file and folder import,
-emulator installers/detection/defaults, complete download controls, JSON sources,
-and application settings as desktop mode. Use **Gerenciar** on the library hero,
-**Detalhes e gerenciamento** in catalog details, or **Sistema** for tools. These
-screens stay inside the console shell and load only when opened.
+Big Picture is laid out like a PlayStation 5. The top bar holds the **Jogos**,
+**Biblioteca** and **Explorar** tabs (LB/RB switch them; Up from the content
+reaches the bar) and shortcuts to search, downloads, friends and settings.
+**Jogos** shows the recently played games in a row with the library, catalog
+and import tiles after them; the focused tile's hub below has Play, online play,
+favorite and options, with playtime, last session, achievements and the game's
+description. X favorites and Y opens the game's options (play, play online,
+manage, favorite, remove) on home and in the library.
+
+Options (or the PS / Xbox button, where the browser exposes it, or M on the
+keyboard) opens the **Central de controle** at the bottom of the screen:
+downloads, friends, Party, phone play, background theme, game import, download
+sources, settings and power. Everything the desktop has is reachable there: game
+details/configuration, file and folder import, emulator installers, download
+controls, JSON sources and application settings. These screens stay inside the
+console shell and load only when opened.
+
+The background is a parallax scene that shifts with the focus and the mouse.
+The focused game's art is the default. The other themes are blue waves, real public-domain photos
+(NASA, the U.S. Air Force and U.S. national parks) and pixel-art layers from
+CC0 game art packs by ansimuz, each layer moving at its own depth; sources and
+licenses are listed in `public/themes/CREDITS.md`, and the OpenRetro pixel
+valley. **Central de
+controle → Tema do fundo** also turns the player's own pictures into
+backgrounds; each one is copied into `backgrounds` in application data (PNG,
+JPG, WEBP or GIF, up to 40 MB), so it keeps working after the original moves.
 
 Use the D-pad/stick to focus controls and A to activate. Selects require A to open,
 Up/Down to highlight and A to apply; B cancels. Text fields open the virtual
 keyboard; Y cycles lowercase, uppercase and symbols. LB/RB moves through fields
-in document order. B closes the current dialog or opens the console sidebar.
+in document order. B closes the current dialog or screen.
 
-File selection for games, BIOS, executables, JSON sources and download folders
-uses an integrated controller-navigable browser in the native app. Directory
-listings show up to 500 entries; search by name to find entries beyond that limit.
-Native file access and emulation require the Tauri app, not browser preview.
+File selection for games, BIOS, executables, JSON sources, background pictures
+and download folders uses an integrated controller-navigable browser in the
+native app. Directory listings show up to 500 entries; search by name to find
+entries beyond that limit. Native file access and emulation require the Tauri
+app, not browser preview.
 
 ## Automatic updates
 

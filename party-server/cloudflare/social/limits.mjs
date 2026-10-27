@@ -53,5 +53,8 @@ export async function cleanupSocial(db, now = Date.now()) {
     db.prepare("DELETE FROM login_codes WHERE expires_at <= ?").bind(now),
     db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
     db.prepare("DELETE FROM auth_rate_limits WHERE expires_at <= ?").bind(now),
+    db
+      .prepare("DELETE FROM email_alerts WHERE created_at <= ?")
+      .bind(now - 24 * 60 * 60 * 1000),
   ]);
 }

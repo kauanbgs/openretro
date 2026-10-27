@@ -513,6 +513,11 @@ export function AccountSettings({
                         label: "Aparecer em Conheça novas pessoas",
                         on: user.discoverable !== false,
                       },
+                      {
+                        key: "emailAlerts",
+                        label: "Avisos por e-mail",
+                        on: user.emailAlerts !== false,
+                      },
                     ] as const
                   ).map((item) => (
                     <div className="setting-row" key={item.key}>
@@ -526,7 +531,9 @@ export function AccountSettings({
                                 ? "Você escolhe se seus amigos podem ver o jogo atual."
                                 : item.key === "discoverable"
                                   ? "Outros usuários conectados podem ver seu nome, ícone e código de amigo. Desative para se ocultar."
-                                  : "Seus amigos verão você como offline.",
+                                  : item.key === "emailAlerts"
+                                    ? "Receba um e-mail quando alguém te adicionar ou te mandar a primeira mensagem em dias, se você não estiver no OpenRetro. No máximo 2 por dia."
+                                    : "Seus amigos verão você como offline.",
                           )}
                         </p>
                       </div>

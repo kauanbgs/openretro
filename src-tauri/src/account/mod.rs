@@ -74,6 +74,9 @@ pub struct User {
     discoverable: bool,
     #[serde(default = "default_discoverable")]
     share_history: bool,
+    /// Servers before email alerts send none; they never sent any either.
+    #[serde(default = "default_discoverable")]
+    email_alerts: bool,
     created_at: i64,
 }
 /// The preset icons the app draws, numbered from 0.
@@ -150,6 +153,8 @@ pub struct ProfilePatch {
     discoverable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     share_history: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    email_alerts: Option<bool>,
 }
 impl ProfilePatch {
     fn validate(&mut self) -> AccountResult<()> {
@@ -188,6 +193,7 @@ impl ProfilePatch {
             && self.avatar.is_none()
             && self.discoverable.is_none()
             && self.share_history.is_none()
+            && self.email_alerts.is_none()
         {
             return Err(AccountError::new("invalid", "Dados do perfil inválidos."));
         }

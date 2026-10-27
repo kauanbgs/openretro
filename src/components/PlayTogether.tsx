@@ -35,6 +35,7 @@ export function usePlayTogether() {
       (f) => f.presence && f.presence.status !== "offline",
     ),
     phoneActive: !!phone.data?.running,
+    phoneDevices: devices,
     phoneDescription: devices
       ? devices === 1
         ? t("1 celular conectado")

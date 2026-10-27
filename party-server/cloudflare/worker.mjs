@@ -1,6 +1,7 @@
 import { socialResponse } from "./social/router.mjs";
 export { SocialHub } from "./social/hub.mjs";
 import { cleanupSocial } from "./social/limits.mjs";
+import { alertsOffRoute } from "./social/alerts.mjs";
 import {
   hostAvailable,
   inviteConfigured,
@@ -114,6 +115,8 @@ export default {
         headers: { ...headers, "Content-Type": "application/json" },
       });
     try {
+      if (url.pathname === "/email/off")
+        return alertsOffRoute(request, env, url, headers);
       if (
         url.pathname === "/social" ||
         url.pathname.startsWith("/api/friends") ||
@@ -702,7 +705,11 @@ export class PartyRoom extends DurableObject {
       Object.keys(this.meta.usedInvites).length >= 128
     )
       return null;
-    return { ticket, name: profile.display_name || profile.friend_code, avatar: profile.avatar };
+    return {
+      ticket,
+      name: profile.display_name || profile.friend_code,
+      avatar: profile.avatar,
+    };
   }
   async fetch(request) {
     if (

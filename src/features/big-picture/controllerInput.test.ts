@@ -25,6 +25,12 @@ describe("console controller across page and dialog transitions", () => {
     expect(input.sample(pad([0]), 165)).toEqual(["a"]);
     expect(input.sample(pad([1]), 198)).toEqual(["b"]);
   });
+  it("reports Options and the PS / Xbox button for the control center", () => {
+    const input = new ControllerInput();
+    expect(input.sample(pad([9]), 0)).toEqual(["menu"]);
+    expect(input.sample(pad(), 33)).toEqual([]);
+    expect(input.sample(pad([16]), 66)).toEqual(["home"]);
+  });
   it("repeats only directions and clears disconnected devices", () => {
     const input = new ControllerInput();
     expect(input.sample(pad([15]), 0)).toEqual(["right"]);
