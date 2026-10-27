@@ -1,28 +1,5 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import {
-  Award,
-  Check,
-  ChevronDown,
-  Download,
-  FolderOpen,
-  Gamepad2,
-  Github,
-  Heart,
-  Library,
-  MessageCircle,
-  Monitor,
-  Play,
-  Save,
-  Search,
-  Settings,
-  Share2,
-  ShieldCheck,
-  Smartphone,
-  Sparkles,
-  Users,
-  Wifi,
-  X,
-} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Check, Github, Share2, X } from "lucide-react";
 
 const REPO = "https://github.com/kauanbgs/openretro";
 // Stable asset name published with every release; used until the API answers.
@@ -87,81 +64,83 @@ function track(name: string, params: Record<string, unknown> = {}) {
   window.gtag?.("event", name, params);
 }
 
+const library = [
+  { id: "mario-kart", name: "Super Mario Kart", system: "Super Nintendo" },
+  { id: "crash", name: "Crash Bandicoot", system: "PlayStation" },
+  { id: "zelda", name: "Zelda: A Link to the Past", system: "Super Nintendo" },
+  { id: "sonic", name: "Sonic the Hedgehog", system: "Mega Drive" },
+  { id: "tekken", name: "Tekken 3", system: "PlayStation" },
+  { id: "chrono-trigger", name: "Chrono Trigger", system: "Super Nintendo" },
+];
+
 const systems = [
   "NES",
-  "SNES",
+  "Super Nintendo",
   "Nintendo 64",
   "Game Boy",
   "Game Boy Advance",
   "Nintendo DS",
+  "Mega Drive",
   "Master System",
-  "Genesis",
-  "Game Gear",
   "PlayStation",
-  "PSP",
   "PlayStation 2",
   "PlayStation 3",
+  "PSP",
   "Arcade",
   "MS-DOS",
 ];
 
-const extras = [
+const features = [
   {
-    icon: Library,
-    title: "Covers and details, automatically",
-    text: "Add a game and OpenRetro finds its cover, year, genre and description.",
+    title: "Covers and details, filled in",
+    text: "Add a game and it shows up with its cover, year and description.",
   },
   {
-    icon: Save,
-    title: "Pick up where you left off",
-    text: "Resume your last session and manage save states on supported systems.",
+    title: "Controller-first TV mode",
+    text: "Switch to full screen and browse your library from the couch.",
   },
   {
-    icon: Award,
+    title: "Resume where you stopped",
+    text: "Jump back into your last session and keep save states.",
+  },
+  {
     title: "Achievements",
-    text: "Unlock RetroAchievements in the classics you already love.",
+    text: "Earn RetroAchievements in games you already know by heart.",
   },
   {
-    icon: MessageCircle,
     title: "Friends and chat",
-    text: "Add friends, message them and see what everyone is playing.",
+    text: "Add friends, send messages and see what they're playing.",
   },
   {
-    icon: Sparkles,
-    title: "Find your next game",
-    text: "Recommendations based on what you play, from a catalog of classics.",
-  },
-  {
-    icon: Gamepad2,
     title: "Discord status",
-    text: "Let your friends see what you're playing right now.",
+    text: "Your Discord profile shows the game you're playing.",
   },
 ];
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
-    q: "Is OpenRetro really free?",
-    a: "Yes. No price, no subscription, no ads. The code is open source under the MIT license, so anyone can check what it does.",
+    q: "Is it really free?",
+    a: "Yes. There's no price, no subscription and no ads. The code is open source under the MIT license.",
   },
   {
     q: "Does it come with games?",
     a: "No. OpenRetro is a launcher. You add games you own from a folder on your PC, or from download sources you add yourself.",
   },
   {
-    q: "Do I need to set up emulators?",
-    a: "No. When you press play, OpenRetro downloads and configures the right emulator for that system. Plug in a controller and you're in.",
+    q: "Do I have to set up emulators?",
+    a: "No. The first time you play a system, OpenRetro downloads and configures its emulator.",
   },
   {
     q: "Do my friends need to install anything?",
-    a: "No. For a Party, your friends open a link in their browser and play with a keyboard or controller. Your phone works the same way, with no app.",
+    a: "No. Friends join your Party from a link in their browser. Your phone connects the same way.",
   },
   {
     q: 'Windows says "Windows protected your PC". Is it safe?',
     a: (
       <>
-        The installer isn't code-signed yet, so Windows SmartScreen may warn you
-        about a new app. Click <b>More info</b>, then <b>Run anyway</b>. Every
-        line of code is public on{" "}
+        The installer isn't code-signed yet, so SmartScreen warns about it.
+        Click <b>More info</b>, then <b>Run anyway</b>. All of the code is
+        public on{" "}
         <a href={REPO} target="_blank" rel="noreferrer">
           GitHub
         </a>
@@ -171,25 +150,36 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Do I need an account?",
-    a: "Not to play. An account is only used for friends, chat and Parties.",
+    a: "Not to play. You only sign in for friends, chat and Parties.",
   },
   {
-    q: "Does it work on Mac or Linux?",
-    a: "Not yet. OpenRetro runs on Windows 10 and 11 (64-bit).",
+    q: "Does it run on Mac or Linux?",
+    a: "Not yet. OpenRetro runs on Windows 10 and 11, 64-bit.",
   },
 ];
 
-function Brand() {
+function formatSize(bytes?: number) {
+  return bytes ? `${Math.round(bytes / 1024 / 1024)} MB` : undefined;
+}
+
+function WindowsMark({ size = 18 }: { size?: number }) {
   return (
-    <span className="brand">
-      <img src="./openretro.svg" alt="" width="28" height="28" />
-      <span>OpenRetro</span>
-    </span>
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M0 2.2 6.5 1.3v6.2H0zM7.3 1.2 16 0v7.5H7.3zM0 8.3h6.5v6.3L0 13.7zM7.3 8.3H16V16l-8.7-1.2z"
+      />
+    </svg>
   );
 }
 
-function formatSize(bytes?: number) {
-  return bytes ? `${Math.round(bytes / 1024 / 1024)} MB` : undefined;
+function Brand() {
+  return (
+    <a className="brand" href="#top" aria-label="OpenRetro home">
+      <img src="./openretro.svg" alt="" width="26" height="26" />
+      OpenRetro
+    </a>
+  );
 }
 
 function DownloadButton({
@@ -197,146 +187,85 @@ function DownloadButton({
   platform,
   where,
   onDownload,
-  size = "large",
+  compact = false,
 }: {
   installer: Installer;
   platform: Platform;
   where: string;
   onDownload: () => void;
-  size?: "large" | "small";
+  compact?: boolean;
 }) {
-  const [sent, setSent] = useState(false);
-  if (platform === "mobile" && size === "large") {
+  const [copied, setCopied] = useState(false);
+  if (platform === "mobile") {
     const share = async () => {
       track("send_to_pc", { where });
-      const data = {
-        title: "OpenRetro",
-        text: "Download OpenRetro on my PC",
-        url: SITE,
-      };
       try {
-        if (navigator.share) await navigator.share(data);
+        if (navigator.share)
+          await navigator.share({
+            title: "OpenRetro",
+            text: "Download OpenRetro on my PC",
+            url: SITE,
+          });
         else {
           await navigator.clipboard.writeText(SITE);
-          setSent(true);
+          setCopied(true);
         }
       } catch {
         // The share sheet was closed.
       }
     };
     return (
-      <div className="cta-group">
-        <button className="cta" onClick={share}>
-          <Share2 size={20} />
-          {sent ? "Link copied" : "Send the link to my PC"}
-        </button>
-        <p className="cta-meta">
-          OpenRetro installs on Windows. Open this page on your PC to download.
-        </p>
-      </div>
+      <button className={`download ${compact ? "compact" : ""}`} onClick={share}>
+        <Share2 size={compact ? 16 : 19} />
+        {copied ? "Link copied" : compact ? "Send to PC" : "Send the link to my PC"}
+      </button>
     );
   }
-  const meta = [
-    installer.version,
-    "Windows 10 & 11",
-    "64-bit",
-    formatSize(installer.size),
-  ]
-    .filter(Boolean)
-    .join(" · ");
   return (
-    <div className="cta-group">
-      <a
-        className={`cta ${size === "small" ? "small" : ""}`}
-        href={installer.url}
-        onClick={() => {
-          track("file_download", {
-            where,
-            version: installer.version,
-            file_name: "OpenRetro-Setup.exe",
-          });
-          onDownload();
-        }}
-      >
-        <Download size={size === "small" ? 16 : 20} />
-        {size === "small" ? "Download" : "Download free for Windows"}
-      </a>
-      {size === "large" && (
-        <p className="cta-meta">
-          {platform === "other"
-            ? "Windows only for now. You can still grab the installer."
-            : meta}
-        </p>
-      )}
-    </div>
+    <a
+      className={`download ${compact ? "compact" : ""}`}
+      href={installer.url}
+      onClick={() => {
+        track("file_download", {
+          where,
+          version: installer.version,
+          file_name: "OpenRetro-Setup.exe",
+        });
+        onDownload();
+      }}
+    >
+      <WindowsMark size={compact ? 15 : 18} />
+      {compact ? "Download" : "Download for Windows"}
+    </a>
   );
 }
 
-/** The app's console mode, redrawn in English. */
-function ConsoleMockup() {
+function DownloadNote({
+  installer,
+  platform,
+}: {
+  installer: Installer;
+  platform: Platform;
+}) {
+  if (platform === "mobile")
+    return (
+      <p className="download-note">
+        OpenRetro is a Windows app. Send yourself the link and download it on
+        your PC.
+      </p>
+    );
+  if (platform === "other")
+    return (
+      <p className="download-note">
+        OpenRetro runs on Windows 10 and 11. Mac and Linux aren't supported yet.
+      </p>
+    );
+  const size = formatSize(installer.size);
   return (
-    <div className="mockup" aria-label="OpenRetro console mode" role="img">
-      <div className="mockup-bg" />
-      <div className="mockup-top">
-        <span className="mockup-tabs">
-          <b>Games</b>
-          <span>Library</span>
-          <span>Explore</span>
-        </span>
-        <span className="mockup-tools">
-          <span className="pill">
-            <Users size={12} /> Party
-          </span>
-          <span className="pill">
-            <Smartphone size={12} /> Phone
-          </span>
-          <Search size={13} />
-          <Settings size={13} />
-          <span className="clock">20:42</span>
-        </span>
-      </div>
-      <div className="mockup-row">
-        <img
-          className="tile focused"
-          src="./art/mario-kart.jpg"
-          alt=""
-        />
-        {["mario-world", "zelda", "chrono-trigger", "metroid", "sonic"].map(
-          (cover) => (
-            <img
-              key={cover}
-              className="tile"
-              src={`./art/${cover}.jpg`}
-              alt=""
-              loading="lazy"
-            />
-          ),
-        )}
-      </div>
-      <div className="mockup-hub">
-        <h3>Super Mario Kart</h3>
-        <p>Super Nintendo · Racing · 1992</p>
-        <span className="mockup-actions">
-          <span className="mock-play">
-            <Play size={12} fill="currentColor" /> Play
-          </span>
-          <span className="mock-online">
-            <Users size={12} /> Play online
-          </span>
-        </span>
-      </div>
-      <div className="mockup-hints">
-        <span>
-          <i className="btn-a">A</i> Select
-        </span>
-        <span>
-          <i className="btn-b">B</i> Back
-        </span>
-        <span>
-          <i className="btn-y">Y</i> Options
-        </span>
-      </div>
-    </div>
+    <p className="download-note">
+      Free for Windows 10 and 11{size ? `, ${size}` : ""}.
+      {installer.version ? ` Version ${installer.version.replace(/^v/, "")}.` : ""}
+    </p>
   );
 }
 
@@ -360,10 +289,7 @@ function AfterDownload({ onClose, url }: { onClose: () => void; url: string }) {
         <button className="modal-close" aria-label="Close" onClick={onClose}>
           <X size={18} />
         </button>
-        <span className="modal-check">
-          <Check size={22} />
-        </span>
-        <h2 id="after-title">Your download has started</h2>
+        <h2 id="after-title">Your download started</h2>
         <ol className="install-steps">
           <li>
             <b>Open OpenRetro-Setup.exe</b>
@@ -372,17 +298,17 @@ function AfterDownload({ onClose, url }: { onClose: () => void; url: string }) {
           <li>
             <b>If Windows shows a blue warning</b>
             <span>
-              Click <em>More info</em>, then <em>Run anyway</em>. The installer
-              isn't code-signed yet.
+              Click More info, then Run anyway. The installer isn't code-signed
+              yet.
             </span>
           </li>
           <li>
             <b>Add your games and press play</b>
-            <span>The emulator sets itself up the first time.</span>
+            <span>Each emulator sets itself up the first time.</span>
           </li>
         </ol>
         <p className="modal-retry">
-          Didn't start? <a href={url}>Try again</a>
+          Nothing happened? <a href={url}>Download again</a>
         </p>
       </section>
     </div>
@@ -393,379 +319,202 @@ export function Website() {
   const installer = useInstaller();
   const [platform] = useState(detectPlatform);
   const [downloaded, setDownloaded] = useState(false);
-  const [open, setOpen] = useState<number | null>(0);
-  const cta = (where: string, size?: "large" | "small") => (
+  const button = (where: string, compact = false) => (
     <DownloadButton
       installer={installer}
       platform={platform}
       where={where}
-      size={size}
+      compact={compact}
       onDownload={() => setDownloaded(true)}
     />
   );
   return (
-    <div className="website">
+    <div className="site" id="top">
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className="site-header">
-        <div className="header-inner">
-          <a className="brand-link" href="#" aria-label="OpenRetro home">
-            <Brand />
-          </a>
+      <header className="header">
+        <div className="wrap header-inner">
+          <Brand />
           <nav aria-label="Main">
             <a href="#how">How it works</a>
-            <a href="#together">Play together</a>
+            <a href="#friends">Play with friends</a>
             <a href="#faq">FAQ</a>
           </nav>
-          <div className="header-actions">
-            <a
-              className="icon-link"
-              href={REPO}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="OpenRetro on GitHub"
-            >
-              <Github size={19} />
-            </a>
-            {platform !== "mobile" && cta("header", "small")}
-          </div>
+          <a
+            className="header-link"
+            href={REPO}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="OpenRetro on GitHub"
+          >
+            <Github size={19} />
+          </a>
+          {button("header", true)}
         </div>
       </header>
 
       <main id="main">
-        <section className="hero">
-          <div className="hero-glow" aria-hidden="true" />
-          <div className="page hero-inner">
-            <div className="hero-copy">
-              <span className="eyebrow">
-                <span className="dot" /> Free and open source · Windows
-              </span>
-              <h1>
-                Every retro game you own.
-                <br />
-                <span className="accent">One launcher. Press play.</span>
-              </h1>
-              <p className="lede">
-                OpenRetro keeps your whole collection in one library, sets up
-                the emulators for you, and lets friends join your game from
-                their browser. From NES to PlayStation 3.
-              </p>
-              {cta("hero")}
-              <ul className="trust">
-                <li>
-                  <Check size={15} /> No ads, ever
-                </li>
-                <li>
-                  <Check size={15} /> No account needed to play
-                </li>
-                <li>
-                  <Check size={15} /> Updates itself
-                </li>
-              </ul>
+        <section className="hero wrap">
+          <div className="hero-copy">
+            <h1>All your retro games in one place, ready to play.</h1>
+            <p className="lede">
+              OpenRetro is a free launcher for Windows. Add your games, press
+              play, and it sets up the emulator for you. Friends can even join
+              from their browser.
+            </p>
+            <div className="hero-action">
+              {button("hero")}
+              <DownloadNote installer={installer} platform={platform} />
             </div>
-            <ConsoleMockup />
+          </div>
+          <div className="shelf" aria-hidden="true">
+            {library.map((game) => (
+              <figure key={game.id}>
+                <img src={`./art/${game.id}.jpg`} alt="" />
+                <figcaption>
+                  <b>{game.name}</b>
+                  <span>{game.system}</span>
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </section>
 
         <section className="systems" aria-label="Supported systems">
-          <p>Plays games from</p>
-          <div className="marquee">
-            <div className="marquee-track">
-              {[...systems, ...systems].map((name, index) => (
-                <span key={index} aria-hidden={index >= systems.length}>
-                  {name}
-                </span>
+          <div className="wrap">
+            <p>Plays games from</p>
+            <ul>
+              {systems.map((name) => (
+                <li key={name}>{name}</li>
               ))}
-            </div>
+            </ul>
           </div>
         </section>
 
-        <section className="page section" id="how">
-          <header className="section-head">
-            <span className="eyebrow">How it works</span>
-            <h2>From download to playing in three steps.</h2>
-            <p>
-              No cores to hunt down, no config files, no mapping your controller
-              for every emulator.
-            </p>
-          </header>
-          <ol className="steps">
+        <section className="how wrap" id="how">
+          <h2>Playing in three steps</h2>
+          <ol>
             <li>
-              <span className="step-icon">
-                <Download />
-              </span>
               <h3>Install OpenRetro</h3>
-              <p>One small installer. It keeps itself up to date.</p>
+              <p>One small installer. Updates arrive on their own.</p>
             </li>
             <li>
-              <span className="step-icon">
-                <FolderOpen />
-              </span>
-              <h3>Add your games</h3>
-              <p>
-                Point it at the folder where your games live. Covers and details
-                show up on their own.
-              </p>
+              <h3>Choose your games folder</h3>
+              <p>Your games appear with covers and details.</p>
             </li>
             <li>
-              <span className="step-icon">
-                <Play />
-              </span>
               <h3>Press play</h3>
               <p>
-                The right emulator downloads and configures itself. Grab a
+                The right emulator downloads and configures itself. Plug in a
                 controller and go.
               </p>
             </li>
           </ol>
         </section>
 
-        <section className="page section split">
-          <div className="split-copy">
-            <span className="eyebrow">
-              <Monitor size={14} /> Console mode
-            </span>
-            <h2>Turn your PC into a console.</h2>
-            <p>
-              A full-screen library you drive with a controller, made for the
-              couch and the TV. Pick a game, resume where you stopped, and never
-              touch the mouse.
-            </p>
-            <ul className="checks">
-              <li>
-                <Check size={16} /> Navigate everything with a controller
-              </li>
-              <li>
-                <Check size={16} /> Resume your last session in one press
-              </li>
-              <li>
-                <Check size={16} /> Themes and wallpapers for your setup
-              </li>
-            </ul>
-          </div>
-          <div className="split-art covers-stack" aria-hidden="true">
-            {["zelda", "crash", "mario-world", "castlevania", "tekken"].map(
-              (cover, index) => (
-                <img
-                  key={cover}
-                  src={`./art/${cover}.jpg`}
-                  alt=""
-                  loading="lazy"
-                  style={{ "--n": index } as CSSProperties}
-                />
-              ),
-            )}
-          </div>
-        </section>
-
-        <section className="page section" id="together">
-          <header className="section-head">
-            <span className="eyebrow">Play together</span>
-            <h2>Player 2 doesn't need to install anything.</h2>
-            <p>The game runs on your PC. Everyone else just opens a link.</p>
-          </header>
-          <div className="together">
-            <article className="together-card">
-              <div className="together-art phone-art" aria-hidden="true">
-                <span className="pc-link">
-                  <Monitor size={54} strokeWidth={1.5} />
-                  <i className="link-line">
-                    <Wifi size={18} />
-                  </i>
-                </span>
-                <div className="phone">
-                  <img src="./art/mario-world.jpg" alt="" loading="lazy" />
-                  <span className="dpad" />
-                  <span className="buttons">
-                    <i />
-                    <i />
+        <section className="friends" id="friends">
+          <div className="wrap friends-inner">
+            <div className="friends-copy">
+              <h2>Your friends join from a link</h2>
+              <p>
+                The game runs on your PC. Start a Party and send the link: up
+                to three friends play along from their browser, with a keyboard
+                or a controller, and you can chat while you play.
+              </p>
+              <p>
+                Your phone works the same way. Scan a code and it becomes a
+                second screen with touch controls.
+              </p>
+            </div>
+            <div className="party" aria-hidden="true">
+              <div className="party-screen">
+                <img src="./art/mario-kart.jpg" alt="" loading="lazy" />
+                <div className="party-chat">
+                  <span>
+                    <b>Ana</b> rematch?
+                  </span>
+                  <span>
+                    <b>Leo</b> one more cup
                   </span>
                 </div>
               </div>
-              <span className="card-icon">
-                <Smartphone size={18} />
-              </span>
-              <h3>Your phone is a second screen</h3>
-              <p>
-                Scan a QR code and play on your phone over your Wi-Fi, with
-                video, sound and touch controls. No app to install.
-              </p>
-            </article>
-            <article className="together-card">
-              <div className="together-art party-art" aria-hidden="true">
-                <div className="party-screen">
-                  <img src="./art/mario-kart.jpg" alt="" loading="lazy" />
-                  <div className="party-chat">
-                    <span>
-                      <b>Ana (P2)</b> rematch?
-                    </span>
-                    <span>
-                      <b>Leo (P3)</b> one more cup
-                    </span>
-                  </div>
-                </div>
-                <div className="party-seats">
-                  <span className="seat p1">P1</span>
-                  <span className="seat p2">P2</span>
-                  <span className="seat p3">P3</span>
-                  <span className="seat empty">+</span>
-                </div>
-              </div>
-              <span className="card-icon">
-                <Users size={18} />
-              </span>
-              <h3>Online Party with up to 4 players</h3>
-              <p>
-                Start a Party and send the link. Friends join from their browser
-                with a keyboard or controller, and you can chat while you play.
-              </p>
-            </article>
+              <ul className="party-players">
+                <li>
+                  <i className="p1" />
+                  You
+                </li>
+                <li>
+                  <i className="p2" />
+                  Ana
+                </li>
+                <li>
+                  <i className="p3" />
+                  Leo
+                </li>
+                <li className="open">
+                  <i />
+                  Open seat
+                </li>
+              </ul>
+            </div>
           </div>
         </section>
 
-        <section className="page section">
-          <header className="section-head">
-            <span className="eyebrow">And a lot more</span>
-            <h2>Everything a retro collection needs.</h2>
-          </header>
-          <div className="extras">
-            {extras.map((item) => (
-              <article key={item.title}>
-                <item.icon size={22} />
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-              </article>
+        <section className="features wrap">
+          <h2>Everything else you'd expect</h2>
+          <ul>
+            {features.map((item) => (
+              <li key={item.title}>
+                <Check size={18} strokeWidth={2.5} />
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.text}</p>
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
-        <section className="page section compare-section">
-          <div className="compare">
-            <div className="compare-col before">
-              <h3>Setting up emulators yourself</h3>
-              <ul>
-                <li>A different emulator for every console</li>
-                <li>Cores, BIOS folders and config files</li>
-                <li>Map your controller again in each one</li>
-                <li>Games scattered across folders</li>
-              </ul>
-            </div>
-            <div className="compare-col after">
-              <h3>
-                <img src="./openretro.svg" alt="" width="22" height="22" />
-                With OpenRetro
-              </h3>
-              <ul>
-                <li>
-                  <Check size={16} /> One app for every console
-                </li>
-                <li>
-                  <Check size={16} /> Emulators set up automatically
-                </li>
-                <li>
-                  <Check size={16} /> Your controller works everywhere
-                </li>
-                <li>
-                  <Check size={16} /> One library with covers
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section className="page section open-source">
-          <ShieldCheck size={30} />
+        <section className="faq wrap" id="faq">
+          <h2>Questions</h2>
           <div>
-            <h2>Open source, no catch.</h2>
-            <p>
-              No ads and no paid tier. Every line of
-              code is public under the MIT license, so you can see exactly what
-              you're installing.
-            </p>
-          </div>
-          <a
-            className="ghost"
-            href={REPO}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Github size={17} /> View on GitHub
-          </a>
-        </section>
-
-        <section className="page section faq" id="faq">
-          <header className="section-head">
-            <span className="eyebrow">FAQ</span>
-            <h2>Questions before you download.</h2>
-          </header>
-          <div className="faq-list">
             {faqs.map((item, index) => (
-              <div
-                key={item.q}
-                className={`faq-item ${open === index ? "open" : ""}`}
-              >
-                <button
-                  aria-expanded={open === index}
-                  aria-controls={`faq-${index}`}
-                  onClick={() => setOpen(open === index ? null : index)}
-                >
-                  {item.q}
-                  <ChevronDown size={18} />
-                </button>
-                <div id={`faq-${index}`} className="faq-answer" role="region">
-                  <p>{item.a}</p>
-                </div>
-              </div>
+              <details key={item.q} open={index === 0}>
+                <summary>{item.q}</summary>
+                <p>{item.a}</p>
+              </details>
             ))}
           </div>
         </section>
 
         <section className="final">
-          <div className="hero-glow" aria-hidden="true" />
-          <div className="page final-inner">
-            <h2>Your classics are waiting.</h2>
-            <p>Free, open source and ready in a couple of minutes.</p>
-            {cta("footer")}
+          <div className="wrap final-inner">
+            <h2>Ready when you are</h2>
+            <p>Free, open source and set up in a couple of minutes.</p>
+            {button("footer")}
+            <DownloadNote installer={installer} platform={platform} />
           </div>
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="page footer-inner">
-          <div className="footer-brand">
-            <Brand />
-            <p>An independent, open-source launcher for classic games.</p>
-          </div>
-          <nav aria-label="Footer">
-            <a href={installer.url}>Download</a>
-            <a href={`${REPO}#readme`}>Documentation</a>
-            <a href={`${REPO}/issues`}>Report a problem</a>
-            <a href="./credits.html">Credits and licenses</a>
-          </nav>
-          <p className="footer-note">
-            <Heart size={13} /> Game artwork belongs to its respective owners.
-            OpenRetro doesn't include or distribute games.
-          </p>
-        </div>
+      <footer className="footer wrap">
+        <Brand />
+        <nav aria-label="Footer">
+          <a href={REPO} target="_blank" rel="noreferrer">
+            Source code
+          </a>
+          <a href={`${REPO}/issues`} target="_blank" rel="noreferrer">
+            Report a problem
+          </a>
+          <a href="./credits.html">Credits and licenses</a>
+        </nav>
+        <p>
+          OpenRetro doesn't include or distribute games. Game artwork belongs to
+          its respective owners.
+        </p>
       </footer>
 
-      {platform === "mobile" && (
-        <div className="mobile-bar">
-          <span>
-            <b>OpenRetro</b> for Windows · Free
-          </span>
-          <button
-            onClick={() =>
-              document
-                .querySelector(".hero .cta")
-                ?.scrollIntoView({ behavior: "smooth", block: "center" })
-            }
-          >
-            Get it
-          </button>
-        </div>
-      )}
       {downloaded && (
         <AfterDownload
           url={installer.url}
