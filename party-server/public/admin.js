@@ -6,7 +6,7 @@ const TOKEN_KEY = "openretro-admin-token";
 const store = {
   get: () => {
     try {
-      return sessionStorage.getItem(TOKEN_KEY);
+      return localStorage.getItem(TOKEN_KEY);
     } catch {
       return null;
     }
@@ -14,8 +14,8 @@ const store = {
   set: (value) => {
     try {
       value
-        ? sessionStorage.setItem(TOKEN_KEY, value)
-        : sessionStorage.removeItem(TOKEN_KEY);
+        ? localStorage.setItem(TOKEN_KEY, value)
+        : localStorage.removeItem(TOKEN_KEY);
     } catch {
       // The session simply will not survive a reload.
     }
