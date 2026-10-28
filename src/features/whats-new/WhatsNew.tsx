@@ -5,7 +5,7 @@ import { PixelLandscape } from "../../components/PixelLandscape";
 import { socialStore } from "../../services/social";
 import { language, locale, t } from "../../i18n";
 import {
-  releaseNotes,
+  releaseNoteFor,
   type BannerPanel,
   type ReleaseNote,
 } from "./releaseNotes";
@@ -38,16 +38,17 @@ export function WhatsNew({ version: installed }: { version: string }) {
     ? new URLSearchParams(location.search).get("whats-new")
     : null;
   const version = preview || installed;
-  const note = releaseNotes[version];
+  const found = releaseNoteFor(version);
+  const note = found?.note;
   const [open, setOpen] = useState(
     () => Boolean(note) && (Boolean(preview) || seen() !== version),
   );
-  if (!note || !open) return null;
+  if (!found || !note || !open) return null;
   const close = () => {
     if (!preview) markSeen(version);
     setOpen(false);
   };
-  return <WhatsNewDialog version={version} note={note} onClose={close} />;
+  return <WhatsNewDialog version={found.version} note={note} onClose={close} />;
 }
 
 export function WhatsNewDialog({

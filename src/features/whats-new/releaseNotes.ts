@@ -99,3 +99,27 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     closing: { pt: "Bom jogo!", en: "Have fun!" },
   },
 };
+
+const parts = (version: string) => version.split(".").map(Number);
+const compare = (a: string, b: string) => {
+  const [x, y] = [parts(a), parts(b)];
+  for (let i = 0; i < Math.max(x.length, y.length); i++)
+    if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
+  return 0;
+};
+
+/** The news a version shows: its own entry, or else the newest earlier entry
+ * of the same major version, so 1.0's stays through every 1.x release until
+ * 2.0 has its own. `version` is the entry's key, for the window's subtitle. */
+export function releaseNoteFor(
+  installed: string,
+): { version: string; note: ReleaseNote } | null {
+  const newest = Object.keys(releaseNotes)
+    .filter(
+      (key) =>
+        parts(key)[0] === parts(installed)[0] && compare(key, installed) <= 0,
+    )
+    .sort(compare)
+    .pop();
+  return newest ? { version: newest, note: releaseNotes[newest] } : null;
+}
