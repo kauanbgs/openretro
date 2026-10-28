@@ -1,5 +1,6 @@
 import { hmac } from "./crypto.mjs";
 import { AccountError } from "./http.mjs";
+import { ACTIVITY_DAYS } from "./activity.mjs";
 
 export const QUOTA_MS = 15 * 60 * 1000;
 export async function quota(
@@ -56,5 +57,8 @@ export async function cleanupSocial(db, now = Date.now()) {
     db
       .prepare("DELETE FROM email_alerts WHERE created_at <= ?")
       .bind(now - 24 * 60 * 60 * 1000),
+    db
+      .prepare("DELETE FROM activity_log WHERE created_at <= ?")
+      .bind(now - ACTIVITY_DAYS * 24 * 60 * 60 * 1000),
   ]);
 }

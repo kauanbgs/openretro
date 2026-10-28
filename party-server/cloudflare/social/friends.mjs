@@ -8,6 +8,7 @@ import { peopleRoute } from "./people.mjs";
 import { historyRoute } from "./history.mjs";
 import { messagesRoute } from "./messages.mjs";
 import { emailAlert } from "./alerts.mjs";
+import { recordActivity } from "./activity.mjs";
 
 export const friendView = (row) => ({
   id: row.id,
@@ -280,6 +281,7 @@ export async function friendsRoute(request, env, url) {
     }
     await db.batch(statements);
   }
+  await recordActivity(db, `friend-${action}`, user.id, id, now);
   await notifyUsers(
     env,
     [user.id, id],

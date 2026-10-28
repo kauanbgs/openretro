@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#121212" />
+    <title>OpenRetro Admin</title>
+    <link rel="stylesheet" href="/admin.css" />
+    <script type="module" src="/admin.js"></script>
+  </head>
+  <body>
+    <header>
+      <a href="#/" class="brand">OpenRetro <span>Admin</span></a>
+      <nav id="nav" hidden>
+        <a href="#/" data-route="overview">Visão geral</a>
+        <a href="#/users" data-route="users">Usuários</a>
+        <a href="#/activity" data-route="activity">Atividade</a>
+        <button id="logout" type="button">Sair</button>
+      </nav>
+    </header>
+    <main id="app"></main>
+  </body>
+</html>

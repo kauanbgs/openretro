@@ -2488,3 +2488,97 @@ test("login and alert emails follow the app language", async () => {
   assert.match(sent[1].subject, /código de acesso/);
   assert.match(sent[2].subject, /sign-in code/);
 });
+
+test("the admin panel is closed to everyone but the listed emails and records what happens", () =>
+  using(
+    async (f) => {
+      const boss = await f.login("boss@example.test"),
+        a = await f.login("alice@example.test"),
+        b = await f.login("bob@example.test");
+      const admin = (path, who) =>
+        f.call(path, undefined, { token: who?.token });
+      assert.equal((await admin("/api/admin/overview")).status, 401);
+      assert.equal((await admin("/api/admin/overview", a)).status, 404);
+      assert.equal((await admin("/api/admin/users", a)).status, 404);
+      await pair(f, a, b);
+      await action(f, a, "block", b.user.id);
+      const hosted = await hostRoom(f, a);
+      assert.ok(hosted);
+      const overview = await (await admin("/api/admin/overview", boss)).json();
+      assert.equal(overview.users, 3);
+      assert.equal(overview.signups.day, 3);
+      assert.equal(overview.parties.total, 1);
+      assert.equal(overview.blocks, 1);
+      assert.equal(overview.signupsPerDay.length, 14);
+      const found = await (
+        await admin("/api/admin/users?q=ali", boss)
+      ).json();
+      assert.equal(found.users.length, 1);
+      assert.equal(found.users[0].email, "al***@example.test");
+      assert.ok(!JSON.stringify(found).includes("alice@example.test"));
+      const kinds = (
+        await (await admin("/api/admin/activity", boss)).json()
+      ).events.map((event) => event.kind);
+      for (const kind of [
+        "signup",
+        "friend-request",
+        "friend-accept",
+        "friend-block",
+        "party-created",
+      ])
+        assert.ok(kinds.includes(kind), kind);
+      const filtered = await (
+        await admin("/api/admin/activity?kind=friend-accept", boss)
+      ).json();
+      assert.deepEqual(
+        filtered.events.map((event) => [event.actor.id, event.target.id]),
+        [[b.user.id, a.user.id]],
+      );
+      const detail = await (
+        await admin(`/api/admin/users/${a.user.id}`, boss)
+      ).json();
+      assert.equal(detail.counts.blocking, 1);
+      assert.equal(detail.friends.length, 0);
+      assert.ok(detail.events.length >= 4);
+      // Deleting an account erases the events that name it.
+      await f.call("/api/account", undefined, {
+        token: b.token,
+        method: "DELETE",
+      });
+      assert.equal(
+        (
+          await f.db
+            .prepare(
+              "SELECT COUNT(*) AS n FROM activity_log WHERE actor_id=? OR target_id=?",
+            )
+            .bind(b.user.id, b.user.id)
+            .first()
+        ).n,
+        0,
+      );
+    },
+    {
+      ADMIN_EMAILS: "Boss@example.test, other@example.test",
+      PARTY_TICKET_SECRET: INVITE_SECRET,
+    },
+  ));
+
+test("with ADMIN_HOST the panel answers only on its own host, and that host serves nothing else", () =>
+  using(
+    async (f) => {
+      const on = "https://admin.example.test",
+        off = BASE;
+      const page = (base, path) => f.call(path, undefined, { base });
+      assert.equal((await page(on, "/")).status, 200);
+      assert.match(await (await page(on, "/")).text(), /OpenRetro Admin/);
+      assert.equal((await page(on, "/admin.js")).status, 200);
+      assert.equal((await page(on, "/api/admin/overview")).status, 401);
+      assert.equal((await page(on, "/privacidade")).status, 404);
+      assert.equal((await page(on, "/api/friends")).status, 404);
+      assert.equal((await page(off, "/admin")).status, 404);
+      assert.equal((await page(off, "/admin.js")).status, 404);
+      assert.equal((await page(off, "/api/admin/overview")).status, 404);
+      assert.equal((await page(off, "/privacidade")).status, 200);
+    },
+    { ADMIN_HOST: "admin.example.test" },
+  ));

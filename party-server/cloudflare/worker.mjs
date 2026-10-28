@@ -11,6 +11,7 @@ import {
 import { related } from "./social/friends.mjs";
 import { authenticate, database } from "./social/auth.mjs";
 import { AccountError } from "./social/http.mjs";
+import { recordActivity } from "./social/activity.mjs";
 import { cloudflareTurn } from "./turn.mjs";
 import { DurableObject } from "cloudflare:workers";
 
@@ -128,11 +129,33 @@ export default {
         headers: { ...headers, "Content-Type": "application/json" },
       });
     try {
+      // With ADMIN_HOST set, the panel lives only on that host and that host
+      // serves nothing else, so the panel has an origin of its own.
+      if (env.ADMIN_HOST) {
+        const adminPath =
+          url.pathname.startsWith("/api/admin/") ||
+          ["/admin", "/admin.html", "/admin.js", "/admin.css"].includes(
+            url.pathname,
+          );
+        const onAdmin = url.hostname === env.ADMIN_HOST;
+        if (
+          onAdmin
+            ? !(
+                adminPath ||
+                url.pathname === "/" ||
+                url.pathname.startsWith("/api/auth/") ||
+                url.pathname === "/health"
+              )
+            : adminPath
+        )
+          return reply({ error: "Página não encontrada." }, 404);
+      }
       if (url.pathname === "/email/off")
         return alertsOffRoute(request, env, url, headers);
       if (
         url.pathname === "/social" ||
         url.pathname.startsWith("/api/friends") ||
+        url.pathname.startsWith("/api/admin/") ||
         url.pathname.startsWith("/api/auth/") ||
         url.pathname === "/api/account" ||
         url.pathname.startsWith("/api/account/")
@@ -219,6 +242,13 @@ export default {
           });
           return reply({ error: safeError }, 503);
         }
+        await recordActivity(
+          database(env, url),
+          "party-created",
+          host.id,
+          null,
+          Date.now(),
+        );
         return reply(reservation, 201);
       }
       if (url.pathname.startsWith("/api/guest-link/")) {
@@ -264,13 +294,19 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD")
         return reply({ error: "Método inválido." }, 405);
       const assetPath =
-        url.pathname === "/" ||
-        url.pathname === "/party" ||
-        /^(\/party\/[A-Z2-9]{6}|\/[A-HJ-NP-Z2-9]{6})$/.test(url.pathname)
-          ? "/index.html"
-          : url.pathname === "/privacidade"
-            ? "/privacy.html"
-            : url.pathname;
+        env.ADMIN_HOST &&
+        url.hostname === env.ADMIN_HOST &&
+        url.pathname === "/"
+          ? "/admin.html"
+          : url.pathname === "/" ||
+              url.pathname === "/party" ||
+              /^(\/party\/[A-Z2-9]{6}|\/[A-HJ-NP-Z2-9]{6})$/.test(url.pathname)
+            ? "/index.html"
+            : url.pathname === "/privacidade"
+              ? "/privacy.html"
+              : url.pathname === "/admin"
+                ? "/admin.html"
+                : url.pathname;
       if (
         ![
           "/index.html",
@@ -278,6 +314,9 @@ export default {
           "/guest.css",
           "/privacy.html",
           "/privacy.css",
+          "/admin.html",
+          "/admin.js",
+          "/admin.css",
         ].includes(assetPath)
       )
         return reply({ error: "Página não encontrada." }, 404);

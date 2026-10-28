@@ -17,6 +17,7 @@ import {
 import { USER_QUOTA_SCOPES, emailQuotaKey, quota } from "./limits.mjs";
 import { mailLocale, sendLoginEmail } from "./email.mjs";
 import { notifyUsers } from "./friends.mjs";
+import { recordActivity } from "./activity.mjs";
 import {
   availableFriendCode,
   chosenTag,
@@ -274,6 +275,8 @@ async function verify(request, env, db, now) {
     }
   }
   const user = results[3].results[0];
+  if (user && results[1].meta.changes)
+    await recordActivity(db, "signup", user.id, null, now);
   // Signing in again in another language moves the emails to it.
   if (user && user.locale !== row.locale) {
     await db

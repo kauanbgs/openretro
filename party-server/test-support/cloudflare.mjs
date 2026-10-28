@@ -33,6 +33,9 @@ export async function runtime(bindings = {}, options = {}) {
               "/guest.css",
               "/privacy.html",
               "/privacy.css",
+              "/admin.html",
+              "/admin.js",
+              "/admin.css",
             ].includes(path)
           )
             return new Response("Not found", { status: 404 });

@@ -6,7 +6,9 @@
 	"workers_dev": true,
 	// The Party lives on the project's own domain; workers.dev keeps working.
 	"routes": [
-		{ "pattern": "party.openretro.com.br", "custom_domain": true }
+		{ "pattern": "party.openretro.com.br", "custom_domain": true },
+		// The admin panel has a host of its own; see ADMIN_HOST below.
+		{ "pattern": "admin.openretro.com.br", "custom_domain": true },
 	],
 	"preview_urls": false,
 	"assets": {
@@ -62,6 +64,7 @@
 	},
 	"vars": {
 		"EMAIL_FROM": "OpenRetro <login@mail.openretro.com.br>",
+		"ADMIN_HOST": "admin.openretro.com.br",
 		"MAX_ROOMS": "32",
 		"MAX_ROOMS_PER_IP": "2",
 		"MAX_CREATES_PER_10_MIN": "12",
