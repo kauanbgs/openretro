@@ -4,21 +4,37 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <meta name="theme-color" content="#121212" />
+    <meta name="theme-color" content="#111521" />
     <title>OpenRetro Admin</title>
+    <link
+      rel="preload"
+      href="/nunito-sans.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <link rel="stylesheet" href="/admin.css" />
     <script type="module" src="/admin.js"></script>
   </head>
   <body>
-    <header>
-      <a href="#/" class="brand">OpenRetro <span>Admin</span></a>
-      <nav id="nav" hidden>
-        <a href="#/" data-route="overview">Visão geral</a>
-        <a href="#/users" data-route="users">Usuários</a>
-        <a href="#/activity" data-route="activity">Atividade</a>
-        <button id="logout" type="button">Sair</button>
-      </nav>
-    </header>
-    <main id="app"></main>
+    <div class="shell">
+      <aside class="side" id="side">
+        <a href="#/" class="brand">OpenRetro <span>Admin</span></a>
+        <nav id="nav" aria-label="Seções" hidden>
+          <a href="#/" data-route="overview">Visão geral</a>
+          <a href="#/live" data-route="live"
+            >Ao vivo <span id="live-count" class="count" hidden></span
+          ></a>
+          <a href="#/users" data-route="users">Usuários</a>
+          <a href="#/activity" data-route="activity">Atividade</a>
+          <a href="#/insights" data-route="insights">Insights</a>
+        </nav>
+        <div class="side-foot" id="side-foot" hidden>
+          <button id="logout" type="button">Sair</button>
+          <p>Os eventos ficam 180 dias e saem junto com a conta.</p>
+        </div>
+      </aside>
+      <main id="app"></main>
+    </div>
   </body>
 </html>

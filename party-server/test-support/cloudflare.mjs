@@ -36,6 +36,7 @@ export async function runtime(bindings = {}, options = {}) {
               "/admin.html",
               "/admin.js",
               "/admin.css",
+              "/nunito-sans.woff2",
             ].includes(path)
           )
             return new Response("Not found", { status: 404 });
@@ -43,11 +44,13 @@ export async function runtime(bindings = {}, options = {}) {
             await readFile(new URL(`../public${path}`, import.meta.url)),
             {
               headers: {
-                "Content-Type": path.endsWith(".html")
-                  ? "text/html; charset=utf-8"
-                  : path.endsWith(".js")
-                    ? "text/javascript"
-                    : "text/css",
+                "Content-Type": path.endsWith(".woff2")
+                  ? "font/woff2"
+                  : path.endsWith(".html")
+                    ? "text/html; charset=utf-8"
+                    : path.endsWith(".js")
+                      ? "text/javascript"
+                      : "text/css",
               },
             },
           );

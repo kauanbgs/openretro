@@ -1,5 +1,8 @@
 import { authenticate, database } from "./auth.mjs";
 import { AccountError } from "./http.mjs";
+import { ONLINE_MS } from "./activity.mjs";
+import { live, presenceOf } from "./admin-live.mjs";
+import { insights } from "./admin-insights.mjs";
 
 const DAY = 24 * 60 * 60 * 1000;
 const CHART_DAYS = 14;
@@ -71,7 +74,7 @@ async function overview(db, now) {
     count(
       db,
       "SELECT COUNT(DISTINCT user_id) AS n FROM sessions WHERE last_seen_at > ?",
-      now - 5 * 60 * 1000,
+      now - ONLINE_MS,
     ),
     count(db, "SELECT COUNT(*) / 2 AS n FROM friendships"),
     count(db, "SELECT COUNT(*) AS n FROM friend_requests"),
@@ -120,22 +123,37 @@ async function overview(db, now) {
   };
 }
 
-async function users(db, url) {
+const SORTS = {
+  recent: "created_at DESC",
+  seen: "last_seen_at DESC NULLS LAST",
+  friends: "friends DESC, created_at DESC",
+  played: "played DESC, created_at DESC",
+};
+const FILTERS = {
+  online: "last_seen_at > ?5",
+  nofriends: "friends = 0 AND ?5 = ?5",
+  noprofile: "display_name IS NULL AND ?5 = ?5",
+};
+async function users(db, url, now) {
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 64);
   const limit = clamp(url.searchParams.get("limit"), 50, 100);
   const offset = clamp(url.searchParams.get("offset"), 0, 100000);
+  const sort = SORTS[url.searchParams.get("sort")] ?? SORTS.recent;
+  const filter = FILTERS[url.searchParams.get("filter")] ?? "?5 = ?5";
   const like = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
   const rows = await db
     .prepare(
-      `SELECT u.id, u.email, u.display_name, u.friend_code, u.avatar, u.created_at,
-        (SELECT MAX(last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at,
-        (SELECT COUNT(*) FROM friendships f WHERE f.user_id = u.id) AS friends
-      FROM users u
-      WHERE ?1 = '' OR u.display_name LIKE ?2 ESCAPE '\\' OR u.friend_code LIKE ?2 ESCAPE '\\'
-        OR u.email LIKE ?2 ESCAPE '\\' OR u.id = ?1
-      ORDER BY u.created_at DESC LIMIT ?3 OFFSET ?4`,
+      `SELECT * FROM (
+        SELECT u.id, u.email, u.display_name, u.friend_code, u.avatar, u.created_at,
+          (SELECT MAX(last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at,
+          (SELECT COUNT(*) FROM friendships f WHERE f.user_id = u.id) AS friends,
+          (SELECT COALESCE(SUM(play_seconds), 0) FROM recent_games g WHERE g.user_id = u.id) AS played
+        FROM users u
+        WHERE ?1 = '' OR u.display_name LIKE ?2 ESCAPE '\\' OR u.friend_code LIKE ?2 ESCAPE '\\'
+          OR u.email LIKE ?2 ESCAPE '\\' OR u.id = ?1
+      ) WHERE ${filter} ORDER BY ${sort} LIMIT ?3 OFFSET ?4`,
     )
-    .bind(query, like, limit + 1, offset)
+    .bind(query, like, limit + 1, offset, now - ONLINE_MS)
     .all();
   return {
     users: rows.results.slice(0, limit).map((row) => ({
@@ -143,7 +161,9 @@ async function users(db, url) {
       email: maskEmail(row.email),
       createdAt: row.created_at,
       lastSeenAt: row.last_seen_at,
+      online: row.last_seen_at > now - ONLINE_MS,
       friends: row.friends,
+      playSeconds: row.played,
     })),
     more: rows.results.length > limit,
   };
@@ -164,7 +184,11 @@ const EVENT_SQL = `SELECT l.id, l.kind, l.created_at,
 async function activity(db, url) {
   const kind = url.searchParams.get("kind") ?? "";
   const limit = clamp(url.searchParams.get("limit"), 50, 100);
-  const before = clamp(url.searchParams.get("before"), Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER);
+  const before = clamp(
+    url.searchParams.get("before"),
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER,
+  );
   const rows = await db
     .prepare(
       `${EVENT_SQL} WHERE (?1 = '' OR l.kind = ?1) AND l.id < ?2 ORDER BY l.id DESC LIMIT ?3`,
@@ -177,56 +201,125 @@ async function activity(db, url) {
   };
 }
 
-async function userDetail(db, id) {
-  const user = await db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first();
+async function userDetail(env, db, id, now) {
+  const user = await db
+    .prepare("SELECT * FROM users WHERE id = ?")
+    .bind(id)
+    .first();
   if (!user) throw notFound();
-  const [seen, friends, counts, games, events] = await db.batch([
-    count(db, "SELECT MAX(last_seen_at) AS at, COUNT(*) AS n FROM sessions WHERE user_id = ?", id),
-    count(
-      db,
-      `SELECT u.id, u.display_name, u.friend_code, u.avatar, f.created_at FROM friendships f
-        JOIN users u ON u.id = f.friend_id WHERE f.user_id = ? ORDER BY f.created_at DESC LIMIT 200`,
-      id,
+  const named = (sql) => count(db, sql, id);
+  const [
+    seen,
+    friends,
+    counts,
+    games,
+    events,
+    incoming,
+    outgoing,
+    blocking,
+    blockedBy,
+    edges,
+    sessions,
+  ] = await db.batch([
+    named(
+      "SELECT MAX(last_seen_at) AS at, COUNT(*) AS n FROM sessions WHERE user_id = ?",
     ),
-    count(
-      db,
-      `SELECT (SELECT COUNT(*) FROM friend_requests WHERE sender_id = ?1) AS sent,
-        (SELECT COUNT(*) FROM friend_requests WHERE receiver_id = ?1) AS received,
-        (SELECT COUNT(*) FROM blocks WHERE user_id = ?1) AS blocking,
-        (SELECT COUNT(*) FROM blocks WHERE blocked_id = ?1) AS blockedBy,
-        (SELECT COUNT(*) FROM direct_messages WHERE sender_id = ?1) AS messagesSent`,
-      id,
+    named(
+      `SELECT u.id, u.display_name, u.friend_code, u.avatar, f.created_at,
+        (SELECT MAX(last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS seen,
+        (SELECT COUNT(*) FROM friendships x WHERE x.user_id = u.id) AS friends
+        FROM friendships f JOIN users u ON u.id = f.friend_id
+        WHERE f.user_id = ? ORDER BY f.created_at DESC LIMIT 200`,
     ),
-    count(
-      db,
+    named(
+      `SELECT (SELECT COUNT(*) FROM direct_messages WHERE sender_id = ?1) AS messagesSent,
+        (SELECT COALESCE(SUM(play_seconds), 0) FROM recent_games WHERE user_id = ?1) AS playSeconds,
+        (SELECT COUNT(*) FROM activity_log WHERE kind = 'party-created' AND actor_id = ?1) AS parties,
+        (SELECT COUNT(*) FROM daily_active WHERE user_id = ?1) AS daysActive`,
+    ),
+    named(
       "SELECT title, console, last_played_at, play_seconds FROM recent_games WHERE user_id = ? ORDER BY last_played_at DESC LIMIT 10",
-      id,
+    ),
+    named(
+      `${EVENT_SQL} WHERE l.actor_id = ?1 OR l.target_id = ?1 ORDER BY l.id DESC LIMIT 50`,
+    ),
+    named(
+      `SELECT u.id, u.display_name, u.friend_code, u.avatar, r.created_at FROM friend_requests r
+        JOIN users u ON u.id = r.sender_id WHERE r.receiver_id = ? ORDER BY r.created_at DESC LIMIT 50`,
+    ),
+    named(
+      `SELECT u.id, u.display_name, u.friend_code, u.avatar, r.created_at FROM friend_requests r
+        JOIN users u ON u.id = r.receiver_id WHERE r.sender_id = ? ORDER BY r.created_at DESC LIMIT 50`,
+    ),
+    named(
+      `SELECT u.id, u.display_name, u.friend_code, u.avatar, b.created_at FROM blocks b
+        JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT 50`,
+    ),
+    named(
+      `SELECT u.id, u.display_name, u.friend_code, u.avatar, b.created_at FROM blocks b
+        JOIN users u ON u.id = b.user_id WHERE b.blocked_id = ? ORDER BY b.created_at DESC LIMIT 50`,
+    ),
+    named(
+      `SELECT f.user_id AS a, f.friend_id AS b FROM friendships f
+        WHERE f.user_id < f.friend_id
+          AND f.user_id IN (SELECT friend_id FROM friendships WHERE user_id = ?1)
+          AND f.friend_id IN (SELECT friend_id FROM friendships WHERE user_id = ?1)`,
     ),
     count(
       db,
-      `${EVENT_SQL} WHERE l.actor_id = ?1 OR l.target_id = ?1 ORDER BY l.id DESC LIMIT 50`,
+      "SELECT created_at, last_seen_at FROM sessions WHERE user_id = ? AND expires_at > ? ORDER BY last_seen_at DESC LIMIT 10",
       id,
+      now,
     ),
   ]);
   const c = counts.results[0];
+  const presence = await presenceOf(env, id);
+  const people = (rows, extra = () => ({})) =>
+    rows.results.map((row) => ({ ...person(row), ...extra(row) }));
   return {
     user: {
       ...person(user),
       email: maskEmail(user.email),
       createdAt: user.created_at,
       lastSeenAt: seen.results[0].at,
+      online: seen.results[0].at > now - ONLINE_MS,
       sessions: seen.results[0].n,
       discoverable: Boolean(user.discoverable),
       appearOffline: Boolean(user.appear_offline),
+      showPlaying: Boolean(user.show_playing),
+      emailAlerts: Boolean(user.email_alerts ?? 1),
+      locale: user.locale,
     },
-    friends: friends.results.map((row) => ({ ...person(row), since: row.created_at })),
+    presence: {
+      status: presence.status,
+      playing: presence.playing && {
+        title: presence.playing.title,
+        console: presence.playing.console,
+        startedAt: presence.playing.startedAt,
+      },
+      inParty: Boolean(presence.party),
+    },
+    friends: people(friends, (row) => ({
+      since: row.created_at,
+      lastSeenAt: row.seen,
+      online: row.seen > now - ONLINE_MS,
+      friends: row.friends,
+    })),
+    edges: edges.results,
+    incoming: people(incoming, (row) => ({ at: row.created_at })),
+    outgoing: people(outgoing, (row) => ({ at: row.created_at })),
+    blocking: people(blocking, (row) => ({ at: row.created_at })),
+    blockedBy: people(blockedBy, (row) => ({ at: row.created_at })),
     counts: {
-      requestsSent: c.sent,
-      requestsReceived: c.received,
-      blocking: c.blocking,
-      blockedBy: c.blockedBy,
       messagesSent: c.messagesSent,
+      playSeconds: c.playSeconds,
+      parties: c.parties,
+      daysActive: c.daysActive,
     },
+    activeSessions: sessions.results.map((row) => ({
+      createdAt: row.created_at,
+      lastSeenAt: row.last_seen_at,
+    })),
     games: games.results.map((row) => ({
       title: row.title,
       console: row.console,
@@ -252,12 +345,12 @@ export async function adminRoute(request, env, url) {
   if (!adminEmails(env).has(user.email.toLowerCase())) throw notFound();
   const path = url.pathname;
   if (path === "/api/admin/me") return { data: { ok: true } };
-  if (path === "/api/admin/overview")
-    return { data: await overview(db, now) };
-  if (path === "/api/admin/users") return { data: await users(db, url) };
-  if (path === "/api/admin/activity")
-    return { data: await activity(db, url) };
+  if (path === "/api/admin/overview") return { data: await overview(db, now) };
+  if (path === "/api/admin/users") return { data: await users(db, url, now) };
+  if (path === "/api/admin/live") return { data: await live(env, db, now) };
+  if (path === "/api/admin/insights") return { data: await insights(db, now) };
+  if (path === "/api/admin/activity") return { data: await activity(db, url) };
   const match = /^\/api\/admin\/users\/([a-f0-9-]{36})$/.exec(path);
-  if (match) return { data: await userDetail(db, match[1]) };
+  if (match) return { data: await userDetail(env, db, match[1], now) };
   throw notFound();
 }

@@ -11,7 +11,7 @@ import {
 import { related } from "./social/friends.mjs";
 import { authenticate, database } from "./social/auth.mjs";
 import { AccountError } from "./social/http.mjs";
-import { recordActivity } from "./social/activity.mjs";
+import { recordActivity, sampleActivity } from "./social/activity.mjs";
 import { cloudflareTurn } from "./turn.mjs";
 import { DurableObject } from "cloudflare:workers";
 
@@ -98,7 +98,13 @@ function limit(value, fallback) {
 
 export default {
   async scheduled(_controller, env, ctx) {
-    if (env.SOCIAL_DB) ctx.waitUntil(cleanupSocial(env.SOCIAL_DB));
+    if (env.SOCIAL_DB)
+      ctx.waitUntil(
+        Promise.all([
+          cleanupSocial(env.SOCIAL_DB),
+          sampleActivity(env.SOCIAL_DB).catch(() => {}),
+        ]),
+      );
   },
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -134,9 +140,13 @@ export default {
       if (env.ADMIN_HOST) {
         const adminPath =
           url.pathname.startsWith("/api/admin/") ||
-          ["/admin", "/admin.html", "/admin.js", "/admin.css"].includes(
-            url.pathname,
-          );
+          [
+            "/admin",
+            "/admin.html",
+            "/admin.js",
+            "/admin.css",
+            "/nunito-sans.woff2",
+          ].includes(url.pathname);
         const onAdmin = url.hostname === env.ADMIN_HOST;
         if (
           onAdmin
@@ -317,6 +327,7 @@ export default {
           "/admin.html",
           "/admin.js",
           "/admin.css",
+          "/nunito-sans.woff2",
         ].includes(assetPath)
       )
         return reply({ error: "Página não encontrada." }, 404);

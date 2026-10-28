@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { Log, LogLevel } from "miniflare";
 import { runtime } from "./test-support/cloudflare.mjs";
 import { sendLoginEmail } from "./cloudflare/social/email.mjs";
+import { sampleActivity } from "./cloudflare/social/activity.mjs";
 import {
   signInvite,
   verifyInvite,
@@ -2510,9 +2511,7 @@ test("the admin panel is closed to everyone but the listed emails and records wh
       assert.equal(overview.parties.total, 1);
       assert.equal(overview.blocks, 1);
       assert.equal(overview.signupsPerDay.length, 14);
-      const found = await (
-        await admin("/api/admin/users?q=ali", boss)
-      ).json();
+      const found = await (await admin("/api/admin/users?q=ali", boss)).json();
       assert.equal(found.users.length, 1);
       assert.equal(found.users[0].email, "al***@example.test");
       assert.ok(!JSON.stringify(found).includes("alice@example.test"));
@@ -2534,28 +2533,90 @@ test("the admin panel is closed to everyone but the listed emails and records wh
         filtered.events.map((event) => [event.actor.id, event.target.id]),
         [[b.user.id, a.user.id]],
       );
+      await pair(f, boss, a);
+      await sampleActivity(f.db);
       const detail = await (
         await admin(`/api/admin/users/${a.user.id}`, boss)
       ).json();
-      assert.equal(detail.counts.blocking, 1);
-      assert.equal(detail.friends.length, 0);
+      assert.equal(detail.blocking.length, 1);
+      assert.equal(detail.blocking[0].id, b.user.id);
+      assert.equal(detail.friends.length, 1);
+      assert.equal(detail.friends[0].id, boss.user.id);
+      assert.deepEqual(detail.edges, []);
+      assert.equal(detail.counts.parties, 1);
+      assert.equal(detail.counts.daysActive, 1);
+      assert.equal(detail.presence.status, "offline");
+      assert.equal(detail.activeSessions.length, 1);
       assert.ok(detail.events.length >= 4);
-      // Deleting an account erases the events that name it.
+      assert.equal(
+        (
+          await admin(
+            `/api/admin/users/${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}`,
+            boss,
+          )
+        ).status,
+        404,
+      );
+      const blockedBy = await (
+        await admin(`/api/admin/users/${b.user.id}`, boss)
+      ).json();
+      assert.equal(blockedBy.blockedBy[0].id, a.user.id);
+      const online = await (
+        await admin("/api/admin/users?filter=online&sort=friends", boss)
+      ).json();
+      assert.equal(online.users.length, 3);
+      assert.ok(online.users.every((user) => user.online));
+      assert.equal(online.users[0].friends, 1);
+      await f.db.prepare("UPDATE sessions SET last_seen_at=?").bind(1).run();
+      // The panel's own request keeps its admin online.
+      const stillOnline = await (
+        await admin("/api/admin/users?filter=online", boss)
+      ).json();
+      assert.deepEqual(
+        stillOnline.users.map((user) => user.id),
+        [boss.user.id],
+      );
+      assert.equal(
+        (await (await admin("/api/admin/users?filter=nofriends", boss)).json())
+          .users.length,
+        1,
+      );
+      const snapshot = await (await admin("/api/admin/live", boss)).json();
+      assert.deepEqual(
+        snapshot.online.map((player) => player.id),
+        [boss.user.id],
+      );
+      assert.equal(snapshot.online[0].playing, null);
+      assert.deepEqual(snapshot.parties, []);
+      const insights = await (await admin("/api/admin/insights", boss)).json();
+      assert.equal(insights.funnel.total, 3);
+      assert.equal(insights.funnel.hosted, 1);
+      assert.equal(insights.funnel.withFriend, 2);
+      assert.equal(insights.activePerDay.at(-1).count, 3);
+      assert.equal(insights.onlineSamples.length, 1);
+      assert.equal(insights.onlineSamples[0].online, 3);
+      assert.equal(insights.onlineByHour.length, 24);
+      assert.equal(insights.friendBuckets.length, 5);
+      assert.equal(insights.mostBlocked[0].id, b.user.id);
+      assert.equal(insights.acceptRate, 1);
+      // Deleting an account erases the events and the activity days that name it.
       await f.call("/api/account", undefined, {
         token: b.token,
         method: "DELETE",
       });
-      assert.equal(
-        (
-          await f.db
-            .prepare(
-              "SELECT COUNT(*) AS n FROM activity_log WHERE actor_id=? OR target_id=?",
-            )
-            .bind(b.user.id, b.user.id)
-            .first()
-        ).n,
-        0,
-      );
+      for (const table of ["activity_log", "daily_active"])
+        assert.equal(
+          (
+            await f.db
+              .prepare(
+                `SELECT COUNT(*) AS n FROM ${table} WHERE ${table === "activity_log" ? "actor_id=?1 OR target_id=?1" : "user_id=?1"}`,
+              )
+              .bind(b.user.id)
+              .first()
+          ).n,
+          0,
+          table,
+        );
     },
     {
       ADMIN_EMAILS: "Boss@example.test, other@example.test",
