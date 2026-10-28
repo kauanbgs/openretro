@@ -454,6 +454,7 @@ pub struct LoginChallenge {
 #[tauri::command]
 pub async fn account_start(
     email: String,
+    locale: Option<String>,
     gate: tauri::State<'_, AccountGate>,
 ) -> AccountResult<LoginChallenge> {
     let email = normalized_email(&email)?;
@@ -462,7 +463,7 @@ pub async fn account_start(
         .request(
             Method::POST,
             "/api/auth/start",
-            Some(json!({ "email": email })),
+            Some(json!({ "email": email, "locale": locale })),
             None,
         )
         .await?;

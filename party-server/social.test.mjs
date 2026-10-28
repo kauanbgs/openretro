@@ -512,7 +512,7 @@ async function fixture(bindings = {}, options = {}) {
       ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
     });
   const start = (email = EMAIL, options) =>
-    call("/api/auth/start", { email }, options);
+    call("/api/auth/start", { email, locale: "pt-BR" }, options);
   const code = () => /é: (\d{6})/.exec(emails.at(-1)?.text || "")?.[1];
   const verify = (value = code(), email = EMAIL, options) =>
     call("/api/auth/verify", { email, code: value }, options);
@@ -1684,7 +1684,13 @@ test("email transport isolates provider configuration and sends plain Portuguese
       RESEND_API_KEY: "test-key",
       EMAIL_FROM: "OpenRetro <conta@example.test>",
     },
-    { email: EMAIL, code: "123456", challenge: "test-challenge", local: false },
+    {
+      email: EMAIL,
+      code: "123456",
+      challenge: "test-challenge",
+      local: false,
+      locale: "pt-BR",
+    },
     async (url, options) => {
       assert.equal(url, "https://api.resend.com/emails");
       assert.equal(
@@ -2453,3 +2459,32 @@ test("the Party chat relays seated players' lines to the room and keeps nothing"
     },
     { PARTY_TICKET_SECRET: INVITE_SECRET },
   ));
+
+test("login and alert emails follow the app language", async () => {
+  const sent = [];
+  const send = (locale) =>
+    sendLoginEmail(
+      {
+        RESEND_API_KEY: "test-key",
+        EMAIL_FROM: "OpenRetro <conta@example.test>",
+      },
+      {
+        email: EMAIL,
+        code: "123456",
+        challenge: `c-${locale}`,
+        local: false,
+        locale,
+      },
+      async (_url, options) => {
+        sent.push(JSON.parse(options.body));
+        return Response.json({ id: "fixture" });
+      },
+    );
+  await send("en");
+  await send("pt-BR");
+  await send("fr");
+  assert.match(sent[0].subject, /sign-in code/);
+  assert.match(sent[0].text, /valid for 10 minutes/);
+  assert.match(sent[1].subject, /código de acesso/);
+  assert.match(sent[2].subject, /sign-in code/);
+});

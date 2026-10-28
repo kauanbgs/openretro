@@ -15,7 +15,7 @@ import {
   unavailable,
 } from "./http.mjs";
 import { USER_QUOTA_SCOPES, emailQuotaKey, quota } from "./limits.mjs";
-import { sendLoginEmail } from "./email.mjs";
+import { mailLocale, sendLoginEmail } from "./email.mjs";
 import { notifyUsers } from "./friends.mjs";
 import {
   availableFriendCode,
@@ -92,8 +92,9 @@ export function database(env, url) {
   return env.SOCIAL_DB.withSession("first-primary");
 }
 async function start(request, env, db, url, now) {
-  const { email: raw } = await readJson(request);
+  const { email: raw, locale: asked } = await readJson(request);
   const email = normalizeEmail(raw);
+  const locale = mailLocale(asked);
   const local = localDevelopment(env, url);
   if (
     (!env.RESEND_API_KEY && !local) ||
@@ -131,13 +132,22 @@ async function start(request, env, db, url, now) {
   const inserted = await db
     .prepare(
       `INSERT INTO login_codes
-    (email_hash, challenge_id, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)
+    (email_hash, challenge_id, code_hash, created_at, expires_at, locale) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(email_hash) DO UPDATE SET challenge_id = excluded.challenge_id,
     code_hash = excluded.code_hash, created_at = excluded.created_at,
-    expires_at = excluded.expires_at, attempts = 0, used_at = NULL, claim_id = NULL
+    expires_at = excluded.expires_at, locale = excluded.locale,
+    attempts = 0, used_at = NULL, claim_id = NULL
     WHERE login_codes.created_at <= ? RETURNING challenge_id`,
     )
-    .bind(subject, challenge, digest, now, now + CODE_MS, now - RESEND_MS)
+    .bind(
+      subject,
+      challenge,
+      digest,
+      now,
+      now + CODE_MS,
+      locale,
+      now - RESEND_MS,
+    )
     .first();
   if (!inserted)
     throw new AccountError(
@@ -146,7 +156,7 @@ async function start(request, env, db, url, now) {
       60,
     );
   try {
-    await sendLoginEmail(env, { email, code, challenge, local });
+    await sendLoginEmail(env, { email, code, challenge, local, locale });
   } catch {
     await db
       .prepare(
@@ -264,6 +274,14 @@ async function verify(request, env, db, now) {
     }
   }
   const user = results[3].results[0];
+  // Signing in again in another language moves the emails to it.
+  if (user && user.locale !== row.locale) {
+    await db
+      .prepare("UPDATE users SET locale = ? WHERE id = ?")
+      .bind(row.locale, user.id)
+      .run();
+    user.locale = row.locale;
+  }
   if (!user) {
     if (results[0].results[0]?.attempts === 5)
       throw new AccountError(

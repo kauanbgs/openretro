@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { language } from "../i18n";
 import {
   accountFailure,
   getPendingLogin,
@@ -81,7 +82,7 @@ describe("optional account client", () => {
     await api.logout(true);
     await api.remove("EXCLUIR");
     expect(call.mock.calls).toEqual([
-      ["account_start", { email: "test@example.test" }],
+      ["account_start", { email: "test@example.test", locale: language }],
       ["account_verify", { email: "test@example.test", code: "123456" }],
       ["account_profile", { patch: { displayName: "Jogador" } }],
       ["account_logout", { all: true }],

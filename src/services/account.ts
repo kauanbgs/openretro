@@ -1,4 +1,5 @@
 import { invoke, isTauri, isRemote } from "./transport";
+import { language } from "../i18n";
 import defaultOrigin from "../../src-tauri/src/remote_play/party-url.txt?raw";
 
 export interface AccountUser {
@@ -133,7 +134,10 @@ export function createAccountApi(
     session: () =>
       desktop ? native("account_session") : Promise.resolve(signedOut),
     start: (email) =>
-      native("account_start", { email: email.trim().toLowerCase() }),
+      native("account_start", {
+        email: email.trim().toLowerCase(),
+        locale: language,
+      }),
     verify: (email, code) =>
       native<AccountSession>("account_verify", {
         email: email.trim().toLowerCase(),

@@ -1,5 +1,6 @@
 import { hmac, verifyHmac } from "./crypto.mjs";
 import { hubCall } from "./hub.mjs";
+import { mailLocale } from "./email.mjs";
 
 /** A message after this long without one in the conversation sends an email. */
 export const QUIET_MS = 7 * 24 * 60 * 60 * 1000;
@@ -29,7 +30,7 @@ export async function emailAlert(
   try {
     if (!env.RESEND_API_KEY || !env.EMAIL_FROM) return;
     const target = await db
-      .prepare("SELECT email,email_alerts FROM users WHERE id=?")
+      .prepare("SELECT email,email_alerts,locale FROM users WHERE id=?")
       .bind(receiver)
       .first();
     // Players with the app open already see it there.
@@ -49,16 +50,30 @@ export async function emailAlert(
     const name = sender.display_name ?? sender.friend_code;
     const off = await alertsOffLink(env, origin, receiver);
     // The text never carries the message itself.
+    const en = mailLocale(target.locale) === "en";
     const [subject, line] =
       kind === "request"
-        ? [
-            `${name} quer ser seu amigo no OpenRetro`,
-            `${name} (${sender.friend_code}) te mandou um pedido de amizade no OpenRetro.\nAbra o OpenRetro para aceitar ou recusar.`,
-          ]
-        : [
-            `${name} te mandou uma mensagem no OpenRetro`,
-            `${name} (${sender.friend_code}) te mandou uma mensagem no OpenRetro.\nAbra o OpenRetro para ler e responder.`,
-          ];
+        ? en
+          ? [
+              `${name} wants to be your friend on OpenRetro`,
+              `${name} (${sender.friend_code}) sent you a friend request on OpenRetro.\nOpen OpenRetro to accept or decline.`,
+            ]
+          : [
+              `${name} quer ser seu amigo no OpenRetro`,
+              `${name} (${sender.friend_code}) te mandou um pedido de amizade no OpenRetro.\nAbra o OpenRetro para aceitar ou recusar.`,
+            ]
+        : en
+          ? [
+              `${name} sent you a message on OpenRetro`,
+              `${name} (${sender.friend_code}) sent you a message on OpenRetro.\nOpen OpenRetro to read and reply.`,
+            ]
+          : [
+              `${name} te mandou uma mensagem no OpenRetro`,
+              `${name} (${sender.friend_code}) te mandou uma mensagem no OpenRetro.\nAbra o OpenRetro para ler e responder.`,
+            ];
+    const footer = en
+      ? `You are getting this because you weren't in OpenRetro. To stop receiving these, go to:\n${off}`
+      : `Você recebe este aviso porque não estava no OpenRetro. Para não receber mais, acesse:\n${off}`;
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -70,7 +85,7 @@ export async function emailAlert(
         from: env.EMAIL_FROM,
         to: [target.email],
         subject,
-        text: `${line}\n\nVocê recebe este aviso porque não estava no OpenRetro. Para não receber mais, acesse:\n${off}`,
+        text: `${line}\n\n${footer}`,
         headers: {
           "List-Unsubscribe": `<${off}>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

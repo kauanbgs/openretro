@@ -1,8 +1,11 @@
 import { unavailable } from "./http.mjs";
 
+/** The languages emails are written in; anything else reads English. */
+export const mailLocale = (value) => (value === "pt-BR" ? "pt-BR" : "en");
+
 export async function sendLoginEmail(
   env,
-  { email, code, challenge, local },
+  { email, code, challenge, local, locale },
   fetcher = fetch,
   logger = console,
 ) {
@@ -25,8 +28,15 @@ export async function sendLoginEmail(
     body: JSON.stringify({
       from: env.EMAIL_FROM,
       to: [email],
-      subject: "Seu código de acesso ao OpenRetro",
-      text: `Seu código de acesso ao OpenRetro é: ${code}\n\nEle é válido por 10 minutos e só pode ser usado uma vez.\nSe não foi você, ignore este e-mail.`,
+      ...(mailLocale(locale) === "en"
+        ? {
+            subject: "Your OpenRetro sign-in code",
+            text: `Your OpenRetro sign-in code is: ${code}\n\nIt is valid for 10 minutes and can only be used once.\nIf this wasn't you, ignore this email.`,
+          }
+        : {
+            subject: "Seu código de acesso ao OpenRetro",
+            text: `Seu código de acesso ao OpenRetro é: ${code}\n\nEle é válido por 10 minutos e só pode ser usado uma vez.\nSe não foi você, ignore este e-mail.`,
+          }),
     }),
     signal: AbortSignal.timeout(10000),
   });
