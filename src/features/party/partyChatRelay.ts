@@ -1,6 +1,6 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke, isTauri } from "../../services/transport";
-import { partyStore, sendPartyChat } from "./partySession";
+import { partyStore, sendPartyChat, togglePartyMute } from "./partySession";
 
 /**
  * Carries the host's Party chat between the main window, which holds the
@@ -27,11 +27,14 @@ export function startPartyChatRelay() {
   const sending = listen<string>("party-chat-send", (event) => {
     if (typeof event.payload === "string") sendPartyChat(event.payload);
   });
+  // M over a running game mutes or unmutes the host's microphone.
+  const muting = listen("party-mic-toggle", togglePartyMute);
   // The overlay asks for the lines when it starts.
   const syncing = listen("party-chat-sync", share);
   return () => {
     stop();
     void sending.then((unlisten) => unlisten());
     void syncing.then((unlisten) => unlisten());
+    void muting.then((unlisten) => unlisten());
   };
 }

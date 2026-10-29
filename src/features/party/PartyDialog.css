@@ -366,3 +366,40 @@
   color: var(--body);
   margin: 5px 0 10px;
 }
+
+.party-devices {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  margin-top: 12px;
+}
+.party-devices label {
+  display: grid;
+  gap: 4px;
+  color: var(--body);
+  font-size: 12px;
+}
+.party-devices select {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+}
+
+.party-mic-level {
+  display: flex;
+  gap: 3px;
+  margin-top: 10px;
+}
+.party-mic-level span {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-strong);
+}
+.party-mic-level span.on {
+  background: #5ee38b;
+}

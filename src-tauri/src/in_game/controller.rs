@@ -83,6 +83,7 @@ pub fn start(app: tauri::AppHandle) {
         let mut last_toggle = Instant::now() - Duration::from_secs(10);
         let mut previous_menu = 0u32;
         let mut previous_chat = false;
+        let mut previous_mute = false;
         let main_window = app
             .get_webview_window("main")
             .and_then(|window| window.hwnd().ok())
@@ -114,6 +115,7 @@ pub fn start(app: tauri::AppHandle) {
                 sdl_pid = 0;
                 previous = false;
                 previous_chat = false;
+                previous_mute = false;
                 thread::sleep(Duration::from_millis(150));
                 continue;
             };
@@ -139,6 +141,15 @@ pub fn start(app: tauri::AppHandle) {
                 });
             }
             previous_chat = chat;
+            // M mutes or unmutes the host's Party microphone, the same way.
+            let mute = !open
+                && game_foreground
+                && super::party_chat::active()
+                && unsafe { GetAsyncKeyState(0x4D) } < 0;
+            if mute && !previous_mute {
+                let _ = app.emit("party-mic-toggle", ());
+            }
+            previous_mute = mute;
             // Without commands there is no OpenRetro menu to drive.
             if !commands {
                 thread::sleep(Duration::from_millis(25));

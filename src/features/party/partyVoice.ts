@@ -28,19 +28,68 @@ export function microphoneFailure(cause: unknown): string {
   return "Não foi possível abrir o microfone.";
 }
 
+const MIC_KEY = "openretro-party-microphone";
+const SPEAKER_KEY = "openretro-party-speaker";
+/** The device the host chose for voice, or "" for the system's default. */
+export function chosenDevice(kind: "microphone" | "speaker"): string {
+  try {
+    return (
+      localStorage.getItem(kind === "microphone" ? MIC_KEY : SPEAKER_KEY) ?? ""
+    );
+  } catch {
+    return "";
+  }
+}
+export function chooseDevice(kind: "microphone" | "speaker", id: string) {
+  try {
+    const key = kind === "microphone" ? MIC_KEY : SPEAKER_KEY;
+    if (id) localStorage.setItem(key, id);
+    else localStorage.removeItem(key);
+  } catch {
+    /* The choice only lasts until the app closes. */
+  }
+}
+export interface AudioDevices {
+  microphones: { id: string; label: string }[];
+  speakers: { id: string; label: string }[];
+}
+/** The sound devices the system offers. Names appear once a microphone was allowed. */
+export async function listAudioDevices(): Promise<AudioDevices> {
+  const devices = (await navigator.mediaDevices?.enumerateDevices?.()) ?? [];
+  const pick = (kind: MediaDeviceKind) =>
+    devices
+      .filter((device) => device.kind === kind && device.deviceId !== "default")
+      .map((device, index) => ({
+        id: device.deviceId,
+        label: device.label || `${index + 1}`,
+      }));
+  return { microphones: pick("audioinput"), speakers: pick("audiooutput") };
+}
+
 /** A voice-quality microphone: echo and noise are handled by the browser. */
 export async function openMicrophone(): Promise<MediaStreamTrack> {
   if (!navigator.mediaDevices?.getUserMedia)
     throw new DOMException("No microphone API", "NotFoundError");
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      channelCount: 1,
-    },
-  });
-  return stream.getAudioTracks()[0];
+  const audio: MediaTrackConstraints = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: 1,
+  };
+  const device = chosenDevice("microphone");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: device ? { ...audio, deviceId: { exact: device } } : audio,
+    });
+    return stream.getAudioTracks()[0];
+  } catch (cause) {
+    // A headset that was unplugged since it was chosen: use the default.
+    if (!device || (cause as DOMException)?.name !== "OverconstrainedError")
+      throw cause;
+    chooseDevice("microphone", "");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio });
+    return stream.getAudioTracks()[0];
+  }
 }
 
 /**

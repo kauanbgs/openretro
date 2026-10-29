@@ -1,9 +1,10 @@
+import { t } from "../../i18n";
 import { bridge } from "../../services/bridge";
 import { invoke, isTauri } from "../../services/transport";
 import { validatePartyServer } from "./partyConfig";
 import { preferH264VideoCodec } from "./partyCodecs";
 import { configurePartyVideo } from "./partyQuality";
-import { microphoneFailure, openMicrophone } from "./partyVoice";
+import { chosenDevice, microphoneFailure, openMicrophone } from "./partyVoice";
 import {
   loudness,
   parsePartyReaction,
@@ -69,6 +70,10 @@ export interface PartyState {
   chat: PartyChatLine[];
   /** The host's microphone is open to the room. */
   mic: boolean;
+  /** The microphone stays open but sends silence. */
+  muted: boolean;
+  /** How loud the host's microphone is now, from 0 to 5. */
+  micLevel: number;
   micError: string;
   /** The room's server relays reactions and seat moves. */
   live: boolean;
@@ -92,6 +97,8 @@ const initial: PartyState = {
   guestLinkBusy: false,
   chat: [],
   mic: false,
+  muted: false,
+  micLevel: 0,
   micError: "",
   live: false,
   speaking: [],
@@ -233,7 +240,11 @@ function listenToVoices() {
   clearInterval(voiceMeter);
   voiceMeter = setInterval(() => {
     const levels = new Map<string, number>();
-    if (microphone) levels.set("host", levelOf(microphone.meter));
+    const own = microphone ? levelOf(microphone.meter) : 0;
+    if (microphone) levels.set("host", own);
+    // Five steps are enough to see that the microphone hears you.
+    const micLevel = Math.min(5, Math.round(own * 40));
+    if (micLevel !== state.micLevel) update({ micLevel });
     for (const [id, peer] of peers)
       if (peer.voice?.heard) levels.set(id, levelOf(peer.voice.heard.meter));
     const speaking = talking(levels, lastLoud, performance.now());
@@ -302,12 +313,35 @@ function stopMicrophone() {
   microphone?.track.stop();
   microphone = undefined;
 }
+/**
+ * Mutes or unmutes the open microphone. The track stays open, so unmuting is
+ * instant and a Bluetooth headset does not switch profiles again.
+ */
+export function setPartyMuted(muted: boolean, announce = false) {
+  if (!microphone) return;
+  microphone.track.enabled = !muted;
+  update({ muted });
+  // Pressing the key during a game has no panel to show it: say it in the chat.
+  if (announce)
+    update({
+      chat: addChatLine(
+        state.chat,
+        chatNote(muted ? t("Microfone silenciado.") : t("Microfone ligado.")),
+      ),
+    });
+}
+/** The key over a game: mutes, unmutes, or opens a microphone that was off. */
+export function togglePartyMute() {
+  if (state.phase !== "open") return;
+  if (!microphone) void setPartyMicrophone(true);
+  else setPartyMuted(!state.muted, true);
+}
 /** Opens or closes the host's microphone to everyone in the room. */
 export async function setPartyMicrophone(on: boolean) {
   if (state.phase !== "open" || !context) return;
   if (!on) {
     stopMicrophone();
-    update({ mic: false, micError: "" });
+    update({ mic: false, muted: false, micError: "" });
     routeVoice();
     return;
   }
@@ -324,7 +358,7 @@ export async function setPartyMicrophone(on: boolean) {
     meter.fftSize = 512;
     source.connect(meter);
     microphone = { track, source, meter };
-    update({ mic: true, micError: "" });
+    update({ mic: true, muted: false, micError: "" });
     routeVoice();
   } catch (cause) {
     if (run === generation) update({ micError: microphoneFailure(cause) });
@@ -431,6 +465,17 @@ export function closeGuestLink() {
   update({ guestLink: null, guestLinkBusy: false });
   send({ type: "guest-link-close" });
 }
+/** Sends the voices to the speaker or headset the host chose. */
+export async function applyChosenSpeaker() {
+  const sink = chosenDevice("speaker");
+  const output = context as
+    | (AudioContext & {
+        setSinkId?: (id: string) => Promise<void>;
+      })
+    | undefined;
+  if (!output?.setSinkId) return;
+  await output.setSinkId(sink).catch(() => {});
+}
 export async function startParty() {
   endParty();
   const run = generation;
@@ -450,6 +495,7 @@ export async function startParty() {
     const url = validatePartyServer(configuration.url);
     context = new AudioContext({ latencyHint: "interactive" });
     await context.resume();
+    await applyChosenSpeaker();
     if (run !== generation) return;
     const audio = context.createMediaStreamDestination();
     // Party is not anonymous: the room is reserved with the account's

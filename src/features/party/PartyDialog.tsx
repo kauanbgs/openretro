@@ -28,6 +28,8 @@ import {
   sendPartyChat,
   sendPartyReaction,
   setPartyMicrophone,
+  setPartyMuted,
+  applyChosenSpeaker,
   startParty,
   setFriendsAllowed,
 } from "./partySession";
@@ -37,6 +39,12 @@ import { locale, t } from "../../i18n";
 import { AccountAvatar } from "../social/accountAvatars";
 import { PartyChat } from "./PartyChat";
 import { PartyReactionTray } from "./PartyLiveParts";
+import {
+  chooseDevice,
+  chosenDevice,
+  listAudioDevices,
+  type AudioDevices,
+} from "./partyVoice";
 
 export function PartyDialog({
   onClose,
@@ -62,6 +70,29 @@ export function PartyDialog({
   );
   useEffect(() => setCopied(false), [link?.url]);
   const active = room.phase === "open";
+  const [devices, setDevices] = useState<AudioDevices>({
+    microphones: [],
+    speakers: [],
+  });
+  const [picked, setPicked] = useState({
+    microphone: chosenDevice("microphone"),
+    speaker: chosenDevice("speaker"),
+  });
+  // Device names appear only after the microphone was allowed, so look again then.
+  useEffect(() => {
+    if (!active) return;
+    void listAudioDevices()
+      .then(setDevices)
+      .catch(() => {});
+  }, [active, room.mic]);
+  const pickDevice = (kind: "microphone" | "speaker", id: string) => {
+    chooseDevice(kind, id);
+    setPicked((value) => ({ ...value, [kind]: id }));
+    if (kind === "speaker") void applyChosenSpeaker();
+    // A microphone in use switches to the new one.
+    else if (room.mic)
+      void setPartyMicrophone(false).then(() => setPartyMicrophone(true));
+  };
   const busy = room.phase === "connecting";
   const signedIn = social.session.hasSession;
   // An open room always has an invite ready: one press creates both.
@@ -425,6 +456,83 @@ export function PartyDialog({
             >
               <span />
             </button>
+            {room.mic && (
+              <>
+                <div>
+                  <strong>{t("Silenciar")}</strong>
+                  <p>
+                    {t(
+                      "Durante o jogo, aperte M para silenciar ou voltar a falar.",
+                    )}
+                  </p>
+                  <div
+                    className="party-mic-level"
+                    role="meter"
+                    aria-label={t("Volume do seu microfone")}
+                    aria-valuemin={0}
+                    aria-valuemax={5}
+                    aria-valuenow={room.micLevel}
+                  >
+                    {[1, 2, 3, 4, 5].map((step) => (
+                      <span
+                        key={step}
+                        className={room.micLevel >= step ? "on" : ""}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <button
+                  className={"switch " + (room.muted ? "on" : "")}
+                  role="switch"
+                  aria-label={t("Silenciar")}
+                  aria-checked={room.muted}
+                  onClick={() => setPartyMuted(!room.muted)}
+                >
+                  <span />
+                </button>
+              </>
+            )}
+            {(devices.microphones.length > 1 ||
+              devices.speakers.length > 1) && (
+              <div className="party-devices">
+                {devices.microphones.length > 1 && (
+                  <label>
+                    {t("Microfone")}
+                    <select
+                      value={picked.microphone}
+                      onChange={(event) =>
+                        pickDevice("microphone", event.target.value)
+                      }
+                    >
+                      <option value="">{t("Padrão do Windows")}</option>
+                      {devices.microphones.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {devices.speakers.length > 1 && (
+                  <label>
+                    {t("Fones ou caixas de som")}
+                    <select
+                      value={picked.speaker}
+                      onChange={(event) =>
+                        pickDevice("speaker", event.target.value)
+                      }
+                    >
+                      <option value="">{t("Padrão do Windows")}</option>
+                      {devices.speakers.map((device) => (
+                        <option key={device.id} value={device.id}>
+                          {device.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            )}
             {room.micError && (
               <p className="party-friends-error" role="alert">
                 {t(room.micError)}

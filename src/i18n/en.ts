@@ -2315,4 +2315,13 @@ export const en: Record<string, string> = {
   "Mover para J{seat}": "Move to P{seat}",
   "Esse lugar está reservado para o convite.":
     "That seat is held for the invite link.",
+  "Microfone silenciado.": "Microphone muted.",
+  Silenciar: "Mute",
+  "Durante o jogo, aperte M para silenciar ou voltar a falar.":
+    "During a game, press M to mute or speak again.",
+  Microfone: "Microphone",
+  "Fones ou caixas de som": "Headphones or speakers",
+  "Padrão do Windows": "Windows default",
+  "Microfone ligado.": "Microphone on.",
+  "Volume do seu microfone": "Your microphone level",
 };

@@ -1,6 +1,6 @@
 [package]
 name = "openretro"
-version = "1.1.0"
+version = "1.1.1"
 description = "An open home for your classic games"
 authors = ["OpenRetro contributors"]
 edition = "2021"
