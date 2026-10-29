@@ -426,3 +426,7 @@ textarea:focus-visible {
   margin: 0;
   font-size: 15px;
 }
+.letter b {
+  color: var(--text);
+  font-weight: 700;
+}

@@ -2644,9 +2644,25 @@ test("with ADMIN_HOST the panel answers only on its own host, and that host serv
     { ADMIN_HOST: "admin.example.test" },
   ));
 
+const invite = (f, pairs) =>
+  f.db.batch(
+    pairs
+      .split(",")
+      .map((pair) => pair.split("=").map((part) => part.trim()))
+      .filter(([slug, name]) => /^[a-z0-9-]{2,40}$/.test(slug) && name)
+      .map(([slug, name]) =>
+        f.db
+          .prepare(
+            "INSERT INTO playtest_streamers (slug,name,created_at) VALUES (?,?,?)",
+          )
+          .bind(slug, name, 1),
+      ),
+  );
+
 test("playtest invites open only for listed streamers, count what happens and keep feedback away from accounts", () =>
   using(
     async (f) => {
+      await invite(f, "ana-live=Ana Live, bruno=Bruno, ruim_=Ruim, =Vazio");
       const boss = await f.login("boss@example.test");
       const post = (path, data, ip) => f.call(path, data, { ip });
       const asset = await f.call("/p/ana-live");
@@ -2755,13 +2771,13 @@ test("playtest invites open only for listed streamers, count what happens and ke
     },
     {
       ADMIN_EMAILS: "boss@example.test",
-      PLAYTEST_STREAMERS: "ana-live=Ana Live, bruno=Bruno, ruim_=Ruim, =Vazio",
     },
   ));
 
 test("the admin sets the game sources the playtest page shows, as HTTPS addresses only", () =>
   using(
     async (f) => {
+      await invite(f, "ana-live=Ana Live");
       const boss = await f.login("boss@example.test");
       const guest = await f.login("alice@example.test");
       const save = (sources, who) =>
@@ -2815,13 +2831,13 @@ test("the admin sets the game sources the playtest page shows, as HTTPS addresse
     },
     {
       ADMIN_EMAILS: "boss@example.test",
-      PLAYTEST_STREAMERS: "ana-live=Ana Live",
     },
   ));
 
 test("a long first feedback earns one random Steam key per invite, and keys are never handed out twice", () =>
   using(
     async (f) => {
+      await invite(f, "ana-live=Ana Live, bruno=Bruno, carla=Carla");
       const boss = await f.login("boss@example.test");
       const guest = await f.login("alice@example.test");
       const saveKeys = (keys, who) =>
@@ -2891,6 +2907,61 @@ test("a long first feedback earns one random Steam key per invite, and keys are 
     },
     {
       ADMIN_EMAILS: "boss@example.test",
-      PLAYTEST_STREAMERS: "ana-live=Ana Live, bruno=Bruno, carla=Carla",
     },
+  ));
+
+test("the admin adds and removes playtest invites without a deploy, and invite lookups are limited", () =>
+  using(
+    async (f) => {
+      const boss = await f.login("boss@example.test");
+      const guest = await f.login("alice@example.test");
+      const save = (streamers, who) =>
+        f.call(
+          "/api/admin/playtest/streamers",
+          { streamers },
+          { token: who?.token },
+        );
+      assert.equal((await save("Ana")).status, 401);
+      assert.equal((await save("Ana", guest)).status, 404);
+      for (const bad of [
+        "x=Ana",
+        "Ana Live=Ana",
+        "ana-live=",
+        "a-b=Um\nA-B=Dois",
+      ])
+        assert.equal((await save(bad, boss)).status, 400, bad);
+      const saved = await save(
+        " ana-live = Ana Live \nÉrica da Silva\r\n",
+        boss,
+      );
+      assert.equal(saved.status, 200);
+      const [ana, erica] = (await saved.json()).streamers;
+      assert.deepEqual(ana, { slug: "ana-live", name: "Ana Live" });
+      assert.match(erica.slug, /^erica-da-silva-[a-z0-9]{4}$/);
+      assert.equal(erica.name, "Érica da Silva");
+      const info = (slug) => f.call(`/api/playtest/${slug}`);
+      assert.deepEqual(await (await info("ana-live")).json(), {
+        name: "Ana Live",
+      });
+      assert.equal((await info(erica.slug)).status, 200);
+      // Saving again keeps what is written and drops what is gone.
+      await save(`ana-live=Ana Live\n${erica.slug}=Érica`, boss);
+      assert.equal((await info(erica.slug)).status, 200);
+      await save("ana-live=Ana Live", boss);
+      assert.equal((await info(erica.slug)).status, 404);
+      const board = await (
+        await f.call("/api/admin/playtest", undefined, { token: boss.token })
+      ).json();
+      assert.deepEqual(board.invites, [{ slug: "ana-live", name: "Ana Live" }]);
+      // Guessing codes runs into the lookup limit.
+      let last;
+      for (let i = 0; i < 160; i++)
+        last = (
+          await f.call(`/api/playtest/chute-${i}`, undefined, {
+            ip: "192.0.2.77",
+          })
+        ).status;
+      assert.equal(last, 429);
+    },
+    { ADMIN_EMAILS: "boss@example.test" },
   ));

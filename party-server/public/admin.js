@@ -1189,6 +1189,38 @@ async function playtestView() {
       save.disabled = false;
     }
   });
+  const lines = (list) => list.map((s) => `${s.slug}=${s.name}`).join("\n");
+  const invites = h("textarea", {
+    class: "sources",
+    rows: 6,
+    spellcheck: false,
+    "aria-label": "Streamers",
+    placeholder: "Nome do streamer",
+  });
+  invites.value = lines(d.invites);
+  const invitesSaved = h("p", { class: "muted", role: "status" });
+  const invitesSave = h(
+    "button",
+    { class: "ghost", type: "button" },
+    "Salvar streamers",
+  );
+  invitesSave.addEventListener("click", async () => {
+    invitesSave.disabled = true;
+    invitesSaved.textContent = "Salvando…";
+    try {
+      const data = await api("/api/admin/playtest/streamers", {
+        method: "POST",
+        body: JSON.stringify({ streamers: invites.value }),
+      });
+      invites.value = lines(data.streamers);
+      invitesSaved.textContent = `Salvo. ${plural(data.streamers.length, "convite", "convites")}. Os links novos aparecem na tabela ao recarregar.`;
+    } catch (error) {
+      if (error instanceof Unauthorized) return fail(error);
+      invitesSaved.textContent = error.message;
+    } finally {
+      invitesSave.disabled = false;
+    }
+  });
   const keys = h("textarea", {
     class: "sources",
     rows: 5,
@@ -1223,7 +1255,7 @@ async function playtestView() {
   app.replaceChildren(
     ...page(
       "Playtest",
-      "Os convites para streamers. Para criar um, adicione slug=Nome em PLAYTEST_STREAMERS no wrangler.jsonc e faça o deploy.",
+      "Os convites para streamers. Tudo aqui vale na hora, sem deploy.",
     ),
     figures([
       figure(total("view"), "aberturas dos convites"),
@@ -1231,6 +1263,13 @@ async function playtestView() {
       figure(total("download"), "downloads"),
       figure(total("feedback"), "feedbacks"),
     ]),
+    ...section(
+      "Streamers",
+      "Um convite por linha. Escreva só o nome para criar um novo: o link ganha um código difícil de adivinhar. Para tirar um convite, apague a linha. Quem tem o link vê as fontes e a chave, então o código é o que protege.",
+    ),
+    invites,
+    h("div", { class: "toolbar" }, invitesSave),
+    invitesSaved,
     ...section(
       "Fontes de jogos",
       "Um endereço HTTPS por linha. Quem aceita o convite vê essas fontes, com o passo a passo para adicioná-las no app. Deixe vazio para esconder o passo.",

@@ -65,8 +65,6 @@
 	"vars": {
 		"EMAIL_FROM": "OpenRetro <login@mail.openretro.com.br>",
 		"ADMIN_HOST": "admin.openretro.com.br",
-		// Playtest invites, as "slug=Name" pairs: openretro.com.br/p/<slug>.
-		"PLAYTEST_STREAMERS": "kauan-powe=Kauan,dougao-were=Dougao, vakeiro-2111=Vakeiro,allan-pocj=Allan, siegod-26sp=SieGod",
 		"MAX_ROOMS": "32",
 		"MAX_ROOMS_PER_IP": "2",
 		"MAX_CREATES_PER_10_MIN": "12",

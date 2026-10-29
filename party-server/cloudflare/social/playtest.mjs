@@ -111,16 +111,72 @@ export async function saveSources(db, text, now) {
   return sources;
 }
 
-/** The invites, from the PLAYTEST_STREAMERS variable: "slug=Name, other=Name". */
-export function streamers(env) {
-  const list = new Map();
-  for (const entry of String(env.PLAYTEST_STREAMERS ?? "").split(",")) {
-    const at = entry.indexOf("=");
-    const slug = entry.slice(0, at).trim().toLowerCase();
-    const name = entry.slice(at + 1).trim();
-    if (at > 0 && /^[a-z0-9-]{2,40}$/.test(slug) && name) list.set(slug, name);
-  }
+const STREAMERS_MAX = 100;
+const slugOf = (name) =>
+  name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30);
+const suffix = () =>
+  Array.from(
+    crypto.getRandomValues(new Uint8Array(4)),
+    (n) => "abcdefghijklmnopqrstuvwxyz0123456789"[n % 36],
+  ).join("");
+/**
+ * One invite per line: "slug=Name", or just "Name" for a new one, which gets a
+ * hard to guess slug (the link is what keeps the sources and the key private).
+ */
+export function parseStreamers(text) {
+  const lines = String(text ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length > STREAMERS_MAX)
+    throw new AccountError(400, `Use no máximo ${STREAMERS_MAX} streamers.`);
+  const seen = new Set();
+  return lines.map((line) => {
+    const at = line.indexOf("=");
+    const name = (at < 0 ? line : line.slice(at + 1)).trim();
+    let slug = at < 0 ? "" : line.slice(0, at).trim().toLowerCase();
+    if (!name || name.length > 60)
+      throw new AccountError(400, `Nome inválido: ${line.slice(0, 60)}`);
+    if (at < 0) slug = `${slugOf(name) || "streamer"}-${suffix()}`;
+    if (!/^[a-z0-9-]{2,40}$/.test(slug))
+      throw new AccountError(
+        400,
+        `O código do link só aceita letras minúsculas, números e hífen: ${line.slice(0, 60)}`,
+      );
+    if (seen.has(slug)) throw new AccountError(400, `Código repetido: ${slug}`);
+    seen.add(slug);
+    return { slug, name };
+  });
+}
+/** Replaces the invites. Their counts and feedback stay in the database. */
+export async function saveStreamers(db, text, now) {
+  const list = parseStreamers(text);
+  await db.batch([
+    db.prepare("DELETE FROM playtest_streamers"),
+    ...list.map(({ slug, name }) =>
+      db
+        .prepare(
+          "INSERT INTO playtest_streamers (slug,name,created_at) VALUES (?,?,?)",
+        )
+        .bind(slug, name, now),
+    ),
+  ]);
   return list;
+}
+/** The invites: slug to the name the page greets. */
+export async function streamers(db) {
+  const { results } = await db
+    .prepare(
+      "SELECT slug, name FROM playtest_streamers ORDER BY created_at, slug",
+    )
+    .all();
+  return new Map(results.map((row) => [row.slug, row.name]));
 }
 
 export async function playtestRoute(request, env, url) {
@@ -128,7 +184,13 @@ export async function playtestRoute(request, env, url) {
     /^\/api\/playtest\/([a-z0-9-]{2,40})(?:\/(event|feedback|sources|reward))?$/.exec(
       url.pathname,
     );
-  const name = match && streamers(env).get(match[1]);
+  if (!match) throw notFound();
+  const db = database(env, url),
+    now = Date.now(),
+    visitor = request.headers.get("CF-Connecting-IP") || "local";
+  // Looking an invite up is limited too, so its code cannot be guessed.
+  await quota(db, env.AUTH_PEPPER, "playtest-lookup", visitor, 150, now);
+  const name = (await streamers(db)).get(match[1]);
   if (!name) throw notFound();
   const [, slug, action] = match;
   if (!action) {
@@ -137,9 +199,6 @@ export async function playtestRoute(request, env, url) {
   }
   const reads = action === "sources" || action === "reward";
   if (request.method !== (reads ? "GET" : "POST")) throw notFound();
-  const db = database(env, url),
-    now = Date.now(),
-    visitor = request.headers.get("CF-Connecting-IP") || "local";
   if (action === "reward") {
     await quota(db, env.AUTH_PEPPER, "playtest-reward", visitor, 60, now);
     return { data: { key: await claimedKey(db, slug) } };
@@ -214,7 +273,7 @@ export async function playtestOverview(env, db) {
       "SELECT steam_key, slug, claimed_at FROM playtest_keys ORDER BY id",
     ),
   ]);
-  const names = streamers(env);
+  const names = await streamers(db);
   const rows = new Map(
     [...names].map(([slug, name]) => [
       slug,
@@ -246,6 +305,7 @@ export async function playtestOverview(env, db) {
   }
   return {
     sources,
+    invites: [...names].map(([slug, name]) => ({ slug, name })),
     keys: {
       available: keys.results.filter((k) => !k.slug).map((k) => k.steam_key),
       claimed: keys.results

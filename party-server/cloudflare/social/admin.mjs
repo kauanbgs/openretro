@@ -3,7 +3,12 @@ import { AccountError, readJson } from "./http.mjs";
 import { ONLINE_MS } from "./activity.mjs";
 import { live, presenceOf } from "./admin-live.mjs";
 import { insights } from "./admin-insights.mjs";
-import { playtestOverview, saveKeys, saveSources } from "./playtest.mjs";
+import {
+  playtestOverview,
+  saveKeys,
+  saveSources,
+  saveStreamers,
+} from "./playtest.mjs";
 
 const DAY = 24 * 60 * 60 * 1000;
 const CHART_DAYS = 14;
@@ -335,9 +340,11 @@ async function userDetail(env, db, id, now) {
 export async function adminRoute(request, env, url) {
   const edit =
     request.method === "POST" &&
-    ["/api/admin/playtest/sources", "/api/admin/playtest/keys"].includes(
-      url.pathname,
-    );
+    [
+      "/api/admin/playtest/sources",
+      "/api/admin/playtest/keys",
+      "/api/admin/playtest/streamers",
+    ].includes(url.pathname);
   if (request.method !== "GET" && !edit) throw notFound();
   const db = database(env, url),
     now = Date.now();
@@ -355,7 +362,9 @@ export async function adminRoute(request, env, url) {
     return {
       data: path.endsWith("/keys")
         ? { keys: await saveKeys(db, body.keys, now) }
-        : { sources: await saveSources(db, body.sources, now) },
+        : path.endsWith("/streamers")
+          ? { streamers: await saveStreamers(db, body.streamers, now) }
+          : { sources: await saveSources(db, body.sources, now) },
     };
   }
   if (path === "/api/admin/me") return { data: { ok: true } };
