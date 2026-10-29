@@ -2,6 +2,7 @@ import { accountRoute } from "./auth.mjs";
 import { AccountError } from "./http.mjs";
 import { friendsRoute } from "./friends.mjs";
 import { adminRoute } from "./admin.mjs";
+import { playtestRoute } from "./playtest.mjs";
 
 export async function socialResponse(request, env, { allowed, headers }) {
   const reply = (data, status, extra = {}) =>
@@ -24,9 +25,11 @@ export async function socialResponse(request, env, { allowed, headers }) {
     const result = await (
       pathname.startsWith("/api/admin/")
         ? adminRoute
-        : pathname === "/social" || pathname.startsWith("/api/friends")
-          ? friendsRoute
-          : accountRoute
+        : pathname.startsWith("/api/playtest/")
+          ? playtestRoute
+          : pathname === "/social" || pathname.startsWith("/api/friends")
+            ? friendsRoute
+            : accountRoute
     )(request, env, new URL(request.url));
     if (result.response) return result.response;
     const { data, status = 200, attachment } = result;

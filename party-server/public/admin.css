@@ -602,6 +602,21 @@ button.ghost {
 button.ghost:hover {
   border-color: var(--muted);
 }
+textarea.sources {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  margin-bottom: 12px;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+}
 .more {
   margin-top: 20px;
 }
@@ -685,6 +700,12 @@ form.login p {
   .figures {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.msg {
+  display: block;
+  max-width: 60ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 @media (prefers-reduced-motion: no-preference) {
   tr.click td,

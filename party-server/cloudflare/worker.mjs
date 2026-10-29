@@ -166,6 +166,7 @@ export default {
         url.pathname === "/social" ||
         url.pathname.startsWith("/api/friends") ||
         url.pathname.startsWith("/api/admin/") ||
+        url.pathname.startsWith("/api/playtest/") ||
         url.pathname.startsWith("/api/auth/") ||
         url.pathname === "/api/account" ||
         url.pathname.startsWith("/api/account/")
@@ -312,11 +313,13 @@ export default {
               url.pathname === "/party" ||
               /^(\/party\/[A-Z2-9]{6}|\/[A-HJ-NP-Z2-9]{6})$/.test(url.pathname)
             ? "/index.html"
-            : url.pathname === "/privacidade"
-              ? "/privacy.html"
-              : url.pathname === "/admin"
-                ? "/admin.html"
-                : url.pathname;
+            : /^\/p\/[a-z0-9-]{2,40}$/.test(url.pathname)
+              ? "/playtest.html"
+              : url.pathname === "/privacidade"
+                ? "/privacy.html"
+                : url.pathname === "/admin"
+                  ? "/admin.html"
+                  : url.pathname;
       if (
         ![
           "/index.html",
@@ -324,6 +327,10 @@ export default {
           "/guest.css",
           "/privacy.html",
           "/privacy.css",
+          "/playtest.html",
+          "/playtest.js",
+          "/playtest.css",
+          "/playtest-app.webp",
           "/admin.html",
           "/admin.js",
           "/admin.css",

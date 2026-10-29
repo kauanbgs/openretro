@@ -1155,6 +1155,154 @@ async function insightsView() {
   );
 }
 
+const FEEDBACK = { problem: "Problema", idea: "Ideia", opinion: "Opinião" };
+async function playtestView() {
+  const d = await api("/api/admin/playtest");
+  const site = location.origin.replace("//admin.", "//party.");
+  const total = (key) => d.streamers.reduce((sum, s) => sum + s[key], 0);
+  const sources = h("textarea", {
+    class: "sources",
+    rows: 6,
+    spellcheck: false,
+    "aria-label": "Fontes de jogos",
+    placeholder: "https://exemplo.com/fonte.json",
+  });
+  sources.value = d.sources.join("\n");
+  const saved = h("p", { class: "muted", role: "status" });
+  const save = h("button", { class: "ghost", type: "button" }, "Salvar fontes");
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    saved.textContent = "Salvando…";
+    try {
+      const data = await api("/api/admin/playtest/sources", {
+        method: "POST",
+        body: JSON.stringify({ sources: sources.value }),
+      });
+      sources.value = data.sources.join("\n");
+      saved.textContent = data.sources.length
+        ? `Salvo. ${plural(data.sources.length, "fonte", "fontes")} no convite.`
+        : "Salvo. O convite não mostra o passo das fontes.";
+    } catch (error) {
+      if (error instanceof Unauthorized) return fail(error);
+      saved.textContent = error.message;
+    } finally {
+      save.disabled = false;
+    }
+  });
+  const keys = h("textarea", {
+    class: "sources",
+    rows: 5,
+    spellcheck: false,
+    "aria-label": "Chaves de Steam",
+    placeholder: "AAAAA-BBBBB-CCCCC",
+  });
+  keys.value = d.keys.available.join("\n");
+  const keysSaved = h("p", { class: "muted", role: "status" });
+  const keysSave = h(
+    "button",
+    { class: "ghost", type: "button" },
+    "Salvar chaves",
+  );
+  keysSave.addEventListener("click", async () => {
+    keysSave.disabled = true;
+    keysSaved.textContent = "Salvando…";
+    try {
+      const data = await api("/api/admin/playtest/keys", {
+        method: "POST",
+        body: JSON.stringify({ keys: keys.value }),
+      });
+      keys.value = data.keys.join("\n");
+      keysSaved.textContent = `Salvo. ${plural(data.keys.length, "chave disponível", "chaves disponíveis")}.`;
+    } catch (error) {
+      if (error instanceof Unauthorized) return fail(error);
+      keysSaved.textContent = error.message;
+    } finally {
+      keysSave.disabled = false;
+    }
+  });
+  app.replaceChildren(
+    ...page(
+      "Playtest",
+      "Os convites para streamers. Para criar um, adicione slug=Nome em PLAYTEST_STREAMERS no wrangler.jsonc e faça o deploy.",
+    ),
+    figures([
+      figure(total("view"), "aberturas dos convites"),
+      figure(total("accept"), "aceites"),
+      figure(total("download"), "downloads"),
+      figure(total("feedback"), "feedbacks"),
+    ]),
+    ...section(
+      "Fontes de jogos",
+      "Um endereço HTTPS por linha. Quem aceita o convite vê essas fontes, com o passo a passo para adicioná-las no app. Deixe vazio para esconder o passo.",
+    ),
+    sources,
+    h("div", { class: "toolbar" }, save),
+    saved,
+    ...section(
+      "Chaves de Steam",
+      "Uma chave por linha. Cada streamer que mandar o primeiro feedback com 40 caracteres ou mais recebe uma chave sorteada daqui. Salvar troca só as chaves que ainda não foram entregues.",
+    ),
+    keys,
+    h("div", { class: "toolbar" }, keysSave),
+    keysSaved,
+    ...(d.keys.claimed.length
+      ? [
+          table(
+            ["Streamer", "Chave entregue", "Quando"],
+            d.keys.claimed.map((k) => [k.name, k.key, ago(k.at)]),
+          ),
+        ]
+      : []),
+    ...section("Convites"),
+    d.streamers.length
+      ? table(
+          [
+            "Streamer",
+            "Link",
+            "Aberturas",
+            "Aceites",
+            "Downloads",
+            "Feedbacks",
+            "Último",
+          ],
+          d.streamers.map((s) => [
+            s.name,
+            h(
+              "a",
+              {
+                href: `${site}/p/${s.slug}`,
+                target: "_blank",
+                rel: "noopener",
+              },
+              `/p/${s.slug}`,
+            ),
+            String(s.view),
+            String(s.accept),
+            String(s.download),
+            String(s.feedback),
+            ago(s.lastAt),
+          ]),
+          { numeric: [2, 3, 4, 5] },
+        )
+      : empty("Nenhum convite ainda."),
+    ...section(
+      "Feedback recebido",
+      "Os 100 mais recentes. Ficam guardados por um ano e não têm ligação com nenhuma conta.",
+    ),
+    d.feedback.length
+      ? table(
+          ["Quando", "Streamer", "Tipo", "Mensagem"],
+          d.feedback.map((f) => [
+            when(f.at),
+            f.name,
+            FEEDBACK[f.kind] ?? f.kind,
+            h("span", { class: "msg" }, f.message),
+          ]),
+        )
+      : empty("Nenhum feedback ainda."),
+  );
+}
+
 function fail(error) {
   if (error instanceof Unauthorized) {
     stopRefresh();
@@ -1178,6 +1326,7 @@ async function route() {
     else if (current === "live") await liveView();
     else if (current === "activity") await activity();
     else if (current === "insights") await insightsView();
+    else if (current === "playtest") await playtestView();
     else await overview();
   } catch (error) {
     fail(error);

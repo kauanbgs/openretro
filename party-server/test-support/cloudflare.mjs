@@ -33,6 +33,10 @@ export async function runtime(bindings = {}, options = {}) {
               "/guest.css",
               "/privacy.html",
               "/privacy.css",
+              "/playtest.html",
+              "/playtest.js",
+              "/playtest.css",
+              "/playtest-app.webp",
               "/admin.html",
               "/admin.js",
               "/admin.css",
@@ -46,11 +50,13 @@ export async function runtime(bindings = {}, options = {}) {
               headers: {
                 "Content-Type": path.endsWith(".woff2")
                   ? "font/woff2"
-                  : path.endsWith(".html")
-                    ? "text/html; charset=utf-8"
-                    : path.endsWith(".js")
-                      ? "text/javascript"
-                      : "text/css",
+                  : path.endsWith(".webp")
+                    ? "image/webp"
+                    : path.endsWith(".html")
+                      ? "text/html; charset=utf-8"
+                      : path.endsWith(".js")
+                        ? "text/javascript"
+                        : "text/css",
               },
             },
           );

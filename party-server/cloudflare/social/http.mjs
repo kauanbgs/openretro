@@ -31,7 +31,7 @@ export function normalizeEmail(value) {
     throw new AccountError(400, "Digite um e-mail válido.");
   return email;
 }
-export async function readJson(request) {
+export async function readJson(request, maxBytes = 2048) {
   if (
     request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !==
     "application/json"
@@ -47,7 +47,7 @@ export async function readJson(request) {
       const { value, done } = await reader.read();
       if (done) break;
       length += value.length;
-      if (length > 2048) {
+      if (length > maxBytes) {
         await reader.cancel();
         throw new AccountError(413, "Os dados enviados são grandes demais.");
       }

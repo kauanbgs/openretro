@@ -1,5 +1,7 @@
 /** How long the admin panel remembers what happened. */
 export const ACTIVITY_DAYS = 180;
+/** Playtest counts follow the admin log; feedback is kept for a year. */
+export const PLAYTEST_FEEDBACK_DAYS = 365;
 /** The social hub drops a connection after this long without a heartbeat. */
 export const ONLINE_MS = 90000;
 const DAY = 24 * 60 * 60 * 1000;

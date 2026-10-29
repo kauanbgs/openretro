@@ -2643,3 +2643,254 @@ test("with ADMIN_HOST the panel answers only on its own host, and that host serv
     },
     { ADMIN_HOST: "admin.example.test" },
   ));
+
+test("playtest invites open only for listed streamers, count what happens and keep feedback away from accounts", () =>
+  using(
+    async (f) => {
+      const boss = await f.login("boss@example.test");
+      const post = (path, data, ip) => f.call(path, data, { ip });
+      const asset = await f.call("/p/ana-live");
+      assert.equal(asset.status, 200);
+      assert.match(await asset.text(), /Playtest/);
+      assert.equal((await f.call("/p/Ana_Live")).status, 404);
+      const info = await f.call("/api/playtest/ana-live");
+      assert.deepEqual(await info.json(), { name: "Ana Live" });
+      assert.equal((await f.call("/api/playtest/outra")).status, 404);
+      assert.equal(
+        (
+          await post("/api/playtest/outra/feedback", {
+            kind: "idea",
+            message: "um texto",
+          })
+        ).status,
+        404,
+      );
+      for (const kind of ["view", "accept", "download", "view"])
+        assert.equal(
+          (await post("/api/playtest/ana-live/event", { kind })).status,
+          201,
+        );
+      assert.equal(
+        (await post("/api/playtest/ana-live/event", { kind: "x" })).status,
+        400,
+      );
+      assert.equal(
+        (
+          await post("/api/playtest/ana-live/feedback", {
+            kind: "bug",
+            message: "texto longo",
+          })
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await post("/api/playtest/ana-live/feedback", {
+            kind: "idea",
+            message: "oi",
+          })
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await post("/api/playtest/ana-live/feedback", {
+            kind: "idea",
+            message: "a".repeat(1501),
+          })
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await post("/api/playtest/ana-live/feedback", {
+            kind: "problem",
+            message: "  O save não abriu.  ",
+          })
+        ).status,
+        201,
+      );
+      const admin = (who) =>
+        f.call("/api/admin/playtest", undefined, { token: who?.token });
+      assert.equal((await admin()).status, 401);
+      const board = await (await admin(boss)).json();
+      const ana = board.streamers.find((s) => s.slug === "ana-live");
+      assert.deepEqual(
+        [ana.name, ana.view, ana.accept, ana.download, ana.feedback],
+        ["Ana Live", 2, 1, 1, 1],
+      );
+      assert.equal(board.streamers.find((s) => s.slug === "bruno").view, 0);
+      assert.equal(board.feedback[0].message, "O save não abriu.");
+      assert.equal(board.feedback[0].name, "Ana Live");
+      // Feedback is limited per visitor, not per invite.
+      for (let i = 0; i < 7; i++)
+        assert.equal(
+          (
+            await post("/api/playtest/ana-live/feedback", {
+              kind: "idea",
+              message: `ideia ${i} ok`,
+            })
+          ).status,
+          201,
+        );
+      assert.equal(
+        (
+          await post("/api/playtest/ana-live/feedback", {
+            kind: "idea",
+            message: "mais uma",
+          })
+        ).status,
+        429,
+      );
+      assert.equal(
+        (
+          await post(
+            "/api/playtest/ana-live/feedback",
+            { kind: "idea", message: "outra pessoa" },
+            "192.0.2.9",
+          )
+        ).status,
+        201,
+      );
+    },
+    {
+      ADMIN_EMAILS: "boss@example.test",
+      PLAYTEST_STREAMERS: "ana-live=Ana Live, bruno=Bruno, ruim_=Ruim, =Vazio",
+    },
+  ));
+
+test("the admin sets the game sources the playtest page shows, as HTTPS addresses only", () =>
+  using(
+    async (f) => {
+      const boss = await f.login("boss@example.test");
+      const guest = await f.login("alice@example.test");
+      const save = (sources, who) =>
+        f.call(
+          "/api/admin/playtest/sources",
+          { sources },
+          { token: who?.token },
+        );
+      const shown = async () =>
+        (await (await f.call("/api/playtest/ana-live/sources")).json()).sources;
+      assert.deepEqual(await shown(), []);
+      assert.equal((await f.call("/api/playtest/outra/sources")).status, 404);
+      assert.equal((await save("https://a.example/x.json")).status, 401);
+      assert.equal((await save("https://a.example/x.json", guest)).status, 404);
+      for (const bad of [
+        "http://a.example/x.json",
+        "ftp://a.example/x.json",
+        "https://user:pass@a.example/x.json",
+        "not an address",
+      ])
+        assert.equal((await save(bad, boss)).status, 400, bad);
+      assert.equal(
+        (
+          await save(
+            Array(21)
+              .fill("https://a.example/x")
+              .map((u, i) => u + i)
+              .join("\n"),
+            boss,
+          )
+        ).status,
+        400,
+      );
+      const ok = await save(
+        " https://a.example/one.json \r\n\r\nhttps://b.example/two.json\nhttps://a.example/one.json\n",
+        boss,
+      );
+      assert.equal(ok.status, 200);
+      const expected = [
+        "https://a.example/one.json",
+        "https://b.example/two.json",
+      ];
+      assert.deepEqual((await ok.json()).sources, expected);
+      assert.deepEqual(await shown(), expected);
+      const board = await (
+        await f.call("/api/admin/playtest", undefined, { token: boss.token })
+      ).json();
+      assert.deepEqual(board.sources, expected);
+      assert.equal((await save("", boss)).status, 200);
+      assert.deepEqual(await shown(), []);
+    },
+    {
+      ADMIN_EMAILS: "boss@example.test",
+      PLAYTEST_STREAMERS: "ana-live=Ana Live",
+    },
+  ));
+
+test("a long first feedback earns one random Steam key per invite, and keys are never handed out twice", () =>
+  using(
+    async (f) => {
+      const boss = await f.login("boss@example.test");
+      const guest = await f.login("alice@example.test");
+      const saveKeys = (keys, who) =>
+        f.call("/api/admin/playtest/keys", { keys }, { token: who?.token });
+      const feedback = async (slug, message, ip = "192.0.2.1") =>
+        (
+          await f.call(
+            `/api/playtest/${slug}/feedback`,
+            { kind: "idea", message },
+            { ip },
+          )
+        ).json();
+      const reward = async (slug) =>
+        (await (await f.call(`/api/playtest/${slug}/reward`)).json()).key;
+      const long = "O save do SNES não abriu e o menu travou na segunda vez.";
+      assert.ok(long.length >= 40);
+      assert.equal((await saveKeys("AAAAA-BBBBB-CCCCC")).status, 401);
+      assert.equal((await saveKeys("AAAAA-BBBBB-CCCCC", guest)).status, 404);
+      for (const bad of ["abc", "AAAAA BBBBB", 'AAAAA-BBBBB"; DROP'])
+        assert.equal((await saveKeys(bad, boss)).status, 400, bad);
+      // Nothing to hand out yet.
+      assert.deepEqual((await feedback("ana-live", long)).reward, {
+        key: null,
+      });
+      const pool = ["AAAAA-BBBBB-CCCCC", "DDDDD-EEEEE-FFFFF"];
+      const saved = await saveKeys(
+        pool.join("\r\n") + "\nAAAAA-BBBBB-CCCCC",
+        boss,
+      );
+      assert.deepEqual((await saved.json()).keys, pool);
+      // A short message earns nothing.
+      assert.equal((await feedback("ana-live", "curto demais")).reward, null);
+      assert.equal(await reward("ana-live"), null);
+      const first = (await feedback("ana-live", long)).reward.key;
+      assert.ok(pool.includes(first));
+      assert.equal(await reward("ana-live"), first);
+      // The same invite keeps its key, and a short follow-up still shows it.
+      assert.equal((await feedback("ana-live", long)).reward.key, first);
+      assert.equal(
+        (await feedback("ana-live", "mais uma nota")).reward.key,
+        first,
+      );
+      const second = (await feedback("bruno", long, "192.0.2.9")).reward.key;
+      assert.ok(pool.includes(second) && second !== first);
+      assert.deepEqual((await feedback("carla", long, "192.0.2.10")).reward, {
+        key: null,
+      });
+      assert.equal((await f.call("/api/playtest/outra/reward")).status, 404);
+      const board = await (
+        await f.call("/api/admin/playtest", undefined, { token: boss.token })
+      ).json();
+      assert.deepEqual(board.keys.available, []);
+      assert.deepEqual(
+        board.keys.claimed.map((k) => [k.slug, k.name, k.key]).sort(),
+        [
+          ["ana-live", "Ana Live", first],
+          ["bruno", "Bruno", second],
+        ].sort(),
+      );
+      // Saving again replaces only what is unclaimed.
+      await saveKeys(`${first}\nGGGGG-HHHHH-IIIII`, boss);
+      const after = await (
+        await f.call("/api/admin/playtest", undefined, { token: boss.token })
+      ).json();
+      assert.deepEqual(after.keys.available, ["GGGGG-HHHHH-IIIII"]);
+      assert.equal(after.keys.claimed.length, 2);
+    },
+    {
+      ADMIN_EMAILS: "boss@example.test",
+      PLAYTEST_STREAMERS: "ana-live=Ana Live, bruno=Bruno, carla=Carla",
+    },
+  ));

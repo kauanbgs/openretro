@@ -1,8 +1,9 @@
 import { authenticate, database } from "./auth.mjs";
-import { AccountError } from "./http.mjs";
+import { AccountError, readJson } from "./http.mjs";
 import { ONLINE_MS } from "./activity.mjs";
 import { live, presenceOf } from "./admin-live.mjs";
 import { insights } from "./admin-insights.mjs";
+import { playtestOverview, saveKeys, saveSources } from "./playtest.mjs";
 
 const DAY = 24 * 60 * 60 * 1000;
 const CHART_DAYS = 14;
@@ -332,7 +333,12 @@ async function userDetail(env, db, id, now) {
 
 /** Read-only panel API. Anyone who is not listed in ADMIN_EMAILS gets a plain 404. */
 export async function adminRoute(request, env, url) {
-  if (request.method !== "GET") throw notFound();
+  const edit =
+    request.method === "POST" &&
+    ["/api/admin/playtest/sources", "/api/admin/playtest/keys"].includes(
+      url.pathname,
+    );
+  if (request.method !== "GET" && !edit) throw notFound();
   const db = database(env, url),
     now = Date.now();
   let user;
@@ -344,11 +350,21 @@ export async function adminRoute(request, env, url) {
   }
   if (!adminEmails(env).has(user.email.toLowerCase())) throw notFound();
   const path = url.pathname;
+  if (edit) {
+    const body = await readJson(request, 16384);
+    return {
+      data: path.endsWith("/keys")
+        ? { keys: await saveKeys(db, body.keys, now) }
+        : { sources: await saveSources(db, body.sources, now) },
+    };
+  }
   if (path === "/api/admin/me") return { data: { ok: true } };
   if (path === "/api/admin/overview") return { data: await overview(db, now) };
   if (path === "/api/admin/users") return { data: await users(db, url, now) };
   if (path === "/api/admin/live") return { data: await live(env, db, now) };
   if (path === "/api/admin/insights") return { data: await insights(db, now) };
+  if (path === "/api/admin/playtest")
+    return { data: await playtestOverview(env, db) };
   if (path === "/api/admin/activity") return { data: await activity(db, url) };
   const match = /^\/api\/admin\/users\/([a-f0-9-]{36})$/.exec(path);
   if (match) return { data: await userDetail(env, db, match[1], now) };
