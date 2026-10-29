@@ -437,7 +437,9 @@ export function ModsTab({
             variants={variants}
             canInstall={Boolean(entry) && isDesktop && !installing && !busy}
             hasGame={Boolean(entry)}
-            empty="Nenhuma tradução ou romhack encontrado. Tente outro nome, como o título original ou em inglês."
+            empty={t(
+              "Nenhuma tradução ou romhack encontrado. Tente outro nome, como o título original ou em inglês.",
+            )}
             onInstall={install}
           />
         ))}

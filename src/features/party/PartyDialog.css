@@ -74,6 +74,32 @@
   min-height: 24px;
   padding: 2px;
 }
+.party-seat-top > .party-seat-actions {
+  display: flex;
+  gap: 2px;
+}
+.party-seat.speaking > .account-avatar {
+  border-radius: 50%;
+  animation: party-seat-speaking 1.1s ease-in-out infinite;
+}
+@keyframes party-seat-speaking {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #5ee38b;
+  }
+  50% {
+    box-shadow: 0 0 0 5px #5ee38b55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .party-seat.speaking > .account-avatar {
+    animation: none;
+    box-shadow: 0 0 0 3px #5ee38b;
+  }
+}
+.party-chat-section > .party-reactions {
+  margin-bottom: 10px;
+}
 .party-seat strong {
   max-width: 100%;
   overflow: hidden;

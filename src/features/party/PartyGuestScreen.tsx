@@ -18,6 +18,13 @@ import {
 import { loadMapping, pickPad, type PadMapping } from "./partyPadMapping";
 import { PartyPadSetup } from "./PartyPadSetup";
 import { PartyChat } from "./PartyChat";
+import { PARTY_REACTIONS, type PartyReactionId } from "./partyLive";
+import {
+  PartyReactionFloat,
+  PartyReactionTray,
+  PartySpeakers,
+} from "./PartyLiveParts";
+import { microphoneFailure } from "./partyVoice";
 import { t } from "../../i18n";
 import "./PartyGuestScreen.css";
 
@@ -104,6 +111,14 @@ export function PartyGuestScreen({
     setChat(false);
     (document.activeElement as HTMLElement | null)?.blur();
   };
+  const [reacting, setReacting] = useState(false);
+  const react = (id: PartyReactionId) => guest.current?.sendReaction(id);
+  const toggleMic = () =>
+    void guest.current
+      ?.setMicrophone(!stateRef.current.mic)
+      .catch((cause) =>
+        setState((s) => ({ ...s, message: t(microphoneFailure(cause)) })),
+      );
   const actions = useRef({
     openMenu,
     resume,
@@ -111,6 +126,7 @@ export function PartyGuestScreen({
     closeSetup,
     openChat,
     closeChat,
+    react,
   });
   actions.current = {
     openMenu,
@@ -119,6 +135,7 @@ export function PartyGuestScreen({
     closeSetup,
     openChat,
     closeChat,
+    react,
   };
   // A controller unplugged mid-setup must not leave play paused.
   useEffect(() => {
@@ -214,6 +231,18 @@ export function PartyGuestScreen({
       event.preventDefault();
       if (event.type === "keydown" && event.code === "KeyT" && !event.repeat) {
         actions.current.openChat();
+        return;
+      }
+      const digit = /^Digit([1-6])$/.exec(event.code);
+      if (
+        event.type === "keydown" &&
+        digit &&
+        !event.repeat &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey
+      ) {
+        actions.current.react(PARTY_REACTIONS[Number(digit[1]) - 1].id);
         return;
       }
       if (event.type === "keydown" && partyKeys[event.code] !== undefined)
@@ -364,10 +393,39 @@ export function PartyGuestScreen({
             {t("Chat (T)")}
           </button>
         )}
+        {state.player && state.live && (
+          <button
+            className="button secondary"
+            aria-pressed={reacting}
+            onClick={() => setReacting((value) => !value)}
+          >
+            {t("Reagir")}
+          </button>
+        )}
+        {state.player && state.voice && (
+          <button
+            className="button secondary"
+            aria-pressed={Boolean(state.mic)}
+            onClick={toggleMic}
+          >
+            {state.mic ? t("Microfone ligado") : t("Ligar microfone")}
+          </button>
+        )}
         <button className="button secondary" onClick={openMenu}>
           {t("Sair")}
         </button>
       </header>
+      {state.player && !failed && (
+        <>
+          <PartySpeakers speakers={state.speakers ?? []} />
+          <PartyReactionFloat items={state.reactions ?? []} />
+          {reacting && !menu && (
+            <div className="party-guest-reactions">
+              <PartyReactionTray onPick={react} shortcuts />
+            </div>
+          )}
+        </>
+      )}
       {state.player && !failed && (
         <PartyChat
           lines={state.chat ?? []}

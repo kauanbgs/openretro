@@ -91,6 +91,13 @@
   left: 50%;
   transform: translateX(-50%);
 }
+.party-guest-reactions {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  z-index: 4;
+  transform: translateX(-50%);
+}
 .party-guest-notice {
   position: absolute;
   bottom: 20px;

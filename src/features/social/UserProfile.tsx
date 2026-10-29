@@ -8,6 +8,7 @@ import {
   LockKeyhole,
   RefreshCw,
   Settings,
+  Trophy,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -160,6 +161,23 @@ export function UserProfile({
       month: "short",
       year: "numeric",
     });
+  const shelf = canSeeHistory ? (profile?.recentGames ?? []) : [];
+  const featured = shelf.reduce<(typeof shelf)[number] | undefined>(
+    (best, game) =>
+      !best || game.playSeconds > best.playSeconds ? game : best,
+    undefined,
+  );
+  const totalSeconds = shelf.reduce((sum, game) => sum + game.playSeconds, 0);
+  const consoles = new Set(shelf.map((game) => game.console)).size;
+  const duration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    return minutes >= 60
+      ? t("{hours} h {minutes} min", {
+          hours: Math.floor(minutes / 60),
+          minutes: minutes % 60,
+        })
+      : t("{minutes} min", { minutes });
+  };
   return (
     <section
       className="user-profile"
@@ -194,6 +212,18 @@ export function UserProfile({
       {profile && (
         <>
           <header className="profile-hero">
+            {featured?.cover && (
+              <img
+                className="profile-backdrop"
+                src={featured.cover}
+                alt=""
+                aria-hidden="true"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            )}
             <div className="profile-identity">
               <AccountAvatar
                 avatar={self ? social.session.user?.avatar : profile.avatar}
@@ -448,45 +478,71 @@ export function UserProfile({
                   </p>
                 </div>
               ) : profile.recentGames.length ? (
-                <ol className="profile-games">
-                  {profile.recentGames.map((game) => (
-                    <li key={JSON.stringify([game.title, game.console])}>
-                      <div className="profile-game-cover">
-                        <span
-                          className="profile-game-fallback"
-                          aria-hidden="true"
-                        >
-                          <Gamepad2 size={36} />
-                          <span>{game.title}</span>
-                        </span>
-                        {game.playSeconds >= 60 && (
-                          <span className="profile-game-time">
-                            <Clock3 size={12} />
-                            {t("{minutes} min", {
-                              minutes: Math.floor(game.playSeconds / 60),
-                            })}
+                <>
+                  <dl className="profile-stats">
+                    <div>
+                      <dt>{t("Tempo de jogo")}</dt>
+                      <dd>{duration(totalSeconds)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("Jogos")}</dt>
+                      <dd>{profile.recentGames.length}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("Consoles")}</dt>
+                      <dd>{consoles}</dd>
+                    </div>
+                  </dl>
+                  <ol className="profile-games">
+                    {profile.recentGames.map((game) => (
+                      <li
+                        key={JSON.stringify([game.title, game.console])}
+                        className={game === featured ? "is-featured" : ""}
+                      >
+                        <div className="profile-game-cover">
+                          <span
+                            className="profile-game-fallback"
+                            aria-hidden="true"
+                          >
+                            <Gamepad2 size={36} />
+                            <span>{game.title}</span>
                           </span>
-                        )}
-                        {game.cover ? (
-                          <img
-                            src={game.cover}
-                            alt={game.title}
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        ) : null}
-                      </div>
-                      <div>
-                        <h4>{game.title}</h4>
-                        <p>{game.console}</p>
-                        <small>{date(game.lastPlayedAt)}</small>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                          {game.cover ? (
+                            <img
+                              src={game.cover}
+                              alt={game.title}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="profile-game-info">
+                          {game === featured && (
+                            <span className="profile-game-badge">
+                              <Trophy size={13} />
+                              {t("Mais jogado")}
+                            </span>
+                          )}
+                          <h4>{game.title}</h4>
+                          <p>{game.console}</p>
+                          <small>
+                            {game.playSeconds >= 60 && (
+                              <>
+                                <Clock3 size={11} />
+                                {duration(game.playSeconds)}
+                                {" · "}
+                              </>
+                            )}
+                            {date(game.lastPlayedAt)}
+                          </small>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </>
               ) : (
                 <div className="profile-empty">
                   <Gamepad2 size={28} />

@@ -1,6 +1,7 @@
 import { t } from "../../i18n";
 import { neutralPad, PartyPadSender, type PadState } from "./partyInput";
 import { tunePartyReceiver } from "./partyQuality";
+import { openMicrophone, playVoice, voiceTransceiver } from "./partyVoice";
 import {
   addChatLine,
   chatMessage,
@@ -8,6 +9,14 @@ import {
   parsePartyChat,
   type PartyChatLine,
 } from "./partyChatLines";
+import {
+  parsePartyReaction,
+  parseSpeakers,
+  reactionMessage,
+  type PartyReaction,
+  type PartyReactionId,
+  type PartySpeaker,
+} from "./partyLive";
 
 export interface GuestRoom {
   code: string;
@@ -30,6 +39,16 @@ export interface GuestState {
   connectedOnce: boolean;
   /** The room's chat since this guest joined. */
   chat?: PartyChatLine[];
+  /** The host offers voice: the others can be heard and a microphone used. */
+  voice?: boolean;
+  /** This guest's microphone is open to the room. */
+  mic?: boolean;
+  /** The room relays quick reactions. */
+  live?: boolean;
+  /** Who is talking right now, as the host hears it. */
+  speakers?: PartySpeaker[];
+  /** Quick reactions from the room, newest last. */
+  reactions?: PartyReaction[];
 }
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): value is RecordValue =>
@@ -62,6 +81,8 @@ export function validGuestMessage(m: unknown): m is RecordValue {
   if (!record(m)) return false;
   if (m.type === "waiting") return true;
   if (m.type === "chat") return parsePartyChat(m) !== null;
+  if (m.type === "reaction") return parsePartyReaction(m) !== null;
+  if (m.type === "seat") return [2, 3, 4].includes(m.player as number);
   if (m.type === "chat-error") return text(m.message, 512);
   if (m.type === "error" || m.type === "ended") return text(m.message, 4096);
   if (m.type === "accepted")
@@ -101,6 +122,9 @@ export class PartyGuest {
   private queue = Promise.resolve();
   private input = neutralPad();
   private lastPong = Date.now();
+  private voice?: RTCRtpTransceiver;
+  private voiceOut?: HTMLAudioElement;
+  private microphone?: MediaStreamTrack;
   constructor(
     private changed: (state: GuestState) => void,
     private media: (stream: MediaStream | null) => void,
@@ -111,11 +135,11 @@ export class PartyGuest {
     player = this.state.player,
   ) {
     this.state = {
+      ...this.state,
       phase,
       message,
       player,
       connectedOnce: this.state.connectedOnce || phase === "connected",
-      chat: this.state.chat,
     };
     this.changed(this.state);
   }
@@ -188,6 +212,9 @@ export class PartyGuest {
     const message = chatMessage(value);
     if (message && this.state.player) this.send(message);
   }
+  sendReaction(id: PartyReactionId) {
+    if (this.state.player && this.state.live) this.send(reactionMessage(id));
+  }
   private chat(line: PartyChatLine) {
     this.state = {
       ...this.state,
@@ -209,6 +236,21 @@ export class PartyGuest {
       this.chat(chatNote(m.message as string));
       return;
     }
+    if (m.type === "reaction") {
+      const reaction = parsePartyReaction(m)!;
+      this.state = {
+        ...this.state,
+        reactions: [...(this.state.reactions ?? []).slice(-11), reaction],
+      };
+      this.changed(this.state);
+      return;
+    }
+    if (m.type === "seat") {
+      // The host moved this guest; the controller follows on its own.
+      this.state = { ...this.state, player: m.player as number };
+      this.changed(this.state);
+      return;
+    }
     if (m.type === "error" || m.type === "ended") {
       this.finish(m.type, m.message as string);
       return;
@@ -218,6 +260,7 @@ export class PartyGuest {
     if (m.type === "accepted") {
       if (this.pc) throw new Error("duplicate acceptance");
       this.update("accepted", undefined, m.player as number);
+      this.state = { ...this.state, live: m.live === true };
       const pc = (this.pc = new RTCPeerConnection({
         iceServers: m.iceServers as RTCIceServer[],
         iceTransportPolicy: m.policy as RTCIceTransportPolicy,
@@ -237,6 +280,12 @@ export class PartyGuest {
         this.channel = event.channel;
         this.sender = new PartyPadSender(event.channel);
         event.channel.onopen = () => this.sender?.send(neutralPad(), true);
+        event.channel.onmessage = (message) => {
+          const speakers = parseSpeakers(message.data);
+          if (!speakers || this.stopped) return;
+          this.state = { ...this.state, speakers };
+          this.changed(this.state);
+        };
         event.channel.onclose = () =>
           this.finish("error", t("A conexão com o Party foi perdida."));
       };
@@ -244,6 +293,12 @@ export class PartyGuest {
       pc.ontrack = (event) => {
         if (this.stopped) return;
         tunePartyReceiver(event.receiver);
+        // The other people's voices play on their own, apart from the game.
+        if (event.transceiver && event.transceiver === voiceTransceiver(pc)) {
+          this.voiceOut?.pause();
+          this.voiceOut = playVoice(event.track);
+          return;
+        }
         stream.addTrack(event.track);
         this.media(stream);
       };
@@ -272,6 +327,14 @@ export class PartyGuest {
       if (signal.type === "offer") {
         await pc.setRemoteDescription(signal.sdp as RTCSessionDescriptionInit);
         if (this.stopped) return;
+        // Answering "send and receive" lets the microphone start later
+        // without negotiating again.
+        this.voice = voiceTransceiver(pc);
+        if (this.voice) {
+          this.voice.direction = "sendrecv";
+          this.state = { ...this.state, voice: true };
+          this.changed(this.state);
+        }
         for (const candidate of this.candidates.splice(0))
           await pc.addIceCandidate(candidate);
         const answer = await pc.createAnswer();
@@ -290,6 +353,33 @@ export class PartyGuest {
       }
     }
   }
+  /** Opens or closes this guest's microphone to the room. */
+  async setMicrophone(on: boolean) {
+    if (this.stopped || !this.voice) return;
+    if (!on) {
+      this.closeMicrophone();
+      return;
+    }
+    if (this.microphone) return;
+    const track = await openMicrophone();
+    if (this.stopped || !this.voice) {
+      track.stop();
+      return;
+    }
+    this.microphone = track;
+    await this.voice.sender.replaceTrack(track);
+    this.state = { ...this.state, mic: true };
+    this.changed(this.state);
+  }
+  private closeMicrophone() {
+    this.microphone?.stop();
+    this.microphone = undefined;
+    void this.voice?.sender.replaceTrack(null).catch(() => {});
+    if (this.state.mic) {
+      this.state = { ...this.state, mic: false };
+      this.changed(this.state);
+    }
+  }
   leave() {
     this.finish("left");
   }
@@ -304,6 +394,11 @@ export class PartyGuest {
     this.pc?.close();
     this.socket?.close();
     this.candidates = [];
+    this.microphone?.stop();
+    this.microphone = undefined;
+    this.state = { ...this.state, mic: false };
+    this.voiceOut?.pause();
+    this.voiceOut = undefined;
     this.media(null);
     this.update(phase, message);
   }

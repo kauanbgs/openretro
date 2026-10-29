@@ -6,7 +6,15 @@ import {
   type RefObject,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Copy, Link2, LoaderCircle, X } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Link2,
+  LoaderCircle,
+  X,
+} from "lucide-react";
 import { bridge } from "../../services/bridge";
 import { Modal } from "../../components/Modal";
 import { isTauri } from "../../services/transport";
@@ -14,9 +22,12 @@ import {
   closeGuestLink,
   createGuestLink,
   endParty,
+  moveGuest,
   partyStore,
   removeGuest,
   sendPartyChat,
+  sendPartyReaction,
+  setPartyMicrophone,
   startParty,
   setFriendsAllowed,
 } from "./partySession";
@@ -25,6 +36,7 @@ import { socialStore } from "../../services/social";
 import { locale, t } from "../../i18n";
 import { AccountAvatar } from "../social/accountAvatars";
 import { PartyChat } from "./PartyChat";
+import { PartyReactionTray } from "./PartyLiveParts";
 
 export function PartyDialog({
   onClose,
@@ -112,26 +124,57 @@ export function PartyDialog({
             )}
           </p>
         </div>
-        <div className="party-seats" aria-label="Jogadores da sala">
+        <div className="party-seats" aria-label={t("Jogadores da sala")}>
           {[1, 2, 3, 4].map((player) => {
             const guest = room.guests.find((g) => g.player === player);
             const connected = guest && room.connected.includes(guest.id);
             const reserved = !guest && link?.player === player;
+            const speaking = room.speaking.includes(
+              player === 1 ? "host" : (guest?.id ?? ""),
+            );
             return (
               <div
-                className={`party-seat ${player === 1 || guest ? "occupied" : ""}`}
+                className={`party-seat ${player === 1 || guest ? "occupied" : ""} ${speaking ? "speaking" : ""}`}
                 key={player}
               >
                 <div className="party-seat-top">
                   <span>J{player}</span>
                   {guest && (
-                    <button
-                      className="icon-button"
-                      aria-label={`Remover ${guest.name}`}
-                      onClick={() => removeGuest(guest.id)}
-                    >
-                      <X size={14} />
-                    </button>
+                    <span className="party-seat-actions">
+                      {room.live && player > 2 && (
+                        <button
+                          className="icon-button"
+                          aria-label={t("Mover {name} para J{seat}", {
+                            name: guest.name,
+                            seat: player - 1,
+                          })}
+                          title={t("Mover para J{seat}", { seat: player - 1 })}
+                          onClick={() => moveGuest(guest.id, player - 1)}
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                      )}
+                      {room.live && player < 4 && (
+                        <button
+                          className="icon-button"
+                          aria-label={t("Mover {name} para J{seat}", {
+                            name: guest.name,
+                            seat: player + 1,
+                          })}
+                          title={t("Mover para J{seat}", { seat: player + 1 })}
+                          onClick={() => moveGuest(guest.id, player + 1)}
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      )}
+                      <button
+                        className="icon-button"
+                        aria-label={`Remover ${guest.name}`}
+                        onClick={() => removeGuest(guest.id)}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
                   )}
                 </div>
                 {(player === 1 || guest) && (
@@ -341,22 +384,52 @@ export function PartyDialog({
         </section>
         {room.error && (
           <p className="party-error" role="alert">
-            {room.error}
+            {t(room.error)}
           </p>
         )}
         {!isTauri && (
           <p className="party-note">
-            Abra o aplicativo desktop para criar uma sala e transmitir o jogo.
+            {t(
+              "Abra o aplicativo desktop para criar uma sala e transmitir o jogo.",
+            )}
           </p>
         )}
         {active && (
           <div className="party-now">
-            <strong>{room.game || "Aguardando um jogo"}</strong>
+            <strong>{room.game || t("Aguardando um jogo")}</strong>
             <p>
               {room.game
-                ? "O áudio do PC também é compartilhado."
-                : "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem."}
+                ? t("O áudio do PC também é compartilhado.")
+                : t(
+                    "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem.",
+                  )}
             </p>
+          </div>
+        )}
+        {active && (
+          <div className="party-friends-setting">
+            <div>
+              <strong>{t("Voz do Party")}</strong>
+              <p>
+                {t(
+                  "Fale com seus amigos durante o jogo. Use fones, ou o microfone capta o som do jogo.",
+                )}
+              </p>
+            </div>
+            <button
+              className={"switch " + (room.mic ? "on" : "")}
+              role="switch"
+              aria-label={t("Meu microfone")}
+              aria-checked={room.mic}
+              onClick={() => void setPartyMicrophone(!room.mic)}
+            >
+              <span />
+            </button>
+            {room.micError && (
+              <p className="party-friends-error" role="alert">
+                {t(room.micError)}
+              </p>
+            )}
           </div>
         )}
         {active && (
@@ -372,6 +445,7 @@ export function PartyDialog({
                     "Ninguém escreveu ainda. Durante o jogo, aperte T para escrever por cima da tela. Nada fica salvo.",
                   )}
             </p>
+            {room.live && <PartyReactionTray onPick={sendPartyReaction} />}
             <PartyChat
               inline
               open
@@ -383,14 +457,14 @@ export function PartyDialog({
         )}
         {active && !room.relay && (
           <p className="party-note">
-            Conexão em modo de teste. Algumas redes podem não conectar.
+            {t("Conexão em modo de teste. Algumas redes podem não conectar.")}
           </p>
         )}
         <footer className="party-footer">
           <span>
             {active
-              ? "A sala continua aberta ao fechar esta janela."
-              : "Você joga no PC. Seus amigos jogam de onde estiverem."}
+              ? t("A sala continua aberta ao fechar esta janela.")
+              : t("Você joga no PC. Seus amigos jogam de onde estiverem.")}
           </span>
           {active &&
             (confirmEnd ? (

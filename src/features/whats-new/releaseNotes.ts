@@ -98,6 +98,75 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     ],
     closing: { pt: "Bom jogo!", en: "Have fun!" },
   },
+  "1.1.0": {
+    date: "2026-10-29",
+    title: {
+      pt: "OpenRetro 1.1 - Voz e reações no Party",
+      en: "OpenRetro 1.1 - Voice and reactions in Party",
+    },
+    banner: [
+      {
+        art: "logo",
+        lead: { pt: "Converse no", en: "Talk in" },
+        strong: { pt: "Party", en: "Party" },
+        text: {
+          pt: "Fale com os amigos durante o jogo, sem sair do OpenRetro.",
+          en: "Talk to your friends during the game, without leaving OpenRetro.",
+        },
+      },
+      {
+        art: "landscape",
+        lead: { pt: "Reaja com", en: "React with" },
+        strong: { pt: "um toque", en: "one tap" },
+        text: {
+          pt: "Palmas, risadas e fogo sobem pela tela de todo mundo.",
+          en: "Applause, laughs and fire float up everyone's screen.",
+        },
+      },
+    ],
+    body: [
+      { pt: "Olá, pessoal! 🎮", en: "Hi everyone! 🎮" },
+      {
+        pt: "O Party ficou mais vivo: agora dá para conversar e reagir enquanto vocês jogam. Para usar, o anfitrião e os amigos precisam estar na 1.1.",
+        en: "Party got livelier: now you can talk and react while you play. To use it, the host and friends all need to be on 1.1.",
+      },
+      { pt: "O que chegou na 1.1:", en: "What's new in 1.1:" },
+    ],
+    highlights: [
+      {
+        title: { pt: "Voz no Party", en: "Voice in Party" },
+        text: {
+          pt: "ligue o microfone no painel do Party ou na barra do jogo, no app ou no navegador. Cada pessoa ouve as outras, nunca a própria voz. Use fones.",
+          en: "turn on your microphone in the Party panel or the game bar, in the app or the browser. Everyone hears the others, never their own voice. Use headphones.",
+        },
+      },
+      {
+        title: { pt: "Quem está falando", en: "Who is talking" },
+        text: {
+          pt: "um anel verde no avatar de quem fala e uma marca com o lugar e o nome no canto da tela.",
+          en: "a green ring on the avatar of whoever speaks, and a mark with their seat and name in the corner of the screen.",
+        },
+      },
+      {
+        title: { pt: "Reações rápidas", en: "Quick reactions" },
+        text: {
+          pt: "👏 😂 🔥 ❤️ 😮 👍 pelo botão Reagir ou pelas teclas 1 a 6. Sobem pela tela de todos com o nome de quem mandou.",
+          en: "👏 😂 🔥 ❤️ 😮 👍 with the React button or the 1 to 6 keys. They float up everyone's screen with the sender's name.",
+        },
+      },
+      {
+        title: { pt: "Trocar o controle", en: "Swap controllers" },
+        text: {
+          pt: "o anfitrião muda quem joga como J2, J3 e J4 pelas setas do painel, sem ninguém sair da sala.",
+          en: "the host changes who plays as P2, P3 and P4 with the arrows in the panel, without anyone leaving the room.",
+        },
+      },
+    ],
+    closing: {
+      pt: "Bom jogo, e boas conversas!",
+      en: "Have fun, and happy chatting!",
+    },
+  },
 };
 
 const parts = (version: string) => version.split(".").map(Number);

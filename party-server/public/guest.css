@@ -422,3 +422,157 @@ video {
   font: inherit;
   font-size: 14px;
 }
+
+/* Quick reactions drift up over the game; the tray sits at the bottom. */
+#reactions {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  transform: translateX(-50%);
+  border: 1px solid #ffffff2e;
+  border-radius: 999px;
+  background: #0b1018e6;
+}
+#reactions[hidden] {
+  display: none;
+}
+#reactions button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+#reactions button:hover {
+  background: #ffffff1c;
+}
+#reactions button:focus-visible {
+  outline: 2px solid #8ecbff;
+}
+#react-float {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+.reaction-pop {
+  position: absolute;
+  bottom: 14%;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  animation: reaction-rise 3.2s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.reaction-emoji {
+  font-size: 46px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px #0008);
+}
+.reaction-pop small {
+  max-width: 120px;
+  padding: 1px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #0b1018cc;
+  color: #fff;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes reaction-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1.12);
+  }
+  22% {
+    transform: translateY(-14px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-34vh) scale(1);
+  }
+}
+#speakers {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+#speakers[hidden] {
+  display: none;
+}
+#speakers li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 220px;
+  padding: 4px 12px 4px 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #0b1018d9;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.speaking-mark {
+  display: grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: #17301f;
+  color: #8ff0ae;
+  font-size: 11px;
+  font-weight: 800;
+  animation: speaking 1.1s ease-in-out infinite;
+}
+@keyframes speaking {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #5ee38b;
+  }
+  50% {
+    box-shadow: 0 0 0 5px #5ee38b55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction-pop {
+    animation: reaction-fade 3.2s linear forwards;
+  }
+  @keyframes reaction-fade {
+    0%,
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  .speaking-mark {
+    animation: none;
+    box-shadow: 0 0 0 3px #5ee38b;
+  }
+}

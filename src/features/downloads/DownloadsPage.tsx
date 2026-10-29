@@ -196,7 +196,7 @@ export function DownloadsPage({
                     <p>
                       {j.progress.toFixed(1)}%{" "}
                       {j.totalBytes
-                        ? ` · ${bytes(j.downloadedBytes)} de ${bytes(j.totalBytes)}`
+                        ? ` · ${t("{done} de {total}", { done: bytes(j.downloadedBytes), total: bytes(j.totalBytes) })}`
                         : ""}
                       {j.state === "DOWNLOADING"
                         ? ` · ${bytes(j.bytesPerSecond)}/s`

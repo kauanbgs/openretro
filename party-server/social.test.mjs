@@ -1992,10 +1992,19 @@ test("a host's guest link seats one named browser guest without an account, apar
         const accepted = streamer.messages.find((m) => m.type === "accepted");
         assert.equal(accepted.player, 2);
         assert.match(accepted.resume, /^[a-f0-9]{64}$/);
-        // The guest learns its seat and the media route, nothing social.
+        // The guest learns its seat, the media route and whether the room relays
+        // reactions; nothing social.
         assert.deepEqual(
           Object.keys(accepted).sort(),
-          ["iceServers", "player", "policy", "relay", "resume", "type"].sort(),
+          [
+            "iceServers",
+            "live",
+            "player",
+            "policy",
+            "relay",
+            "resume",
+            "type",
+          ].sort(),
         );
         const roster = await eventually(() =>
           room.host.messages.find(
@@ -2451,6 +2460,167 @@ test("the Party chat relays seated players' lines to the room and keeps nothing"
           ["bora jogar", "vamos!", "n0", "n1", "n2", "n3", "n4"],
         );
         assert.equal(lines(stranger).length, 0);
+      } finally {
+        for (const ws of sockets)
+          try {
+            ws.close();
+          } catch {}
+      }
+    },
+    { PARTY_TICKET_SECRET: INVITE_SECRET },
+  ));
+
+test("the host moves guests between seats and reactions reach seated players", () =>
+  using(
+    async (f) => {
+      const a = await f.login("seat-host@example.test"),
+        b = await f.login("seat-friend@example.test");
+      await pair(f, a, b);
+      const room = await hostRoom(f, a),
+        sockets = [room.host.ws];
+      try {
+        // The guest link takes seat 2; a friend then takes seat 3.
+        room.host.send({ type: "guest-link" });
+        const link = await eventually(() =>
+          room.host.messages.find((m) => m.type === "guest-link" && m.url),
+        );
+        const visitor = await roomSocket(f, room.code);
+        sockets.push(visitor.ws);
+        visitor.send({
+          type: "join",
+          room: room.code,
+          name: "Convidado",
+          guest: new URL(link.url).pathname.slice(1),
+        });
+        await eventually(() =>
+          visitor.messages.some((m) => m.type === "accepted"),
+        );
+        assert.equal((await room.bind(true)).status, 200);
+        const presence = await publishParty(f, a, room);
+        sockets.push(presence.ws);
+        await eventually(
+          async () =>
+            (await list(f, b)).friends[0].presence.party?.code === room.code,
+        );
+        const friend = await pendingJoin(
+          f,
+          room,
+          (await ticketFor(f, b, a)).invite,
+        );
+        sockets.push(friend.ws);
+        assert.equal(
+          friend.messages.find((m) => m.type === "accepted").player,
+          3,
+        );
+        const roster = await eventually(() =>
+          room.host.messages
+            .filter((m) => m.type === "roster")
+            .find((m) => m.guests.length === 2),
+        );
+        const idOf = (name) => roster.guests.find((g) => g.name === name)?.id;
+        const seats = () => room.host.messages.filter((m) => m.type === "seat");
+        // Only the host can move anyone.
+        visitor.send({ type: "move", id: idOf("Convidado"), player: 4 });
+        // Moving into a free seat.
+        room.host.send({ type: "move", id: idOf("Convidado"), player: 4 });
+        await eventually(() =>
+          visitor.messages.some((m) => m.type === "seat" && m.player === 4),
+        );
+        assert.equal(seats().at(-1).player, 4);
+        // Moving onto a taken seat swaps the two guests.
+        room.host.send({ type: "move", id: idOf("Convidado"), player: 3 });
+        await eventually(() =>
+          friend.messages.some((m) => m.type === "seat" && m.player === 4),
+        );
+        assert.deepEqual(
+          visitor.messages
+            .filter((m) => m.type === "seat")
+            .map((m) => m.player),
+          [4, 3],
+        );
+        // Out-of-range seats and the host's seat are refused silently.
+        const before = seats().length;
+        room.host.send({ type: "move", id: idOf("Convidado"), player: 1 });
+        room.host.send({ type: "move", id: idOf("Convidado"), player: 9 });
+        room.host.send({ type: "move", id: "nobody", player: 2 });
+        // Reactions: a fixed set, one per beat, to everyone seated.
+        visitor.send({ type: "reaction", reaction: "fire" });
+        const reaction = await eventually(() =>
+          room.host.messages.find((m) => m.type === "reaction"),
+        );
+        assert.equal(reaction.reaction, "fire");
+        assert.equal(reaction.name, "Convidado");
+        assert.equal(reaction.player, 3);
+        await eventually(() =>
+          friend.messages.some((m) => m.type === "reaction"),
+        );
+        visitor.send({ type: "reaction", reaction: "<b>x</b>" });
+        visitor.send({ type: "reaction", reaction: "clap" });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        assert.equal(
+          room.host.messages.filter((m) => m.type === "reaction").length,
+          1,
+        );
+        assert.equal(seats().length, before);
+      } finally {
+        for (const ws of sockets)
+          try {
+            ws.close();
+          } catch {}
+      }
+    },
+    { PARTY_TICKET_SECRET: INVITE_SECRET },
+  ));
+
+test("a friend cannot be moved into the seat held for an unclaimed guest link", () =>
+  using(
+    async (f) => {
+      const a = await f.login("held-host@example.test"),
+        b = await f.login("held-friend@example.test");
+      await pair(f, a, b);
+      const room = await hostRoom(f, a),
+        sockets = [room.host.ws];
+      try {
+        const created = await eventually(() =>
+          room.host.messages.find((m) => m.type === "created"),
+        );
+        assert.equal(created.live, true);
+        room.host.send({ type: "guest-link" });
+        const link = await eventually(() =>
+          room.host.messages.find((m) => m.type === "guest-link" && m.url),
+        );
+        assert.equal(link.player, 2);
+        assert.equal((await room.bind(true)).status, 200);
+        const presence = await publishParty(f, a, room);
+        sockets.push(presence.ws);
+        await eventually(
+          async () =>
+            (await list(f, b)).friends[0].presence.party?.code === room.code,
+        );
+        const friend = await pendingJoin(
+          f,
+          room,
+          (await ticketFor(f, b, a)).invite,
+        );
+        sockets.push(friend.ws);
+        const accepted = friend.messages.find((m) => m.type === "accepted");
+        assert.equal(accepted.player, 3);
+        assert.equal(accepted.live, true);
+        const roster = await eventually(() =>
+          room.host.messages
+            .filter((m) => m.type === "roster")
+            .find((m) => m.guests.length === 1),
+        );
+        room.host.send({ type: "move", id: roster.guests[0].id, player: 2 });
+        await eventually(() =>
+          room.host.messages.some(
+            (m) => m.type === "error" && /reservado/.test(m.message),
+          ),
+        );
+        assert.equal(
+          friend.messages.filter((m) => m.type === "seat").length,
+          0,
+        );
       } finally {
         for (const ws of sockets)
           try {

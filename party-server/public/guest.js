@@ -101,6 +101,19 @@ let socket,
   seq = 0,
   joined = false;
 let heartbeat;
+let voice, voiceOut, microphone;
+// The room relays quick reactions (older servers do not).
+let live = false;
+// Quick reactions: the room relays only these ids, never free text.
+const REACTIONS = {
+  clap: "👏",
+  laugh: "😂",
+  fire: "🔥",
+  heart: "❤️",
+  wow: "😮",
+  like: "👍",
+};
+const reactionIds = Object.keys(REACTIONS);
 const held = new Map(),
   candidates = [];
 const status = (text) => {
@@ -180,6 +193,15 @@ function ended(message, final = false) {
   channel?.close();
   pc?.close();
   socket?.close();
+  closeMicrophone();
+  voiceOut?.pause();
+  voiceOut = voice = undefined;
+  $("mic").hidden = true;
+  $("react").hidden = true;
+  $("reactions").hidden = true;
+  $("speakers").hidden = true;
+  $("speakers").textContent = "";
+  $("react-float").textContent = "";
   $("screen").srcObject = null;
   // The room's chat ends with it.
   chatLines.length = 0;
@@ -269,9 +291,57 @@ $("join-form").addEventListener("submit", (event) => {
     );
   };
 });
+function showReaction(m) {
+  if (!Object.hasOwn(REACTIONS, m.reaction)) return;
+  const pop = document.createElement("span");
+  pop.className = "reaction-pop";
+  pop.style.left = `${8 + Math.floor(Math.random() * 70)}%`;
+  const emoji = document.createElement("span");
+  emoji.className = "reaction-emoji";
+  emoji.textContent = REACTIONS[m.reaction];
+  const who = document.createElement("small");
+  who.textContent = String(m.name ?? "").slice(0, 64);
+  pop.append(emoji, who);
+  $("react-float").append(pop);
+  setTimeout(() => pop.remove(), 3300);
+}
+/** The host says who is talking; they show as marks over the game. */
+function showSpeakers(raw) {
+  try {
+    const m = JSON.parse(raw);
+    if (m.type !== "voice" || !Array.isArray(m.speaking)) return;
+    const list = $("speakers");
+    list.textContent = "";
+    for (const speaker of m.speaking.slice(0, 4)) {
+      const item = document.createElement("li");
+      const mark = document.createElement("span");
+      mark.className = "speaking-mark";
+      mark.textContent = `J${Number(speaker.player)}`;
+      item.append(mark, String(speaker.name ?? "").slice(0, 80));
+      list.append(item);
+    }
+    list.hidden = list.children.length === 0;
+  } catch {
+    /* Ignore a malformed message from the host. */
+  }
+}
+function react(id) {
+  if (joined && !$("stage").hidden) send({ type: "reaction", reaction: id });
+}
 async function receive(m) {
   if (m.type === "chat" && typeof m.text === "string") {
     addChat({ name: String(m.name), player: Number(m.player), text: m.text });
+    return;
+  }
+  if (m.type === "reaction") {
+    showReaction(m);
+    return;
+  }
+  if (m.type === "seat" && [2, 3, 4].includes(m.player)) {
+    // The host moved this seat; the controller follows on its own.
+    player = m.player;
+    if (!$("stage").hidden)
+      $("player").textContent = `J${player} · Você está na partida`;
     return;
   }
   if (m.type === "chat-error") {
@@ -288,6 +358,7 @@ async function receive(m) {
   }
   if (m.type === "accepted") {
     player = m.player;
+    live = m.live === true;
     if (visit && typeof m.resume === "string")
       remember((visit = { ...visit, resume: m.resume }));
     status(`Seu lugar é J${player}. Conectando imagem e som…`);
@@ -305,9 +376,19 @@ async function receive(m) {
     pc.ondatachannel = (event) => {
       channel = event.channel;
       channel.onopen = () => input(true);
+      channel.onmessage = (message) => showSpeakers(message.data);
     };
     const tracks = new MediaStream();
     pc.ontrack = (event) => {
+      // The other people's voices play apart from the game's picture and sound.
+      if (event.transceiver && event.transceiver === voiceLine()) {
+        voiceOut?.pause();
+        voiceOut = new Audio();
+        voiceOut.autoplay = true;
+        voiceOut.srcObject = new MediaStream([event.track]);
+        void voiceOut.play().catch(() => {});
+        return;
+      }
       // Play as soon as media decodes: the browser's default buffer suits
       // calls, not a game being played. Sound too, or lip sync would hold
       // the picture back to match it.
@@ -325,6 +406,7 @@ async function receive(m) {
       if (pc.connectionState === "connected") {
         $("lobby").hidden = true;
         $("stage").hidden = false;
+        $("react").hidden = !live;
         $("player").textContent = `J${player} · Você está na partida`;
         $("connection").textContent = "Conectado à Party";
         void activate();
@@ -343,6 +425,13 @@ async function receive(m) {
     const signal = m.signal;
     if (signal.type === "offer") {
       await pc.setRemoteDescription(signal.sdp);
+      // Answering "send and receive" lets the microphone start later without
+      // negotiating again.
+      voice = voiceLine();
+      if (voice) {
+        voice.direction = "sendrecv";
+        $("mic").hidden = false;
+      }
       for (const candidate of candidates.splice(0))
         await pc.addIceCandidate(candidate);
       await pc.setLocalDescription(await pc.createAnswer());
@@ -365,6 +454,54 @@ async function activate() {
   }
 }
 $("play").onclick = activate;
+// The host's offer carries a second audio line after the game's sound: voices.
+function voiceLine() {
+  const lines = pc
+    .getTransceivers()
+    .filter(
+      (line) => (line.receiver?.track ?? line.sender?.track)?.kind === "audio",
+    );
+  return lines.length >= 2 ? lines[1] : undefined;
+}
+function closeMicrophone() {
+  microphone?.stop();
+  microphone = undefined;
+  $("mic").textContent = "Ligar microfone";
+}
+$("mic").onclick = async () => {
+  if (!voice) return;
+  try {
+    if (microphone) {
+      closeMicrophone();
+      await voice.sender.replaceTrack(null);
+      return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+      },
+    });
+    microphone = stream.getAudioTracks()[0];
+    await voice.sender.replaceTrack(microphone);
+    $("mic").textContent = "Microfone ligado";
+  } catch (cause) {
+    closeMicrophone();
+    $("connection").textContent =
+      cause?.name === "NotAllowedError"
+        ? "O microfone está bloqueado. Libere o acesso no navegador."
+        : cause?.name === "NotFoundError"
+          ? "Nenhum microfone foi encontrado neste aparelho."
+          : "Não foi possível abrir o microfone.";
+  }
+};
+$("react").onclick = () => {
+  $("reactions").hidden = !$("reactions").hidden;
+};
+for (const button of document.querySelectorAll("[data-reaction]"))
+  button.addEventListener("click", () => react(button.dataset.reaction));
 $("leave").onclick = () =>
   ended("Você saiu da partida. Pode pedir para entrar novamente.");
 $("fullscreen").onclick = () => {
@@ -455,6 +592,19 @@ document.addEventListener("keydown", (event) => {
   if (!$("stage").hidden && event.code === "KeyT" && !event.repeat) {
     event.preventDefault();
     openChat();
+    return;
+  }
+  const digit = /^Digit([1-6])$/.exec(event.code);
+  if (
+    !$("stage").hidden &&
+    digit &&
+    !event.repeat &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey
+  ) {
+    event.preventDefault();
+    react(reactionIds[Number(digit[1]) - 1]);
     return;
   }
   if ($("stage").hidden || !(event.code in keys)) return;

@@ -21,23 +21,56 @@
   padding: 6px 0;
 }
 .profile-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   background: var(--bg);
+}
+.profile-backdrop {
+  position: absolute;
+  inset: -60px;
+  z-index: -2;
+  width: calc(100% + 120px);
+  height: calc(100% + 120px);
+  object-fit: cover;
+  filter: blur(46px) saturate(1.5);
+  opacity: 0.42;
+}
+.profile-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    180deg,
+    transparent 20%,
+    color-mix(in srgb, var(--bg) 70%, transparent) 70%,
+    var(--bg)
+  );
 }
 .profile-identity {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 32px 26px;
-  min-height: 166px;
+  padding: 40px 26px 34px;
+  min-height: 190px;
+}
+.profile-identity > .account-avatar {
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px var(--bg),
+    0 0 0 5px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 14px 30px -10px #000a;
 }
 .profile-identity > .account-avatar {
   flex-shrink: 0;
 }
 .profile-identity h2 {
   margin: 0 0 9px;
-  font-size: 25px;
-  line-height: 1.2;
-  font-weight: 750;
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
 .profile-code {
@@ -65,7 +98,8 @@
   padding: 16px 26px;
   min-height: 70px;
   border-block: 1px solid var(--border);
-  background: var(--panel2);
+  background: color-mix(in srgb, var(--panel2) 88%, transparent);
+  backdrop-filter: blur(10px);
 }
 .profile-actions > .button.primary {
   order: 1;
@@ -174,11 +208,33 @@
 }
 .profile-games {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 24px 18px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-flow: dense;
+  gap: 28px 20px;
   list-style: none;
   padding: 0;
   margin: 0;
+}
+.profile-games li.is-featured {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.profile-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 44px;
+  margin: 0 0 30px;
+}
+.profile-stats dt {
+  color: var(--quiet);
+  font-size: 12px;
+}
+.profile-stats dd {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 .profile-games li {
   min-width: 0;
@@ -188,9 +244,48 @@
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--panel2);
   margin-bottom: 12px;
+  box-shadow: 0 18px 22px -16px #000c;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.profile-games li:hover .profile-game-cover {
+  transform: translateY(-5px);
+  box-shadow: 0 26px 26px -16px #000;
+}
+.is-featured .profile-game-cover {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 26px 40px -18px color-mix(in srgb, var(--accent) 45%, #000);
+}
+.profile-game-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.profile-games small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.profile-games .is-featured h4 {
+  font-size: 18px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-game-cover {
+    transition: none;
+  }
+  .profile-games li:hover .profile-game-cover {
+    transform: none;
+  }
 }
 .profile-game-cover img {
   position: absolute;
@@ -216,21 +311,6 @@
   line-height: 1.3;
   font-weight: 750;
   color: var(--muted);
-}
-.profile-game-time {
-  position: absolute;
-  top: 9px;
-  left: 9px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 7px;
-  background: #090909d9;
-  border: 1px solid #ffffff30;
-  border-radius: 3px;
-  font-size: 10px;
-  color: #fff;
 }
 .profile-games h4 {
   margin: 0 0 4px;
@@ -353,6 +433,13 @@
   }
 }
 @media (max-width: 620px) {
+  .profile-games li.is-featured {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+  .profile-identity h2 {
+    font-size: 26px;
+  }
   .profile-body {
     grid-template-columns: 1fr;
     padding: 18px;

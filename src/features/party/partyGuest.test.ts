@@ -321,4 +321,73 @@ describe("Party input ownership and transmission", () => {
     input.sample(null, 700);
     expect(input.sample(pad, 800)).toEqual(["b"]);
   });
+
+  describe("Party live extras", () => {
+    const speakers = JSON.stringify({
+      type: "voice",
+      speaking: [{ player: 1, name: "Anfitrião" }],
+    });
+    it("follows a seat change, shows reactions and who is talking", async () => {
+      const { guest, socket } = setup();
+      socket.message({ ...accepted, live: true });
+      await flush();
+      expect(guest.state.live).toBe(true);
+      socket.message({ type: "seat", player: 2 });
+      await flush();
+      expect(guest.state.player).toBe(2);
+      socket.message({
+        type: "reaction",
+        id: "r1",
+        reaction: "fire",
+        name: "Ana",
+        player: 3,
+      });
+      await flush();
+      expect(guest.state.reactions?.map((r) => r.emoji)).toEqual(["🔥"]);
+      socket.message({
+        type: "reaction",
+        id: "r2",
+        reaction: "x",
+        name: "A",
+        player: 3,
+      });
+      await flush();
+      expect(guest.state.phase).toBe("error");
+    });
+    it("reads the host's list from the game channel and ignores junk", async () => {
+      const { guest, socket } = setup();
+      socket.message({ ...accepted, live: true });
+      await flush();
+      const pad = channel() as unknown as { onmessage: (e: unknown) => void };
+      Peer.last.ondatachannel({ channel: pad as unknown as RTCDataChannel });
+      pad.onmessage({ data: speakers });
+      expect(guest.state.speakers).toEqual([{ player: 1, name: "Anfitrião" }]);
+      pad.onmessage({ data: "{" });
+      pad.onmessage({ data: new ArrayBuffer(4) });
+      expect(guest.state.speakers).toHaveLength(1);
+      pad.onmessage({ data: JSON.stringify({ type: "voice", speaking: [] }) });
+      expect(guest.state.speakers).toEqual([]);
+    });
+    it("sends a reaction only when the room relays them", async () => {
+      const { guest, socket } = setup();
+      socket.message(accepted);
+      await flush();
+      guest.sendReaction("clap");
+      expect(socket.sent.some((m) => m.includes("reaction"))).toBe(false);
+    });
+    it("keeps the same reaction ids in the app, the server and the browser page", async () => {
+      const { readFileSync } = await import("node:fs");
+      const { PARTY_REACTIONS } = await import("./partyLive");
+      const ids = PARTY_REACTIONS.map((r) => r.id);
+      const server = readFileSync("party-server/cloudflare/worker.mjs", "utf8");
+      const page = readFileSync("party-server/public/guest.js", "utf8");
+      for (const id of ids) {
+        expect(server).toContain(`"${id}"`);
+        expect(page).toMatch(new RegExp(`${id}: "`));
+      }
+      expect(server).toContain(
+        `new Set([${ids.map((i) => `"${i}"`).join(", ")}])`,
+      );
+    });
+  });
 });

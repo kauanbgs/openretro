@@ -146,6 +146,9 @@ export const en: Record<string, string> = {
   "Tempo de jogo": "Play time",
   Avaliação: "Rating",
   "{minutes} min": "{minutes} min",
+  "{hours} h {minutes} min": "{hours} h {minutes} min",
+  Consoles: "Consoles",
+  "Mais jogado": "Most played",
   "Aceitar pedido": "Accept request",
   "Recusar pedido": "Decline request",
   "Bloquear {name}?": "Block {name}?",
@@ -300,6 +303,17 @@ export const en: Record<string, string> = {
   "Não foi possível reservar seu código de amigo. Tente novamente.":
     "Could not reserve your friend code. Try again.",
   "Amigos podem entrar": "Friends can join",
+  "Voz do Party": "Party voice",
+  "Fale com seus amigos durante o jogo. Use fones, ou o microfone capta o som do jogo.":
+    "Talk with your friends during the game. Use headphones, or the microphone picks up the game's sound.",
+  "Meu microfone": "My microphone",
+  "Ligar microfone": "Turn microphone on",
+  "Microfone ligado": "Microphone on",
+  "O microfone está bloqueado. Libere o acesso nas permissões e tente de novo.":
+    "The microphone is blocked. Allow access in the permissions and try again.",
+  "Nenhum microfone foi encontrado neste aparelho.":
+    "No microphone was found on this device.",
+  "Não foi possível abrir o microfone.": "Could not open the microphone.",
   "Seu Party fica oculto enquanto você aparece offline.":
     "Your Party stays hidden while you appear offline.",
   "Amigos entram pelo painel sem pedir aprovação. O código continua disponível para convites manuais.":
@@ -2219,4 +2233,86 @@ export const en: Record<string, string> = {
     "During the game, press T to type over the screen.",
   "Ninguém escreveu ainda. Durante o jogo, aperte T para escrever por cima da tela. Nada fica salvo.":
     "No one has written yet. During the game, press T to type over the screen. Nothing is saved.",
+  "Jogadores da sala": "Players in the room",
+  "Abra o aplicativo desktop para criar uma sala e transmitir o jogo.":
+    "Open the desktop app to create a room and stream the game.",
+  "Aguardando um jogo": "Waiting for a game",
+  "O áudio do PC também é compartilhado.": "Your PC's audio is shared too.",
+  "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem.":
+    "Open a game to start. For PS3, open the game after the room is created so guests can play.",
+  "Conexão em modo de teste. Algumas redes podem não conectar.":
+    "Connection in test mode. Some networks may not connect.",
+  "A sala continua aberta ao fechar esta janela.":
+    "The room stays open when you close this window.",
+  "Você joga no PC. Seus amigos jogam de onde estiverem.":
+    "You play on your PC. Your friends play from wherever they are.",
+  "Abra o aplicativo desktop para transmitir uma partida.":
+    "Open the desktop app to stream a match.",
+  "Atualize o Microsoft Edge WebView2 para transmitir uma partida.":
+    "Update Microsoft Edge WebView2 to stream a match.",
+  "O serviço Party ainda não foi ativado nesta versão.":
+    "The Party service isn't enabled in this version yet.",
+  "Não foi possível iniciar a captura do PC.":
+    "Couldn't start capturing your PC.",
+  "O servidor não respondeu. Confira o endereço e tente novamente.":
+    "The server didn't respond. Check the address and try again.",
+  "A conexão com a sala terminou. Crie outra sala para continuar.":
+    "The connection to the room ended. Create another room to continue.",
+  "Não foi possível conectar um amigo. Peça para ele entrar novamente.":
+    "Couldn't connect a friend. Ask them to join again.",
+  "Não foi possível conectar o participante. Remova-o e peça para entrar novamente.":
+    "Couldn't connect the participant. Remove them and ask them to join again.",
+  "Use apenas o endereço do servidor, sem caminho ou senha.":
+    "Use only the server address, without a path or password.",
+  "Use HTTPS. HTTP só é permitido em localhost para desenvolvimento.":
+    "Use HTTPS. HTTP is only allowed on localhost for development.",
+  "Deixe o controle à mão: ele passa a valer assim que o jogo abrir.":
+    "Keep your controller handy: it works as soon as the game opens.",
+  "O som do jogo chega junto com a imagem. Com fones, ninguém ouve eco.":
+    "The game's sound arrives with the picture. With headphones, nobody hears an echo.",
+  "Seu lugar é o que mostra o seu nome aqui embaixo.":
+    "Your seat is the one showing your name below.",
+  "O J1 é de quem está no PC; os amigos jogam do J2 ao J4.":
+    "P1 belongs to whoever is on the PC; friends play P2 to P4.",
+  "{host} está escolhendo um jogo": "{host} is choosing a game",
+  "Escolhendo um jogo": "Choosing a game",
+  "Esperando um amigo": "Waiting for a friend",
+  "Dica: {tip}": "Tip: {tip}",
+  "A partida aparece aqui sozinha assim que o jogo abrir.":
+    "The match appears here on its own as soon as the game opens.",
+  "Anfitrião · no PC": "Host · on PC",
+  "Nenhuma tradução ou romhack encontrado. Tente outro nome, como o título original ou em inglês.":
+    "No translation or ROM hack found. Try another name, like the original title or the English one.",
+  "{done} de {total}": "{done} of {total}",
+  "A imagem é grande demais. Escolha uma com até 40 MB.":
+    "The image is too large. Pick one up to 40 MB.",
+  "Escolha uma imagem PNG, JPG, WEBP ou GIF.":
+    "Pick a PNG, JPG, WEBP or GIF image.",
+  "Você já tem imagens demais. Remova alguma antes.":
+    "You already have too many images. Remove some first.",
+  "Essa imagem não é um fundo do OpenRetro.":
+    "That image isn't an OpenRetro background.",
+  "Este console não tem estados salvos pelo OpenRetro.":
+    "This console has no save states managed by OpenRetro.",
+  "A janela do chat não está disponível.": "The chat window isn't available.",
+  "Este console não precisa de BIOS no runtime.":
+    "This console doesn't need a BIOS in the runtime.",
+  "Não foi possível preparar os controles do Party: {e}":
+    "Couldn't set up the Party controls: {e}",
+  "Este patch xdelta usa compressão secundária, que o OpenRetro ainda não aplica. Recrie o patch sem compressão secundária (xdelta3 -S none) ou aplique-o com outra ferramenta e importe o jogo resultante.":
+    "This xdelta patch uses secondary compression, which OpenRetro doesn't apply yet. Recreate the patch without secondary compression (xdelta3 -S none) or apply it with another tool and import the resulting game.",
+  "Recomendações demais de uma vez.": "Too many recommendations at once.",
+  Reações: "Reactions",
+  Reagir: "React",
+  "Falando agora": "Talking now",
+  Palmas: "Applause",
+  Risada: "Laugh",
+  "Mandou bem": "Nice play",
+  Amei: "Love it",
+  Uau: "Wow",
+  Boa: "Nice",
+  "Mover {name} para J{seat}": "Move {name} to P{seat}",
+  "Mover para J{seat}": "Move to P{seat}",
+  "Esse lugar está reservado para o convite.":
+    "That seat is held for the invite link.",
 };

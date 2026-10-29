@@ -46,6 +46,9 @@ const invalid =
 const safeError = "Não foi possível conectar à sala. Tente novamente.";
 const json = (value, status = 200) =>
   Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
+// Quick reactions are a fixed set of ids, never free text, and one per beat.
+const REACTIONS = new Set(["clap", "laugh", "fire", "heart", "wow", "like"]);
+const REACTION_GAP_MS = 600;
 const CHAT_MAX = 200;
 const CHAT_WINDOW_MS = 10000,
   CHAT_PER_WINDOW = 6;
@@ -562,7 +565,13 @@ export class PartyRoom extends DurableObject {
     if (!player) return false;
     member.player = player;
     guest.serializeAttachment(member);
-    send(guest, { type: "accepted", player, ...this.meta.transport, ...extra });
+    send(guest, {
+      type: "accepted",
+      player,
+      live: true,
+      ...this.meta.transport,
+      ...extra,
+    });
     send(this.host(), { type: "peer", id: member.id, player });
     return true;
   }
@@ -897,6 +906,7 @@ export class PartyRoom extends DurableObject {
               type: "created",
               code: this.meta.code,
               url: `${this.meta.origin}/party/${this.meta.code}`,
+              live: true,
               ...transport,
             });
             this.roster();
@@ -997,6 +1007,64 @@ export class PartyRoom extends DurableObject {
           await this.closeGuestLink("O anfitrião fechou o lugar do convite.");
           await this.ctx.storage.put("room", this.meta);
           this.roster();
+          return;
+        }
+        if (a.role === "host" && m.type === "move") {
+          // Puts a seated guest in another seat, swapping with whoever has it.
+          const guest = this.guests().find(
+            (s) => s.deserializeAttachment().id === m.id,
+          );
+          const member = guest?.deserializeAttachment();
+          if (!member?.player || ![2, 3, 4].includes(m.player)) return;
+          if (member.player === m.player) return;
+          const link = this.meta.guestLink;
+          const other = this.guests().find(
+            (s) => s.deserializeAttachment().player === m.player,
+          );
+          // The seat held for the guest link stays out of reach of friends.
+          if (!other && !member.anonymous && link?.player === m.player) {
+            send(ws, {
+              type: "error",
+              message: "Esse lugar está reservado para o convite.",
+            });
+            return;
+          }
+          const from = member.player;
+          member.player = m.player;
+          guest.serializeAttachment(member);
+          if (member.anonymous && link) link.player = m.player;
+          send(guest, { type: "seat", player: m.player });
+          send(ws, { type: "seat", id: member.id, player: m.player });
+          if (other) {
+            const swapped = other.deserializeAttachment();
+            swapped.player = from;
+            other.serializeAttachment(swapped);
+            if (swapped.anonymous && link) link.player = from;
+            send(other, { type: "seat", player: from });
+            send(ws, { type: "seat", id: swapped.id, player: from });
+          }
+          if (link) await this.ctx.storage.put("room", this.meta);
+          this.roster();
+          return;
+        }
+        if (m.type === "reaction") {
+          if (a.role !== "host" && !a.player) return;
+          if (!REACTIONS.has(m.reaction)) return;
+          const now = Date.now();
+          if (now - (a.reactionAt ?? 0) < REACTION_GAP_MS) return;
+          a.reactionAt = now;
+          ws.serializeAttachment(a);
+          const line = {
+            type: "reaction",
+            id: crypto.randomUUID(),
+            reaction: m.reaction,
+            name:
+              a.role === "host" ? this.meta.hostName || "Anfitrião" : a.name,
+            player: a.role === "host" ? 1 : a.player,
+          };
+          send(this.host(), line);
+          for (const guest of this.guests())
+            if (guest.deserializeAttachment().player) send(guest, line);
           return;
         }
         if (m.type === "chat") {

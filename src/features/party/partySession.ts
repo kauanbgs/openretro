@@ -3,6 +3,16 @@ import { invoke, isTauri } from "../../services/transport";
 import { validatePartyServer } from "./partyConfig";
 import { preferH264VideoCodec } from "./partyCodecs";
 import { configurePartyVideo } from "./partyQuality";
+import { microphoneFailure, openMicrophone } from "./partyVoice";
+import {
+  loudness,
+  parsePartyReaction,
+  reactionMessage,
+  speakersMessage,
+  talking,
+  type PartyReactionId,
+  type PartySpeaker,
+} from "./partyLive";
 import { socialStore } from "../../services/social";
 import { accountFailure } from "../../services/account";
 import { parsePartyRoster } from "./partyRoster";
@@ -57,6 +67,13 @@ export interface PartyState {
   guestLinkBusy: boolean;
   /** The room's temporary chat; it ends with the room. */
   chat: PartyChatLine[];
+  /** The host's microphone is open to the room. */
+  mic: boolean;
+  micError: string;
+  /** The room's server relays reactions and seat moves. */
+  live: boolean;
+  /** Who is talking now: "host" or a guest's id. */
+  speaking: string[];
 }
 const initial: PartyState = {
   friendsAllowed: true,
@@ -74,6 +91,10 @@ const initial: PartyState = {
   guestLink: null,
   guestLinkBusy: false,
   chat: [],
+  mic: false,
+  micError: "",
+  live: false,
+  speaking: [],
 };
 let state = initial;
 const listeners = new Set<() => void>();
@@ -154,18 +175,161 @@ let decode = packetDecoder();
 let refresh: ReturnType<typeof setInterval> | undefined;
 let audioTime = 0;
 let playing = false;
-const peers = new Map<
-  string,
-  {
-    pc: RTCPeerConnection;
-    pad: WebSocket;
-    channel: RTCDataChannel;
-    lastInput: number;
-    lastState: string;
-    seq: number;
-    pending: RTCIceCandidateInit[];
+interface Peer {
+  pc: RTCPeerConnection;
+  pad: WebSocket;
+  channel: RTCDataChannel;
+  lastInput: number;
+  lastState: string;
+  seq: number;
+  pending: RTCIceCandidateInit[];
+  voice?: Voice;
+  /** The seat this guest plays from; the host can move it. */
+  player: number;
+}
+const peers = new Map<string, Peer>();
+/** One guest's voice line: what they hear, and what they say. */
+interface Voice {
+  transceiver: RTCRtpTransceiver;
+  /** The mix this guest hears: everyone's voice except their own. */
+  out: MediaStreamAudioDestinationNode;
+  heard?: {
+    source: MediaStreamAudioSourceNode;
+    gain: GainNode;
+    element: HTMLAudioElement;
+    meter: AnalyserNode;
+  };
+}
+let microphone:
+  | {
+      track: MediaStreamTrack;
+      source: MediaStreamAudioSourceNode;
+      meter: AnalyserNode;
+    }
+  | undefined;
+let voiceMeter: ReturnType<typeof setInterval> | undefined;
+const lastLoud = new Map<string, number>();
+const samples = new Float32Array(512);
+const levelOf = (meter: AnalyserNode) => {
+  meter.getFloatTimeDomainData(samples);
+  return loudness(samples);
+};
+/** The current list of who is talking, as sent to every guest. */
+let speakersMessageText = speakersMessage([]);
+let speakersSentAt = 0;
+/** The game channel may drop packets, so the list is repeated, not only sent on change. */
+const SPEAKERS_REPEAT_MS = 1000;
+function namedSpeakers(speaking: string[]): PartySpeaker[] {
+  const user = socialStore.snapshot().session.user;
+  return speaking.flatMap((id) => {
+    if (id === "host")
+      return [{ player: 1, name: user?.displayName ?? "Anfitrião" }];
+    const guest = state.guests.find((g) => g.id === id);
+    return guest?.player ? [{ player: guest.player, name: guest.name }] : [];
+  });
+}
+/** Tells the room who is talking: on a change, and again every second. */
+function listenToVoices() {
+  clearInterval(voiceMeter);
+  voiceMeter = setInterval(() => {
+    const levels = new Map<string, number>();
+    if (microphone) levels.set("host", levelOf(microphone.meter));
+    for (const [id, peer] of peers)
+      if (peer.voice?.heard) levels.set(id, levelOf(peer.voice.heard.meter));
+    const speaking = talking(levels, lastLoud, performance.now());
+    const changed = speaking.join() !== state.speaking.join();
+    if (changed) update({ speaking });
+    const now = performance.now();
+    if (!changed && now - speakersSentAt < SPEAKERS_REPEAT_MS) return;
+    // Names are looked up again each time, so a moved guest shows the new seat.
+    speakersMessageText = speakersMessage(namedSpeakers(speaking));
+    speakersSentAt = now;
+    for (const peer of peers.values())
+      if (peer.channel.readyState === "open")
+        peer.channel.send(speakersMessageText);
+  }, 100);
+}
+/**
+ * Wires every voice again: each guest and the host's microphone feed the
+ * host's speakers and every other guest's mix, never their own.
+ */
+function routeVoice() {
+  if (!context) return;
+  microphone?.source.disconnect();
+  // Disconnecting the source drops every output, the level meter included.
+  microphone?.source.connect(microphone.meter);
+  for (const peer of peers.values()) peer.voice?.heard?.gain.disconnect();
+  for (const [id, peer] of peers) {
+    const heard = peer.voice?.heard;
+    if (!heard) continue;
+    heard.gain.connect(context.destination);
+    for (const [otherId, other] of peers)
+      if (otherId !== id && other.voice) heard.gain.connect(other.voice.out);
   }
->();
+  if (microphone)
+    for (const peer of peers.values())
+      if (peer.voice) microphone.source.connect(peer.voice.out);
+}
+function hear(peer: Peer, track: MediaStreamTrack) {
+  if (!context || !peer.voice) return;
+  const stream = new MediaStream([track]);
+  // Chromium feeds a remote track to Web Audio only while an element holds it.
+  const element = new Audio();
+  element.muted = true;
+  element.srcObject = stream;
+  void element.play().catch(() => {});
+  const source = context.createMediaStreamSource(stream);
+  const gain = context.createGain();
+  source.connect(gain);
+  const meter = context.createAnalyser();
+  meter.fftSize = 512;
+  source.connect(meter);
+  peer.voice.heard = { source, gain, element, meter };
+  routeVoice();
+}
+function silence(voice: Voice | undefined) {
+  if (!voice) return;
+  voice.heard?.gain.disconnect();
+  voice.heard?.source.disconnect();
+  voice.heard?.meter.disconnect();
+  voice.heard?.element.pause();
+  if (voice.heard) voice.heard.element.srcObject = null;
+  voice.out.disconnect();
+}
+function stopMicrophone() {
+  microphone?.source.disconnect();
+  microphone?.meter.disconnect();
+  microphone?.track.stop();
+  microphone = undefined;
+}
+/** Opens or closes the host's microphone to everyone in the room. */
+export async function setPartyMicrophone(on: boolean) {
+  if (state.phase !== "open" || !context) return;
+  if (!on) {
+    stopMicrophone();
+    update({ mic: false, micError: "" });
+    routeVoice();
+    return;
+  }
+  if (microphone) return;
+  const run = generation;
+  try {
+    const track = await openMicrophone();
+    if (run !== generation || !context || microphone) {
+      track.stop();
+      return;
+    }
+    const source = context.createMediaStreamSource(new MediaStream([track]));
+    const meter = context.createAnalyser();
+    meter.fftSize = 512;
+    source.connect(meter);
+    microphone = { track, source, meter };
+    update({ mic: true, micError: "" });
+    routeVoice();
+  } catch (cause) {
+    if (run === generation) update({ micError: microphoneFailure(cause) });
+  }
+}
 const canvas = document.createElement("canvas");
 canvas.width = WAITING_WIDTH;
 canvas.height = WAITING_HEIGHT;
@@ -199,6 +363,8 @@ function dropPeer(id: string) {
   const peer = peers.get(id);
   if (!peer) return;
   peers.delete(id);
+  silence(peer.voice);
+  routeVoice();
   peer.channel.close();
   peer.pc.close();
   peer.pad.close();
@@ -217,6 +383,10 @@ export function endParty() {
   media?.close();
   media = undefined;
   for (const id of [...peers.keys()]) dropPeer(id);
+  stopMicrophone();
+  clearInterval(voiceMeter);
+  lastLoud.clear();
+  speakersMessageText = speakersMessage([]);
   clearInterval(refresh);
   video?.close();
   video = undefined;
@@ -234,6 +404,14 @@ export function endParty() {
 export function sendPartyChat(text: string) {
   const message = chatMessage(text);
   if (message && state.phase === "open") send(message);
+}
+/** Sends a quick reaction, shown over the game to everyone in the room. */
+export function sendPartyReaction(id: PartyReactionId) {
+  if (state.phase === "open" && state.live) send(reactionMessage(id));
+}
+/** Puts a guest in another seat; whoever sits there takes the guest's seat. */
+export function moveGuest(id: string, player: number) {
+  if (state.phase === "open" && state.live) send({ type: "move", id, player });
 }
 export function removeGuest(id: string) {
   dropPeer(id);
@@ -386,7 +564,14 @@ export async function startParty() {
           clearTimeout(timeout);
           iceServers = m.iceServers;
           policy = m.policy === "all" ? "all" : "relay";
-          update({ phase: "open", url: m.url, code: m.code, relay: m.relay });
+          update({
+            phase: "open",
+            url: m.url,
+            code: m.code,
+            relay: m.relay,
+            live: m.live === true,
+          });
+          listenToVoices();
           hostTicket = reservation.ticket || "";
           syncFriendsAccess();
         }
@@ -394,6 +579,45 @@ export async function startParty() {
         if (m.type === "chat") {
           const line = parsePartyChat(m);
           if (line) update({ chat: addChatLine(state.chat, line) });
+        }
+        if (m.type === "reaction") {
+          const reaction = parsePartyReaction(m);
+          // Shown with the chat, so the host sees them over the game too.
+          if (reaction)
+            update({
+              chat: addChatLine(state.chat, {
+                id: reaction.id,
+                from: reaction.player === 1 ? "host" : "reaction",
+                name: reaction.name,
+                player: reaction.player,
+                text: reaction.emoji,
+                at: reaction.at,
+              }),
+            });
+        }
+        if (m.type === "seat" && typeof m.id === "string") {
+          const moved = peers.get(m.id);
+          if ([2, 3, 4].includes(m.player) && moved) {
+            const old = moved.player;
+            moved.player = m.player;
+            // Let go of what the guest held in the old seat, unless a swap
+            // has already put someone else there.
+            setTimeout(() => {
+              if (
+                [...peers.values()].some((p) => p.player === old) ||
+                moved.pad.readyState !== WebSocket.OPEN
+              )
+                return;
+              moved.pad.send(
+                JSON.stringify({
+                  type: "pad",
+                  player: old,
+                  buttons: 0,
+                  axes: [0, 0, 0, 0],
+                }),
+              );
+            }, 80);
+          }
         }
         if (m.type === "chat-error" && typeof m.message === "string")
           update({ chat: addChatLine(state.chat, chatNote(m.message)) });
@@ -417,14 +641,15 @@ export async function startParty() {
             ordered: false,
             maxRetransmits: 0,
           });
-          const peer = {
+          const peer: Peer = {
             pc,
             pad,
             channel,
             lastInput: 0,
             lastState: "",
             seq: -1,
-            pending: [] as RTCIceCandidateInit[],
+            pending: [],
+            player: m.player,
           };
           peers.set(m.id, peer);
           pad.onclose = () => {
@@ -435,7 +660,23 @@ export async function startParty() {
                 "A conexão de um controle foi interrompida. Peça ao amigo para entrar novamente.",
             });
           };
+          channel.onopen = () => channel.send(speakersMessageText);
           stream!.getTracks().forEach((track) => pc.addTrack(track, stream!));
+          // A second audio line after the game's sound carries the voices.
+          const out = context!.createMediaStreamDestination();
+          const voiceSender = pc.addTrack(
+            out.stream.getAudioTracks()[0],
+            out.stream,
+          );
+          const voiceLine = pc
+            .getTransceivers()
+            .find((transceiver) => transceiver.sender === voiceSender);
+          if (voiceLine) peer.voice = { transceiver: voiceLine, out };
+          pc.ontrack = (event) => {
+            if (peer.voice && event.transceiver === peer.voice.transceiver)
+              hear(peer, event.track);
+          };
+          routeVoice();
           for (const transceiver of pc.getTransceivers()) {
             if (transceiver.sender.track?.kind === "video")
               preferH264VideoCodec(
@@ -476,7 +717,7 @@ export async function startParty() {
                 pad.send(
                   JSON.stringify({
                     type: "pad",
-                    player: m.player,
+                    player: peer.player,
                     buttons: value.buttons,
                     axes: value.axes,
                   }),

@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ACCOUNT_AVATARS } from "../social/accountAvatars";
+import { t } from "../../i18n";
 
 // What guests watch while the host has no game open: the host's PC paints
 // it and streams it like a game frame, so every guest sees the same room.
@@ -40,11 +41,13 @@ export interface WaitingRoom {
 }
 
 export function waitingTitle(host: string | null) {
-  return host ? `${host} está escolhendo um jogo` : "Escolhendo um jogo";
+  return host
+    ? t("{host} está escolhendo um jogo", { host })
+    : t("Escolhendo um jogo");
 }
 
 export function waitingTip(time: number) {
-  return WAITING_TIPS[Math.floor(time / TIP_MS) % WAITING_TIPS.length];
+  return t(WAITING_TIPS[Math.floor(time / TIP_MS) % WAITING_TIPS.length]);
 }
 
 export function waitingSeats(room: WaitingRoom): WaitingSeat[] {
@@ -52,8 +55,8 @@ export function waitingSeats(room: WaitingRoom): WaitingSeat[] {
     if (player === 1)
       return {
         player,
-        name: room.host.name || "Anfitrião",
-        status: "Anfitrião · no PC",
+        name: room.host.name || t("Anfitrião"),
+        status: t("Anfitrião · no PC"),
         avatar: room.host.avatar ?? 0,
         taken: true,
         ready: true,
@@ -62,8 +65,8 @@ export function waitingSeats(room: WaitingRoom): WaitingSeat[] {
     if (!guest)
       return {
         player,
-        name: "Lugar livre",
-        status: "Esperando um amigo",
+        name: t("Lugar livre"),
+        status: t("Esperando um amigo"),
         avatar: null,
         taken: false,
         ready: false,
@@ -72,7 +75,7 @@ export function waitingSeats(room: WaitingRoom): WaitingSeat[] {
     return {
       player,
       name: guest.name,
-      status: ready ? "Pronto para jogar" : "Conectando…",
+      status: ready ? t("Pronto para jogar") : t("Conectando…"),
       avatar: guest.avatar ?? 0,
       taken: true,
       ready,
@@ -218,7 +221,7 @@ export function paintWaiting(
   paint.fillStyle = muted;
   paint.font = `500 24px ${FONT}`;
   paint.fillText(
-    "A partida aparece aqui sozinha assim que o jogo abrir.",
+    t("A partida aparece aqui sozinha assim que o jogo abrir."),
     cx,
     358,
   );
@@ -285,5 +288,9 @@ export function paintWaiting(
 
   paint.fillStyle = muted;
   paint.font = `500 20px ${FONT}`;
-  paint.fillText(fit(paint, `Dica: ${waitingTip(time)}`, W - 160), cx, 664);
+  paint.fillText(
+    fit(paint, t("Dica: {tip}", { tip: waitingTip(time) }), W - 160),
+    cx,
+    664,
+  );
 }
