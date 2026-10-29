@@ -29,7 +29,7 @@ const note = (kind) =>
 function open(name) {
   document.title = `${name}, o playtest te espera · OpenRetro`;
   $("title").textContent =
-    `${name}, quer testar o OpenRetro antes de todo mundo?`;
+    `${name}, quer testar o OpenRetro com os seus viewers?`;
   for (const id of ["intro", "shot", "steps"]) $(id).hidden = false;
   const STEPS = ["s-download", "s-sources", "s-party", "s-feedback"];
   // The marks count only the steps on show, so no source means no gap.
