@@ -1,6 +1,6 @@
 [package]
 name = "openretro"
-version = "1.1.1"
+version = "1.2.0"
 description = "An open home for your classic games"
 authors = ["OpenRetro contributors"]
 edition = "2021"
@@ -53,6 +53,9 @@ sevenz-rust2 = { version = "0.24.1", default-features = false, features = ["util
 [target.'cfg(windows)'.dependencies]
 # Phone play: screen capture. Audio comes directly from the managed game runtime.
 windows-capture = "2"
+# Switch emulators read SDL, which only sees real devices: phone and Party
+# players become virtual Xbox 360 pads through the ViGEmBus driver.
+vigem-client = "0.1"
 # PS3 games share no audio: RPCS3's own process sound, by process loopback.
 windows = { version = "0.62", features = ["Win32_Media_Audio", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 # The completion handler process loopback calls back is a COM object.

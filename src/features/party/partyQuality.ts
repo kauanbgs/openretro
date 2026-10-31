@@ -1,6 +1,6 @@
-// A ceiling, not a forced bitrate: WebRTC still estimates each guest's link.
-// Give 720p60 motion more room than the old 5 Mbps / 30 fps stream.
-export const PARTY_MAX_BITRATE = 8_000_000;
+// A ceiling, not a forced bitrate: WebRTC still estimates each guest's link,
+// so 1080p60 motion can take what the link allows.
+export const PARTY_MAX_BITRATE = 16_000_000;
 
 export async function configurePartyVideo(sender: RTCRtpSender) {
   const parameters = sender.getParameters();

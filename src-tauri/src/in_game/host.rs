@@ -19,6 +19,18 @@ struct Rect {
     bottom: i32,
 }
 
+#[repr(C)]
+#[derive(Default)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+struct Surface {
+    area: i64,
+    rect: Rect,
+}
+
 struct Search {
     pid: u32,
     window: *mut c_void,
@@ -43,6 +55,9 @@ extern "system" {
     fn GetWindow(window: *mut c_void, command: u32) -> *mut c_void;
     fn GetWindowRect(window: *mut c_void, rect: *mut Rect) -> i32;
     fn GetClientRect(window: *mut c_void, rect: *mut Rect) -> i32;
+    fn ClientToScreen(window: *mut c_void, point: *mut Point) -> i32;
+    fn ScreenToClient(window: *mut c_void, point: *mut Point) -> i32;
+    fn GetCursorPos(point: *mut Point) -> i32;
     fn GetWindowLongPtrW(window: *mut c_void, index: i32) -> isize;
     fn SetWindowLongPtrW(window: *mut c_void, index: i32, value: isize) -> isize;
     fn SetParent(child: *mut c_void, parent: *mut c_void) -> *mut c_void;
@@ -328,6 +343,129 @@ pub fn reembed(app: &tauri::AppHandle, pid: u32) -> Result<Option<Embedded>> {
         describe(child)
     );
     attach(game_parent(app)?, child).map(Some)
+}
+
+unsafe extern "system" fn find_surface(window: *mut c_void, data: isize) -> i32 {
+    let best = &mut *(data as *mut Surface);
+    let mut rect = Rect::default();
+    if IsWindowVisible(window) != 0 && GetWindowRect(window, &mut rect) != 0 {
+        let area =
+            i64::from((rect.right - rect.left).max(0)) * i64::from((rect.bottom - rect.top).max(0));
+        if area > best.area {
+            *best = Surface { area, rect };
+        }
+    }
+    1
+}
+
+/// How far the emulator's game surface sits inside its window, as
+/// [left, top, right, bottom]: the menu bar above it and the status bar below.
+/// The surface is the largest native child, which exists once a game is
+/// running; None means it is not there yet.
+pub fn chrome_insets(window: isize) -> Option<[i32; 4]> {
+    let child = window as *mut c_void;
+    unsafe {
+        let mut client = Rect::default();
+        if IsWindow(child) == 0 || GetClientRect(child, &mut client) == 0 {
+            return None;
+        }
+        let mut surface = Surface {
+            area: 0,
+            rect: Rect::default(),
+        };
+        EnumChildWindows(child, find_surface, &mut surface as *mut Surface as isize);
+        let mut origin = Point::default();
+        ClientToScreen(child, &mut origin);
+        let margins = [
+            surface.rect.left - origin.x,
+            surface.rect.top - origin.y,
+            origin.x + client.right - surface.rect.right,
+            origin.y + client.bottom - surface.rect.bottom,
+        ];
+        let client_area = i64::from(client.right) * i64::from(client.bottom);
+        // Only the surface of a running game: most of the window, with a
+        // sensible margin around it.
+        let sensible = margins.iter().all(|margin| (0..=200).contains(margin))
+            && margins.iter().any(|margin| *margin > 0);
+        (surface.area * 10 >= client_area * 4 && sensible).then_some(margins)
+    }
+}
+
+/// Which of the emulator's bars shows.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Chrome {
+    Hidden,
+    Menu,
+    Status,
+}
+
+/// Puts the emulator's window so only the wanted bar shows. The window is
+/// taller and wider than OpenRetro's by the bars, and slides: whatever falls
+/// outside the parent is clipped, so the game fills the screen the rest of
+/// the time and nothing resizes when a bar appears.
+pub fn show_chrome(window: isize, insets: [i32; 4], bar: Chrome) -> bool {
+    let child = window as *mut c_void;
+    let [left, top, right, bottom] = insets;
+    unsafe {
+        let parent = GetParent(child);
+        let mut bounds = Rect::default();
+        if IsWindow(child) == 0 || parent.is_null() || GetClientRect(parent, &mut bounds) == 0 {
+            return false;
+        }
+        let y = match bar {
+            Chrome::Hidden => -top,
+            Chrome::Menu => 0,
+            Chrome::Status => -(top + bottom),
+        };
+        SetWindowPos(
+            child,
+            std::ptr::null_mut(),
+            -left,
+            y,
+            (bounds.right + left + right).max(1),
+            (bounds.bottom + top + bottom).max(1),
+            SWP_SHOWWINDOW,
+        ) != 0
+    }
+}
+
+/// The pointer's height inside OpenRetro's window and that window's height.
+pub fn pointer_height(window: isize) -> Option<(i32, i32)> {
+    let child = window as *mut c_void;
+    unsafe {
+        let parent = GetParent(child);
+        let (mut bounds, mut spot) = (Rect::default(), Point::default());
+        if IsWindow(child) == 0
+            || parent.is_null()
+            || GetClientRect(parent, &mut bounds) == 0
+            || GetCursorPos(&mut spot) == 0
+            || ScreenToClient(parent, &mut spot) == 0
+        {
+            return None;
+        }
+        Some((spot.y, bounds.bottom))
+    }
+}
+
+/// Whether the process has a window of its own open: one of its menus or a
+/// dialog, which would close if the bar they came from slid away.
+pub fn has_popup(pid: u32) -> bool {
+    // Menus are owned by the main window, which the game-window search skips.
+    unsafe extern "system" fn visible_of(window: *mut c_void, data: isize) -> i32 {
+        let search = &mut *(data as *mut (u32, bool));
+        let mut pid = 0;
+        GetWindowThreadProcessId(window, &mut pid);
+        if pid == search.0 && IsWindowVisible(window) != 0 {
+            search.1 = true;
+            return 0;
+        }
+        1
+    }
+    let mut search = (pid, false);
+    unsafe {
+        EnumWindows(visible_of, &mut search as *mut (u32, bool) as isize);
+    }
+    search.1
 }
 
 /// Clip the renderer itself, without capturing frames or affecting game input.

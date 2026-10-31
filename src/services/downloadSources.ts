@@ -1,6 +1,5 @@
 import type { DownloadSourceDocument, DownloadSourceEntry } from "../types";
 import { t } from "../i18n";
-export const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 export function validMagnet(uri: unknown): uri is string {
   if (typeof uri !== "string" || uri.length > 16384) return false;
   try {
@@ -30,8 +29,6 @@ export function validDirectUrl(uri: unknown): uri is string {
   }
 }
 export function parseDownloadSource(text: string): DownloadSourceDocument {
-  if (new TextEncoder().encode(text).length > MAX_SOURCE_BYTES)
-    throw new Error(t("Source exceeds the 16 MB limit."));
   let raw: unknown;
   try {
     raw = JSON.parse(text.replace(/^\uFEFF/, ""));

@@ -15,7 +15,7 @@ describe("Party video quality", () => {
     expect(sender.setParameters).toHaveBeenCalledWith({
       transactionId: "negotiated",
       encodings: [
-        { rid: "game", active: true, maxBitrate: 8_000_000, maxFramerate: 60 },
+        { rid: "game", active: true, maxBitrate: 16_000_000, maxFramerate: 60 },
       ],
       degradationPreference: "balanced",
     });
@@ -35,7 +35,7 @@ describe("Party video quality", () => {
     await configurePartyVideo(sender as unknown as RTCRtpSender);
     expect(sender.setParameters).toHaveBeenLastCalledWith({
       transactionId: "retry",
-      encodings: [{ maxBitrate: 8_000_000, maxFramerate: 60 }],
+      encodings: [{ maxBitrate: 16_000_000, maxFramerate: 60 }],
     });
   });
 

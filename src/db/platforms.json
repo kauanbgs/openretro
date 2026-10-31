@@ -17,6 +17,7 @@
   { "id": "psp", "extensions": ["iso", "cso", "pbp"] },
   { "id": "ps2", "extensions": ["iso", "chd"], "biosRequired": true },
   { "id": "ps3", "extensions": [] },
+  { "id": "switch", "extensions": ["nsp", "xci", "nsz", "xcz"] },
   { "id": "arcade", "extensions": ["zip"] },
   { "id": "dos", "extensions": ["exe", "com", "conf"] }
 ]

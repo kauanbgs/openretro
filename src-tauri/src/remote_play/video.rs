@@ -5,10 +5,26 @@
 use axum::body::Bytes;
 use image::ImageEncoder;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::broadcast;
 
 const PARTY_INTERVAL_US: u64 = 16_666;
+static FULL_HD: AtomicBool = AtomicBool::new(false);
+
+/// Lets Party and phone WebRTC take 1080p frames instead of 720p. Full HD
+/// moves 2.25x the pixels through the encoder, so it is the player's choice.
+pub fn set_full_hd(on: bool) {
+    FULL_HD.store(on, Ordering::Relaxed);
+}
+
+/// The largest frame an active WebRTC encoder takes.
+pub fn encoder_limit() -> (u32, u32) {
+    if FULL_HD.load(Ordering::Relaxed) {
+        (1920, 1080)
+    } else {
+        (1280, 720)
+    }
+}
 const DEFAULT_RTC_INTERVAL_US: u64 = 33_333;
 /// Loopback packet tags: little-endian width/height, then 4 bytes a pixel.
 pub const RGBX: u8 = 4;

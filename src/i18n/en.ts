@@ -782,6 +782,29 @@ export const en: Record<string, string> = {
     "Pick a version from your sources or add a file.",
   "Jogo em execução": "Game running",
   "Adicionar arquivo": "Add file",
+  "O Windows exige administrador para abrir este emulador. Clique com o botão direito no .exe do emulador, abra Propriedades > Compatibilidade e desmarque \"Executar este programa como administrador\". Um emulador elevado também não abre dentro do OpenRetro.":
+    "Windows requires administrator rights to open this emulator. Right-click the emulator's .exe, open Properties > Compatibility and untick \"Run this program as an administrator\". An elevated emulator cannot open inside OpenRetro either.",
+  "Qualidade da imagem da Party": "Party picture quality",
+  "Tamanho máximo da imagem enviada aos convidados. 1080p fica mais nítido, mas exige um PC mais forte e uma conexão rápida; a Party reduz sozinha se a conexão não aguentar.":
+    "Largest picture sent to guests. 1080p is sharper but needs a stronger PC and a fast connection; Party lowers it by itself if the connection cannot keep up.",
+  "720p · recomendado": "720p · recommended",
+  "1080p · mais nítido": "1080p · sharper",
+  "Qual arquivo executar?": "Which file should run?",
+  "arquivo do jogo": "game file",
+  "O emulador de {console} não foi encontrado. Escolha o .exe dele em Emuladores.":
+    "The {console} emulator was not found. Pick its .exe in Emulators.",
+  "Nenhum emulador de {console} configurado. Adicione o yuzu (ou outro) em Emuladores.":
+    "No {console} emulator is set up. Add yuzu (or another) in Emulators.",
+  "jogo instalado no emulador": "installed in the emulator",
+  "não encontrado": "not found",
+  "Remover da lista": "Remove from list",
+  "Selecione um arquivo do jogo": "Select a game file",
+  "Adicione a atualização, o DLC ou outra cópia do jogo e escolha qual abrir. O emulador recebe o arquivo selecionado.":
+    "Add the update, the DLC or another copy of the game and choose which one to open. The emulator receives the selected file.",
+  "Este arquivo não é de um jogo deste console.":
+    "This file is not a game for this console.",
+  "Este arquivo não faz parte do jogo. Escolha outro na lista.":
+    "This file is not part of the game. Pick another from the list.",
   "Assistir trailer": "Watch trailer",
   "Remover dos favoritos": "Remove from favorites",
   "Favoritar jogo": "Favorite game",
@@ -1382,7 +1405,6 @@ export const en: Record<string, string> = {
     "Choose a folder with an absolute path.",
   "Não foi possível acessar esta pasta.": "Couldn't open this folder.",
   "Escolha um arquivo JSON.": "Choose a JSON file.",
-  "A fonte excede o limite de 16 MB.": "The source exceeds the 16 MB limit.",
   "Avatar inválido.": "Invalid avatar.",
   "Cor inválida.": "Invalid color.",
   "Encerre o jogo antes de trocar de jogador.":
@@ -1517,6 +1539,16 @@ export const en: Record<string, string> = {
   "a atualização {version} do jogo": "game update {version}",
   "O emulador de PS3 baixado veio corrompido. Tente de novo.":
     "The downloaded PS3 emulator was corrupted. Try again.",
+  "Abre o setup.exe deste download. Instale só programas de fontes em que você confia.":
+    "Opens this download's setup.exe. Only install programs from sources you trust.",
+  "Instalador aberto. Quando terminar, volte e escolha Adicionar à biblioteca.":
+    "Installer opened. When it finishes, come back and choose Add to library.",
+  "Espere o download terminar para instalar.": "Wait for the download to finish before installing.",
+  "Não encontrei o instalador (setup.exe) nessa pasta.":
+    "I couldn't find the installer (setup.exe) in that folder.",
+  "Instaladores só abrem no Windows.": "Installers only open on Windows.",
+  "Use o aplicativo desktop para instalar downloads.":
+    "Use the desktop app to install downloads.",
   "Preparando o PS3: instalando o emulador":
     "Preparing the PS3: installing the emulator",
   "Não foi possível instalar o emulador de PS3: {e}":
@@ -2238,8 +2270,8 @@ export const en: Record<string, string> = {
     "Open the desktop app to create a room and stream the game.",
   "Aguardando um jogo": "Waiting for a game",
   "O áudio do PC também é compartilhado.": "Your PC's audio is shared too.",
-  "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem.":
-    "Open a game to start. For PS3, open the game after the room is created so guests can play.",
+  "Abra um jogo para começar. No PS3 e no Switch, abra o jogo com a sala já criada para os convidados jogarem.":
+    "Open a game to start. For PS3 and Switch, open the game after the room is created so guests can play.",
   "Conexão em modo de teste. Algumas redes podem não conectar.":
     "Connection in test mode. Some networks may not connect.",
   "A sala continua aberta ao fechar esta janela.":

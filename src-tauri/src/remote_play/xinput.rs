@@ -16,6 +16,28 @@ use std::{
 
 /// The shim, built by build.rs. Written next to rpcs3.exe before each game.
 pub const DLL: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/xinput1_3.dll"));
+/// The names an emulator may load XInput by: RPCS3 and older SDL use 1.3, SDL
+/// and .NET programs 1.4. The shim finds Windows' own copy by full path.
+const NAMES: [&str; 3] = ["xinput1_3.dll", "xinput1_4.dll", "xinput9_1_0.dll"];
+
+/// Puts the shim next to an emulator while remote players are seated, and
+/// takes it away afterwards. Only copies made here are ever removed.
+pub fn install(directory: &std::path::Path, remote: bool) -> Result<(), String> {
+    for name in NAMES {
+        let path = directory.join(name);
+        let ours = std::fs::read(&path).ok().as_deref() == Some(DLL);
+        if remote && !ours {
+            if path.exists() {
+                continue;
+            }
+            std::fs::write(&path, DLL)
+                .map_err(|e| format!("Não foi possível preparar os controles do Party: {e}"))?;
+        } else if !remote && ours {
+            std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
 /// RPCS3 inherits the mapping's name; without it the shim only passes through.
 pub const ENV: &str = "OPENRETRO_PARTY_PADS";
 const MAGIC: u32 = 0x3150_524f;
@@ -129,30 +151,50 @@ const BUTTONS: [u16; 16] = [
     0, 0, 0x0040, 0x0080,
 ];
 
-/// The two words the shim reads for a connected pad. libretro's sticks point
-/// down for positive Y; XInput's point up.
-fn words(state: PadState, sequence: u32) -> (u64, u64) {
+/// A pad as XInput reports it.
+pub struct Fields {
+    pub buttons: u16,
+    pub left_trigger: u8,
+    pub right_trigger: u8,
+    pub lx: i16,
+    pub ly: i16,
+    pub rx: i16,
+    pub ry: i16,
+}
+
+/// libretro's sticks point down for positive Y; XInput's point up.
+pub fn fields(state: PadState) -> Fields {
     let buttons = BUTTONS
         .iter()
         .enumerate()
         .filter(|(bit, _)| state.buttons & (1 << bit) != 0)
         .fold(0u16, |all, (_, button)| all | button);
-    let trigger = |bit: u16| {
-        if state.buttons & (1 << bit) != 0 {
-            255u64
-        } else {
-            0
-        }
-    };
-    let up = |value: i16| value.saturating_neg().max(-32767) as u16 as u64;
+    let trigger = |bit: u16| if state.buttons & (1 << bit) != 0 { 255 } else { 0 };
+    let up = |value: i16| value.saturating_neg().max(-32767);
     let [lx, ly, rx, ry] = state.axes;
-    let main = u64::from(buttons)
-        | trigger(12) << 16
-        | trigger(13) << 24
-        | (lx as u16 as u64) << 32
-        | up(ly) << 48;
-    let extra =
-        (rx as u16 as u64) | up(ry) << 16 | u64::from(sequence & 0x7fff_ffff) << 32 | 1 << 63;
+    Fields {
+        buttons,
+        left_trigger: trigger(12),
+        right_trigger: trigger(13),
+        lx,
+        ly: up(ly),
+        rx,
+        ry: up(ry),
+    }
+}
+
+/// The two words the shim reads for a connected pad.
+fn words(state: PadState, sequence: u32) -> (u64, u64) {
+    let pad = fields(state);
+    let main = u64::from(pad.buttons)
+        | u64::from(pad.left_trigger) << 16
+        | u64::from(pad.right_trigger) << 24
+        | (pad.lx as u16 as u64) << 32
+        | (pad.ly as u16 as u64) << 48;
+    let extra = (pad.rx as u16 as u64)
+        | (pad.ry as u16 as u64) << 16
+        | u64::from(sequence & 0x7fff_ffff) << 32
+        | 1 << 63;
     (main, extra)
 }
 
@@ -162,6 +204,7 @@ pub fn set(player: u8, state: Option<PadState>) {
     if !(1..=4).contains(&player) {
         return;
     }
+    super::vigem::set(player, state);
     let Ok(active) = ACTIVE.lock() else { return };
     let Some(mapping) = active.as_ref() else {
         return;

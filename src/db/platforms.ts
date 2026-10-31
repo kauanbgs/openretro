@@ -101,6 +101,13 @@ export const platforms: Platform[] = [
     // Games are found by content: a disc folder's EBOOT.BIN or a PS3 disc image.
     extensions: [],
   },
+  {
+    id: "switch",
+    name: "Nintendo Switch",
+    shortName: "NSW",
+    manufacturer: "Nintendo",
+    extensions: ["nsp", "xci", "nsz", "xcz"],
+  },
   { id: "arcade", name: "Arcade", shortName: "ARC", extensions: ["zip"] },
   {
     id: "dos",

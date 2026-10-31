@@ -133,6 +133,20 @@ export function createPartyServer(config = process.env) {
     maxPayload: 32 * 1024,
     perMessageDeflate: false,
   });
+  // The app, the guest page and local development: a page from anywhere else
+  // cannot open a room here through somebody's browser. Clients that send no
+  // Origin (the test client, scripts) are not browsers and are limited by the
+  // per-address quotas below.
+  const originAllowed = (origin) =>
+    !origin ||
+    origin === publicUrl.origin ||
+    [
+      "tauri://localhost",
+      "http://tauri.localhost",
+      "https://tauri.localhost",
+      "http://localhost:1420",
+      "http://127.0.0.1:1420",
+    ].includes(origin);
   http.on("upgrade", (req, socket, head) => {
     // This header must be overwritten by the operator's trusted reverse proxy.
     const forwarded =
@@ -151,7 +165,8 @@ export function createPartyServer(config = process.env) {
     if (
       new URL(req.url, publicUrl).pathname !== "/signal" ||
       clients.size >= 256 ||
-      limits.connections >= 12
+      limits.connections >= 12 ||
+      !originAllowed(req.headers.origin)
     ) {
       socket.destroy();
       return;

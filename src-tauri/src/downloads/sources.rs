@@ -10,7 +10,6 @@ use std::{
 };
 use tauri::{Manager, State};
 
-pub const MAX_SOURCE_BYTES: usize = 16 * 1024 * 1024;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceEntry {
@@ -234,9 +233,6 @@ pub fn entry_id(entry: &SourceEntry) -> String {
     )
 }
 pub fn parse_document(text: &str) -> Result<SourceDocument> {
-    if text.len() > MAX_SOURCE_BYTES {
-        return Err("Source exceeds the 16 MB limit.".into());
-    }
     let mut doc: SourceDocument = serde_json::from_str(text.trim_start_matches('\u{feff}'))
         .map_err(|_| {
             "Invalid source JSON. Expected name and a downloads array with title and uris."
@@ -273,7 +269,13 @@ fn fetch_document(url: &str) -> Result<SourceDocument> {
     {
         return Err("Source URL must use HTTPS without embedded credentials.".into());
     }
+    // Hosts commonly answer 403 to a request that names no client.
     let client = reqwest::blocking::Client::builder()
+        .user_agent(concat!(
+            "OpenRetro/",
+            env!("CARGO_PKG_VERSION"),
+            " (+https://github.com/kauanbgs/openretro)"
+        ))
         .timeout(Duration::from_secs(45))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             if attempt.previous().len() >= 5 || attempt.url().scheme() != "https" {
@@ -284,8 +286,9 @@ fn fetch_document(url: &str) -> Result<SourceDocument> {
         }))
         .build()
         .map_err(error)?;
-    let response = client
+    let mut response = client
         .get(url)
+        .header(reqwest::header::ACCEPT, "application/json, text/plain;q=0.9, */*;q=0.5")
         .send()
         .map_err(|_| "Could not fetch source. Check its URL and your connection.")?;
     if !response.status().is_success() {
@@ -299,7 +302,6 @@ fn fetch_document(url: &str) -> Result<SourceDocument> {
     }
     let mut text = String::new();
     response
-        .take((MAX_SOURCE_BYTES + 1) as u64)
         .read_to_string(&mut text)
         .map_err(|_| "Source must be UTF-8 JSON.")?;
     parse_document(&text)

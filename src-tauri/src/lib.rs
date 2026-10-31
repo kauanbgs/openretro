@@ -45,6 +45,8 @@ pub fn run() {
             commands::sync_runtime_platforms(&db).map_err(std::io::Error::other)?;
             #[cfg(windows)]
             commands::register_rpcs3(&db, &dir).map_err(std::io::Error::other)?;
+            commands::apply_saved_party_resolution(&db);
+            commands::heal_switch_emulators(&db);
             app.manage(db);
             app.manage(metadata::LaunchboxCatalog::default());
             metadata::start(app.handle());
@@ -136,6 +138,7 @@ pub fn run() {
             downloads::control_download,
             downloads::remove_download,
             downloads::download_files,
+            downloads::run_download_installer,
             downloads::add_download_to_library,
             commands::list_library,
             commands::list_emulators,
@@ -155,6 +158,9 @@ pub fn run() {
             commands::remove_emulator,
             commands::test_emulator,
             commands::detect_emulators,
+            commands::list_launch_files,
+            commands::add_launch_file,
+            commands::remove_launch_file,
             commands::get_settings,
             commands::save_settings,
             commands::app_paths,

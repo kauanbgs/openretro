@@ -133,7 +133,7 @@ struct Handler {
 /// Nearest-neighbour scaling keeps pixel art crisp and costs one read per pixel.
 fn fit(width: u32, height: u32, party: bool) -> (u32, u32) {
     let (max_width, max_height) = if party {
-        (1280, 720)
+        super::video::encoder_limit()
     } else {
         (MAX_WIDTH, MAX_HEIGHT)
     };

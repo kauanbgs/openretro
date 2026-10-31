@@ -432,7 +432,7 @@ export function PartyDialog({
               {room.game
                 ? t("O áudio do PC também é compartilhado.")
                 : t(
-                    "Abra um jogo para começar. No PS3, abra o jogo com a sala já criada para os convidados jogarem.",
+                    "Abra um jogo para começar. No PS3 e no Switch, abra o jogo com a sala já criada para os convidados jogarem.",
                   )}
             </p>
           </div>

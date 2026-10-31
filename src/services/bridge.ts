@@ -20,8 +20,9 @@ import type {
   SourceMatch,
   DownloadJob,
   DownloadedFile,
+  LaunchFile,
 } from "../types";
-import { parseDownloadSource, MAX_SOURCE_BYTES } from "./downloadSources";
+import { parseDownloadSource } from "./downloadSources";
 import { sourceStore, type PreviewSource } from "./sourceStore";
 import { t } from "../i18n";
 export interface FilePickerRequest {
@@ -141,20 +142,14 @@ export const bridge = {
         throw new Error(
           t("Source returned HTTP {status}.", { status: response.status }),
         );
-      if (Number(response.headers.get("content-length")) > MAX_SOURCE_BYTES)
-        throw new Error(t("Source exceeds the 16 MB limit."));
       const reader = response.body?.getReader();
       if (!reader) throw new Error(t("Empty source response."));
       const decoder = new TextDecoder();
-      let size = 0;
       text = "";
       try {
         for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
-          size += value.byteLength;
-          if (size > MAX_SOURCE_BYTES)
-            throw new Error(t("Source exceeds the 16 MB limit."));
           text += decoder.decode(value, { stream: true });
         }
         text += decoder.decode();
@@ -236,6 +231,12 @@ export const bridge = {
     if (!isDesktop)
       throw new Error(t("Use o aplicativo desktop para adicionar downloads."));
     return invoke("add_download_to_library", { id, path: path ?? null });
+  },
+  /** Opens the installer (setup.exe) a finished download brought. */
+  async runDownloadInstaller(id: string): Promise<void> {
+    if (!isDesktop)
+      throw new Error(t("Use o aplicativo desktop para instalar downloads."));
+    return invoke("run_download_installer", { id });
   },
   async downloadFiles(id: string): Promise<DownloadedFile[]> {
     return isDesktop ? invoke("download_files", { id }) : [];
@@ -329,6 +330,23 @@ export const bridge = {
       directory: false,
       title: t("Selecione o patch (.ips, .bps, .ups, .xdelta) ou um .zip/.7z"),
     });
+  },
+  async pickLaunchFile(): Promise<string | null> {
+    if (!isDesktop)
+      throw new Error(t("Escolher arquivos só é possível no computador."));
+    return pickPath({
+      directory: false,
+      title: t("Selecione um arquivo do jogo"),
+    });
+  },
+  async launchFiles(itemId: string): Promise<LaunchFile[]> {
+    return isDesktop ? invoke("list_launch_files", { itemId }) : [];
+  },
+  async addLaunchFile(itemId: string, path: string): Promise<void> {
+    if (isDesktop) return invoke("add_launch_file", { itemId, path });
+  },
+  async removeLaunchFile(itemId: string, path: string): Promise<void> {
+    if (isDesktop) return invoke("remove_launch_file", { itemId, path });
   },
   async pickBios(): Promise<string | null> {
     if (!isDesktop)
@@ -439,6 +457,7 @@ export const bridge = {
     id: string,
     slot?: number,
     netplay?: NetplaySession,
+    file?: string,
   ): Promise<number> {
     if (isDesktop) {
       const start = () =>
@@ -446,6 +465,7 @@ export const bridge = {
           id,
           slot: slot ?? null,
           netplay: netplay ?? null,
+          file: file ?? null,
         });
       try {
         return await start();

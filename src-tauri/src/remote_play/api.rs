@@ -139,7 +139,7 @@ pub async fn invoke(app: &tauri::AppHandle, command: &str, args: Value) -> Resul
             }
             let launcher = app.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = crate::launcher::launch_game(launcher, id, slot, netplay).await {
+                if let Err(e) = crate::launcher::launch_game(launcher, id, slot, netplay, None).await {
                     log::warn!("Phone launch: {e}");
                 }
             });

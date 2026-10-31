@@ -573,10 +573,109 @@ pub fn insert_library_game(
     if duplicate {
         return Err("This file is already in your library.".into());
     }
+    let item_id = uuid::Uuid::new_v4().to_string();
     tx.execute("INSERT INTO games(id,metadata) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata",params![game.id,serde_json::to_string(&game).map_err(error)?]).map_err(error)?;
-    tx.execute("INSERT INTO library_items(id,game_id,platform_id,source_provider,source_path,added_at,sha256) VALUES(?1,?2,?3,'local',?4,?5,?6)",params![uuid::Uuid::new_v4().to_string(),game.id,game.platform_id,inspected.path,chrono::Utc::now().to_rfc3339(),inspected.sha256]).map_err(error)?;
+    tx.execute("INSERT INTO library_items(id,game_id,platform_id,source_provider,source_path,added_at,sha256) VALUES(?1,?2,?3,'local',?4,?5,?6)",params![item_id,game.id,game.platform_id,inspected.path,chrono::Utc::now().to_rfc3339(),inspected.sha256]).map_err(error)?;
+    if game.platform_id == "switch" {
+        use_bundled_switch_emulator(&tx, &item_id, &inspected.path)?;
+    }
     tx.commit().map_err(error)?;
     log::info!("Imported game {}", game.id);
+    Ok(())
+}
+/// The yuzu-style emulator sitting in a game's folder or above it, as a
+/// portable install keeps its games inside its own storage.
+fn bundled_switch_emulator(game: &std::path::Path) -> Option<std::path::PathBuf> {
+    const NAMES: [&str; 7] = ["yuzu", "eden", "citron", "suyu", "sudachi", "torzu", "ryujinx"];
+    game.ancestors().skip(1).take(8).find_map(|dir| {
+        let mut found: Vec<_> = std::fs::read_dir(dir)
+            .ok()?
+            .flatten()
+            .filter(|entry| entry.path().is_file())
+            .filter(|entry| {
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                name.ends_with(".exe")
+                    && !name.contains("cmd")
+                    && NAMES.iter().any(|prefix| name.starts_with(prefix))
+            })
+            .map(|entry| entry.path())
+            .collect();
+        // yuzu.exe before yuzu_ea.exe.
+        found.sort_by_key(|path| path.as_os_str().len());
+        found.into_iter().next()
+    })
+}
+/// A game inside a portable emulator plays with that emulator: it is
+/// registered (once) and chosen for the game.
+fn use_bundled_switch_emulator(
+    tx: &rusqlite::Connection,
+    item_id: &str,
+    game_path: &str,
+) -> Result<()> {
+    let Some(exe) = bundled_switch_emulator(std::path::Path::new(game_path)) else {
+        return Ok(());
+    };
+    let Ok(exe) = filesystem::executable(&exe.to_string_lossy()) else {
+        return Ok(());
+    };
+    let path = exe.to_string_lossy().into_owned();
+    let digest = <sha2::Sha256 as sha2::Digest>::digest(path.to_lowercase().as_bytes());
+    let id = format!("switch-{}", &format!("{digest:x}")[..12]);
+    let folder = exe
+        .parent()
+        .and_then(|dir| dir.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let emulator = Emulator {
+        id: id.clone(),
+        name: format!(
+            "{} ({folder})",
+            exe.file_stem().unwrap_or_default().to_string_lossy()
+        ),
+        executable_path: path,
+        supported_platforms: vec!["switch".into()],
+        version: None,
+        default_platforms: vec![],
+    };
+    tx.execute("INSERT INTO emulators(id,data) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET data=excluded.data",params![emulator.id,serde_json::to_string(&emulator).map_err(error)?]).map_err(error)?;
+    tx.execute("UPDATE library_items SET emulator_id=?1 WHERE id=?2", params![id, item_id]).map_err(error)?;
+    Ok(())
+}
+/// Switch games that lost their emulator (it was removed, or never registered)
+/// take the one in their own folder again.
+pub fn heal_switch_emulators(db: &Database) {
+    let Ok(conn) = db.0.lock() else { return };
+    let orphans: Vec<(String, String)> = conn
+        .prepare(
+            "SELECT id, source_path FROM library_items WHERE platform_id='switch' AND (emulator_id IS NULL OR emulator_id NOT IN (SELECT id FROM emulators))",
+        )
+        .and_then(|mut statement| {
+            statement
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect()
+        })
+        .unwrap_or_default();
+    for (item, path) in orphans {
+        if let Err(message) = use_bundled_switch_emulator(&conn, &item, &path) {
+            log::warn!("Could not restore the emulator of a Switch game: {message}");
+        }
+    }
+}
+/// Adds the other files of a game (a Switch update or DLC) to the library
+/// entry the file with `sha256` created.
+pub fn add_launch_files(app: &tauri::AppHandle, sha256: &str, paths: &[String]) -> Result<()> {
+    let db = app.state::<Database>();
+    let conn = db.0.lock().map_err(error)?;
+    let item: String = conn
+        .query_row("SELECT id FROM library_items WHERE sha256=?1", [sha256], |r| r.get(0))
+        .map_err(error)?;
+    for path in paths {
+        conn.execute(
+            "INSERT OR IGNORE INTO launch_files(library_item_id,path) VALUES(?1,?2)",
+            params![item, path],
+        )
+        .map_err(error)?;
+    }
     Ok(())
 }
 /// What deleting a game's files removes: the whole folder of the OpenRetro
@@ -846,6 +945,81 @@ pub fn test_emulator(id: String, db: State<Database>) -> Result<String> {
     filesystem::executable(&emulator.executable_path)?;
     Ok("Executable found and permissions validated. Launch a game to verify platform compatibility.".into())
 }
+/// A file a game can start from: the entry's own, or one the player added.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchFile {
+    pub path: String,
+    /// The library entry's own file; it cannot be removed.
+    pub original: bool,
+    pub exists: bool,
+}
+#[tauri::command(async)]
+pub fn list_launch_files(item_id: String, db: State<Database>) -> Result<Vec<LaunchFile>> {
+    let conn = db.read()?;
+    let source: String = conn
+        .query_row(
+            "SELECT source_path FROM library_items WHERE id=?1",
+            [&item_id],
+            |r| r.get(0),
+        )
+        .map_err(|_| "This game is no longer in your library.".to_string())?;
+    let mut files = vec![LaunchFile {
+        exists: std::path::Path::new(&source).is_file(),
+        path: source,
+        original: true,
+    }];
+    let mut statement = conn
+        .prepare("SELECT path FROM launch_files WHERE library_item_id=?1 ORDER BY id")
+        .map_err(error)?;
+    let extra = statement
+        .query_map([&item_id], |r| r.get::<_, String>(0))
+        .map_err(error)?;
+    for path in extra {
+        let path = path.map_err(error)?;
+        files.push(LaunchFile {
+            exists: std::path::Path::new(&path).is_file(),
+            path,
+            original: false,
+        });
+    }
+    Ok(files)
+}
+#[tauri::command(async)]
+pub fn add_launch_file(item_id: String, path: String, db: State<Database>) -> Result<()> {
+    let file = filesystem::canonical_file(&path)?;
+    let platform: String = {
+        let conn = db.read()?;
+        conn.query_row(
+            "SELECT platform_id FROM library_items WHERE id=?1",
+            [&item_id],
+            |r| r.get(0),
+        )
+        .map_err(|_| "This game is no longer in your library.".to_string())?
+    };
+    if !filesystem::platform_ids_for_file(&file).contains(&platform) {
+        return Err("Este arquivo não é de um jogo deste console.".into());
+    }
+    db.0.lock()
+        .map_err(error)?
+        .execute(
+            "INSERT OR IGNORE INTO launch_files(library_item_id,path) VALUES(?1,?2)",
+            params![item_id, file.to_string_lossy()],
+        )
+        .map_err(error)?;
+    Ok(())
+}
+#[tauri::command(async)]
+pub fn remove_launch_file(item_id: String, path: String, db: State<Database>) -> Result<()> {
+    db.0.lock()
+        .map_err(error)?
+        .execute(
+            "DELETE FROM launch_files WHERE library_item_id=?1 AND path=?2",
+            params![item_id, path],
+        )
+        .map_err(error)?;
+    Ok(())
+}
 #[tauri::command(async)]
 pub fn detect_emulators() -> Vec<Emulator> {
     let mut detected = Vec::new();
@@ -891,6 +1065,10 @@ pub fn detect_emulators() -> Vec<Emulator> {
         ("snes9x", "Snes9x", vec!["snes"]),
         ("fceux", "FCEUX", vec!["nes"]),
         ("melonDS", "melonDS", vec!["nds"]),
+        ("ryujinx", "Ryujinx", vec!["switch"]),
+        ("eden", "Eden", vec!["switch"]),
+        ("citron", "Citron", vec!["switch"]),
+        ("yuzu", "yuzu", vec!["switch"]),
     ];
     let paths = std::env::var_os("PATH").unwrap_or_default();
     detected.extend(
@@ -929,8 +1107,21 @@ pub fn get_settings(db: State<Database>) -> Result<serde_json::Value> {
         Err(e) => Err(error(e)),
     }
 }
+/// Party video is 720p unless the player chose 1080p.
+pub fn apply_party_resolution(settings: &serde_json::Value) {
+    crate::remote_play::video::set_full_hd(settings["partyResolution"] == "1080p");
+}
+pub fn apply_saved_party_resolution(db: &Database) {
+    let saved = db.0.lock().ok().and_then(|conn| {
+        conn.query_row("SELECT value FROM settings WHERE key='app'", [], |r| r.get::<_, String>(0)).ok()
+    });
+    if let Some(settings) = saved.and_then(|raw| serde_json::from_str(&raw).ok()) {
+        apply_party_resolution(&settings);
+    }
+}
 #[tauri::command(async)]
 pub fn save_settings(settings: serde_json::Value, db: State<Database>) -> Result<()> {
+    apply_party_resolution(&settings);
     db.0.lock().map_err(error)?.execute("INSERT INTO settings(key,value) VALUES('app',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",[settings.to_string()]).map_err(error)?;
     Ok(())
 }
@@ -944,6 +1135,22 @@ pub fn app_paths(app: tauri::AppHandle) -> Result<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_game_inside_a_portable_yuzu_plays_with_that_yuzu() {
+        let root = std::env::temp_dir().join(format!("openretro-yuzu-{}", uuid::Uuid::new_v4()));
+        let registered = root.join("user/nand/user/Contents/registered");
+        std::fs::create_dir_all(&registered).unwrap();
+        for name in ["yuzu_ea.exe", "yuzu.exe", "yuzu-cmd.exe", "unins000.exe"] {
+            std::fs::write(root.join(name), b"").unwrap();
+        }
+        let game = registered.join("450a70da.nca");
+        std::fs::write(&game, b"").unwrap();
+        assert_eq!(bundled_switch_emulator(&game), Some(root.join("yuzu.exe")));
+        let elsewhere = std::env::temp_dir().join(format!("openretro-alone-{}.nsp", uuid::Uuid::new_v4()));
+        assert_eq!(bundled_switch_emulator(&elsewhere), None);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn removing_files_takes_the_whole_download_unless_shared() {

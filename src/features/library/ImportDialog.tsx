@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   FileCheck2,
@@ -8,6 +9,11 @@ import {
   FolderTree,
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
+import {
+  importTitle,
+  groupSwitchFiles,
+  type ImportGroup,
+} from "../../services/importTitle";
 import { bridge, isDesktop } from "../../services/bridge";
 import { LibraryManager } from "../../services/LibraryManager";
 import { platforms } from "../../db/platforms";
@@ -30,7 +36,7 @@ export function ImportDialog({
   );
   const [selected, setSelected] = useState(initial?.id ?? "custom");
   const [title, setTitle] = useState(
-    initial?.title ?? initialCandidate?.filename.replace(/\.[^.]+$/, "") ?? "",
+    initial?.title ?? (initialCandidate ? importTitle(initialCandidate) : ""),
   );
   const [platform, setPlatform] = useState(
     initialCandidate?.platformIds.find((p) => p === initial?.platformId) ??
@@ -45,19 +51,23 @@ export function ImportDialog({
   const [metadataError, setMetadataError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const [folderQueue, setFolderQueue] = useState<ImportCandidate[]>([]);
+  /** Files and emulator of a Switch game's folder, applied once it is in the library. */
+  const [bundles, setBundles] = useState<Record<string, ImportGroup>>({});
   useEffect(() => {
     if (!candidate || initial) return;
     let cancelled = false;
     setMetadataError("");
-    const stem = candidate.filename
-      .replace(/\.[^.]+$/, "")
-      .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
-      .trim();
+    const stem = importTitle(candidate);
     setMetadataSearch(stem);
     void Promise.all(
       candidate.platformIds.map(async (id) => {
-        const exact = await metadataProvider.match(id, candidate.filename);
+        // A Switch file is named by title ID; its folder is the real name.
+        const exact = await metadataProvider.match(
+          id,
+          id === "switch" ? stem : candidate.filename,
+        );
         return exact ? [exact] : metadataProvider.search(stem, id);
       }),
     )
@@ -93,11 +103,7 @@ export function ImportDialog({
             c.platformIds[0] ??
             "",
         );
-        const stem = c.filename
-          .replace(/\.[^.]+$/, "")
-          .replace(/\([^)]*\)|\[[^\]]*\]/g, "")
-          .replace(/[_-]/g, " ")
-          .trim();
+        const stem = importTitle(c).replace(/-/g, " ");
         if (!initial) {
           setTitle(stem);
           setMetadataSearch(stem);
@@ -167,11 +173,34 @@ export function ImportDialog({
           };
       if (!game.title) throw new Error(t("Enter a title for your game."));
       await new LibraryManager().import(game, candidate);
+      const bundle = bundles[candidate.path];
+      if (bundle?.extra.length || bundle?.emulator) {
+        const item = (await bridge.library()).find(
+          (entry) => entry.item.sha256 === candidate.sha256,
+        )?.item;
+        if (item) {
+          for (const extra of bundle.extra)
+            await bridge.addLaunchFile(item.id, extra.path);
+          // The folder's own yuzu.exe runs this game; nothing else uses it.
+          if (bundle.emulator) {
+            const id = `switch-${bundle.emulator.sha256.slice(0, 12)}`;
+            await bridge.saveEmulator({
+              id,
+              name: `${bundle.emulator.filename.replace(/\.exe$/i, "")} (${game.title})`,
+              executablePath: bundle.emulator.path,
+              supportedPlatforms: ["switch"],
+              defaultPlatforms: [],
+            });
+            await bridge.configureGame(item.id, id, null, []);
+            await queryClient.invalidateQueries({ queryKey: ["emulators"] });
+          }
+        }
+      }
       const [next, ...remaining] = folderQueue;
       if (next) {
         setFolderQueue(remaining);
         setCandidate(next);
-        setTitle(next.filename.replace(/\.[^.]+$/, ""));
+        setTitle(importTitle(next));
         setPlatform(next.platformIds[0] ?? "");
         setMatches([]);
         setSelected("custom");
@@ -191,11 +220,14 @@ export function ImportDialog({
     try {
       const path = await bridge.pickGameFolder();
       if (!path) return;
-      const [first, ...remaining] = await bridge.inspectGameFolder(path);
-      if (!first) return;
-      setFolderQueue(remaining);
+      const groups = groupSwitchFiles(await bridge.inspectGameFolder(path));
+      const [firstGroup, ...rest] = groups;
+      if (!firstGroup) return;
+      const first = firstGroup.main;
+      setBundles(Object.fromEntries(groups.map((g) => [g.main.path, g])));
+      setFolderQueue(rest.map((g) => g.main));
       setCandidate(first);
-      setTitle(first.filename.replace(/\.[^.]+$/, ""));
+      setTitle(importTitle(first));
       setPlatform(first.platformIds[0] ?? "");
       setMatches([]);
       setSelected("custom");

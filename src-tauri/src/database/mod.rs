@@ -55,9 +55,22 @@ pub fn initialize(path: &Path) -> Result<Database> {
         .map_err(error)?;
     tx.execute_batch(include_str!("009_single_player.sql"))
         .map_err(error)?;
-    tx.execute_batch(include_str!("010_managed_emulators.sql"))
+    // Once only: it removes emulators added by hand, and running it at every
+    // start would remove the ones added since.
+    let managed_only: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=10)",
+            [],
+            |r| r.get(0),
+        )
         .map_err(error)?;
+    if !managed_only {
+        tx.execute_batch(include_str!("010_managed_emulators.sql"))
+            .map_err(error)?;
+    }
     tx.execute_batch(include_str!("011_achievements.sql"))
+        .map_err(error)?;
+    tx.execute_batch(include_str!("012_launch_files.sql"))
         .map_err(error)?;
     // Old signals say little about today's taste and only grow the file.
     tx.execute(

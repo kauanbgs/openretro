@@ -2572,6 +2572,33 @@ test("the host moves guests between seats and reactions reach seated players", (
     { PARTY_TICKET_SECRET: INVITE_SECRET },
   ));
 
+test("a session stops renewing after a year and is written at most once in a while", () =>
+  using(async (f) => {
+    const one = await f.login();
+    const row = () =>
+      f.db.prepare("SELECT created_at, last_seen_at FROM sessions").first();
+    const first = await row();
+    const call = () =>
+      f.call("/api/auth/session", undefined, { token: one.token });
+    assert.equal((await call()).status, 200);
+    assert.equal((await call()).status, 200);
+    // Used again within seconds, the session row is not written again.
+    assert.equal((await row()).last_seen_at, first.last_seen_at);
+    // Used after the pause, it is renewed.
+    await f.db
+      .prepare("UPDATE sessions SET last_seen_at = ?")
+      .bind(Date.now() - 120000)
+      .run();
+    assert.equal((await call()).status, 200);
+    assert.ok((await row()).last_seen_at > Date.now() - 60000);
+    // A year after it began it ends, however often it was used.
+    await f.db
+      .prepare("UPDATE sessions SET created_at = ?")
+      .bind(Date.now() - 366 * 86400000)
+      .run();
+    assert.equal((await call()).status, 401);
+  }));
+
 test("a friend cannot be moved into the seat held for an unclaimed guest link", () =>
   using(
     async (f) => {

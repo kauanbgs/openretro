@@ -78,7 +78,8 @@ impl Format {
 /// window-sized readbacks are scaled to fit the stream.
 fn output_size(width: usize, height: usize, format: Format, party: bool) -> (usize, usize) {
     let (max_width, max_height) = if party {
-        (1280, 720)
+        let (width, height) = super::video::encoder_limit();
+        (width as usize, height as usize)
     } else {
         (MAX_WIDTH, MAX_HEIGHT)
     };

@@ -20,11 +20,13 @@ mod frames;
 mod process_audio;
 #[cfg(windows)]
 pub mod xinput;
+#[cfg(windows)]
+pub(crate) mod vigem;
 mod api;
 pub mod input;
 mod network;
 mod server;
-mod video;
+pub(crate) mod video;
 
 /// The runtime listens for player N on this port + N - 1, on loopback only.
 pub const REMOTE_PAD_BASE_PORT: u16 = 55400;

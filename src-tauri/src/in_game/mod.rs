@@ -11,6 +11,14 @@ mod screen_view;
 #[cfg(target_os = "windows")]
 pub(crate) mod sdl;
 use screen_view::ScreenView;
+#[cfg(target_os = "windows")]
+pub(crate) use host::Chrome;
+
+/// Whether an emulator has a menu or dialog of its own open.
+#[cfg(target_os = "windows")]
+pub(crate) fn has_popup(pid: u32) -> bool {
+    host::has_popup(pid)
+}
 
 #[derive(Default)]
 pub struct InGameService(Mutex<Option<Session>>, std::sync::atomic::AtomicBool);
@@ -130,6 +138,32 @@ impl SessionGuard {
                 Err(message) => log::warn!("Could not embed the runtime window again: {message}"),
             }
         }
+    }
+    /// The emulator window's menu bar and status bar, once its game draws.
+    #[cfg(target_os = "windows")]
+    pub fn chrome_insets(&self) -> Option<[i32; 4]> {
+        host::chrome_insets(self.embedded()?)
+    }
+    /// Shows only the wanted bar of the emulator's window.
+    #[cfg(target_os = "windows")]
+    pub fn show_chrome(&self, insets: [i32; 4], bar: host::Chrome) {
+        if let Some(window) = self.embedded() {
+            host::show_chrome(window, insets, bar);
+        }
+    }
+    /// The pointer's height in OpenRetro's window, and that window's height.
+    #[cfg(target_os = "windows")]
+    pub fn pointer_height(&self) -> Option<(i32, i32)> {
+        host::pointer_height(self.embedded()?)
+    }
+    #[cfg(target_os = "windows")]
+    fn embedded(&self) -> Option<isize> {
+        let service = self.app.state::<InGameService>();
+        let guard = service.0.lock().ok()?;
+        guard
+            .as_ref()
+            .filter(|session| session.info.id == self.id)
+            .and_then(|session| session.embedded_window)
     }
     /// Shows the process's game window inside OpenRetro's main window. RPCS3
     /// takes no commands, so its session only gets this: no command channel

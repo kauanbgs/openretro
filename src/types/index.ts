@@ -105,6 +105,12 @@ export interface ActiveVariant {
   sha256: string;
   savesShared: boolean;
 }
+/** A file a game can start from: its own, or one the player added. */
+export interface LaunchFile {
+  path: string;
+  original: boolean;
+  exists: boolean;
+}
 export interface LibraryGame {
   game: GameMetadata;
   item: LibraryItem;
@@ -150,6 +156,8 @@ export interface ImportCandidate {
   filename: string;
   sha256: string;
   platformIds: string[];
+  /** A name the file's surroundings give the game, such as an emulator's cache. */
+  titleHint?: string;
 }
 export interface AppSettings {
   autoResume?: boolean;
@@ -190,6 +198,8 @@ export interface AppSettings {
   deleteArchives?: boolean;
   /** Install the latest official update before a PS3 game starts. */
   ps3Updates?: boolean;
+  /** Largest picture Party sends to guests; 1080p needs a faster PC and link. */
+  partyResolution?: "720p" | "1080p";
   /** Internal resolution of PS2 games in the managed runtime. */
   ps2Resolution?: "1x" | "2x" | "4x" | "8x";
   /** Image sizing for PS2 and retro games in the managed runtime. */
@@ -278,6 +288,7 @@ export interface DownloadJob {
   stage?: string | null;
   libraryStatus?: "added" | "manual" | null;
   libraryMessage?: string | null;
+  hasInstaller?: boolean;
 }
 export interface DownloadImported {
   gameId: string;

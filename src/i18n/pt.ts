@@ -19,7 +19,6 @@ export const pt: Record<string, string> = {
   "Update {name}": "Atualizar {name}",
   "Remove {name}": "Remover {name}",
   "HTTPS. Refresh imports the latest version without losing the saved source.": "HTTPS. Atualizar importa a versão mais recente sem perder a fonte salva.",
-  "Source exceeds the 16 MB limit.": "A fonte excede o limite de 16 MB.",
   "Could not read this JSON file.": "Não foi possível ler este arquivo JSON.",
   "HTTPS links and magnet entries are imported. Sources are stored on this device; no account is required.": "Links HTTPS e magnet links são importados. As fontes ficam salvas neste dispositivo; não é preciso criar conta.",
   "Update source": "Atualizar fonte",

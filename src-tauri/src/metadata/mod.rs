@@ -28,7 +28,7 @@ const USER_AGENT: &str = concat!(
     " (+https://github.com/kauanbgs/openretro)"
 );
 /// Bump when the index layout changes so existing installs rebuild.
-const SCHEMA_VERSION: &str = "2";
+const SCHEMA_VERSION: &str = "3";
 const REFRESH_AFTER_SECONDS: i64 = 7 * 86_400;
 const INDEX_SCHEMA: &str = "PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF;
          CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -59,6 +59,7 @@ const PLATFORMS: &[(&str, &str)] = &[
     ("Sony Playstation 2", "ps2"),
     // Browsable only, to see what the catalog would offer before supporting it.
     ("Sony Playstation 3", "ps3"),
+    ("Nintendo Switch", "switch"),
     ("Arcade", "arcade"),
     ("MS-DOS", "dos"),
 ];

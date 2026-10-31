@@ -12,6 +12,8 @@ import { t } from "../i18n";
 export const MANAGED_RUNTIME_ID = "openretro-retroarch";
 /** PS3's emulator installs itself, with the console's system, on the first launch. */
 export const MANAGED_PS3_ID = "openretro-rpcs3";
+/** Consoles that run in an emulator the player sets up. */
+const EXTERNAL_ONLY = new Set(["switch"]);
 export class GameResolver {
   constructor(
     private exists: (path: string) => Promise<boolean>,
@@ -47,9 +49,19 @@ export class GameResolver {
     if (!emulator || !(await this.exists(emulator.executablePath)))
       return {
         state: "MISSING_EMULATOR",
-        message: t("O OpenRetro ainda não roda jogos de {console}.", {
-          console: platform.name,
-        }),
+        message: !EXTERNAL_ONLY.has(platform.id)
+          ? t("O OpenRetro ainda não roda jogos de {console}.", {
+              console: platform.name,
+            })
+          : emulator
+            ? t(
+                "O emulador de {console} não foi encontrado. Escolha o .exe dele em Emuladores.",
+                { console: platform.name },
+              )
+            : t(
+                "Nenhum emulador de {console} configurado. Adicione o yuzu (ou outro) em Emuladores.",
+                { console: platform.name },
+              ),
       };
     if (emulator.id === MANAGED_RUNTIME_ID) {
       if (!(await this.runtimeBios(platform.id)))

@@ -109,6 +109,16 @@ fn retroarch_core(
     Ok(managed)
 }
 
+/// How close to a screen edge the pointer brings the emulator's menu or status bar.
+#[cfg(windows)]
+const EDGE: i32 = 6;
+#[cfg(windows)]
+use crate::in_game::Chrome;
+/// yuzu and the emulators forked from it share one command line.
+fn yuzu_family(executable: &std::path::Path) -> bool {
+    let name = executable.file_stem().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    ["yuzu", "eden", "citron", "suyu", "sudachi", "torzu"].iter().any(|prefix| name.starts_with(prefix))
+}
 pub fn select_emulator(
     conn: &rusqlite::Connection,
     entry: &crate::models::LibraryGame,
@@ -150,13 +160,14 @@ pub async fn launch_game(
     id: String,
     slot: Option<i32>,
     netplay: Option<netplay::Netplay>,
+    file: Option<String>,
 ) -> Result<i64> {
     if slot.is_some_and(|slot| !(-1..=99).contains(&slot)) {
         return Err("Slot de estado inválido.".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted) = {
+ let (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted,chosen) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
@@ -169,17 +180,31 @@ pub async fn launch_game(
   // The runtime's SDL2 tells which controllers are connected.
   let sdl_library=database::emulators(&conn)?.into_iter().find(|e|e.id=="openretro-retroarch").and_then(|e|std::path::Path::new(&e.executable_path).parent().map(|dir|dir.join("SDL2.dll")));
   let hardcore_wanted=crate::achievements::hardcore_enabled(&conn);
-  (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted)
+  // The player may start from another of the game's files (a Switch update or
+  // DLC); only the entry's own file and the ones added to it count.
+  let chosen=match file {
+     Some(path) if path!=entry.item.source_path => {
+        let added=conn.query_row("SELECT 1 FROM launch_files WHERE library_item_id=?1 AND path=?2",rusqlite::params![id,path],|_|Ok(())).is_ok();
+        if !added { return Err("Este arquivo não faz parte do jogo. Escolha outro na lista.".into()); }
+        Some(path)
+     }
+     _ => None,
+  };
+  (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted,chosen)
  };
  // The selected translation or hack plays instead of the original file.
  let variant=entry.item.active_variant.clone();
- let game_path=filesystem::canonical_file(variant.as_ref().map_or(&entry.item.source_path,|v|&v.path)).map_err(|e| if variant.is_some() { "O arquivo da versão modificada sumiu. Volte para o jogo original ou reinstale a modificação em \"Traduções e mods\".".to_string() } else { e })?;
+ let game_path=filesystem::canonical_file(chosen.as_ref().or(variant.as_ref().map(|v|&v.path)).unwrap_or(&entry.item.source_path)).map_err(|e| if chosen.is_none() && variant.is_some() { "O arquivo da versão modificada sumiu. Volte para o jogo original ou reinstale a modificação em \"Traduções e mods\".".to_string() } else { e })?;
  // PS3 games install their emulator, system software and disc keys on first use.
  let ps3=emulator.id=="openretro-rpcs3";
  let managed_retroarch=is_managed_runtime(&emulator,&entry);
+ // Switch emulators are the player's own, but play inside OpenRetro's window
+ // like RPCS3, so a Party or phone can see, hear and control them.
+ let switch=entry.item.platform_id=="switch" && !managed_retroarch;
+ let hosted=ps3 || switch;
  // Reserve before setup/installations so two launch requests cannot prepare
  // or boot the same managed emulator at the same time.
- let runtime_session=if managed_retroarch || ps3 { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
+ let runtime_session=if managed_retroarch || hosted { Some(crate::in_game::reserve(&app, &id, &entry.game.title, slot.unwrap_or(0).max(0))?) } else { None };
  crate::remote_play::input::dpad_as_stick(&entry.game.platform_id);
  #[cfg(windows)]
  if ps3 {
@@ -201,7 +226,21 @@ pub async fn launch_game(
  #[cfg(windows)]
  let phones=crate::remote_play::running(&app);
  #[cfg(windows)]
- let party_pads=if ps3 && (phones || crate::in_game::party_input(&app)) { Some(crate::remote_play::xinput::PartyPads::create()?) } else { None };
+ let party_pads=if hosted && (phones || crate::in_game::party_input(&app)) { Some(crate::remote_play::xinput::PartyPads::create()?) } else { None };
+ // Party players reach an SDL or XInput emulator as XInput pads 2 to 4.
+ // SDL emulators only see real devices: phones and Party guests become
+ // virtual Xbox 360 pads (ViGEmBus) for as long as the game runs. The XInput
+ // shim, which only RPCS3 reads, is taken out of the emulator's folder.
+ #[cfg(windows)]
+ let _virtual_pads=if switch {
+    let _=crate::remote_play::xinput::install(executable.parent().ok_or("Invalid emulator directory")?,false);
+    if phones || crate::in_game::party_input(&app) {
+       // Phone and Party players need the driver: install it when it is missing.
+       Some(crate::remote_play::vigem::Session::start_installing()?)
+    } else {
+       crate::remote_play::vigem::Session::start().ok()
+    }
+ } else { None };
  let bios=entry.item.bios_path.as_ref().map(|p|filesystem::canonical_file(p)).transpose()?;
  if slot.is_some() && !managed_retroarch { return Err("Estados salvos só podem ser abertos pelo OpenRetro Runtime.".into()); }
  if let Some(netplay)=&netplay {
@@ -267,7 +306,11 @@ pub async fn launch_game(
     #[cfg(not(windows))]
     { let _=&sdl_library; unreachable!() }
  } else { entry.item.runtime_args.iter().map(|a|a.replace("{game}",&game_path.to_string_lossy()).replace("{bios}",&bios.as_ref().map(|p|p.to_string_lossy().into_owned()).unwrap_or_default())).collect() };
- if !managed_retroarch && !ps3 && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) { args.push(game_path.to_string_lossy().into_owned()); }
+ if !managed_retroarch && !ps3 && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) {
+    // yuzu and its forks open their game list first unless told to boot the game.
+    if switch && yuzu_family(&executable) { args.push("-g".into()); }
+    args.push(game_path.to_string_lossy().into_owned());
+ }
  let session=uuid::Uuid::new_v4().to_string(); let started=chrono::Utc::now().to_rfc3339();
  {
  let mut conn=db.0.lock().map_err(error)?; let tx=conn.transaction().map_err(error)?;
@@ -286,12 +329,17 @@ pub async fn launch_game(
  if ps3 { use std::os::windows::process::CommandExt; command.creation_flags(0x00008000); } // ABOVE_NORMAL_PRIORITY_CLASS
  #[cfg(windows)]
  if let Some(pads)=&party_pads { command.env(crate::remote_play::xinput::ENV,&pads.name); }
+ // Some yuzu builds ask Windows for administrator rights in their manifest,
+ // which a normal app cannot grant (error 740); an emulator needs none to
+ // play, and an elevated window could not be embedded in OpenRetro anyway.
+ #[cfg(windows)]
+ if switch { command.env("__COMPAT_LAYER","RunAsInvoker"); }
  let child=managed_process::ManagedChild::spawn(&mut command);
- let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
+ let mut child=match child { Ok(c)=>c,Err(e)=>{ db.0.lock().map_err(error)?.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?; if e.raw_os_error()==Some(740) { return Err("O Windows exige administrador para abrir este emulador. Clique com o botão direito no .exe do emulador, abra Propriedades > Compatibilidade e desmarque \"Executar este programa como administrador\". Um emulador elevado também não abre dentro do OpenRetro.".into()); } return Err(format!("The emulator could not be started: {e}. Check its permissions and configuration.")); } };
  if let Some(runtime_session)=&runtime_session {
     // Both play inside OpenRetro's window; only the runtime takes commands.
-    let hosted=if ps3 { runtime_session.host(child.id()) } else if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable) } else { Ok(()) };
-    if let Err(message)=hosted {
+    let attached=if hosted { runtime_session.host(child.id()) } else if let Some(stdin)=child.stdin.take() { runtime_session.attach(stdin,child.id(),&executable) } else { Ok(()) };
+    if let Err(message)=attached {
       let code=match child.try_wait() { Ok(Some(status))=>status.code(), _=>{ let _=child.kill(); child.wait().ok().and_then(|status|status.code()) } };
       let conn=db.0.lock().map_err(error)?;
       conn.execute("DELETE FROM play_sessions WHERE id=?1",[&session]).map_err(error)?;
@@ -310,6 +358,14 @@ pub async fn launch_game(
  // closes. Give it time to finish saves, then reap the managed child.
  let mut closed_since=None;
  let mut checked=Instant::now();
+ // A Switch emulator draws its game under a menu bar and a status bar. They
+ // stay hidden, and show while the pointer is at the top or bottom edge.
+ #[cfg(windows)]
+ let mut bars:Option<[i32;4]>=None;
+ #[cfg(windows)]
+ let mut bar=Chrome::Hidden;
+ #[cfg(windows)]
+ let mut bars_checked=Instant::now();
  let status=loop {
     match child.try_wait() {
        Ok(Some(status))=>break Ok(status),
@@ -320,6 +376,29 @@ pub async fn launch_game(
     if managed_retroarch && checked.elapsed()>=Duration::from_millis(500) {
        if let Some(session)=&runtime_session { session.keep_embedded(child.id()); }
        checked=Instant::now();
+    }
+    #[cfg(windows)]
+    if switch {
+       if let Some(session)=&runtime_session {
+          match bars {
+             None if bars_checked.elapsed()>=Duration::from_millis(500) => {
+                bars=session.chrome_insets();
+                if let Some(insets)=bars { session.show_chrome(insets,bar); }
+                bars_checked=Instant::now();
+             }
+             Some(insets) => {
+                // Menus and dialogs of the emulator belong to a bar: it stays while they are open.
+                let wanted=match session.pointer_height() {
+                   Some((y,_)) if y<=EDGE || (bar==Chrome::Menu && y<=insets[1]+EDGE) => Chrome::Menu,
+                   Some((y,height)) if y>=height-EDGE || (bar==Chrome::Status && y>=height-insets[3]-EDGE) => Chrome::Status,
+                   _ => Chrome::Hidden,
+                };
+                let wanted=if wanted==Chrome::Hidden && bar!=Chrome::Hidden && crate::in_game::has_popup(child.id()) { bar } else { wanted };
+                if wanted!=bar { bar=wanted; session.show_chrome(insets,bar); }
+             }
+             None => {}
+          }
+       }
     }
     if runtime_session.as_ref().is_some_and(|session|session.window_closed()) {
        if closed_since.get_or_insert_with(Instant::now).elapsed()>=Duration::from_secs(5) {
@@ -338,8 +417,8 @@ pub async fn launch_game(
  drop(conn);
  if let (true,Some(log))=(achievements_session,&runtime_log) { crate::achievements::finish_session(&app,&id,&entry.game.title,variant.is_none(),log); }
  let status=status.map_err(error)?;
- // RPCS3 can report an error code while shutting down after a normal exit.
- if !status.success() && !ps3 {
+ // RPCS3 and Switch emulators can report an error code while shutting down after a normal exit.
+ if !status.success() && !hosted {
     let message=format!("The emulator exited with code {}. Your session was saved. Check that the game format, core, and any required BIOS are supported.",status.code().map(|code| code.to_string()).unwrap_or_else(|| "an unknown status".into()));
     return Err(match &runtime_log { Some(log)=>diagnosis::explain(&*db.0.lock().map_err(error)?,log,status.code(),message), None=>message });
  }

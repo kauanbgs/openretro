@@ -26,6 +26,12 @@ import {
 
 const CODE_MS = 10 * 60 * 1000;
 const SESSION_MS = 90 * 24 * 60 * 60 * 1000;
+// A session is renewed while used, but only up to this age: after it the
+// person signs in again, so a stolen token cannot live forever.
+const SESSION_MAX_MS = 365 * 24 * 60 * 60 * 1000;
+// Renewing is a write to the primary database, so it happens at most this
+// often; presence counts someone online for 90 s, well above it.
+const TOUCH_MS = 30 * 1000;
 const RESEND_MS = 60 * 1000;
 const invalidCode =
   "Código inválido ou expirado. Confira o e-mail ou peça outro código.";
@@ -307,14 +313,31 @@ export async function authenticate(request, db, now) {
   const authorization = request.headers.get("Authorization") || "";
   if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) throw invalidSession();
   const tokenHash = await sha256(authorization.slice(7));
-  const session = await db
+  let session = await db
     .prepare(
-      `UPDATE sessions SET last_seen_at = ?, expires_at = ?
-    WHERE token_hash = ? AND expires_at > ? RETURNING id, user_id, created_at, last_seen_at, expires_at`,
+      `SELECT id, user_id, created_at, last_seen_at, expires_at FROM sessions
+    WHERE token_hash = ? AND expires_at > ? AND created_at > ?`,
     )
-    .bind(now, now + SESSION_MS, tokenHash, now)
+    .bind(tokenHash, now, now - SESSION_MAX_MS)
     .first();
   if (!session) throw invalidSession();
+  const renewTo = Math.min(
+    now + SESSION_MS,
+    session.created_at + SESSION_MAX_MS,
+  );
+  if (
+    session.last_seen_at <= now - TOUCH_MS ||
+    session.expires_at < renewTo - TOUCH_MS
+  ) {
+    session = await db
+      .prepare(
+        `UPDATE sessions SET last_seen_at = ?, expires_at = ?
+    WHERE token_hash = ? AND expires_at > ? RETURNING id, user_id, created_at, last_seen_at, expires_at`,
+      )
+      .bind(now, renewTo, tokenHash, now)
+      .first();
+    if (!session) throw invalidSession();
+  }
   const user = await db
     .prepare("SELECT * FROM users WHERE id = ?")
     .bind(session.user_id)

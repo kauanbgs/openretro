@@ -46,6 +46,7 @@ import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
 import { NetplayDialog } from "./NetplayDialog";
+import { LaunchFileDialog } from "./LaunchFileDialog";
 import { ModsTab } from "./ModsTab";
 import {
   AchievementsTab,
@@ -118,6 +119,7 @@ export function GamePage({
   const [busy, setBusy] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState(false);
   const [netplay, setNetplay] = useState(startOnline);
+  const [chooseFile, setChooseFile] = useState(false);
   const [downloadQuery, setDownloadQuery] = useState("");
   const [downloadSource, setDownloadSource] = useState("all");
   const [trailer, setTrailer] = useState<string>();
@@ -164,6 +166,11 @@ export function GamePage({
   );
   // Bumped after a BIOS is added so the resolver runs again.
   const [biosVersion, setBiosVersion] = useState(0);
+  // An emulator registered while this screen was loaded (a phone keeps its
+  // list from before) must be seen, or the game reads as unsupported.
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: ["emulators"] });
+  }, [queryClient, game.id]);
   useEffect(() => {
     let active = true;
     new GameResolver(bridge.exists, bridge.runtimeBiosStatus)
@@ -205,20 +212,31 @@ export function GamePage({
       setBusy(false);
     }
   }
-  async function play(slot?: number, session?: NetplaySession) {
+  /** Switch games can have several files; Play asks which one to run. */
+  function startPlay() {
+    if (entry?.item.platformId === "switch" && isDesktop && !isRemote)
+      setChooseFile(true);
+    else void play();
+  }
+  async function play(slot?: number, session?: NetplaySession, file?: string) {
     if (!entry) return;
     setRunning(true);
     try {
+      const latest = await queryClient.fetchQuery({
+        queryKey: ["emulators"],
+        queryFn: bridge.emulators,
+        staleTime: 0,
+      });
       const r = await new GameResolver(
         bridge.exists,
         bridge.runtimeBiosStatus,
-      ).resolve(game, entry.item, emulators);
+      ).resolve(game, entry.item, latest);
       setResolution(r);
       if (r.state !== "READY") {
         notify(r.message);
         return;
       }
-      const seconds = await bridge.launch(entry.item.id, slot, session);
+      const seconds = await bridge.launch(entry.item.id, slot, session, file);
       // On a phone the game runs on the PC; switch to its game screen.
       if (isRemote) return void window.location.assign("/play");
       notify(
@@ -314,7 +332,7 @@ export function GamePage({
             disabled={running || busy}
             onClick={() =>
               entry
-                ? void play()
+                ? startPlay()
                 : (setDownloadQuery(""),
                   setDownloadSource("all"),
                   setDownloadOptions(true))
@@ -937,6 +955,18 @@ export function GamePage({
             )}
           </div>
         </Modal>
+      )}
+      {chooseFile && entry && (
+        <LaunchFileDialog
+          itemId={entry.item.id}
+          title={game.title}
+          notify={notify}
+          onClose={() => setChooseFile(false)}
+          onPlay={(file) => {
+            setChooseFile(false);
+            void play(undefined, undefined, file);
+          }}
+        />
       )}
       {netplay && entry && (
         <NetplayDialog

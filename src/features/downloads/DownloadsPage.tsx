@@ -251,6 +251,29 @@ export function DownloadsPage({
                       </button>
                     ) : null}
                     {j.state === "COMPLETED" &&
+                      j.hasInstaller &&
+                      j.libraryStatus !== "added" && (
+                        <button
+                          disabled={busy}
+                          className="button secondary"
+                          title={t(
+                            "Abre o setup.exe deste download. Instale só programas de fontes em que você confia.",
+                          )}
+                          onClick={() =>
+                            void run(async () => {
+                              await bridge.runDownloadInstaller(j.id);
+                              notify(
+                                t(
+                                  "Instalador aberto. Quando terminar, volte e escolha Adicionar à biblioteca.",
+                                ),
+                              );
+                            })
+                          }
+                        >
+                          <Download size={15} /> {t("Instalar")}
+                        </button>
+                      )}
+                    {j.state === "COMPLETED" &&
                     j.libraryStatus === "added" ? null : j.state ===
                       "COMPLETED" ? (
                       <button

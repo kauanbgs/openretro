@@ -52,6 +52,9 @@ pub struct DownloadJob {
     pub library_status: Option<String>,
     #[serde(default)]
     pub library_message: Option<String>,
+    /// A repack's installer sits in the folder; worked out when the jobs are listed.
+    #[serde(default, skip_deserializing)]
+    pub has_installer: bool,
 }
 struct ActiveTask {
     cancel: CancellationToken,
@@ -326,6 +329,27 @@ fn response_filename(headers: &reqwest::header::HeaderMap) -> Option<String> {
         .map(|name| name.trim_matches('"'))
         .and_then(safe_download_filename)
 }
+/// The 16-digit title ID a Switch dump's name carries, if any.
+fn switch_title_id(name: &str) -> Option<&str> {
+    let bytes = name.as_bytes();
+    (0..bytes.len().saturating_sub(15)).find_map(|start| {
+        let id = name.get(start..start + 16)?;
+        let hex = id.bytes().all(|b| b.is_ascii_hexdigit());
+        let end = bytes.get(start + 16).is_none_or(|b| !b.is_ascii_hexdigit());
+        let begin = start == 0 || !bytes[start - 1].is_ascii_hexdigit();
+        (hex && end && begin && id.starts_with("0100")).then_some(id)
+    })
+}
+/// Lower sorts first: the base game before its updates and DLC.
+fn switch_rank(filename: &str) -> u8 {
+    let name = filename.to_ascii_lowercase();
+    let later = match switch_title_id(&name) {
+        Some(id) => !id.ends_with("000"),
+        None => ["update", "dlc", "patch"].iter().any(|word| name.contains(word)),
+    };
+    let packed = name.ends_with(".nsp") || name.ends_with(".nsz");
+    u8::from(packed) + if later { 10 } else { 0 }
+}
 fn playable_extension(path: &Path) -> bool {
     matches!(
         path.extension()
@@ -333,7 +357,9 @@ fn playable_extension(path: &Path) -> bool {
             .unwrap_or("")
             .to_ascii_lowercase()
             .as_str(),
-        "gb" | "gbc"
+        "nsp" | "xci" | "nsz" | "xcz"
+            | "gb"
+            | "gbc"
             | "gba"
             | "nes"
             | "sfc"
@@ -675,6 +701,17 @@ fn add_to_library(
         .filter(|file| file.platform_ids.contains(&game.platform_id))
         .filter(|file| chosen.is_none_or(|chosen| Path::new(&file.path) == chosen))
         .collect();
+    // A Switch game arrives as its base file plus updates and DLC: the base
+    // is the game and the rest are files to choose from when playing.
+    let (matches, extras) = if game.platform_id == "switch" && chosen.is_none() && matches.len() > 1 {
+        let mut ordered = matches;
+        ordered.sort_by(|a, b| switch_rank(&a.filename).cmp(&switch_rank(&b.filename)).then(a.filename.cmp(&b.filename)));
+        let extras: Vec<String> = ordered.iter().skip(1).map(|file| file.path.clone()).collect();
+        ordered.truncate(1);
+        (ordered, extras)
+    } else {
+        (matches, Vec::new())
+    };
     let file = match matches.as_slice() {
         [file] => file,
         [] => {
@@ -711,8 +748,14 @@ fn add_to_library(
         Err(message) => return manual(message),
     };
     reporter.begin(job, "Adicionando à biblioteca");
+    let sha256 = candidate.sha256.clone();
     match crate::commands::insert_library_game(app, game.clone(), candidate) {
         Ok(()) => {
+            if !extras.is_empty() {
+                if let Err(message) = crate::commands::add_launch_files(app, &sha256, &extras) {
+                    log::warn!("Switch update and DLC files were not added: {message}");
+                }
+            }
             let _ = app.emit(
                 "download-imported",
                 serde_json::json!({"gameId": game.id, "downloadId": job.id}),
@@ -879,6 +922,7 @@ pub async fn start_source_download(
         stage: None,
         library_status: None,
         library_message: None,
+        has_installer: false,
     };
     if is_magnet {
         spawn_transfer(&app, job)?;
@@ -896,8 +940,69 @@ pub fn list_download_jobs(db: State<Database>) -> Result<Vec<DownloadJob>> {
     let rows = stmt
         .query_map([], |r| r.get::<_, String>(0))
         .map_err(error)?;
-    rows.map(|r| serde_json::from_str(&r.map_err(error)?).map_err(error))
-        .collect()
+    let mut jobs = rows
+        .map(|r| serde_json::from_str::<DownloadJob>(&r.map_err(error)?).map_err(error))
+        .collect::<Result<Vec<_>>>()?;
+    for job in jobs.iter_mut().filter(|job| job.state == "COMPLETED") {
+        job.has_installer = find_installer(Path::new(&job.directory)).is_some();
+    }
+    Ok(jobs)
+}
+/// A repack ships its own installer, `setup.exe`, in the download folder or
+/// directly inside one of its folders. Only that file counts, so the button
+/// never offers an arbitrary program from the download.
+fn find_installer(root: &Path) -> Option<PathBuf> {
+    let root = root.canonicalize().ok()?;
+    let named = |dir: &Path| {
+        std::fs::read_dir(dir).ok()?.flatten().find_map(|entry| {
+            let kind = entry.file_type().ok()?;
+            (kind.is_file()
+                && entry
+                    .file_name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case("setup.exe"))
+            .then(|| entry.path().canonicalize().ok())
+            .flatten()
+            .filter(|path| path.starts_with(&root))
+        })
+    };
+    named(&root).or_else(|| {
+        std::fs::read_dir(&root)
+            .ok()?
+            .flatten()
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+            .find_map(|entry| named(&entry.path()))
+    })
+}
+/// Opens the installer a finished download brought, which asks Windows for
+/// the permissions it needs. The player starts it by choosing Instalar.
+#[tauri::command]
+pub async fn run_download_installer(app: tauri::AppHandle, id: String) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let job = get_job(&app, &id)?;
+        if job.state != "COMPLETED" {
+            return Err("Espere o download terminar para instalar.".into());
+        }
+        let installer = find_installer(Path::new(&job.directory))
+            .ok_or("Não encontrei o instalador (setup.exe) nessa pasta.")?;
+        #[cfg(target_os = "windows")]
+        {
+            // Explorer opens it the way a double click does, so Windows shows
+            // its own permission prompt when the installer asks for one.
+            std::process::Command::new("explorer.exe")
+                .arg(&installer)
+                .spawn()
+                .map_err(error)?;
+            Ok(())
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = installer;
+            Err("Instaladores só abrem no Windows.".into())
+        }
+    })
+    .await
+    .map_err(error)?
 }
 #[tauri::command]
 pub async fn control_download(app: tauri::AppHandle, id: String, action: String) -> Result<()> {
@@ -1061,7 +1166,7 @@ fn collect_files(
                 .to_lowercase();
             if [
                 "gb", "gbc", "gba", "nes", "sfc", "smc", "z64", "n64", "v64", "nds", "sms", "md",
-                "gen", "gg", "cue", "chd", "pbp", "iso", "cso", "bin",
+                "gen", "gg", "cue", "chd", "pbp", "iso", "cso", "bin", "nsp", "xci", "nsz", "xcz",
             ]
             .contains(&extension.as_str())
             {
@@ -1112,6 +1217,21 @@ mod tests {
         std::fs::write(root.join("default.xex"), b"").unwrap();
         assert_eq!(unsupported_console(&root), Some("Xbox 360"));
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_switch_download_puts_the_base_game_before_updates_and_dlc() {
+        let mut names = vec![
+            "Zelda [01007EF00011E800][v65536].nsp",
+            "Zelda DLC [01007EF00011F001].nsp",
+            "Zelda [01007EF00011E000].nsp",
+            "Zelda.xci",
+        ];
+        names.sort_by_key(|name| switch_rank(name));
+        assert_eq!(names[0], "Zelda.xci");
+        assert_eq!(names[1], "Zelda [01007EF00011E000].nsp");
+        assert_eq!(switch_title_id("01007ef00011e800.nsp"), Some("01007ef00011e800"));
+        assert_eq!(switch_title_id("game.nsp"), None);
     }
 
     #[test]

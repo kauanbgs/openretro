@@ -12,10 +12,7 @@ import {
 } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { bridge, isDesktop } from "../../services/bridge";
-import {
-  MAX_SOURCE_BYTES,
-  parseDownloadSource,
-} from "../../services/downloadSources";
+import { parseDownloadSource } from "../../services/downloadSources";
 import type { DownloadSource } from "../../types";
 import { locale, t } from "../../i18n";
 
@@ -362,10 +359,6 @@ export function SourceManager() {
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    if (f.size > MAX_SOURCE_BYTES) {
-                      setError(t("Source exceeds the 16 MB limit."));
-                      return;
-                    }
                     void f
                       .text()
                       .then((t) => {

@@ -98,4 +98,8 @@ pub struct ImportCandidate {
     pub filename: String,
     pub sha256: String,
     pub platform_ids: Vec<String>,
+    /// A name the file's own surroundings give the game, such as the title an
+    /// emulator cached for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_hint: Option<String>,
 }

@@ -232,6 +232,22 @@ fn cookie_token(headers: &HeaderMap) -> Option<&str> {
         .find_map(|pair| pair.trim().strip_prefix(&format!("{COOKIE}=")[..]))
 }
 
+/// The address token pairs a phone once, on the page that sets the cookie.
+/// Sockets from the network must carry the cookie; only this PC's own
+/// windows, which cannot keep one, may still send the token in the address.
+fn paired_from(
+    shared: &Shared,
+    pairing: &Pairing,
+    headers: &HeaderMap,
+    peer: SocketAddr,
+) -> bool {
+    if peer.ip().is_loopback() {
+        paired(shared, pairing, headers)
+    } else {
+        paired(shared, &Pairing { t: None }, headers)
+    }
+}
+
 fn paired(shared: &Shared, pairing: &Pairing, headers: &HeaderMap) -> bool {
     pairing
         .t
@@ -257,7 +273,8 @@ fn pair_then(shared: &Shared, pairing: &Pairing, to: &str) -> Option<Response> {
     }
     // QR scanners can open this as a cross-site navigation. Lax lets the
     // cookie accompany the top-level GET redirect on a phone's first visit.
-    let cookie = format!("{COOKIE}={given}; Path=/; HttpOnly; SameSite=Lax");
+    // The cookie lasts a day: a phone that is gone does not stay paired.
+    let cookie = format!("{COOKIE}={given}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400");
     Some(([(header::SET_COOKIE, cookie)], Redirect::to(to)).into_response())
 }
 
@@ -391,11 +408,12 @@ async fn file(
 
 async fn event_socket(
     State(shared): State<Arc<Shared>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Query(pairing): Query<Pairing>,
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    if !paired(&shared, &pairing, &headers) {
+    if !paired_from(&shared, &pairing, &headers, peer) {
         return StatusCode::FORBIDDEN.into_response();
     }
     let mut events = shared.events.subscribe();
@@ -415,11 +433,12 @@ async fn event_socket(
 
 async fn socket(
     State(shared): State<Arc<Shared>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Query(pairing): Query<Pairing>,
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    if !paired(&shared, &pairing, &headers) {
+    if !paired_from(&shared, &pairing, &headers, peer) {
         return StatusCode::FORBIDDEN.into_response();
     }
     upgrade.on_upgrade(move |socket| session(shared, socket, false, true))
@@ -428,11 +447,12 @@ async fn socket(
 // Party's local bridge never sends the launcher's fallback screen to guests.
 async fn party_socket(
     State(shared): State<Arc<Shared>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Query(pairing): Query<Pairing>,
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    if !paired(&shared, &pairing, &headers) {
+    if !paired_from(&shared, &pairing, &headers, peer) {
         return StatusCode::FORBIDDEN.into_response();
     }
     upgrade.on_upgrade(move |socket| session(shared, socket, true, true))
@@ -442,11 +462,12 @@ async fn party_socket(
 /// would otherwise receive a copy of every raw frame it never shows.
 async fn party_input_socket(
     State(shared): State<Arc<Shared>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Query(pairing): Query<Pairing>,
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    if !paired(&shared, &pairing, &headers) {
+    if !paired_from(&shared, &pairing, &headers, peer) {
         return StatusCode::FORBIDDEN.into_response();
     }
     upgrade.on_upgrade(move |socket| session(shared, socket, true, false))
@@ -972,7 +993,7 @@ fn handle(
         Incoming::Launch { id } => {
             let app = shared.app.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = crate::launcher::launch_game(app, id, None, None).await {
+                if let Err(e) = crate::launcher::launch_game(app, id, None, None, None).await {
                     log::warn!("Phone play launch: {e}");
                 }
             });

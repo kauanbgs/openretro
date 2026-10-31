@@ -413,6 +413,31 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                   </select>
                 </div>
               </Group>
+              <Group title={t("Party")}>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Qualidade da imagem da Party")}</strong>
+                    <p>
+                      {t(
+                        "Tamanho máximo da imagem enviada aos convidados. 1080p fica mais nítido, mas exige um PC mais forte e uma conexão rápida; a Party reduz sozinha se a conexão não aguentar.",
+                      )}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Qualidade da imagem da Party")}
+                    value={settings.partyResolution ?? "720p"}
+                    onChange={(e) =>
+                      void save({
+                        partyResolution: e.target
+                          .value as AppSettings["partyResolution"],
+                      })
+                    }
+                  >
+                    <option value="720p">{t("720p · recomendado")}</option>
+                    <option value="1080p">{t("1080p · mais nítido")}</option>
+                  </select>
+                </div>
+              </Group>
               <Group title={t("Atualizações")}>
                 <div className="setting-row">
                   <div>

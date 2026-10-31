@@ -167,6 +167,89 @@ export const releaseNotes: Record<string, ReleaseNote> = {
       en: "Have fun, and happy chatting!",
     },
   },
+  "1.2.0": {
+    date: "2026-10-31",
+    title: {
+      pt: "OpenRetro 1.2 - Nintendo Switch",
+      en: "OpenRetro 1.2 - Nintendo Switch",
+    },
+    banner: [
+      {
+        art: "logo",
+        lead: { pt: "Chegou o", en: "Here comes the" },
+        strong: { pt: "Nintendo Switch", en: "Nintendo Switch" },
+        text: {
+          pt: "Adicione seus jogos de Switch e jogue com o seu yuzu, dentro do OpenRetro.",
+          en: "Add your Switch games and play them with your yuzu, inside OpenRetro.",
+        },
+      },
+      {
+        art: "landscape",
+        lead: { pt: "Party em", en: "Party in" },
+        strong: { pt: "1080p", en: "1080p" },
+        text: {
+          pt: "Imagem mais nítida para os amigos, e o celular vira controle do Switch.",
+          en: "A sharper picture for your friends, and your phone becomes a Switch controller.",
+        },
+      },
+    ],
+    body: [
+      { pt: "Olá, pessoal! 🎮", en: "Hi everyone! 🎮" },
+      {
+        pt: "A 1.2 traz o Nintendo Switch para a sua biblioteca e deixa a Party mais nítida. Para jogar com o Switch você usa o seu próprio emulador (yuzu, Eden, Citron e outros).",
+        en: "1.2 brings the Nintendo Switch to your library and makes Party sharper. To play Switch games you use your own emulator (yuzu, Eden, Citron and others).",
+      },
+      { pt: "O que chegou na 1.2:", en: "What's new in 1.2:" },
+    ],
+    highlights: [
+      {
+        title: { pt: "Jogos de Switch", en: "Switch games" },
+        text: {
+          pt: "importe uma pasta e o OpenRetro acha o jogo, o nome e o emulador sozinho, inclusive em um yuzu portátil com o jogo instalado. O jogo abre dentro do OpenRetro.",
+          en: "import a folder and OpenRetro finds the game, its name and the emulator by itself, even in a portable yuzu with the game installed. The game opens inside OpenRetro.",
+        },
+      },
+      {
+        title: { pt: "Escolha o arquivo", en: "Pick the file" },
+        text: {
+          pt: "ao apertar Jogar, escolha qual arquivo executar: o jogo, uma atualização ou um DLC. Adicione outros arquivos quando quiser.",
+          en: "when you press Play, choose which file to run: the game, an update or DLC. Add more files whenever you want.",
+        },
+      },
+      {
+        title: { pt: "Menu sob demanda", en: "Menu on demand" },
+        text: {
+          pt: "as barras do emulador ficam escondidas e a imagem ocupa a tela toda. Leve o mouse à borda de cima ou de baixo para vê-las.",
+          en: "the emulator's bars stay hidden and the picture fills the screen. Move the mouse to the top or bottom edge to see them.",
+        },
+      },
+      {
+        title: {
+          pt: "Celular e Party como controle",
+          en: "Phone and Party controllers",
+        },
+        text: {
+          pt: "no Switch, o celular e os convidados viram controles Xbox 360 virtuais. O OpenRetro instala o driver ViGEmBus quando precisar (o Windows pede permissão uma vez); depois é só escolher o controle no seu emulador.",
+          en: "in Switch games, your phone and your guests become virtual Xbox 360 controllers. OpenRetro installs the ViGEmBus driver when it needs it (Windows asks permission once); then pick the controller in your emulator.",
+        },
+      },
+      {
+        title: { pt: "Party em 1080p", en: "Party in 1080p" },
+        text: {
+          pt: "em Configurações, escolha 1080p para uma imagem mais nítida. O teto de qualidade subiu para 16 Mbps, e a Party reduz sozinha se a conexão não aguentar.",
+          en: "choose 1080p in Settings for a sharper picture. The quality ceiling is now 16 Mbps, and Party lowers it by itself if the connection can't keep up.",
+        },
+      },
+      {
+        title: { pt: "Correções", en: "Fixes" },
+        text: {
+          pt: "os emuladores que você adiciona não somem mais ao reabrir o OpenRetro; o celular passa a ver a versão atual do app; e o catálogo mostra os jogos de Switch.",
+          en: "emulators you add no longer disappear when you reopen OpenRetro; your phone now sees the current version of the app; and the catalog shows Switch games.",
+        },
+      },
+    ],
+    closing: { pt: "Bom jogo!", en: "Have fun!" },
+  },
 };
 
 const parts = (version: string) => version.split(".").map(Number);

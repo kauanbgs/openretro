@@ -105,6 +105,31 @@ test("clients create without keys; host owns approval, unique slots and shutdown
     await app.close();
   }
 });
+test("a browser page from another site cannot open a connection to the room server", async () => {
+  const app = createPartyServer({
+    PUBLIC_URL: "http://localhost:8787",
+    ALLOW_STUN_ONLY: "true",
+  });
+  await new Promise((resolve) => app.http.listen(0, "127.0.0.1", resolve));
+  const url = `ws://127.0.0.1:${app.http.address().port}/signal`;
+  const open = (origin) =>
+    new Promise((resolve) => {
+      const ws = new WebSocket(url, origin ? { origin } : undefined);
+      ws.once("open", () => {
+        ws.close();
+        resolve(true);
+      });
+      ws.once("error", () => resolve(false));
+    });
+  try {
+    assert.equal(await open("https://evil.example"), false);
+    assert.equal(await open("http://localhost:8787"), true);
+    assert.equal(await open("tauri://localhost"), true);
+    assert.equal(await open(undefined), true);
+  } finally {
+    await app.close();
+  }
+});
 test("production rooms fail explicitly without TURN configuration", async () => {
   const app = createPartyServer({});
   await new Promise((resolve) => app.http.listen(0, "127.0.0.1", resolve));

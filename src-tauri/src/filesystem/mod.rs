@@ -81,9 +81,78 @@ fn is_ps3_game(path: &Path) -> bool {
         _ => false,
     }
 }
+/// A Switch dump is an NSP (a "PFS0" archive from the first byte) or an XCI
+/// (a "HEAD" header at 0x100), whatever its file is called. Dumps named after
+/// their title ID often end in .bin, which would pass for a Mega Drive game.
+fn is_switch_game(path: &Path) -> bool {
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    // Cartridge-sized ROMs of other consoles are skipped without opening them.
+    if !["bin", "nsp", "xci", "nsz", "xcz", ""].contains(&extension.as_str()) {
+        return false;
+    }
+    let magic_at = |offset: u64| {
+        let mut magic = [0u8; 4];
+        File::open(path)
+            .and_then(|mut file| {
+                file.seek(SeekFrom::Start(offset))?;
+                file.read_exact(&mut magic)
+            })
+            .is_ok()
+            .then_some(magic)
+    };
+    magic_at(0) == Some(*b"PFS0") || magic_at(0x100) == Some(*b"HEAD")
+}
+/// A game installed inside a yuzu-style emulator's own storage: its program
+/// NCA under `nand/user/Contents/registered`. Smaller NCAs there are
+/// updates' and DLC's pieces, and the emulator launches from this path.
+fn is_installed_switch_game(path: &Path) -> bool {
+    const MIN_SIZE: u64 = 256 * 1024 * 1024;
+    let names: Vec<String> = path
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().to_lowercase())
+        .collect();
+    names.last().is_some_and(|name| name.ends_with(".nca"))
+        && names
+            .windows(4)
+            .any(|part| part == ["nand", "user", "contents", "registered"])
+        && std::fs::metadata(path).is_ok_and(|meta| meta.len() >= MIN_SIZE)
+}
+/// The name yuzu cached for the game installed in the same storage
+/// (`user/cache/game_list/<title id>.appname.txt`). With several games cached
+/// there is no telling which one an NCA is without the console's keys.
+fn installed_title(path: &Path) -> Option<String> {
+    if !is_installed_switch_game(path) {
+        return None;
+    }
+    let list = path.ancestors().find_map(|dir| {
+        ["user/cache/game_list", "cache/game_list"]
+            .iter()
+            .map(|sub| dir.join(sub))
+            .find(|list| list.is_dir())
+    })?;
+    let mut names = std::fs::read_dir(list)
+        .ok()?
+        .flatten()
+        .filter(|entry| entry.file_name().to_string_lossy().ends_with(".appname.txt"))
+        .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty());
+    let (first, second) = (names.next()?, names.next());
+    second.is_none().then_some(first)
+}
 pub fn platform_ids_for_file(path: &Path) -> Vec<String> {
+    if is_installed_switch_game(path) {
+        return vec!["switch".into()];
+    }
     if is_ps3_game(path) {
         return vec!["ps3".into()];
+    }
+    if is_switch_game(path) {
+        return vec!["switch".into()];
     }
     let extension = path
         .extension()
@@ -202,6 +271,7 @@ fn inspect_hashed(
             .to_string_lossy()
             .into_owned(),
         path: path.to_string_lossy().into_owned(),
+        title_hint: installed_title(&path),
         platform_ids: ids,
     };
     let after = std::fs::metadata(&path).map_err(error)?;
@@ -251,6 +321,14 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
                 }
                 continue;
             }
+            // Emulators keep shader and game-list caches in files named after
+            // the games; they are never games.
+            if kind.is_dir()
+                && ["shader", "shaders", "glcache", "cache"]
+                    .contains(&entry.file_name().to_string_lossy().to_lowercase().as_str())
+            {
+                continue;
+            }
             if kind.is_dir() {
                 if depth < 8 {
                     pending.push((entry_path, depth + 1));
@@ -265,7 +343,8 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
                 .and_then(|value| value.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            let supported = platform_extensions().contains_key(&extension);
+            let supported =
+                platform_extensions().contains_key(&extension) || is_installed_switch_game(&entry_path);
             if !supported {
                 continue;
             }
@@ -333,6 +412,47 @@ pub fn executable(path: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn switch_dumps_are_known_by_their_content_not_their_extension() {
+        let root = std::env::temp_dir().join(format!("openretro-switch-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let nsp = root.join("0100152000022000.bin");
+        std::fs::write(&nsp, b"PFS0\0\0\0\0").unwrap();
+        let mut xci = vec![0u8; 0x200];
+        xci[0x100..0x104].copy_from_slice(b"HEAD");
+        let xci_path = root.join("game.xci");
+        std::fs::write(&xci_path, xci).unwrap();
+        let rom = root.join("sonic.bin");
+        std::fs::write(&rom, vec![0u8; 0x400]).unwrap();
+        assert_eq!(platform_ids_for_file(&nsp), vec!["switch"]);
+        assert_eq!(platform_ids_for_file(&xci_path), vec!["switch"]);
+        assert!(!platform_ids_for_file(&rom).contains(&"switch".to_string()));
+        // A game installed in the emulator's storage is its big program NCA.
+        let registered = root.join("user/nand/user/Contents/registered");
+        std::fs::create_dir_all(&registered).unwrap();
+        let program = registered.join("450a70dabf2a93d9486661a0ed383da9.nca");
+        std::fs::File::create(&program).unwrap().set_len(300 * 1024 * 1024).unwrap();
+        let piece = registered.join("0c9ea0f5670f8e18377cf3c0e964f934.nca");
+        std::fs::write(&piece, vec![0u8; 1024]).unwrap();
+        assert_eq!(platform_ids_for_file(&program), vec!["switch"]);
+        let list = root.join("user/cache/game_list");
+        std::fs::create_dir_all(&list).unwrap();
+        std::fs::write(list.join("0100152000022000.appname.txt"), "Mario Kart 8 Deluxe
+").unwrap();
+        assert_eq!(installed_title(&program).as_deref(), Some("Mario Kart 8 Deluxe"));
+        std::fs::write(list.join("01007EF00011E000.appname.txt"), "Zelda").unwrap();
+        assert_eq!(installed_title(&program), None);
+        std::fs::remove_file(list.join("01007EF00011E000.appname.txt")).unwrap();
+        assert!(platform_ids_for_file(&piece).is_empty());
+        let shaders = root.join("user/shader/opengl/transferable");
+        std::fs::create_dir_all(&shaders).unwrap();
+        std::fs::write(shaders.join("0100152000022000.bin"), vec![0u8; 64]).unwrap();
+        let found = inspect_folder(&root.to_string_lossy()).unwrap();
+        let names: Vec<_> = found.iter().map(|c| c.filename.as_str()).collect();
+        assert!(names.contains(&"450a70dabf2a93d9486661a0ed383da9.nca"), "found {names:?}");
+        assert!(!found.iter().any(|c| c.path.to_lowercase().contains("shader")));
+        std::fs::remove_dir_all(&root).ok();
+    }
     #[test]
     fn folder_fingerprints_are_reused_and_modified_or_forged_files_are_rechecked() {
         let root = std::env::temp_dir().join(format!("openretro-folder-{}", uuid::Uuid::new_v4()));

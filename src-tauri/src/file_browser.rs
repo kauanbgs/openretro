@@ -117,14 +117,9 @@ pub async fn read_source_json(path: String) -> Result<String> {
         {
             return Err("Escolha um arquivo JSON.".into());
         }
-        let file = std::fs::File::open(path).map_err(error)?;
+        let mut file = std::fs::File::open(path).map_err(error)?;
         let mut bytes = Vec::new();
-        file.take(16 * 1024 * 1024 + 1)
-            .read_to_end(&mut bytes)
-            .map_err(error)?;
-        if bytes.len() > 16 * 1024 * 1024 {
-            return Err("A fonte excede o limite de 16 MB.".into());
-        }
+        file.read_to_end(&mut bytes).map_err(error)?;
         String::from_utf8(bytes).map_err(error)
     })
     .await
