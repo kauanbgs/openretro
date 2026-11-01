@@ -84,6 +84,7 @@ pub fn start(app: tauri::AppHandle) {
         let mut previous_menu = 0u32;
         let mut previous_chat = false;
         let mut previous_mute = false;
+        let mut previous_quit = false;
         let main_window = app
             .get_webview_window("main")
             .and_then(|window| window.hwnd().ok())
@@ -116,6 +117,7 @@ pub fn start(app: tauri::AppHandle) {
                 previous = false;
                 previous_chat = false;
                 previous_mute = false;
+                previous_quit = false;
                 thread::sleep(Duration::from_millis(150));
                 continue;
             };
@@ -150,6 +152,19 @@ pub fn start(app: tauri::AppHandle) {
                 let _ = app.emit("party-mic-toggle", ());
             }
             previous_mute = mute;
+            // A game with no menu of ours (PS3, Switch) closes with Ctrl+Alt+Q; its
+            // window then ends the session as if its own close button was used.
+            let quit = !commands
+                && game_foreground
+                && unsafe { GetAsyncKeyState(0x11) } < 0
+                && unsafe { GetAsyncKeyState(0x12) } < 0
+                && unsafe { GetAsyncKeyState(0x51) } < 0;
+            if quit && !previous_quit {
+                if let Err(error) = super::remote_action(&app, "quit") {
+                    log::warn!("Quit shortcut: {error}");
+                }
+            }
+            previous_quit = quit;
             // Without commands there is no OpenRetro menu to drive.
             if !commands {
                 thread::sleep(Duration::from_millis(25));

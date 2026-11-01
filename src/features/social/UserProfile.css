@@ -128,7 +128,7 @@
   grid-column: 2;
   grid-row: 1;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   background: var(--panel);
   padding: 22px;
 }
@@ -172,7 +172,7 @@
   justify-content: center;
   min-width: 24px;
   height: 23px;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
   padding: 0 7px;
   background: var(--panel2);
   color: var(--muted);
@@ -244,7 +244,7 @@
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   background: var(--panel2);
   margin-bottom: 12px;
   box-shadow: 0 18px 22px -16px #000c;
@@ -366,7 +366,7 @@
   margin: 16px 26px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
 }
 .profile-confirm button {
   margin-right: 8px;

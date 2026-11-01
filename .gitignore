@@ -15,3 +15,7 @@ party-server/cloudflare/.wrangler/
 .dev.vars*
 !.dev.vars.example
 web/.openai/local/
+
+# Local work that is not part of the app
+promo/
+codex-*.md

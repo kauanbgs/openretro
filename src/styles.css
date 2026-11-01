@@ -120,7 +120,7 @@ textarea {
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   outline: none;
 }
 input,
@@ -162,7 +162,7 @@ svg {
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
 }
 
 /* The shell */
@@ -196,7 +196,7 @@ main {
   color: var(--quiet);
   background: var(--panel);
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   height: 42px;
   padding: 0 13px;
   flex: 1;
@@ -222,7 +222,7 @@ main {
   color: var(--quiet);
   border: 1px solid var(--border);
   padding: 3px 5px;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   white-space: nowrap;
 }
 .page-content {
@@ -267,7 +267,7 @@ main {
   font-size: 12px;
   font-weight: 650;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   text-decoration: none;
   white-space: nowrap;
   transition:
@@ -323,7 +323,7 @@ main {
   justify-content: center;
   padding: 8px;
   color: var(--muted);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
 }
 .icon-button:hover {
   background: var(--panel2);
@@ -336,7 +336,7 @@ main {
   font-size: 11px;
   color: var(--muted);
   background: var(--panel2);
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   padding: 5px 8px;
 }
 .muted {
@@ -370,7 +370,7 @@ main {
   color: var(--danger);
   background: #a34c4c15;
   border: 1px solid #b86a6a35;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   padding: 13px 16px;
   margin-top: 16px;
   overflow-wrap: anywhere;
@@ -391,7 +391,7 @@ main {
   min-height: 390px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
 }
 .empty-state > svg {
   color: var(--quiet);
@@ -503,7 +503,7 @@ main {
   padding: 0;
   min-width: 0;
   width: 100%;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
 }
 .games-list {
   display: flex;
@@ -579,7 +579,7 @@ main {
   display: flex;
   border: 1px solid var(--border);
   padding: 3px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   margin-left: 4px;
 }
 .view-toggle button {
@@ -588,7 +588,7 @@ main {
   justify-content: center;
   width: 30px;
   height: 28px;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--rs));
   color: var(--quiet);
 }
 .view-toggle button.selected {
@@ -609,7 +609,7 @@ main {
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
 }
 .filter-tabs button.selected {
   color: var(--text);
@@ -671,7 +671,7 @@ main {
 }
 .detail-aside-card {
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--rs));
   background: var(--panel);
   padding: 18px;
 }
@@ -724,7 +724,7 @@ main {
 .gallery-strip button {
   min-width: 0;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   aspect-ratio: 1 / 1;
 }
 .gallery-strip img {
@@ -828,7 +828,7 @@ main {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   border: 1px solid var(--border);
 }
 .screenshot-grid a:hover img {
@@ -862,7 +862,7 @@ main {
   color: var(--text);
   width: 560px;
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: calc(13px * var(--rs));
   box-shadow: 0 24px 100px #0007;
   padding: 28px;
   max-height: 90vh;
@@ -902,7 +902,7 @@ main {
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   color: var(--muted);
   background: var(--bg);
 }
@@ -939,7 +939,7 @@ main {
   gap: 16px;
   padding: 17px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   background: var(--panel);
 }
 .download-option:hover:not(:disabled) {
@@ -968,7 +968,7 @@ main {
   background: var(--panel);
   color: var(--muted);
   font-size: 12px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
 }
 .modal > header .icon-button {
   margin: -4px -5px 0 0;
@@ -1068,7 +1068,7 @@ label textarea {
   padding: 16px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   color: var(--accent);
 }
 .file-summary > div {
@@ -1115,7 +1115,7 @@ details summary {
 }
 fieldset {
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   padding: 16px;
 }
 legend {
@@ -1194,7 +1194,7 @@ progress {
 .settings-nav button {
   text-align: left;
   padding: 11px 13px;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
   font-size: 12px;
   color: var(--muted);
 }
@@ -1262,7 +1262,7 @@ progress {
   align-items: center;
   gap: 17px;
   background: var(--panel);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--rs));
   padding: 24px;
   margin-top: 30px;
 }
@@ -1282,7 +1282,7 @@ progress {
   height: 23px;
   padding: 3px;
   border: 1px solid var(--border);
-  border-radius: 15px;
+  border-radius: calc(15px * var(--rs));
   background: var(--panel2);
   display: flex;
   align-items: center;
@@ -1315,7 +1315,7 @@ progress {
   gap: 12px;
   padding: 13px 12px 13px 18px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--rs));
   background: var(--panel2);
   box-shadow: 0 8px 40px #0004;
   z-index: 150;
@@ -1405,7 +1405,7 @@ progress {
   margin-left: 3px;
   padding: 1px 6px;
   border: 1px solid var(--border, #ffffff2e);
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
   font: 600 11px/1.6 inherit;
   text-align: center;
   color: var(--text, #eee);
@@ -1779,7 +1779,7 @@ html[data-playing="true"] *:after {
   place-items: center;
   aspect-ratio: 1;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   color: var(--text);
   background: var(--panel2);
   cursor: pointer;
@@ -1817,7 +1817,7 @@ html[data-playing="true"] *:after {
   gap: 6px;
   padding: 4px 10px;
   border: 1px solid #ffffff26;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: #e6e6e6;
   background: #0000004d;
   font-size: 12px;
@@ -1876,7 +1876,7 @@ html[data-playing="true"] *:after {
   top: 10px;
   left: 10px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: var(--accentText);
   background: var(--accent);
   font-size: 11px;
@@ -1891,7 +1891,7 @@ html[data-playing="true"] *:after {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: none;
   cursor: pointer;
   text-align: left;
@@ -1929,7 +1929,7 @@ html[data-playing="true"] *:after {
   width: 100%;
   height: 100%;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
 }
 .similar-games {
   margin-top: 48px;
@@ -1971,7 +1971,7 @@ html[data-playing="true"] *:after {
 .lightbox img {
   max-width: 100%;
   max-height: 80vh;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   box-shadow: 0 24px 80px #000;
 }
 .lightbox p {
@@ -2048,7 +2048,7 @@ html[data-playing="true"] *:after {
   gap: 18px;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   background: var(--panel);
 }
 .save-state::before {
@@ -2069,7 +2069,7 @@ html[data-playing="true"] *:after {
   place-items: center;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   color: var(--quiet);
   background: var(--panel2);
 }
@@ -2084,7 +2084,7 @@ html[data-playing="true"] *:after {
   top: 6px;
   left: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: var(--accentText);
   background: var(--accent);
   font-size: 10px;
@@ -2127,7 +2127,7 @@ html[data-playing="true"] *:after {
   gap: 14px;
   padding: 18px;
   border: 1px solid var(--hairline, var(--border));
-  border-radius: 16px;
+  border-radius: calc(16px * var(--rs));
   background: var(--glass, var(--panel));
   transition:
     border-color 200ms ease,
@@ -2166,7 +2166,7 @@ html[data-playing="true"] *:after {
 .library-status.manual {
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   color: var(--text);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   line-height: 1.5;
@@ -2212,7 +2212,7 @@ button.detail-badge {
   gap: 16px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: var(--panel);
 }
 .variant-row[data-active] {
@@ -2243,7 +2243,7 @@ button.detail-badge {
   gap: 5px;
   width: fit-content;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;
@@ -2263,7 +2263,7 @@ button.detail-badge {
   gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: var(--panel2);
 }
 .mod-job-head {
@@ -2297,7 +2297,7 @@ button.detail-badge {
   gap: 18px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: var(--panel);
 }
 .mod-card:not(:has(.mod-images)) {
@@ -2312,7 +2312,7 @@ button.detail-badge {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   background: #00000040;
 }
 .mod-thumbs {

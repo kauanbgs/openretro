@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Dices } from "lucide-react";
+import { ChevronRight, Dices, Flame, Gamepad2, Library } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { GameArtwork } from "../../components/GameArtwork";
 import { GameCard } from "../../components/GameCard";
 import { PlayTogether } from "../../components/PlayTogether";
 import { RecommendationRows } from "../../components/RecommendationRows";
+import { Shelf } from "../../components/Shelf";
 import { useDownloadAvailability } from "../../hooks/useDownloadAvailability";
 import {
   metadataProvider,
@@ -32,16 +34,17 @@ type Category = "popular" | "multiplayer";
 const categories: {
   id: Category;
   label: string;
-  emoji: string;
+  icon: LucideIcon;
   players?: PlayersFilter;
 }[] = [
-  { id: "popular", label: t("Em alta"), emoji: "🔥" },
-  { id: "multiplayer", label: t("Multiplayer"), emoji: "🎮", players: "multi" },
+  { id: "popular", label: t("Em alta"), icon: Flame },
+  { id: "multiplayer", label: t("Multiplayer"), icon: Gamepad2, players: "multi" },
 ];
 export function HomePage({
   library,
   onSelect,
   onDiscover,
+  onLibrary,
   onPhone,
   onParty,
   onFriends,
@@ -167,6 +170,32 @@ export function HomePage({
           </div>
         </div>
       )}
+      {library.length > 0 && (
+        <section className="library-shelf" aria-label={t("Minha biblioteca")}>
+          <div className="section-head">
+            <h2 className="home-section-title">
+              <Library size={20} aria-hidden="true" /> {t("Minha biblioteca")}
+              <small>{library.length}</small>
+            </h2>
+            <button className="section-link" onClick={onLibrary}>
+              {t("Ver tudo")}
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </div>
+          <Shelf>
+            {[...played, ...library.filter((x) => !x.item.lastPlayedAt)]
+              .slice(0, 16)
+              .map(({ game, item }) => (
+                <GameCard
+                  key={item.id}
+                  game={game}
+                  item={item}
+                  onClick={() => onSelect(game)}
+                />
+              ))}
+          </Shelf>
+        </section>
+      )}
       <PlayTogether onPhone={onPhone} onParty={onParty} onFriends={onFriends} />
       <RecommendationRows ready={ready} limit={3} onSelect={onSelect} />
       <div className="home-categories">
@@ -179,7 +208,7 @@ export function HomePage({
               className={`button ${category === c.id ? "primary" : "outline"}`}
               onClick={() => setCategory(c.id)}
             >
-              <span aria-hidden="true">{c.emoji}</span> {c.label}
+              <c.icon size={16} aria-hidden="true" /> {c.label}
             </button>
           ))}
         </div>
@@ -193,7 +222,7 @@ export function HomePage({
       </div>
       {ready && (
         <h2 className="home-section-title">
-          <span aria-hidden="true">{current.emoji}</span> {current.label}
+          <current.icon size={20} aria-hidden="true" /> {current.label}
         </h2>
       )}
       {ready ? (

@@ -23,7 +23,7 @@
   gap: 14px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
 }
 .people-visibility > div {
   flex: 1;

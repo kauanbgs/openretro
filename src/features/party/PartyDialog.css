@@ -383,7 +383,7 @@
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: var(--panel2);
   color: var(--text);
   font: inherit;
@@ -397,7 +397,7 @@
 .party-mic-level span {
   width: 22px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--rs));
   background: var(--border-strong);
 }
 .party-mic-level span.on {

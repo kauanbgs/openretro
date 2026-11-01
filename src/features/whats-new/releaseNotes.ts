@@ -250,6 +250,86 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     ],
     closing: { pt: "Bom jogo!", en: "Have fun!" },
   },
+  "1.3.0": {
+    date: "2026-11-01",
+    title: {
+      pt: "OpenRetro 1.3 - Deixe do seu jeito",
+      en: "OpenRetro 1.3 - Make it yours",
+    },
+    banner: [
+      {
+        art: "logo",
+        lead: { pt: "Aparência", en: "Make it" },
+        strong: { pt: "do seu jeito", en: "yours" },
+        text: {
+          pt: "Cores, cantos, fonte e um vídeo ou imagem de fundo, em Configurações.",
+          en: "Colors, corners, font and a video or picture behind everything, in Settings.",
+        },
+      },
+      {
+        art: "landscape",
+        lead: { pt: "Um visual", en: "A new" },
+        strong: { pt: "novo", en: "look" },
+        text: {
+          pt: "Menu, cartões e Home redesenhados, com setas no lugar da rolagem lateral.",
+          en: "A redesigned menu, cards and Home, with arrows instead of side scrolling.",
+        },
+      },
+    ],
+    body: [
+      { pt: "Olá, pessoal! 🎨", en: "Hi everyone! 🎨" },
+      {
+        pt: "A 1.3 deixa o OpenRetro com a sua cara. Em Configurações, Aparência, você muda quase tudo no visual e vê o resultado na hora.",
+        en: "1.3 lets you make OpenRetro look like you. In Settings, Appearance, you change almost everything about the look and see it at once.",
+      },
+      { pt: "O que chegou na 1.3:", en: "What's new in 1.3:" },
+    ],
+    highlights: [
+      {
+        title: { pt: "Aparência completa", en: "Full appearance" },
+        text: {
+          pt: "escolha as cores de fundo, painéis, texto e destaque, o arredondamento dos cantos, a fonte e a transparência dos painéis. Dá para usar um degradê, uma imagem ou um vídeo atrás de tudo, e o vídeo para sozinho enquanto você joga.",
+          en: "pick the background, panel, text and accent colors, how round the corners are, the font and how see-through the panels are. Use a gradient, a picture or a video behind everything; the video stops by itself while you play.",
+        },
+      },
+      {
+        title: { pt: "Temas", en: "Themes" },
+        text: {
+          pt: "sete temas prontos, incluindo o Vidro. Salve o seu visual com um nome, copie-o como texto para mandar a um amigo ou cole o de outra pessoa. Quem quer ir além pode escrever o próprio CSS.",
+          en: "seven ready-made themes, including Glass. Save your look under a name, copy it as text to send a friend, or paste someone else's. If you want to go further, write your own CSS.",
+        },
+      },
+      {
+        title: { pt: "Home e biblioteca", en: "Home and library" },
+        text: {
+          pt: "a Biblioteca ganhou lugar no menu e uma fileira na Home com o que você jogou por último. Os catálogos agora têm setas para avançar e voltar, e os cartões de celular e Party foram redesenhados.",
+          en: "the Library has its own place in the menu and a row on Home with what you played last. Catalogs now have arrows to move forward and back, and the phone and Party cards were redesigned.",
+        },
+      },
+      {
+        title: { pt: "Iniciar com o Windows", en: "Start with Windows" },
+        text: {
+          pt: "em Configurações, faça o OpenRetro abrir sozinho quando você entra no Windows. Vem desligado.",
+          en: "in Settings, have OpenRetro open by itself when you sign in to Windows. It is off by default.",
+        },
+      },
+      {
+        title: { pt: "Novidades de cada versão", en: "News from every version" },
+        text: {
+          pt: "clique na versão, no canto de baixo, para ler as novidades de todas as versões.",
+          en: "click the version in the bottom corner to read the news from every version.",
+        },
+      },
+      {
+        title: { pt: "Jogos de Switch e PS3", en: "Switch and PS3 games" },
+        text: {
+          pt: "aperte Ctrl+Alt+Q para fechar um jogo que não tem o nosso menu, e o OpenRetro conecta sozinho os jogadores do controle virtual nos controles do yuzu.",
+          en: "press Ctrl+Alt+Q to close a game that has no menu of ours, and OpenRetro connects the virtual-pad players in yuzu's controls by itself.",
+        },
+      },
+    ],
+    closing: { pt: "Bom jogo!", en: "Have fun!" },
+  },
 };
 
 const parts = (version: string) => version.split(".").map(Number);
@@ -274,4 +354,14 @@ export function releaseNoteFor(
     .sort(compare)
     .pop();
   return newest ? { version: newest, note: releaseNotes[newest] } : null;
+}
+
+/** Every version's entry, newest first, up to the installed one. */
+export function releaseHistory(
+  installed: string,
+): { version: string; note: ReleaseNote }[] {
+  return Object.keys(releaseNotes)
+    .filter((key) => compare(key, installed) <= 0)
+    .sort((a, b) => compare(b, a))
+    .map((version) => ({ version, note: releaseNotes[version] }));
 }

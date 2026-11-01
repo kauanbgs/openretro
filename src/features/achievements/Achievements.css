@@ -24,7 +24,7 @@
 .ra-account img {
   width: 48px;
   height: 48px;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   background: var(--panel2);
   object-fit: cover;
 }
@@ -76,13 +76,13 @@
   gap: 16px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   background: var(--panel);
 }
 .ra-game-head img {
   width: 56px;
   height: 56px;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: var(--panel2);
 }
 .ra-game-progress {
@@ -102,7 +102,7 @@
 .ra-bar {
   height: 6px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: var(--panel2);
 }
 .ra-bar span {
@@ -118,7 +118,7 @@
 .ra-filters button {
   padding: 5px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: var(--body);
   font-size: 12px;
   font-weight: 600;
@@ -134,7 +134,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   background: var(--panel);
   list-style: none;
 }
@@ -151,7 +151,7 @@
 .ra-item img {
   width: 48px;
   height: 48px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   background: var(--panel2);
 }
 .ra-item:not(.unlocked) img {

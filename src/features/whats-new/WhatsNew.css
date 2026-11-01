@@ -6,7 +6,7 @@
   max-height: min(680px, 90vh);
   padding: 0;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
 }
 .whats-new > header {
   margin: 0;
@@ -33,7 +33,7 @@
 .whats-new-date {
   display: inline-block;
   padding: 5px 9px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   background: var(--panel2);
   font-size: 14px;
   font-weight: 750;
@@ -54,7 +54,7 @@
   grid-auto-columns: minmax(0, 1fr);
   margin: 0;
   padding: 22px 0 20px;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   background:
     radial-gradient(circle at 85% 0%, #12ace233, transparent 55%),
     linear-gradient(135deg, #1a1846, #0f3a52 60%, #0d4a5c);
@@ -89,7 +89,7 @@
   width: 100%;
   max-width: 220px;
   height: 92px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   object-fit: cover;
   box-shadow: 0 6px 18px #0006;
 }
@@ -159,4 +159,28 @@
   .whats-new-panel + .whats-new-panel {
     border-left: 0;
   }
+}
+
+.whats-new-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.whats-new-versions button {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(7px * var(--rs));
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 650;
+}
+.whats-new-versions button:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.whats-new-versions button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border-color: var(--border-strong);
+  color: var(--text);
 }

@@ -24,7 +24,7 @@
   max-width: 100%;
   overflow-wrap: anywhere;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   background: #000000b8;
   color: #fff;
   font-size: 14px;
@@ -41,7 +41,7 @@
   width: 100%;
   box-sizing: border-box;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   border: 1px solid #ffffff40;
   background: #000000d9;
   color: #fff;

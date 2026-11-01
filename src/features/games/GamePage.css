@@ -52,7 +52,7 @@
   margin: -84px 12px 0;
   padding: 14px 22px;
   border: 1px solid #ffffff26;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   background: #080808d9;
   backdrop-filter: blur(18px);
   color: #eee;
@@ -73,7 +73,7 @@
 }
 .app .game-page .hero-panel .button {
   min-height: 40px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   font-size: 12px;
   padding-inline: 15px;
 }
@@ -104,7 +104,7 @@
   min-height: 70px;
   padding: 14px 18px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   background: color-mix(in srgb, var(--game-surface) 96%, var(--text) 2%);
   color: var(--text);
   font-size: 12px;
@@ -122,7 +122,7 @@
   position: relative;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   background: #000;
 }
 .game-media-open {
@@ -148,7 +148,7 @@
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
   background: #0009;
   color: #fff;
 }
@@ -174,7 +174,7 @@
   width: 32px;
   height: 40px;
   border: 1px solid #ffffff25;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
   background: #0009;
   color: white;
 }
@@ -193,7 +193,7 @@
   bottom: 14px;
   pointer-events: none;
   padding: 3px 7px;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   background: #000a;
   color: #ddd;
   font-size: 10px;
@@ -212,7 +212,7 @@
   aspect-ratio: 16 / 10;
   overflow: hidden;
   border: 2px solid transparent;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   padding: 0;
   background: #080808;
   opacity: 0.48;
@@ -285,7 +285,7 @@
 .game-statistics {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: calc(9px * var(--rs));
   overflow: hidden;
 }
 .app .game-page .detail-aside-card > h2,
@@ -476,7 +476,7 @@ html.remote .app .game-page .hero-panel-actions {
 }
 html.remote .app .game-page .hero-panel-actions .button.primary {
   height: 42px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   font-size: 13px;
 }
 html.remote .app .game-page .detail-body {
@@ -502,7 +502,7 @@ html.remote .app .game-page .detail-aside {
   gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
   cursor: pointer;
 }
 .launch-file.selected {

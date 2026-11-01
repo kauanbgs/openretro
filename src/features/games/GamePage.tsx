@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Clock3,
   Gamepad2,
+  FilePlus2,
 } from "lucide-react";
 import { GameMedia } from "./GameMedia";
 import "./GamePage.css";
@@ -44,6 +45,7 @@ import { bridge, isDesktop, isRemote } from "../../services/bridge";
 import { releasesFor } from "../../services/downloadPlatform";
 import { InGameMenuHelp } from "../../components/InGameMenuHelp";
 import { GameCard } from "../../components/GameCard";
+import { Shelf } from "../../components/Shelf";
 import { SaveTimeline, saveStatesKey } from "./SaveTimeline";
 import { NetplayDialog } from "./NetplayDialog";
 import { LaunchFileDialog } from "./LaunchFileDialog";
@@ -212,11 +214,17 @@ export function GamePage({
       setBusy(false);
     }
   }
-  /** Switch games can have several files; Play asks which one to run. */
-  function startPlay() {
-    if (entry?.item.platformId === "switch" && isDesktop && !isRemote)
+  /** A Switch game with updates or DLC asks which file to run; one file just plays. */
+  async function startPlay() {
+    if (entry?.item.platformId !== "switch" || !isDesktop || isRemote)
+      return void play();
+    try {
+      const files = await bridge.launchFiles(entry.item.id);
+      if (files.length > 1) setChooseFile(true);
+      else void play();
+    } catch {
       setChooseFile(true);
-    else void play();
+    }
   }
   async function play(slot?: number, session?: NetplaySession, file?: string) {
     if (!entry) return;
@@ -332,7 +340,7 @@ export function GamePage({
             disabled={running || busy}
             onClick={() =>
               entry
-                ? startPlay()
+                ? void startPlay()
                 : (setDownloadQuery(""),
                   setDownloadSource("all"),
                   setDownloadOptions(true))
@@ -351,6 +359,17 @@ export function GamePage({
                 ? t("Jogar")
                 : t("Opções de download")}
           </button>
+          {entry?.item.platformId === "switch" && isDesktop && !isRemote && (
+            <button
+              className="button outline"
+              disabled={running || busy}
+              title={t("Arquivos do jogo")}
+              aria-label={t("Arquivos do jogo")}
+              onClick={() => setChooseFile(true)}
+            >
+              <FilePlus2 size={16} />
+            </button>
+          )}
           {!entry && !isRemote && (
             <button className="button outline" onClick={() => onImport(game)}>
               <FolderOpen size={16} /> {t("Adicionar à biblioteca")}
@@ -783,7 +802,7 @@ export function GamePage({
         {game.similar?.length ? (
           <section className="similar-games">
             <h2>{t("Se você gosta deste jogo")}</h2>
-            <div className="similar-row">
+            <Shelf>
               {game.similar.map((similar) => (
                 <GameCard
                   key={similar.id}
@@ -791,7 +810,7 @@ export function GamePage({
                   onClick={() => onSelect(similar)}
                 />
               ))}
-            </div>
+            </Shelf>
           </section>
         ) : null}
       </div>

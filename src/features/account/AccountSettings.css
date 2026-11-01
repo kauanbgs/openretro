@@ -43,7 +43,7 @@
   min-height: 42px;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   color: var(--text);
   font: inherit;
   font-size: 14px;
@@ -121,7 +121,7 @@
   align-items: center;
   gap: 0;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   background: var(--panel);
   padding-left: 13px;
 }

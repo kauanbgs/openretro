@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Gamepad2, Smartphone, Users, Wifi } from "lucide-react";
+import { ChevronRight, Smartphone, Users } from "lucide-react";
 import { bridge, isDesktop, isRemote } from "../services/bridge";
 import { partyStore } from "../features/party/partySession";
 import { t } from "../i18n";
@@ -69,43 +69,47 @@ export function PlayTogether({
     <section className="play-together" aria-label={t("Jogar junto")}>
       <button
         className="play-together-card play-together-phone"
+        data-active={state.phoneActive}
         onClick={onPhone}
       >
+        <span className="play-together-plaque" aria-hidden="true">
+          <Smartphone strokeWidth={1.6} />
+        </span>
         <span className="play-together-copy">
           <strong>{t("Jogar no celular")}</strong>
           <span>{state.phoneDescription}</span>
-          <b>
-            {state.phoneActive ? t("Gerenciar conexão") : t("Conectar celular")}
-          </b>
         </span>
-        <span className="play-together-art" aria-hidden="true">
-          <Smartphone strokeWidth={1.4} />
-          <Wifi className="play-together-symbol" />
-        </span>
+        <b className="play-together-action">
+          {state.phoneActive ? t("Gerenciar conexão") : t("Conectar celular")}
+          <ChevronRight size={16} aria-hidden="true" />
+        </b>
       </button>
       <button
         className="play-together-card play-together-party"
+        data-active={state.partyActive}
         onClick={onParty}
       >
+        <span className="play-together-plaque" aria-hidden="true">
+          <Users strokeWidth={1.6} />
+        </span>
         <span className="play-together-copy">
           <strong>{t("Jogar com amigos")}</strong>
           <span>{state.partyDescription}</span>
           {state.partyActive && (
             <span className="play-together-members">
-              <AccountAvatar avatar={state.account?.avatar} size={28} />
+              <AccountAvatar avatar={state.account?.avatar} size={24} />
               {state.party.guests.map((guest) => (
                 <span key={guest.id} title={guest.name}>
-                  <AccountAvatar avatar={guest.avatar} size={28} />
+                  <AccountAvatar avatar={guest.avatar} size={24} />
                 </span>
               ))}
             </span>
           )}
-          <b>{state.partyActive ? t("Gerenciar Party") : t("Criar Party")}</b>
         </span>
-        <span className="play-together-art" aria-hidden="true">
-          <Gamepad2 strokeWidth={1.4} />
-          <Users className="play-together-symbol" />
-        </span>
+        <b className="play-together-action">
+          {state.partyActive ? t("Gerenciar Party") : t("Criar Party")}
+          <ChevronRight size={16} aria-hidden="true" />
+        </b>
       </button>
       {state.friends.length > 0 && (
         <button className="play-together-friends" onClick={onFriends}>

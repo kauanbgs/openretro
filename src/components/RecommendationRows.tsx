@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { GameCard } from "./GameCard";
+import { Shelf } from "./Shelf";
 import { useLibrary } from "../hooks/useLibrary";
 import { useDownloadAvailability } from "../hooks/useDownloadAvailability";
 import {
@@ -100,7 +101,7 @@ function RecommendationSection({
         {row.kind === "forYou" && <Sparkles size={20} aria-hidden="true" />}
         <span>{rowTitle(row)}</span>
       </h2>
-      <div className="recommendation-row">
+      <Shelf>
         {row.games.map(({ game, reason }) => (
           <GameCard
             key={game.id}
@@ -110,7 +111,7 @@ function RecommendationSection({
             onClick={() => onOpen(game)}
           />
         ))}
-      </div>
+      </Shelf>
     </section>
   );
 }

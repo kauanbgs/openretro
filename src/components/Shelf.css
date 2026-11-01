@@ -1,0 +1,103 @@
+.shelf {
+  position: relative;
+  min-width: 0;
+}
+.shelf-scroller {
+  display: grid;
+  grid-auto-columns: 264px;
+  grid-auto-flow: column;
+  gap: 14px;
+  padding: 4px 2px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.shelf-scroller::-webkit-scrollbar {
+  display: none;
+}
+.shelf-scroller > * {
+  scroll-snap-align: start;
+}
+.shelf-arrow {
+  position: absolute;
+  top: calc(50% - 24px);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px #00000066;
+  color: var(--text);
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 0.15s,
+    transform 0.15s,
+    background 0.15s;
+}
+.shelf-arrow-prev {
+  left: -14px;
+}
+.shelf-arrow-next {
+  right: -14px;
+}
+.shelf:hover .shelf-arrow,
+.shelf:focus-within .shelf-arrow {
+  opacity: 1;
+  transform: none;
+}
+.shelf-arrow:hover {
+  background: var(--panel2);
+  border-color: var(--text);
+}
+.shelf-arrow:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.shelf[data-start="true"] .shelf-arrow-prev,
+.shelf[data-end="true"] .shelf-arrow-next {
+  opacity: 0;
+  pointer-events: none;
+}
+.shelf::before,
+.shelf::after {
+  position: absolute;
+  top: 0;
+  bottom: 8px;
+  z-index: 2;
+  width: 48px;
+  content: "";
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.shelf::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg), transparent);
+}
+.shelf::after {
+  right: 0;
+  background: linear-gradient(270deg, var(--bg), transparent);
+}
+.shelf[data-start="true"]::before,
+.shelf[data-end="true"]::after {
+  opacity: 0;
+}
+html.remote .shelf-scroller {
+  grid-auto-columns: 160px;
+  gap: 10px;
+}
+html.remote .shelf-arrow,
+html.remote .shelf::before,
+html.remote .shelf::after {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shelf-arrow {
+    transition: none;
+  }
+}

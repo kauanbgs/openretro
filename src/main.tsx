@@ -4,13 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const App = lazy(() => import("./App").then(({ App }) => ({ default: App })));
 import "./fonts.css";
 import "./styles.css";
-import "./hydra.css";
+import "./shell.css";
+import { startAppearance } from "./services/appearance";
 import { isRemote } from "./services/transport";
 import { bridge } from "./services/bridge";
 import { adoptLanguage } from "./i18n";
 import { t } from "./i18n";
-// A paired phone gets the touch layout in hydra.css.
+// A paired phone gets the touch layout in shell.css.
 document.documentElement.classList.toggle("remote", isRemote);
+startAppearance();
 const InGameOverlay = lazy(() =>
   import("./features/in-game/InGameOverlay").then(({ InGameOverlay }) => ({
     default: InGameOverlay,

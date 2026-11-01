@@ -11,7 +11,7 @@
   width: 100%;
   min-height: 58px;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   color: var(--text);
   text-align: left;
 }
@@ -67,7 +67,7 @@
   gap: 10px;
   min-width: 0;
   padding: 4px 8px 4px 4px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: var(--text);
 }
 .chat-peer:hover,
@@ -161,7 +161,7 @@
   max-height: 120px;
   padding: 9px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   background: var(--panel);
   color: var(--text);
   font: inherit;
@@ -199,7 +199,7 @@
   gap: 3px;
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   background: #2f8cff;
   color: #fff;
   font-size: 11px;

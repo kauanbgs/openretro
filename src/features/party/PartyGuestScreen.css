@@ -75,7 +75,7 @@
 .party-guest-menu {
   min-width: 320px;
   border: 1px solid #ffffff25;
-  border-radius: 18px;
+  border-radius: calc(18px * var(--rs));
   background: #151c28;
 }
 .party-guest-menu button {

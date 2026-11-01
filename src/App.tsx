@@ -68,6 +68,7 @@ import {
   type LibraryGame,
   type DownloadImported,
 } from "./types";
+import { AppBackdrop } from "./components/AppBackdrop";
 import { t } from "./i18n";
 import { version as appVersion } from "../package.json";
 const HomePage = lazy(() =>
@@ -140,6 +141,7 @@ const navItems = isRemote
     ]
   : [
       { page: "Home" as Page, icon: Home },
+      { page: "Library" as Page, icon: Library },
       { page: "Discover" as Page, icon: Compass },
       { page: "Downloads" as Page, icon: Download },
       { page: "Sources" as Page, icon: Link2 },
@@ -165,6 +167,7 @@ export function App() {
   const [platform, setPlatform] = useState("all");
   const [toast, setToast] = useState("");
   const [help, setHelp] = useState(false);
+  const [changelog, setChangelog] = useState(false);
   const [bigPicture, setBigPicture] = useState(false);
   // The desktop window has no system title bar; Big Picture covers the screen.
   // A paired phone has a backend but no Tauri window to drag or close.
@@ -433,6 +436,7 @@ export function App() {
   const downloading = activeDownloads[0];
   return (
     <div className={`app density-${settings.density}`}>
+      <AppBackdrop paused={Boolean(playing)} />
       {titleBar && <TitleBar />}
       <SocialNotice
         onOpen={(view) => {
@@ -835,12 +839,19 @@ export function App() {
                 })
               : t("Nenhum download em andamento")}
         </button>
-        <button onClick={() => setHelp(true)}>
+        <button
+          onClick={() => setChangelog(true)}
+          title={t("Ver as novidades desta versão")}
+        >
           OpenRetro v{appVersion}
           {isDesktop ? "" : t(" · prévia no navegador")}
         </button>
       </footer>
-      <WhatsNew version={appVersion} />
+      <WhatsNew
+        version={appVersion}
+        show={changelog}
+        onHide={() => setChangelog(false)}
+      />
       {partyOpen && (
         <PartyDialog
           onClose={() => setPartyOpen(false)}

@@ -28,6 +28,7 @@ import { t } from "../i18n";
 export interface FilePickerRequest {
   title: string;
   directory: boolean;
+  filters?: { name: string; extensions: string[] }[];
 }
 let consoleFilePicker:
   ((request: FilePickerRequest) => Promise<string | null>) | undefined;
@@ -600,6 +601,40 @@ export const bridge = {
   },
   async removeConsoleBackground(path: string): Promise<void> {
     if (isDesktop) return invoke("remove_console_background", { path });
+  },
+  /** Whether Windows opens OpenRetro at sign-in. Off until the player asks. */
+  async autostart(): Promise<boolean> {
+    return isDesktop && !isRemote ? invoke("autostart_enabled") : false;
+  },
+  async setAutostart(enabled: boolean): Promise<void> {
+    if (isDesktop && !isRemote) await invoke("set_autostart", { enabled });
+  },
+  /** Pictures and videos kept for the interface background, oldest first. */
+  async appearanceMedia(): Promise<ConsoleBackground[]> {
+    if (!isDesktop) return [];
+    const paths = await invoke<string[]>("list_appearance_media");
+    return paths.map((path) => ({ path, url: convertFileSrc(path) }));
+  },
+  /** Asks for a picture or video and keeps a copy; null when none was chosen. */
+  async addAppearanceMedia(): Promise<ConsoleBackground | null> {
+    if (!isDesktop)
+      throw new Error(t("Abra o aplicativo desktop para usar seus arquivos."));
+    const source = await pickPath({
+      directory: false,
+      title: t("Escolher imagem ou vídeo de fundo"),
+      filters: [
+        {
+          name: t("Imagens e vídeos"),
+          extensions: ["png", "jpg", "jpeg", "webp", "gif", "mp4", "webm"],
+        },
+      ],
+    });
+    if (!source) return null;
+    const path = await invoke<string>("add_appearance_media", { path: source });
+    return { path, url: convertFileSrc(path) };
+  },
+  async removeAppearanceMedia(path: string): Promise<void> {
+    if (isDesktop) return invoke("remove_appearance_media", { path });
   },
   async saveSettings(settings: AppSettings) {
     if (isDesktop) return invoke("save_settings", { settings });

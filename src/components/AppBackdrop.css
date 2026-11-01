@@ -1,0 +1,28 @@
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.app-backdrop > img,
+.app-backdrop > video {
+  position: absolute;
+  inset: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  object-fit: cover;
+}
+.app-backdrop-dim {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+/* Over a backdrop, surfaces turn to frosted glass instead of flat color. */
+html[data-backdrop="on"] .app .sidebar,
+html[data-backdrop="on"] .header {
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+html[data-backdrop="on"] body {
+  background: transparent;
+}

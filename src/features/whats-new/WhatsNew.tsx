@@ -5,6 +5,7 @@ import { PixelLandscape } from "../../components/PixelLandscape";
 import { socialStore } from "../../services/social";
 import { language, locale, t } from "../../i18n";
 import {
+  releaseHistory,
   releaseNoteFor,
   type BannerPanel,
   type ReleaseNote,
@@ -32,7 +33,16 @@ const text = (value: { pt: string; en: string }) =>
   language === "en" ? value.en : value.pt;
 
 /** The version's news, once, the first time it opens. */
-export function WhatsNew({ version: installed }: { version: string }) {
+export function WhatsNew({
+  version: installed,
+  show = false,
+  onHide,
+}: {
+  version: string;
+  /** Opens the window on request, such as from the version in the status bar. */
+  show?: boolean;
+  onHide?: () => void;
+}) {
   // In development, ?whats-new=1.0.0 previews any version's window.
   const preview = import.meta.env.DEV
     ? new URLSearchParams(location.search).get("whats-new")
@@ -43,23 +53,36 @@ export function WhatsNew({ version: installed }: { version: string }) {
   const [open, setOpen] = useState(
     () => Boolean(note) && (Boolean(preview) || seen() !== version),
   );
+  if (show) {
+    const history = releaseHistory(version);
+    if (history.length)
+      return <WhatsNewDialog history={history} onClose={() => onHide?.()} />;
+  }
   if (!found || !note || !open) return null;
   const close = () => {
     if (!preview) markSeen(version);
     setOpen(false);
+    onHide?.();
   };
   return <WhatsNewDialog version={found.version} note={note} onClose={close} />;
 }
 
 export function WhatsNewDialog({
-  version,
-  note,
+  version: firstVersion,
+  note: firstNote,
+  history,
   onClose,
 }: {
-  version: string;
-  note: ReleaseNote;
+  version?: string;
+  note?: ReleaseNote;
+  /** Every version, newest first: the window then lets the player pick one. */
+  history?: { version: string; note: ReleaseNote }[];
   onClose: () => void;
 }) {
+  const [picked, setPicked] = useState(history?.[0]?.version);
+  const entry = history?.find((item) => item.version === picked) ?? history?.[0];
+  const version = entry?.version ?? firstVersion!;
+  const note = entry?.note ?? firstNote!;
   const social = useSyncExternalStore(
     socialStore.subscribe,
     socialStore.snapshot,
@@ -76,9 +99,11 @@ export function WhatsNewDialog({
   return (
     <Modal
       title={
-        name
-          ? t("Bem-vindo de volta, {name}!", { name })
-          : t("Que bom ter você aqui!")
+        history
+          ? t("Novidades do OpenRetro")
+          : name
+            ? t("Bem-vindo de volta, {name}!", { name })
+            : t("Que bom ter você aqui!")
       }
       subtitle={t("Veja o que chegou na versão {version} do OpenRetro.", {
         version: version.replace(/\.0$/, ""),
@@ -87,6 +112,24 @@ export function WhatsNewDialog({
       className="whats-new"
     >
       <div className="whats-new-body">
+        {history && history.length > 1 && (
+          <div
+            className="whats-new-versions"
+            role="tablist"
+            aria-label={t("Versões")}
+          >
+            {history.map((item) => (
+              <button
+                key={item.version}
+                role="tab"
+                aria-selected={item.version === version}
+                onClick={() => setPicked(item.version)}
+              >
+                {item.version.replace(/\.0$/, "")}
+              </button>
+            ))}
+          </div>
+        )}
         <time className="whats-new-date" dateTime={note.date}>
           {date}
         </time>
@@ -116,7 +159,7 @@ export function WhatsNewDialog({
         </div>
         <div className="whats-new-action">
           <button className="button secondary" onClick={onClose} autoFocus>
-            {t("Começar a jogar")}
+            {history ? t("Fechar") : t("Começar a jogar")}
           </button>
         </div>
       </div>

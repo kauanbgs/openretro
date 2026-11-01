@@ -17,6 +17,7 @@ mod managed_process;
 pub mod rpcs3;
 pub mod runtime_menu;
 pub mod save_states;
+mod yuzu_config;
 
 pub(crate) fn core_name(platform: &str) -> Option<&'static str> {
     Some(match platform {
@@ -319,6 +320,12 @@ pub async fn launch_game(
  }
  let timer=Instant::now();
  // Command passes each argument directly to the executable. No shell interprets paths or arguments.
+ // A player mapped to the virtual pad must also be connected in yuzu's controls.
+ if switch && yuzu_family(&executable) {
+    if let Some(directory)=executable.parent() {
+       match yuzu_config::connect_virtual_players(directory) { Ok(0)=>{}, Ok(count)=>log::info!("Connected {count} virtual pad player(s) in yuzu's controls"), Err(message)=>log::warn!("Could not check yuzu's controls: {message}") }
+    }
+ }
  let mut command=Command::new(&executable);
  command.args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?);
  // With output connected, the runtime never opens a console of its own.

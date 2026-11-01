@@ -205,7 +205,7 @@
   display: block;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   background: #0b1020;
 }
 .ps-theme-preview > i {
@@ -244,7 +244,7 @@
 }
 .ps-console .ps-tabs button {
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: rgba(255, 255, 255, 0.55);
   font-size: 22px;
   font-weight: 600;
@@ -301,7 +301,7 @@
   gap: 8px;
   width: auto;
   padding: 0 16px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: rgba(255, 255, 255, 0.1);
   font-size: 14px;
   font-weight: 700;
@@ -396,7 +396,7 @@
   height: 112px;
   margin-top: 28px;
   padding: 0;
-  border-radius: 18px;
+  border-radius: calc(18px * var(--rs));
   background: var(--ps-glass);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   transition:
@@ -482,7 +482,7 @@
   gap: 10px;
   height: 54px;
   padding: 0 30px;
-  border-radius: 14px;
+  border-radius: calc(14px * var(--rs));
   font-size: 18px;
   font-weight: 700;
   transition:
@@ -532,7 +532,7 @@
   min-height: 128px;
   padding: 18px;
   border: 1px solid var(--ps-line);
-  border-radius: 18px;
+  border-radius: calc(18px * var(--rs));
   background: var(--ps-glass);
   backdrop-filter: blur(18px);
   color: rgba(255, 255, 255, 0.7);
@@ -622,7 +622,7 @@
   font-size: 12px;
 }
 .ps-console .tv-controls b[data-glyph~="menu"] {
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
 }
 
 /* ---------- Control center ---------- */
@@ -683,7 +683,7 @@
   height: 128px;
   padding: 16px;
   border: 1px solid var(--ps-line);
-  border-radius: 18px;
+  border-radius: calc(18px * var(--rs));
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
   text-align: left;
@@ -716,7 +716,7 @@
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: #12ace2;
   color: #fff;
   font-size: 12px;
@@ -772,7 +772,7 @@
   gap: 14px;
   height: 52px;
   padding: 0 16px;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   color: #fff;
   font-size: 16px;
   text-align: left;
@@ -820,7 +820,7 @@
   width: 100%;
   padding: 10px 10px 14px;
   border: 1px solid var(--ps-line, #333);
-  border-radius: 16px;
+  border-radius: calc(16px * var(--rs));
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
   text-align: left;
@@ -866,7 +866,7 @@
   justify-content: center;
   gap: 8px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   background: rgba(255, 255, 255, 0.08);
   color: #ffb3b8;
 }

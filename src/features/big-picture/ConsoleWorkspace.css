@@ -31,7 +31,7 @@
   padding: 10px 14px;
   background: #171717;
   border: 1px solid #303030;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
 }
 .tv-workspace-scroll {
   flex: 1;
@@ -71,7 +71,7 @@
   padding: 12px 18px;
   min-height: 46px;
   border: 1px solid #343434;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   background: #191919;
 }
 .console-mode .tv-workspace .button.primary {
@@ -94,7 +94,7 @@
   color: #eee;
   background: #0e0e0e;
   border: 1px solid #363636;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   padding: 10px 12px;
 }
 .tv-workspace :is(input[type="checkbox"], input[type="radio"]) {
@@ -121,7 +121,7 @@
 }
 .console-mode .tv-workspace :is(.tabs button, .settings-nav button) {
   padding: 12px 18px;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
 }
 .console-mode
   .tv-workspace
@@ -186,7 +186,7 @@
   padding: 24px;
   background: #111;
   border: 1px solid #383838;
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
 }
 .tv-workspace-select header {
   display: flex;
@@ -204,7 +204,7 @@
   padding: 14px;
   text-align: left;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
 }
 .console-mode .tv-workspace-select [data-highlight="true"] {
   background: #292929;

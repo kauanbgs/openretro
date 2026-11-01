@@ -25,7 +25,7 @@ html.in-game-overlay #root {
   overflow: auto;
   padding: 26px;
   border: 1px solid #ffffff26;
-  border-radius: 15px;
+  border-radius: calc(15px * var(--rs));
   background: #111111f5;
   box-shadow: 0 25px 90px #0009;
   animation: game-menu-enter 220ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
@@ -88,7 +88,7 @@ html.in-game-overlay #root {
   place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 5px;
+  border-radius: calc(5px * var(--rs));
   background: #ffffff0c;
 }
 .game-menu-slot strong {
@@ -108,7 +108,7 @@ html.in-game-overlay #root {
   gap: 14px;
   padding: 13px 14px;
   min-height: 47px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   color: #c5c5c5;
   text-align: left;
   transition:
@@ -187,7 +187,7 @@ html.in-game-overlay #root {
   padding: 12px 16px;
   margin: 0 10px 0 0;
   border: 1px solid #ffffff30;
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
 }
 .game-menu-confirm button.selected {
   background: #12ace2;
@@ -229,7 +229,7 @@ html.in-game-overlay #root {
 .game-menu-slot-preview span {
   width: 64px;
   aspect-ratio: 4 / 3;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   object-fit: cover;
   background: #ffffff0c;
   image-rendering: pixelated;

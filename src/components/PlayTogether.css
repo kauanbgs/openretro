@@ -1,58 +1,93 @@
 .play-together {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
   margin: 24px 0;
 }
 .play-together-card {
-  --play-color: #91cfff;
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
-  min-height: 166px;
-  padding: 24px;
-  overflow: hidden;
+  min-height: 92px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
-  border-left: 3px solid var(--play-color);
-  border-radius: 10px;
+  border-radius: calc(14px * var(--rs));
   background: var(--panel2);
   color: var(--text);
   text-align: left;
-}
-.play-together-party {
-  --play-color: #c5adff;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 .play-together-card:hover {
-  border-color: var(--play-color);
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--panel2) 80%, var(--text) 8%);
 }
 .play-together-card:focus-visible {
-  outline: 3px solid var(--play-color);
-  outline-offset: 4px;
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+.play-together-plaque {
+  position: relative;
+  flex: 0 0 52px;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: calc(14px * var(--rs));
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+.play-together-plaque svg {
+  width: 26px;
+  height: 26px;
+}
+.play-together-card[data-active="true"] .play-together-plaque::after {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--panel2);
+  border-radius: 50%;
+  background: var(--success);
+  content: "";
 }
 .play-together-copy {
-  position: relative;
-  z-index: 1;
+  flex: 1;
+  min-width: 0;
   display: grid;
-  gap: 8px;
+  gap: 3px;
 }
 .play-together-copy strong {
-  font-size: 20px;
-  font-weight: 750;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.25;
 }
 .play-together-copy > span {
-  max-width: 32ch;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
-.play-together-copy b {
-  margin-top: 9px;
-  color: var(--play-color);
+.play-together-action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: calc(8px * var(--rs));
+  color: var(--text);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.play-together-card:hover .play-together-action {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
 }
 .play-together-members,
 .play-together-friend-icons {
@@ -67,7 +102,7 @@
   gap: 16px;
   padding: 16px 20px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: calc(14px * var(--rs));
   background: var(--panel);
   color: var(--text);
   text-align: left;
@@ -91,7 +126,7 @@
 }
 .play-together-friends:focus-visible,
 .console-mode .play-together-friends:focus {
-  outline: 3px solid #c5adff;
+  outline: 3px solid var(--text);
   outline-offset: 4px;
 }
 .console-mode .play-together-friends {
@@ -102,39 +137,6 @@
   .play-together-friends {
     flex-wrap: wrap;
   }
-}
-.play-together-art {
-  position: relative;
-  flex: 0 0 82px;
-  display: grid;
-  place-items: center;
-  height: 94px;
-  color: var(--play-color);
-}
-.play-together-art > svg:first-child {
-  width: 72px;
-  height: 72px;
-}
-.play-together-phone .play-together-art > svg:first-child {
-  transform: rotate(12deg);
-}
-.play-together-symbol {
-  position: absolute;
-  right: -4px;
-  bottom: 0;
-  width: 34px;
-  height: 34px;
-  padding: 7px;
-  box-sizing: content-box;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--panel2);
-}
-html[data-theme="light"] .play-together-phone {
-  --play-color: #256da4;
-}
-html[data-theme="light"] .play-together-party {
-  --play-color: #7550b5;
 }
 .console-mode .play-together {
   margin: 24px 0 32px;
@@ -148,53 +150,47 @@ html[data-theme="light"] .play-together-party {
   margin-top: 100px;
 }
 .console-mode .play-together-card {
-  min-height: 185px;
-  padding: 28px 32px;
+  min-height: 130px;
+  padding: 24px 28px;
   background: #191919;
   --text: #eee;
+  --bg: #111;
   --muted: #bfc1c7;
   --panel2: #191919;
 }
-.console-mode .play-together .play-together-phone {
-  --play-color: #91cfff;
+.console-mode .play-together-plaque {
+  flex-basis: 72px;
+  width: 72px;
+  height: 72px;
 }
-.console-mode .play-together .play-together-party {
-  --play-color: #c5adff;
+.console-mode .play-together-plaque svg {
+  width: 36px;
+  height: 36px;
 }
 .console-mode .play-together-copy strong {
   font-size: clamp(22px, 1.8vw, 30px);
 }
 .console-mode .play-together-copy > span,
-.console-mode .play-together-copy b {
+.console-mode .play-together-action {
   font-size: 16px;
 }
 .console-mode .play-together-card:focus {
-  outline: 3px solid var(--play-color);
+  outline: 3px solid #eee;
   outline-offset: 4px;
 }
-@media (max-width: 1050px) {
-  .play-together-card {
-    padding: 20px;
-  }
-  .play-together-art {
-    flex-basis: 58px;
-  }
-  .play-together-art > svg:first-child {
-    width: 54px;
-    height: 54px;
-  }
-  .play-together-symbol {
-    width: 24px;
-    height: 24px;
-    padding: 5px;
+@media (max-width: 1100px) {
+  .play-together {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 650px) {
   .play-together {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 10px;
   }
-  .play-together-card {
-    min-height: 145px;
+  .play-together-action {
+    padding: 8px;
+  }
+  .play-together-action svg:last-child {
+    margin: 0;
   }
 }

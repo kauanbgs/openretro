@@ -3,7 +3,7 @@
   gap: 2px;
   padding: 3px;
   border: 1px solid #ffffff2e;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: #0b1018e6;
 }
 .party-reaction-button {
@@ -53,7 +53,7 @@
   max-width: 120px;
   padding: 1px 8px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: #0b1018cc;
   color: #fff;
   font-size: 11px;
@@ -98,7 +98,7 @@
   max-width: 220px;
   padding: 4px 12px 4px 4px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: #0b1018d9;
   color: #fff;
   font-size: 13px;

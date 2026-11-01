@@ -1,5 +1,6 @@
 mod account;
 mod achievements;
+mod autostart;
 mod backgrounds;
 mod commands;
 mod database;
@@ -109,9 +110,14 @@ pub fn run() {
             account::social::social_join,
             account::social::social_join_room,
             account::social::social_game_busy,
+            autostart::autostart_enabled,
+            autostart::set_autostart,
             backgrounds::list_console_backgrounds,
             backgrounds::add_console_background,
             backgrounds::remove_console_background,
+            backgrounds::list_appearance_media,
+            backgrounds::add_appearance_media,
+            backgrounds::remove_appearance_media,
             file_browser::browse_files,
             file_browser::read_source_json,
             metadata::catalog_status,

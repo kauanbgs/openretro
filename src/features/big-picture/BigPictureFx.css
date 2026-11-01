@@ -282,7 +282,7 @@
   width: 240px;
   height: 3px;
   overflow: hidden;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--rs));
   background: rgba(255, 255, 255, 0.08);
 }
 .fx-boot-bar i {
@@ -356,7 +356,7 @@
   position: absolute;
   z-index: -1;
   inset: 2px;
-  border-radius: 7px;
+  border-radius: calc(7px * var(--rs));
   background: #120f1b;
 }
 .console-mode .tv-nav {
@@ -407,7 +407,7 @@
   animation-delay: calc(60ms + var(--i, 0) * 40ms);
 }
 .console-mode .tv-rail-games button {
-  border-radius: 6px;
+  border-radius: calc(6px * var(--rs));
   transition: background 200ms ease;
 }
 .console-mode .tv-rail-games button:hover {
@@ -457,7 +457,7 @@
   letter-spacing: 0.01em;
 }
 .console-mode .tv-controls b {
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   border-color: rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.05);
   font-weight: 900;
@@ -535,7 +535,7 @@
   content: "";
   width: 28px;
   height: 3px;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--rs));
   background: linear-gradient(90deg, var(--fx-a), var(--fx-c));
   box-shadow: 0 0 12px var(--fx-a);
   transform-origin: left;
@@ -552,7 +552,7 @@
 .console-mode .tv-hero-actions > button {
   position: relative;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   border-color: var(--fx-line-strong);
   background: rgba(20, 16, 30, 0.55);
   backdrop-filter: blur(12px);
@@ -626,7 +626,7 @@
 }
 .console-mode .tv-hero-stat {
   border: 1px solid var(--fx-line-strong);
-  border-radius: 18px;
+  border-radius: calc(18px * var(--rs));
   background: linear-gradient(
     160deg,
     rgba(40, 30, 60, 0.6),
@@ -675,7 +675,7 @@
 .console-mode .tv-game-grid .artwork,
 .console-mode .tv-catalog-grid .artwork {
   border: 2px solid transparent;
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   outline: none !important;
   background: #14111c padding-box;
   box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.9);
@@ -793,7 +793,7 @@
   width: auto;
   height: 42px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   color: #1a0d03;
   background: linear-gradient(
     135deg,
@@ -813,7 +813,7 @@
 }
 .console-mode .tv-catalog-badges small {
   border: 1px solid var(--fx-line);
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   background: rgba(255, 255, 255, 0.05);
 }
 .console-mode .tv-catalog-badges small.available {
@@ -824,7 +824,7 @@
 /* list view: slide instead of tilt */
 .console-mode .tv-library .tv-library-list > button {
   border: 1px solid var(--fx-line);
-  border-radius: 14px;
+  border-radius: calc(14px * var(--rs));
   background: var(--fx-glass);
   transform: none;
 }
@@ -834,7 +834,7 @@
   box-shadow: 0 0 40px -12px var(--fx-a);
 }
 .console-mode .tv-library .tv-library-list .artwork {
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
 }
 
 /* ---------- Library chrome ---------- */
@@ -855,7 +855,7 @@
   bottom: 0;
   width: 44px;
   height: 3px;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--rs));
   background: linear-gradient(90deg, var(--fx-a), var(--fx-b));
   box-shadow: 0 0 12px var(--fx-a);
   transform-origin: left;
@@ -905,7 +905,7 @@
 }
 .console-mode .tv-tabs button.active::after {
   height: 3px;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--rs));
   background: linear-gradient(90deg, var(--fx-a), var(--fx-c));
   box-shadow: 0 0 14px var(--fx-a);
 }
@@ -942,7 +942,7 @@
   transform: scale(1.3);
 }
 .console-mode .tv-home-recent .artwork {
-  border-radius: 8px;
+  border-radius: calc(8px * var(--rs));
 }
 
 /* ---------- System grid ---------- */
@@ -960,7 +960,7 @@
   position: relative;
   overflow: hidden;
   border: 1px solid var(--fx-line);
-  border-radius: 20px;
+  border-radius: calc(20px * var(--rs));
   background: var(--fx-glass);
   backdrop-filter: blur(14px);
   animation: fx-rise 700ms var(--fx-out) backwards;
@@ -973,7 +973,7 @@
 .console-mode .tv-system-grid > button > svg {
   box-sizing: content-box;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: calc(14px * var(--rs));
   color: #fff;
   background: linear-gradient(135deg, var(--fx-b), var(--fx-c));
   box-shadow: 0 10px 30px -8px var(--fx-b);
@@ -1012,7 +1012,7 @@
 /* ---------- Lists, dialogs, notices ---------- */
 .console-mode .tv-list article {
   border-color: var(--fx-line);
-  border-radius: 16px;
+  border-radius: calc(16px * var(--rs));
   background: var(--fx-glass);
   transition:
     border-color 250ms ease,
@@ -1040,7 +1040,7 @@
     .tv-player-dialog
   ) {
   border: 1px solid var(--fx-line-strong);
-  border-radius: 24px;
+  border-radius: calc(24px * var(--rs));
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 30%),
     var(--fx-glass-strong);
@@ -1065,7 +1065,7 @@
 .console-mode .tv-catalog-detail-actions button {
   position: relative;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   border-color: var(--fx-line-strong);
   background: rgba(255, 255, 255, 0.05);
   transition:
@@ -1078,7 +1078,7 @@
   transform: translateY(-2px) scale(1.03);
 }
 .console-mode .tv-catalog-releases button {
-  border-radius: 14px;
+  border-radius: calc(14px * var(--rs));
   border-color: var(--fx-line);
   background: rgba(255, 255, 255, 0.04);
   transition:
@@ -1092,7 +1092,7 @@
   border-color: var(--fx-a);
 }
 .console-mode .tv-power-action {
-  border-radius: 16px;
+  border-radius: calc(16px * var(--rs));
   transition:
     transform 350ms var(--fx-spring),
     background 200ms ease;
@@ -1107,7 +1107,7 @@
   filter: drop-shadow(0 0 10px #ff5c6c);
 }
 .console-mode .tv-confirm-dialog button {
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   transition: transform 300ms var(--fx-spring);
 }
 .console-mode .tv-confirm-dialog button.focused {
@@ -1116,7 +1116,7 @@
 }
 .console-mode .tv-keyboard-keys button,
 .console-mode .tv-keyboard-actions button {
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
   border-color: var(--fx-line);
   background: rgba(255, 255, 255, 0.05);
   transition:
@@ -1139,14 +1139,14 @@
 }
 .console-mode .tv-select-menu {
   border: 1px solid var(--fx-line-strong);
-  border-radius: 16px;
+  border-radius: calc(16px * var(--rs));
   background: var(--fx-glass-strong);
   backdrop-filter: blur(20px);
   box-shadow: 0 24px 60px -10px rgba(0, 0, 0, 0.9);
   animation: fx-dialog-pop 380ms var(--fx-spring) both;
 }
 .console-mode .tv-select-menu [role="option"] {
-  border-radius: 10px;
+  border-radius: calc(10px * var(--rs));
   transition:
     background 150ms ease,
     transform 250ms var(--fx-spring);
@@ -1164,7 +1164,7 @@
 .console-mode .tv-notice {
   overflow: hidden;
   border: 1px solid var(--fx-line-strong);
-  border-radius: 999px;
+  border-radius: calc(999px * var(--rs));
   padding: 14px 22px;
   background: var(--fx-glass-strong);
   backdrop-filter: blur(20px);
@@ -1196,7 +1196,7 @@
   background-size: 240% 100%;
 }
 .console-mode .tv-catalog-skeleton i {
-  border-radius: 12px;
+  border-radius: calc(12px * var(--rs));
 }
 
 /* ---------- Launch sequence ---------- */
@@ -1339,7 +1339,7 @@
   height: 4px;
   margin-top: 8px;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: calc(4px * var(--rs));
   background: rgba(255, 255, 255, 0.08);
 }
 .fx-launch-progress i {

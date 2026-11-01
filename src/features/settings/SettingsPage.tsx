@@ -1,3 +1,4 @@
+import { AppearanceEditor } from "./AppearanceEditor";
 import { BrandMark } from "../../components/Brand";
 import { PageHeader } from "../../components/PageHeader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,7 +15,7 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
-import { bridge } from "../../services/bridge";
+import { bridge, isDesktop, isRemote } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { version as appVersion } from "../../../package.json";
 import { adoptLanguage, languages, t } from "../../i18n";
@@ -116,6 +117,11 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
   const { data: settings = defaultSettings } = useQuery({
     queryKey: ["settings"],
     queryFn: bridge.settings,
+  });
+  const { data: autostart } = useQuery({
+    queryKey: ["autostart"],
+    queryFn: bridge.autostart,
+    staleTime: Infinity,
   });
   const { data: paths } = useQuery({
     queryKey: ["paths"],
@@ -347,11 +353,23 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                     <strong>{t("Iniciar com o sistema")}</strong>
                     <p>
                       {t(
-                        "A inicialização junto com o sistema ainda não está disponível.",
+                        "Abre o OpenRetro sozinho quando você entra no Windows. Vem desligado.",
                       )}
                     </p>
                   </div>
-                  <span className="badge">{t("Em breve")}</span>
+                  <Switch
+                    label={t("Iniciar com o sistema")}
+                    on={autostart === true}
+                    disabled={!isDesktop || isRemote || autostart === undefined}
+                    onToggle={() =>
+                      void bridge
+                        .setAutostart(!autostart)
+                        .then(() =>
+                          client.invalidateQueries({ queryKey: ["autostart"] }),
+                        )
+                        .catch((e) => notify(String(e)))
+                    }
+                  />
                 </div>
               </Group>
             </>
@@ -658,6 +676,7 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                   />
                 </div>
               </Group>
+              <AppearanceEditor notify={notify} />
             </>
           ) : (
             <>
@@ -675,21 +694,6 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                     </div>
                   </div>
                 ))}
-              </Group>
-              <Group title={t("Desenvolvimento")}>
-                <div className="setting-row">
-                  <div>
-                    <strong>{t("Modo de desenvolvedor")}</strong>
-                    <p>{t("Mostre informações técnicas na barra lateral.")}</p>
-                  </div>
-                  <Switch
-                    label={t("Modo de desenvolvedor")}
-                    on={settings.developerMode}
-                    onToggle={() =>
-                      void save({ developerMode: !settings.developerMode })
-                    }
-                  />
-                </div>
               </Group>
             </>
           )}
