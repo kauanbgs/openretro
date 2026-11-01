@@ -532,7 +532,9 @@ export function ConsoleWorkspace({
               onJoinParty={(friend) => onRoute({ page: "party-guest", friend })}
             />
           )}
-          {route.page === "settings" && <SettingsPage notify={notify} />}
+          {route.page === "settings" && (
+            <SettingsPage notify={notify} languageInput={keyboardInput} />
+          )}
           {route.page === "themes" && <ConsoleThemes notify={notify} />}
           {route.page === "sources" && (
             <div className="page-content">

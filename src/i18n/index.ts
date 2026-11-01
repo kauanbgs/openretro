@@ -1,11 +1,15 @@
 import { en } from "./en";
 import { pt } from "./pt";
 import { es } from "./es";
-import { detectLanguage, isLanguage, type Language } from "../../shared/languages";
+import {
+  detectLanguage,
+  isLanguage,
+  type Language,
+} from "../../shared/languages";
 export { languages, type Language } from "../../shared/languages";
 
-/** The interface languages. Source text is mostly Portuguese; `en` translates
- * it to English and `pt` translates the few English source strings back. */
+/** Most source text is Portuguese; each dictionary translates source strings
+ * into the chosen language, including the older English source messages. */
 const STORAGE_KEY = "openretro-language";
 
 /** Follow Portuguese or Spanish on Windows/phones; other languages use English.

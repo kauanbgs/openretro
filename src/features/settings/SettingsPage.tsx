@@ -2,7 +2,7 @@ import { AppearanceEditor } from "./AppearanceEditor";
 import { BrandMark } from "../../components/Brand";
 import { PageHeader } from "../../components/PageHeader";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   Check,
   AlertCircle,
@@ -18,7 +18,8 @@ import {
 import { bridge, isDesktop, isRemote } from "../../services/bridge";
 import { defaultSettings, type AppSettings } from "../../types";
 import { version as appVersion } from "../../../package.json";
-import { adoptLanguage, languages, t } from "../../i18n";
+import { adoptLanguage, t } from "../../i18n";
+import { LanguageSelect } from "../../components/LanguageSelect";
 import { AchievementsAccount } from "../achievements/AchievementsAccount";
 type Section =
   | "General"
@@ -107,7 +108,13 @@ function Switch({
     </button>
   );
 }
-export function SettingsPage({ notify }: { notify: (s: string) => void }) {
+export function SettingsPage({
+  notify,
+  languageInput,
+}: {
+  notify: (s: string) => void;
+  languageInput?: RefObject<((key: string) => boolean) | null>;
+}) {
   const [section, setSection] = useState<Section>("General");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -147,12 +154,14 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
     try {
       await writes.current;
       if (revision === version.current) client.setQueryData(["settings"], next);
+      return true;
     } catch (e) {
       if (revision === version.current) {
         setSaveError(String(e));
         notify(String(e));
         await client.invalidateQueries({ queryKey: ["settings"] });
       }
+      return false;
     } finally {
       if (revision === version.current) setSaving(false);
     }
@@ -308,28 +317,17 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                       )}
                     </p>
                   </div>
-                  <select
-                    aria-label={t("Idioma da interface")}
+                  <LanguageSelect
+                    input={languageInput}
                     value={settings.interfaceLanguage ?? "system"}
                     disabled={saving}
-                    onChange={(e) => {
-                      const next = e.target
-                        .value as AppSettings["interfaceLanguage"];
+                    onChange={(next) => {
                       // The window reloads in the new language once saved.
-                      void save({ interfaceLanguage: next }).then(() =>
-                        adoptLanguage(next),
+                      void save({ interfaceLanguage: next }).then(
+                        (saved) => saved && adoptLanguage(next),
                       );
                     }}
-                  >
-                    <option value="system">
-                      {t("Automático (idioma do sistema)")}
-                    </option>
-                    {languages.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div className="setting-row">
                   <div>

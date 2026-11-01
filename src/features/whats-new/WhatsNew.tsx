@@ -80,7 +80,8 @@ export function WhatsNewDialog({
   onClose: () => void;
 }) {
   const [picked, setPicked] = useState(history?.[0]?.version);
-  const entry = history?.find((item) => item.version === picked) ?? history?.[0];
+  const entry =
+    history?.find((item) => item.version === picked) ?? history?.[0];
   const version = entry?.version ?? firstVersion!;
   const note = entry?.note ?? firstNote!;
   const social = useSyncExternalStore(
