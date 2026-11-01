@@ -127,7 +127,7 @@ const pageLabels: Record<Page, string> = {
   Home: t("Início"),
   Library: t("Biblioteca"),
   Discover: t("Catálogo"),
-  Downloads: "Downloads",
+  Downloads: t("Downloads"),
   Sources: t("Fontes"),
   Settings: t("Configurações"),
 };

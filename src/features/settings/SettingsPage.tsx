@@ -54,7 +54,7 @@ const sections: {
   },
   {
     id: "Downloads",
-    label: "Downloads",
+    label: t("Downloads"),
     icon: Download,
     description: t("Fontes de jogos, pasta de destino e o que fazer depois."),
   },

@@ -1,5 +1,14 @@
 /** Portuguese and English source text → Spanish. */
 export const es: Record<string, string> = {
+  Downloads: "Descargas",
+  Trailer: "Tráiler",
+  Saves: "Partidas guardadas",
+  "Slot {number}": "Ranura {number}",
+  Multiplayer: "Multijugador",
+  "🎮 Multiplayer": "🎮 Multijugador",
+  Visual: "Aspecto",
+  "Patch local": "Parche local",
+  "Atualizando…": "Actualizando…",
   "Configurar controle": "Configurar mando",
   "Este controle não foi reconhecido. Configure os botões uma vez.":
     "Este mando no se ha reconocido. Configura sus botones una vez.",
