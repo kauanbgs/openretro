@@ -15,6 +15,11 @@ describe("import titles", () => {
       importTitle(file("D:/Switch/Mario Kart 8 Deluxe/0100152000022000.nsp")),
     ).toBe("Mario Kart 8 Deluxe");
   });
+  it("skips a packaged game's data/games folders", () => {
+    expect(
+      importTitle(file("C:/Jogos/Mario Party Superstars/data/games/MPS.nsp")),
+    ).toBe("Mario Party Superstars");
+  });
   it("reads Windows paths with backslashes", () => {
     expect(
       importTitle({

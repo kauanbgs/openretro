@@ -294,6 +294,20 @@ fn inspect_hashed(
     }
     Ok(candidate)
 }
+/// Folders of a packaged game that hold no games: runtime installers and the
+/// bundled emulator.
+fn is_support_folder(name: &str) -> bool {
+    let name = name.to_lowercase();
+    ["_redist", "redist", "redistributable", "commonredist", "emu", "emulator", "emulador"]
+        .contains(&name.as_str())
+}
+/// Programs that install or run next to a game without being one.
+fn is_support_program(name: &str) -> bool {
+    let name = name.to_lowercase();
+    ["unins", "dxwebsetup", "dxsetup", "vcredist", "vc_redist", "ryujinx", "yuzu", "eden", "citron", "suyu", "sudachi", "torzu", "qtwebengine", "crashpad", "updater", "setup"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+}
 pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
     if path.contains('\0') || !Path::new(path).is_absolute() {
         return Err("Choose an absolute local folder.".into());
@@ -329,6 +343,10 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
             {
                 continue;
             }
+            // Packaged games carry their runtime installers and their emulator.
+            if kind.is_dir() && is_support_folder(&entry.file_name().to_string_lossy()) {
+                continue;
+            }
             if kind.is_dir() {
                 if depth < 8 {
                     pending.push((entry_path, depth + 1));
@@ -343,6 +361,9 @@ pub fn inspect_folder(path: &str) -> Result<Vec<ImportCandidate>> {
                 .and_then(|value| value.to_str())
                 .unwrap_or("")
                 .to_lowercase();
+            if extension == "exe" && is_support_program(&entry.file_name().to_string_lossy()) {
+                continue;
+            }
             let supported =
                 platform_extensions().contains_key(&extension) || is_installed_switch_game(&entry_path);
             if !supported {

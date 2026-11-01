@@ -587,7 +587,7 @@ pub fn insert_library_game(
 /// portable install keeps its games inside its own storage.
 fn bundled_switch_emulator(game: &std::path::Path) -> Option<std::path::PathBuf> {
     const NAMES: [&str; 7] = ["yuzu", "eden", "citron", "suyu", "sudachi", "torzu", "ryujinx"];
-    game.ancestors().skip(1).take(8).find_map(|dir| {
+    let in_folder = |dir: &std::path::Path| {
         let mut found: Vec<_> = std::fs::read_dir(dir)
             .ok()?
             .flatten()
@@ -603,6 +603,15 @@ fn bundled_switch_emulator(game: &std::path::Path) -> Option<std::path::PathBuf>
         // yuzu.exe before yuzu_ea.exe.
         found.sort_by_key(|path| path.as_os_str().len());
         found.into_iter().next()
+    };
+    game.ancestors().skip(1).take(8).find_map(|dir| {
+        // Packaged games keep the emulator in an `emu` folder next to `data`.
+        in_folder(dir).or_else(|| {
+            std::fs::read_dir(dir).ok()?.flatten().filter(|entry| {
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                ["emu", "emulator", "emulador"].contains(&name.as_str()) && entry.path().is_dir()
+            }).find_map(|entry| in_folder(&entry.path()))
+        })
     })
 }
 /// A game inside a portable emulator plays with that emulator: it is
@@ -1149,6 +1158,18 @@ mod tests {
         assert_eq!(bundled_switch_emulator(&game), Some(root.join("yuzu.exe")));
         let elsewhere = std::env::temp_dir().join(format!("openretro-alone-{}.nsp", uuid::Uuid::new_v4()));
         assert_eq!(bundled_switch_emulator(&elsewhere), None);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_game_next_to_an_emu_folder_plays_with_its_ryujinx() {
+        let root = std::env::temp_dir().join(format!("openretro-ryu-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("emu")).unwrap();
+        std::fs::create_dir_all(root.join("data/games")).unwrap();
+        std::fs::write(root.join("emu/Ryujinx.exe"), b"").unwrap();
+        let game = root.join("data/games/MPS.nsp");
+        std::fs::write(&game, b"").unwrap();
+        assert_eq!(bundled_switch_emulator(&game), Some(root.join("emu/Ryujinx.exe")));
         std::fs::remove_dir_all(&root).unwrap();
     }
 

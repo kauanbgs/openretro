@@ -146,6 +146,23 @@ impl Sdl {
                 .collect()
         }
     }
+    /// The SDL GUID (16 bytes) of each connected controller, in SDL's order.
+    pub fn controller_guids(&self) -> Vec<[u8; 16]> {
+        #[repr(C)]
+        struct Guid([u8; 16]);
+        unsafe {
+            let guid = GetProcAddress(self._library.0, c"SDL_JoystickGetDeviceGUID".as_ptr().cast());
+            if guid.is_null() {
+                return Vec::new();
+            }
+            let guid = std::mem::transmute::<*mut c_void, unsafe extern "C" fn(i32) -> Guid>(guid);
+            (self.update)();
+            (0..(self.count)().clamp(0, 16))
+                .filter(|&index| (self.is_controller)(index) != 0)
+                .map(|index| guid(index).0)
+                .collect()
+        }
+    }
     pub fn sample(&self) -> (bool, u32) {
         let mut guide = false;
         let mut menu = 0;

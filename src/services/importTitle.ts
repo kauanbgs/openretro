@@ -16,7 +16,7 @@ const isSwitch = (candidate: ImportCandidate) =>
 
 /** Folders that only organize files and say nothing about the game. */
 const GENERIC_FOLDERS =
-  /^(games?|roms?|switch|nsp|xci|base|update|dlc|user|nand|contents|registered)$/i;
+  /^(games?|roms?|data|switch|nsp|xci|base|update|dlc|user|nand|contents|registered)$/i;
 
 /**
  * The name to look the game up by. A Switch game's files are named after

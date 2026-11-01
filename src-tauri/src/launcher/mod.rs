@@ -18,6 +18,7 @@ pub mod rpcs3;
 pub mod runtime_menu;
 pub mod save_states;
 mod yuzu_config;
+mod ryujinx_config;
 
 pub(crate) fn core_name(platform: &str) -> Option<&'static str> {
     Some(match platform {
@@ -119,6 +120,30 @@ use crate::in_game::Chrome;
 fn yuzu_family(executable: &std::path::Path) -> bool {
     let name = executable.file_stem().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
     ["yuzu", "eden", "citron", "suyu", "sudachi", "torzu"].iter().any(|prefix| name.starts_with(prefix))
+}
+/// The path as Windows programs usually write it: Ryujinx chokes on the `\\?\`
+/// prefix canonical paths carry, as soon as it joins a file name to it.
+fn plain_path(path: &std::path::Path) -> String {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if !rest.starts_with("UNC") => rest.to_string(),
+        _ => text.into_owned(),
+    }
+}
+fn ryujinx_family(executable: &std::path::Path) -> bool {
+    executable.file_stem().is_some_and(|n| n.to_string_lossy().to_lowercase().starts_with("ryujinx"))
+}
+/// Ryujinx takes the game as its last argument. A packaged copy keeps its
+/// settings and games in a `data` folder beside the emulator's, which Ryujinx
+/// only uses when told with `-r` (what the package's own .bat does).
+fn ryujinx_args(executable: &std::path::Path) -> Vec<String> {
+    let name = executable.file_stem().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    if !name.starts_with("ryujinx") { return vec![]; }
+    // Ryujinx itself finds a `portable` folder next to it.
+    match ryujinx_config::data_folder(executable) {
+        Some(folder) if !folder.ends_with("portable") => vec!["-r".to_string(), plain_path(&folder)],
+        _ => vec![],
+    }
 }
 pub fn select_emulator(
     conn: &rusqlite::Connection,
@@ -310,7 +335,8 @@ pub async fn launch_game(
  if !managed_retroarch && !ps3 && !entry.item.runtime_args.iter().any(|a|a.contains("{game}")) {
     // yuzu and its forks open their game list first unless told to boot the game.
     if switch && yuzu_family(&executable) { args.push("-g".into()); }
-    args.push(game_path.to_string_lossy().into_owned());
+    if switch { args.extend(ryujinx_args(&executable)); }
+    args.push(if switch && ryujinx_family(&executable) { plain_path(&game_path) } else { game_path.to_string_lossy().into_owned() });
  }
  let session=uuid::Uuid::new_v4().to_string(); let started=chrono::Utc::now().to_rfc3339();
  {
@@ -325,6 +351,9 @@ pub async fn launch_game(
     if let Some(directory)=executable.parent() {
        match yuzu_config::connect_virtual_players(directory) { Ok(0)=>{}, Ok(count)=>log::info!("Connected {count} virtual pad player(s) in yuzu's controls"), Err(message)=>log::warn!("Could not check yuzu's controls: {message}") }
     }
+ }
+ if switch && ryujinx_family(&executable) {
+    match ryujinx_config::connect_players(&executable,stretch) { Ok(0)=>{}, Ok(count)=>log::info!("Updated {count} setting(s) in Ryujinx's controls"), Err(message)=>log::warn!("Could not check Ryujinx's controls: {message}") }
  }
  let mut command=Command::new(&executable);
  command.args(&args).stdin(if managed_retroarch { std::process::Stdio::piped() } else { std::process::Stdio::inherit() }).current_dir(executable.parent().ok_or("Invalid emulator directory")?);
