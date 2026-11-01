@@ -30,7 +30,7 @@ describe("interface language", () => {
     },
   );
 
-  it.each(["en-US", "es-ES", "fr-FR", "ja-JP", ""])(
+  it.each(["en-US", "fr-FR", "ja-JP", ""])(
     "starts in English for %s even if Portuguese is a secondary preference",
     async (preferred) => {
       browser([preferred, "pt-BR"]);
@@ -40,6 +40,36 @@ describe("interface language", () => {
       expect(i18n.locale()).toBe("en-US");
     },
   );
+
+  it.each(["es", "es-ES", "es-MX", "ES-AR"])(
+    "starts in Spanish for %s",
+    async (preferred) => {
+      browser([preferred, "en-US"]);
+      const i18n = await import("./index");
+      expect(i18n.language).toBe("es");
+      expect(document.documentElement.lang).toBe("es");
+      expect(i18n.locale()).toBe("es-ES");
+      expect(i18n.t("Idioma da interface")).toBe("Idioma de la interfaz");
+      expect(i18n.t("Choose game file")).toBe("Elegir archivo del juego");
+      expect(i18n.t("Porque você jogou {title}", { title: "Mario" })).toBe(
+        "Porque jugaste a Mario",
+      );
+      expect(i18n.t("Erro não traduzido")).toBe("Erro não traduzido");
+    },
+  );
+
+  it("persists a manual Spanish choice and returns to the system language", async () => {
+    const { storage, reload } = browser(["en-US"]);
+    const i18n = await import("./index");
+    expect(i18n.adoptLanguage("es")).toBe(true);
+    expect(storage.get("openretro-language")).toBe("es");
+    vi.resetModules();
+    const spanish = await import("./index");
+    expect(spanish.language).toBe("es");
+    expect(spanish.adoptLanguage("system")).toBe(true);
+    expect(storage.has("openretro-language")).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
 
   it("uses navigator.language when the preference list is unavailable", async () => {
     browser([]);

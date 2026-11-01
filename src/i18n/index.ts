@@ -1,26 +1,19 @@
 import { en } from "./en";
 import { pt } from "./pt";
+import { es } from "./es";
+import { detectLanguage, isLanguage, type Language } from "../../shared/languages";
+export { languages, type Language } from "../../shared/languages";
 
 /** The interface languages. Source text is mostly Portuguese; `en` translates
  * it to English and `pt` translates the few English source strings back. */
-export type Language = "pt-BR" | "en";
-export const languages: { id: Language; name: string }[] = [
-  { id: "pt-BR", name: "Português (Brasil)" },
-  { id: "en", name: "English" },
-];
-
 const STORAGE_KEY = "openretro-language";
 
-function isLanguage(value: unknown): value is Language {
-  return value === "pt-BR" || value === "en";
-}
-
-/** Windows (or the phone) in Portuguese gets Portuguese; anything else English.
+/** Follow Portuguese or Spanish on Windows/phones; other languages use English.
  * Outside a browser (tests) the source language stays. */
 export function systemLanguage(): Language {
   if (typeof document === "undefined") return "pt-BR";
   const preferred = navigator.languages?.[0] || navigator.language || "en";
-  return /^pt(?:-|$)/i.test(preferred) ? "pt-BR" : "en";
+  return detectLanguage(preferred);
 }
 
 function cached(): Language | null {
@@ -39,7 +32,7 @@ if (typeof document !== "undefined") document.documentElement.lang = language;
 
 /** BCP 47 tag for dates and numbers. */
 export function locale(): string {
-  return language === "en" ? "en-US" : "pt-BR";
+  return language === "en" ? "en-US" : language === "es" ? "es-ES" : "pt-BR";
 }
 
 type Patterns = { regex: RegExp; names: string[]; target: string }[];
@@ -82,7 +75,7 @@ export function t(
   text: string,
   values?: Record<string, string | number>,
 ): string {
-  const table = language === "en" ? en : pt;
+  const table = language === "en" ? en : language === "es" ? es : pt;
   const found = table[text];
   if (found !== undefined) return values ? fill(found, values) : found;
   if (values) return fill(text, values);

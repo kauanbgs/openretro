@@ -29,8 +29,8 @@ function markSeen(version: string) {
   }
 }
 
-const text = (value: { pt: string; en: string }) =>
-  language === "en" ? value.en : value.pt;
+const text = (value: { pt: string; en: string; es: string }) =>
+  language === "en" ? value.en : language === "es" ? value.es : value.pt;
 
 /** The version's news, once, the first time it opens. */
 export function WhatsNew({
