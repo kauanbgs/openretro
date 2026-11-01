@@ -1,5 +1,22 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Check, Github, Share2, X } from "lucide-react";
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import {
+  Compass,
+  Download,
+  Github,
+  Home,
+  Library,
+  Link2,
+  Settings,
+  Share2,
+  Smartphone,
+  Users,
+  X,
+} from "lucide-react";
 
 const REPO = "https://github.com/kauanbgs/openretro";
 // Stable asset name published with every release; used until the API answers.
@@ -64,30 +81,81 @@ function track(name: string, params: Record<string, unknown> = {}) {
   window.gtag?.("event", name, params);
 }
 
-const library = [
-  { id: "mario-kart", name: "Super Mario Kart", system: "Super Nintendo" },
-  { id: "crash", name: "Crash Bandicoot", system: "PlayStation" },
-  { id: "zelda", name: "Zelda: A Link to the Past", system: "Super Nintendo" },
-  { id: "sonic", name: "Sonic the Hedgehog", system: "Mega Drive" },
-  { id: "tekken", name: "Tekken 3", system: "PlayStation" },
-  { id: "chrono-trigger", name: "Chrono Trigger", system: "Super Nintendo" },
+const systemGroups = [
+  {
+    maker: "Nintendo",
+    names: [
+      "NES",
+      "Super Nintendo",
+      "Nintendo 64",
+      "Game Boy",
+      "Game Boy Advance",
+      "Nintendo DS",
+      "Nintendo Switch",
+    ],
+  },
+  { maker: "Sega", names: ["Master System", "Mega Drive"] },
+  { maker: "Sony", names: ["PlayStation", "PlayStation 2", "PlayStation 3", "PSP"] },
+  { maker: "Other", names: ["Arcade", "MS-DOS"] },
 ];
 
-const systems = [
-  "NES",
-  "Super Nintendo",
-  "Nintendo 64",
-  "Game Boy",
-  "Game Boy Advance",
-  "Nintendo DS",
-  "Mega Drive",
-  "Master System",
-  "PlayStation",
-  "PlayStation 2",
-  "PlayStation 3",
-  "PSP",
-  "Arcade",
-  "MS-DOS",
+const steps = [
+  {
+    title: "Install OpenRetro",
+    text: "One small installer. Updates arrive on their own.",
+  },
+  {
+    title: "Choose your games folder",
+    text: "Your games appear with covers, years and descriptions.",
+  },
+  {
+    title: "Press play",
+    text: "The right emulator downloads and configures itself. Plug in a controller and go.",
+  },
+];
+
+// The looks that ship in Settings > Appearance, drawn at thumbnail size.
+const themes: {
+  name: string;
+  bg: string;
+  panel: string;
+  text: string;
+  accent: string;
+  radius: number;
+  backdrop?: string;
+}[] = [
+  { name: "Default", bg: "#121212", panel: "#0c0c0c", text: "#e9eaee", accent: "#c0c1c7", radius: 1 },
+  { name: "Charcoal", bg: "#000000", panel: "#0a0a0a", text: "#ededed", accent: "#ededed", radius: 0.5 },
+  { name: "Cartridge", bg: "#17140f", panel: "#201c15", text: "#efe6d2", accent: "#e0a43a", radius: 0.75 },
+  { name: "Brick", bg: "#0f380f", panel: "#306230", text: "#cadc9f", accent: "#9bbc0f", radius: 0 },
+  { name: "Classic gray", bg: "#d6d3cc", panel: "#c4c0b8", text: "#26252d", accent: "#5b4b8a", radius: 1.25 },
+  {
+    name: "Glass",
+    bg: "#0c1020",
+    panel: "#ffffff22",
+    text: "#f4f6ff",
+    accent: "#9fc3ff",
+    radius: 1,
+    backdrop: "linear-gradient(140deg, #3a1c71, #0f6a8c)",
+  },
+  {
+    name: "Midnight",
+    bg: "#0c1020",
+    panel: "#141a30",
+    text: "#e4e8f7",
+    accent: "#7aa2ff",
+    radius: 1.5,
+    backdrop: "linear-gradient(160deg, #0c1020, #241338)",
+  },
+  {
+    name: "Your picture",
+    bg: "#0c0c0c",
+    panel: "#0c0c0caa",
+    text: "#f2f2f2",
+    accent: "#f2f2f2",
+    radius: 1,
+    backdrop: "url(./art/mario-world.jpg) center / cover",
+  },
 ];
 
 const features = [
@@ -96,12 +164,20 @@ const features = [
     text: "Add a game and it shows up with its cover, year and description.",
   },
   {
+    title: "Make it look like yours",
+    text: "Pick colors, corners and a font, or put a picture or video behind everything.",
+  },
+  {
     title: "Controller-first TV mode",
     text: "Switch to full screen and browse your library from the couch.",
   },
   {
     title: "Resume where you stopped",
     text: "Jump back into your last session and keep save states.",
+  },
+  {
+    title: "Nintendo Switch",
+    text: "Add Switch games and play them with the emulator you already use.",
   },
   {
     title: "Achievements",
@@ -128,7 +204,7 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Do I have to set up emulators?",
-    a: "No. The first time you play a system, OpenRetro downloads and configures its emulator.",
+    a: "No. The first time you play a system, OpenRetro downloads and configures its emulator. Nintendo Switch is the exception: you bring your own emulator.",
   },
   {
     q: "Do my friends need to install anything?",
@@ -315,6 +391,123 @@ function AfterDownload({ onClose, url }: { onClose: () => void; url: string }) {
   );
 }
 
+const libraryCovers = [
+  { id: "mario-world", name: "Super Mario World", system: "SNES" },
+  { id: "sonic", name: "Sonic the Hedgehog", system: "MD" },
+  { id: "chrono-trigger", name: "Chrono Trigger", system: "SNES" },
+  { id: "metroid", name: "Super Metroid", system: "SNES" },
+  { id: "crash", name: "Crash Bandicoot", system: "PS1" },
+];
+
+// The app itself, drawn with the same layout and colors it ships with.
+function AppWindow() {
+  const nav = [
+    { icon: Home, label: "Home", active: true },
+    { icon: Library, label: "Library" },
+    { icon: Compass, label: "Catalog" },
+    { icon: Download, label: "Downloads" },
+    { icon: Link2, label: "Sources" },
+    { icon: Settings, label: "Settings" },
+  ];
+  return (
+    <div className="appwin" aria-hidden="true">
+      <aside className="appwin-side">
+        <div className="appwin-profile">
+          <i />
+          <span>
+            <b>Player one</b>
+            <small>Friends and account</small>
+          </span>
+        </div>
+        <ul className="appwin-nav">
+          {nav.map(({ icon: Icon, label, active }) => (
+            <li key={label} className={active ? "active" : undefined}>
+              <Icon size={16} strokeWidth={1.8} />
+              {label}
+            </li>
+          ))}
+        </ul>
+        <p className="appwin-group">Play together</p>
+        <ul className="appwin-nav">
+          <li>
+            <Smartphone size={16} strokeWidth={1.8} />
+            Play on your phone
+          </li>
+          <li>
+            <Users size={16} strokeWidth={1.8} />
+            Play with friends
+          </li>
+        </ul>
+        <p className="appwin-group">My library</p>
+        <ul className="appwin-games">
+          {libraryCovers.slice(0, 4).map((game) => (
+            <li key={game.id}>
+              <img src={`./art/${game.id}.jpg`} alt="" />
+              {game.name}
+            </li>
+          ))}
+        </ul>
+      </aside>
+      <div className="appwin-main">
+        <div className="appwin-top">
+          <b>Home</b>
+          <span className="appwin-pill">Big Picture</span>
+          <span className="appwin-search">Search games</span>
+        </div>
+        <div className="appwin-hero">
+          <img src="./art/donkey-kong.jpg" alt="" />
+          <div>
+            <small>Continue playing</small>
+            <b>Donkey Kong Country</b>
+            <span>Super Nintendo, 1994</span>
+          </div>
+        </div>
+        <p className="appwin-title">My library</p>
+        <div className="appwin-cards">
+          {libraryCovers.map((game) => (
+            <figure key={game.id}>
+              <img src={`./art/${game.id}.jpg`} alt="" />
+              <figcaption>
+                <b>{game.name}</b>
+                <span>{game.system}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ThemeThumb({ theme }: { theme: (typeof themes)[number] }) {
+  return (
+    <figure
+      className="thumb"
+      style={
+        {
+          "--t-bg": theme.bg,
+          "--t-panel": theme.panel,
+          "--t-text": theme.text,
+          "--t-accent": theme.accent,
+          "--t-radius": `${Math.round(8 * theme.radius)}px`,
+          "--t-backdrop": theme.backdrop ?? theme.bg,
+        } as CSSProperties
+      }
+    >
+      <div className="thumb-window" aria-hidden="true">
+        <i className="thumb-side" />
+        <i className="thumb-top" />
+        <i className="thumb-hero" />
+        <i className="thumb-card" />
+        <i className="thumb-card" />
+        <i className="thumb-card" />
+        <b className="thumb-accent" />
+      </div>
+      <figcaption>{theme.name}</figcaption>
+    </figure>
+  );
+}
+
 export function Website() {
   const installer = useInstaller();
   const [platform] = useState(detectPlatform);
@@ -338,6 +531,7 @@ export function Website() {
           <Brand />
           <nav aria-label="Main">
             <a href="#how">How it works</a>
+            <a href="#look">Your look</a>
             <a href="#friends">Play with friends</a>
             <a href="#faq">FAQ</a>
           </nav>
@@ -368,53 +562,57 @@ export function Website() {
               <DownloadNote installer={installer} platform={platform} />
             </div>
           </div>
-          <div className="shelf" aria-hidden="true">
-            {library.map((game) => (
-              <figure key={game.id}>
-                <img src={`./art/${game.id}.jpg`} alt="" />
-                <figcaption>
-                  <b>{game.name}</b>
-                  <span>{game.system}</span>
-                </figcaption>
-              </figure>
-            ))}
+          <div className="stage">
+            <AppWindow />
           </div>
         </section>
 
-        <section className="systems" aria-label="Supported systems">
-          <div className="wrap">
-            <p>Plays games from</p>
-            <ul>
-              {systems.map((name) => (
-                <li key={name}>{name}</li>
-              ))}
-            </ul>
+        <section className="systems wrap" aria-label="Supported systems">
+          <h2>Plays games from every system you grew up with</h2>
+          <div className="systems-grid">
+            {systemGroups.map((group) => (
+              <div key={group.maker}>
+                <h3>{group.maker}</h3>
+                <ul>
+                  {group.names.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="how wrap" id="how">
           <h2>Playing in three steps</h2>
           <ol>
-            <li>
-              <h3>Install OpenRetro</h3>
-              <p>One small installer. Updates arrive on their own.</p>
-            </li>
-            <li>
-              <h3>Choose your games folder</h3>
-              <p>Your games appear with covers and details.</p>
-            </li>
-            <li>
-              <h3>Press play</h3>
-              <p>
-                The right emulator downloads and configures itself. Plug in a
-                controller and go.
-              </p>
-            </li>
+            {steps.map((step) => (
+              <li key={step.title}>
+                <h3>{step.title}</h3>
+                <p>{step.text}</p>
+              </li>
+            ))}
           </ol>
         </section>
 
-        <section className="friends" id="friends">
-          <div className="wrap friends-inner">
+        <section className="look wrap" id="look">
+          <div className="look-copy">
+            <h2>Make it look like yours</h2>
+            <p>
+              Pick the colors, how round the corners are and the font. Put a
+              gradient, a picture or a video behind everything, and share your
+              look with a friend as a line of text.
+            </p>
+          </div>
+          <div className="thumbs">
+            {themes.map((theme) => (
+              <ThemeThumb key={theme.name} theme={theme} />
+            ))}
+          </div>
+        </section>
+
+        <section className="friends wrap" id="friends">
+          <div className="friends-panel">
             <div className="friends-copy">
               <h2>Your friends join from a link</h2>
               <p>
@@ -463,17 +661,14 @@ export function Website() {
 
         <section className="features wrap">
           <h2>Everything else you'd expect</h2>
-          <ul>
+          <dl>
             {features.map((item) => (
-              <li key={item.title}>
-                <Check size={18} strokeWidth={2.5} />
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.text}</p>
-                </div>
-              </li>
+              <div key={item.title}>
+                <dt>{item.title}</dt>
+                <dd>{item.text}</dd>
+              </div>
             ))}
-          </ul>
+          </dl>
         </section>
 
         <section className="faq wrap" id="faq">
@@ -490,10 +685,14 @@ export function Website() {
 
         <section className="final">
           <div className="wrap final-inner">
-            <h2>Ready when you are</h2>
-            <p>Free, open source and set up in a couple of minutes.</p>
-            {button("footer")}
-            <DownloadNote installer={installer} platform={platform} />
+            <div>
+              <h2>Ready when you are</h2>
+              <p>Free, open source and set up in a couple of minutes.</p>
+            </div>
+            <div className="final-action">
+              {button("footer")}
+              <DownloadNote installer={installer} platform={platform} />
+            </div>
           </div>
         </section>
       </main>
