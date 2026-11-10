@@ -11,6 +11,7 @@ import {
   ThemePreview,
   type ConsoleTheme,
 } from "./ParallaxBackdrop";
+import { failed } from "../../utils/notice";
 
 /** The theme Big Picture shows, falling back to the default scene. */
 export function useConsoleTheme() {
@@ -79,7 +80,7 @@ export function ConsoleThemes({ notify }: { notify: (text: string) => void }) {
     try {
       await bridge.saveSettings(next);
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
       await client.invalidateQueries({ queryKey: ["settings"] });
     }
   };
@@ -92,7 +93,7 @@ export function ConsoleThemes({ notify }: { notify: (text: string) => void }) {
       await save({ consoleTheme: "custom", consoleBackground: added.path });
       notify(t("Imagem adicionada como fundo."));
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     } finally {
       setAdding(false);
     }
@@ -103,7 +104,7 @@ export function ConsoleThemes({ notify }: { notify: (text: string) => void }) {
       await client.invalidateQueries({ queryKey: ["console-backgrounds"] });
       notify(t("Imagem removida."));
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     }
   };
   const canAdd = isDesktop && !isRemote;

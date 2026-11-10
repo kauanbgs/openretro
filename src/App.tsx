@@ -24,6 +24,7 @@ import {
   X,
   Gamepad2,
   CheckCircle2,
+  CircleAlert,
   LoaderCircle,
 } from "lucide-react";
 import { PageLoading } from "./components/PageLoading";
@@ -71,6 +72,7 @@ import {
 import { AppBackdrop } from "./components/AppBackdrop";
 import { t } from "./i18n";
 import { version as appVersion } from "../package.json";
+import { failed, readNotice } from "./utils/notice";
 const HomePage = lazy(() =>
   import("./features/home/HomePage").then((module) => ({
     default: module.HomePage,
@@ -210,6 +212,7 @@ export function App() {
   const searchInput = useRef<HTMLInputElement>(null);
   libraryRef.current = library;
   const notify = useCallback((s: string) => setToast(s), []);
+  const notice = readNotice(toast);
   useEffect(() => startSocialClient(notify), [notify]);
   useEffect(() => startMessages(notify), [notify]);
   const { data: settings = defaultSettings, isSuccess: settingsLoaded } =
@@ -709,7 +712,7 @@ export function App() {
                       setProfileId(undefined);
                       setSelected(game);
                     })
-                    .catch((e) => notify(String(e)));
+                    .catch((e) => notify(failed(e)));
                 }}
                 onSeeAll={() => {
                   searchInput.current?.blur();
@@ -939,9 +942,16 @@ export function App() {
         </Modal>
       )}
       {toast && (
-        <div className="toast" role="status">
-          <CheckCircle2 size={19} />
-          <span>{toast}</span>
+        <div
+          className={notice.failed ? "toast failed" : "toast"}
+          role={notice.failed ? "alert" : "status"}
+        >
+          {notice.failed ? (
+            <CircleAlert size={19} />
+          ) : (
+            <CheckCircle2 size={19} />
+          )}
+          <span>{notice.text}</span>
           <button
             className="icon-button"
             aria-label={t("Dismiss notification")}

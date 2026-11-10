@@ -4,6 +4,7 @@ import { FilePlus2, Play, X } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { bridge } from "../../services/bridge";
 import { t } from "../../i18n";
+import { failed } from "../../utils/notice";
 
 const filesKey = (itemId: string) => ["launch-files", itemId];
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -43,7 +44,7 @@ export function LaunchFileDialog({
       setPicked(path);
       await refresh();
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     }
   }
   async function remove(path: string) {
@@ -52,7 +53,7 @@ export function LaunchFileDialog({
       if (picked === path) setPicked(undefined);
       await refresh();
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     }
   }
   return (

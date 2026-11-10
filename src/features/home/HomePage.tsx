@@ -19,6 +19,7 @@ import { platformById } from "../../db/platforms";
 import { enrichGameMetadata } from "../../utils/metadata";
 import type { GameMetadata, LibraryGame } from "../../types";
 import { t } from "../../i18n";
+import { PixelLandscape } from "../../components/PixelLandscape";
 interface Props {
   library: LibraryGame[];
   onSelect: (game: GameMetadata) => void;
@@ -38,7 +39,12 @@ const categories: {
   players?: PlayersFilter;
 }[] = [
   { id: "popular", label: t("Em alta"), icon: Flame },
-  { id: "multiplayer", label: t("Multiplayer"), icon: Gamepad2, players: "multi" },
+  {
+    id: "multiplayer",
+    label: t("Multiplayer"),
+    icon: Gamepad2,
+    players: "multi",
+  },
 ];
 export function HomePage({
   library,
@@ -150,23 +156,28 @@ export function HomePage({
         </button>
       ) : (
         <div className="hero hero-empty">
-          <div className="hero-content">
-            <h2>
-              {status.data?.state === "building"
-                ? t("Preparando o catálogo")
-                : t("Seus clássicos começam aqui")}
-            </h2>
-            <p>
-              {status.data?.state === "building"
-                ? t(
-                    "O OpenRetro está baixando a base de jogos do LaunchBox. Isso leva alguns minutos na primeira vez.",
-                  )
-                : status.data?.state === "unavailable"
-                  ? t("O catálogo de jogos funciona no aplicativo desktop.")
-                  : t(
-                      "Adicione um jogo do seu computador ou explore o catálogo.",
-                    )}
-            </p>
+          <div className="artwork">
+            <PixelLandscape />
+          </div>
+          <div className="hero-backdrop">
+            <div className="hero-content">
+              <h2>
+                {status.data?.state === "building"
+                  ? t("Preparando o catálogo")
+                  : t("Seus clássicos começam aqui")}
+              </h2>
+              <p>
+                {status.data?.state === "building"
+                  ? t(
+                      "O OpenRetro está baixando a base de jogos do LaunchBox. Isso leva alguns minutos na primeira vez.",
+                    )
+                  : status.data?.state === "unavailable"
+                    ? t("O catálogo de jogos funciona no aplicativo desktop.")
+                    : t(
+                        "Adicione um jogo do seu computador ou explore o catálogo.",
+                      )}
+              </p>
+            </div>
           </div>
         </div>
       )}

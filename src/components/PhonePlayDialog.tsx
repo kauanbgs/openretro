@@ -10,6 +10,7 @@ import {
 import { Modal } from "./Modal";
 import { bridge } from "../services/bridge";
 import { t } from "../i18n";
+import { failed } from "../utils/notice";
 
 /** Pairs a phone on the same network to watch, hear and play the PC's game. */
 export function PhonePlayDialog({
@@ -37,7 +38,7 @@ export function PhonePlayDialog({
       else await bridge.remotePlayStop();
       await client.invalidateQueries({ queryKey: ["remote-play"] });
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     } finally {
       setBusy(false);
     }
@@ -92,7 +93,7 @@ export function PhonePlayDialog({
                   onClick={() =>
                     void bridge
                       .remotePlayNetworkSettings()
-                      .catch((error) => notify(String(error)))
+                      .catch((error) => notify(failed(error)))
                   }
                 >
                   {t("Abrir configurações de rede")}

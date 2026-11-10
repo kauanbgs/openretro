@@ -39,6 +39,7 @@ import { ControllerKeyboard } from "./ControllerKeyboard";
 import { ControllerSelect } from "./ControllerSelect";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n";
+import { failed } from "../../utils/notice";
 export interface CatalogViewState {
   query: string;
   platform: string;
@@ -491,7 +492,7 @@ export function BigPictureCatalog({
               .then(() =>
                 queryClient.invalidateQueries({ queryKey: ["catalog-status"] }),
               )
-              .catch((e) => notify(String(e)));
+              .catch((e) => notify(failed(e)));
           }}
         />
       ) : browse.isPending ? (

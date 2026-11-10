@@ -15,6 +15,7 @@ import {
 } from "../../services/appearance";
 import { t } from "../../i18n";
 import "./AppearanceEditor.css";
+import { failed } from "../../utils/notice";
 
 const colorLabels: Record<ColorKey, string> = {
   bg: t("Fundo"),
@@ -115,7 +116,11 @@ function Swatch({ theme }: { theme: SavedTheme }) {
   );
 }
 
-export function AppearanceEditor({ notify }: { notify: (text: string) => void }) {
+export function AppearanceEditor({
+  notify,
+}: {
+  notify: (text: string) => void;
+}) {
   const look = useSyncExternalStore(
     appearanceStore.subscribe,
     appearanceStore.snapshot,
@@ -151,7 +156,7 @@ export function AppearanceEditor({ notify }: { notify: (text: string) => void })
       await client.invalidateQueries({ queryKey: ["appearance-media"] });
       setBackground({ kind: "media", media: added.path });
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     } finally {
       setAdding(false);
     }
@@ -163,7 +168,7 @@ export function AppearanceEditor({ notify }: { notify: (text: string) => void })
       if (look.background.media === path)
         setBackground({ media: null, kind: "none" });
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     }
   };
   const copy = async () => {
@@ -201,7 +206,10 @@ export function AppearanceEditor({ notify }: { notify: (text: string) => void })
             </button>
           ))}
           {saved.map((theme) => (
-            <span className="appearance-theme appearance-theme-saved" key={theme.name}>
+            <span
+              className="appearance-theme appearance-theme-saved"
+              key={theme.name}
+            >
               <button onClick={() => appearanceStore.set(theme.appearance)}>
                 <Swatch theme={theme} />
                 <span>{theme.name}</span>
@@ -273,7 +281,9 @@ export function AppearanceEditor({ notify }: { notify: (text: string) => void })
         ))}
         <Row
           title={t("Voltar às cores do tema")}
-          hint={t("O modo escuro ou claro, em Visual, define as cores de partida.")}
+          hint={t(
+            "O modo escuro ou claro, em Visual, define as cores de partida.",
+          )}
         >
           <button
             className="button outline"
@@ -498,7 +508,9 @@ export function AppearanceEditor({ notify }: { notify: (text: string) => void })
           className="appearance-css"
           aria-label={t("Seu CSS")}
           spellCheck={false}
-          placeholder={":root {\n  --accent: #ff6b81;\n}\n.game-card {\n  border-radius: 0;\n}"}
+          placeholder={
+            ":root {\n  --accent: #ff6b81;\n}\n.game-card {\n  border-radius: 0;\n}"
+          }
           value={look.css}
           maxLength={20000}
           onChange={(e) => set({ css: e.target.value })}
@@ -508,9 +520,14 @@ export function AppearanceEditor({ notify }: { notify: (text: string) => void })
       <Group title={t("Recomeçar")}>
         <Row
           title={t("Voltar ao visual padrão")}
-          hint={t("Desfaz cores, cantos, fonte, fundo e CSS. Seus temas salvos ficam.")}
+          hint={t(
+            "Desfaz cores, cantos, fonte, fundo e CSS. Seus temas salvos ficam.",
+          )}
         >
-          <button className="button outline" onClick={() => appearanceStore.reset()}>
+          <button
+            className="button outline"
+            onClick={() => appearanceStore.reset()}
+          >
             {t("Restaurar tudo")}
           </button>
         </Row>

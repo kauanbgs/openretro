@@ -77,6 +77,7 @@ import {
   type ConsoleAction,
 } from "./ControlCenter";
 import { t } from "../../i18n";
+import { readNotice } from "../../utils/notice";
 
 type Section = "home" | "library" | "catalog";
 const sections: { id: Section; label: string }[] = [
@@ -154,7 +155,7 @@ export function BigPicture({
   const [notice, setNotice] = useState<{ text: string; id: number }>();
   const feedback = useCallback(
     (text: string) => {
-      setNotice({ text, id: Date.now() });
+      setNotice({ text: readNotice(text).text, id: Date.now() });
       notify(text);
     },
     [notify],

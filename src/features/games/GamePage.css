@@ -73,17 +73,37 @@
 }
 .app .game-page .hero-panel .button {
   min-height: 40px;
+  height: auto;
   border-radius: calc(6px * var(--rs));
   font-size: 12px;
   padding-inline: 15px;
 }
-.app .game-page .hero-panel .outline {
-  border-color: #c4c4ca;
-  color: #eee;
-  background: transparent;
+/* Play is the one thing this page is for; the rest stays quiet beside it. */
+.app .game-page .hero-panel .button.primary {
+  min-width: 132px;
+  min-height: 44px;
+  padding-inline: 22px;
+  background: #f1f1f3;
+  color: #121212;
+  font-size: 14px;
+  font-weight: 700;
 }
-.app .game-page .hero-panel .outline:hover {
-  background: #ffffff15;
+.app .game-page .hero-panel .button.primary:hover:not(:disabled) {
+  background: #fff;
+}
+.app .game-page .hero-panel .outline {
+  min-height: 44px;
+  border-color: #ffffff33;
+  color: #e2e2e6;
+  background: #ffffff0f;
+}
+.app .game-page .hero-panel .outline:hover:not(:disabled) {
+  border-color: #ffffff66;
+  background: #ffffff1f;
+  color: #fff;
+}
+.app .game-page .hero-panel .outline.favorited {
+  color: #ff6b81;
 }
 .app .game-page .detail-body {
   max-width: 1800px;

@@ -5,6 +5,7 @@ import type { LibraryGame, SaveState } from "../../types";
 import { bridge, isDesktop } from "../../services/bridge";
 import { formatBytes, formatRelative } from "../../utils/format";
 import { locale, t } from "../../i18n";
+import { failed } from "../../utils/notice";
 
 export const saveStatesKey = (id: string) => ["save-states", id];
 /** Mirrors boots_without_states in src-tauri/src/launcher/mod.rs. */
@@ -70,7 +71,7 @@ export function SaveTimeline({
       });
       notify(t("{slot} apagado.", { slot: slotLabel(slot) }));
     } catch (e) {
-      notify(String(e));
+      notify(failed(e));
     } finally {
       setDeleting(false);
       setConfirmDelete(undefined);

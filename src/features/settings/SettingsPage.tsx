@@ -20,6 +20,7 @@ import { defaultSettings, type AppSettings } from "../../types";
 import { version as appVersion } from "../../../package.json";
 import { adoptLanguage, languages, t } from "../../i18n";
 import { AchievementsAccount } from "../achievements/AchievementsAccount";
+import { failed } from "../../utils/notice";
 type Section =
   | "General"
   | "Games"
@@ -150,7 +151,7 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
     } catch (e) {
       if (revision === version.current) {
         setSaveError(String(e));
-        notify(String(e));
+        notify(failed(e));
         await client.invalidateQueries({ queryKey: ["settings"] });
       }
     } finally {
@@ -367,7 +368,7 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                         .then(() =>
                           client.invalidateQueries({ queryKey: ["autostart"] }),
                         )
-                        .catch((e) => notify(String(e)))
+                        .catch((e) => notify(failed(e)))
                     }
                   />
                 </div>
@@ -538,7 +539,7 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                           .then((path) => {
                             if (path) return save({ downloadDirectory: path });
                           })
-                          .catch((e) => notify(String(e)))
+                          .catch((e) => notify(failed(e)))
                       }
                     >
                       <Folder size={16} /> {t("Escolher pasta")}

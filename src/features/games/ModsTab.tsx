@@ -37,6 +37,7 @@ import {
   PATCH_FORMATS,
 } from "../../services/mods";
 import { t } from "../../i18n";
+import { failed } from "../../utils/notice";
 
 /** Requests by job, so a job that stops to ask a question can continue after a remount. */
 const requests = new Map<string, ModInstallRequest>();
@@ -148,7 +149,7 @@ export function ModsTab({
       await queryClient.invalidateQueries({ queryKey: ["mods"] });
       await refresh();
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     } finally {
       setBusy(false);
     }
@@ -894,7 +895,7 @@ function LocalImport({
       if (result.name && !name)
         setName(result.name.replace(/^.*\//, "").replace(/\.[^.]+$/, ""));
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
       setInfo(undefined);
     } finally {
       setChecking(false);
@@ -921,7 +922,7 @@ function LocalImport({
           onClick={() =>
             void (async () => {
               const picked = await mods.pickPatch().catch((e) => {
-                notify(String(e));
+                notify(failed(e));
                 return null;
               });
               if (!picked) return;
@@ -1078,7 +1079,7 @@ function SourcesDialog({
       await queryClient.invalidateQueries({ queryKey: ["mods"] });
       onChanged();
     } catch (error) {
-      notify(String(error));
+      notify(failed(error));
     } finally {
       setBusy(false);
     }

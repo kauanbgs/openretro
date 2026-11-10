@@ -28,6 +28,9 @@
   --page-gutter: 24px;
   /* Corner scale: 1 is the stock look, 0 is square. Appearance settings move it. */
   --rs: 1;
+  /* Hover and pressed tints follow the text color, so they read on any theme. */
+  --hover-soft: color-mix(in srgb, var(--text) 5%, transparent);
+  --hover: color-mix(in srgb, var(--text) 8%, transparent);
   --radius: calc(8px * var(--rs));
   --radius-small: calc(4px * var(--rs));
 }
@@ -135,7 +138,7 @@ input[type="radio"] {
 .button.outline:hover:not(:disabled),
 .button.glass:hover:not(:disabled),
 .button.on-art:hover:not(:disabled) {
-  background: #ffffff14;
+  background: var(--hover);
   color: var(--text);
 }
 .button.favorited {
@@ -167,7 +170,7 @@ input[type="radio"] {
   color: var(--body);
 }
 .icon-button:hover {
-  background: #ffffff14;
+  background: var(--hover);
   color: var(--text);
 }
 
@@ -216,15 +219,12 @@ html.custom-titlebar {
   color: var(--muted);
 }
 .titlebar-controls button:hover {
-  background: #ffffff14;
+  background: var(--hover);
   color: var(--text);
 }
 .titlebar-controls .titlebar-close:hover {
   background: #c42b1c;
   color: #fff;
-}
-html[data-theme="light"] .titlebar-controls button:hover {
-  background: #0000000f;
 }
 
 /* ---------- Shell ---------- */
@@ -253,7 +253,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   text-align: left;
 }
 .sidebar-profile:hover {
-  background: #ffffff0d;
+  background: var(--hover-soft);
 }
 .sidebar-profile > span:last-child {
   display: grid;
@@ -291,7 +291,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
 }
 .sidebar-nav button:hover,
 .sidebar-library li button:hover {
-  background: #ffffff0d;
+  background: var(--hover-soft);
   color: var(--muted);
 }
 .sidebar-nav button.active,
@@ -451,7 +451,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   text-align: left;
 }
 .sidebar-together button:hover {
-  background: #ffffff0d;
+  background: var(--hover-soft);
   color: var(--text);
 }
 .sidebar-together i {
@@ -721,8 +721,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   font-size: 12px;
 }
 .hero-empty {
-  display: flex;
-  align-items: flex-end;
+  height: 260px;
 }
 .home-categories {
   display: flex;
@@ -928,7 +927,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   border-top: 1px solid var(--border);
 }
 .source-row:hover {
-  background: #ffffff08;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 .source-mark {
   display: grid;
@@ -1070,7 +1069,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   padding: 6px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: #1a1a1a;
+  background: var(--panel2);
   box-shadow: 0 12px 32px #0009;
 }
 .context-menu button {
@@ -1087,7 +1086,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
 }
 .context-menu button:hover,
 .context-menu button:focus-visible {
-  background: #ffffff14;
+  background: var(--hover);
   outline: none;
 }
 .context-menu button.danger {
@@ -1113,7 +1112,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
 }
 .remove-options label.selected {
   border-color: var(--border-strong);
-  background: #ffffff0d;
+  background: var(--hover-soft);
 }
 .remove-options label:has(input:disabled) {
   cursor: default;
@@ -1199,21 +1198,40 @@ html[data-theme="light"] .titlebar-controls button:hover {
 }
 .game-card-title p {
   overflow: hidden;
-  color: #c0c1c7;
+  color: #f1f1f3;
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.game-card-title span {
-  flex-shrink: 0;
-  color: #8e919b;
+/* Console and favorite sit on the art, which is dark whatever the theme. */
+.game-card-platform,
+.game-card-favorite {
+  position: absolute;
+  top: 10px;
+  display: grid;
+  place-items: center;
+  height: 22px;
+  border-radius: calc(6px * var(--rs));
+  background: #000000a6;
+  backdrop-filter: blur(6px);
+}
+.game-card-platform {
+  left: 10px;
+  padding: 0 8px;
+  color: #e9eaee;
   font-size: 11px;
+  font-weight: 700;
+}
+.game-card-favorite {
+  right: 10px;
+  width: 22px;
+  color: #ff6b81;
 }
 .game-card-specifics {
   display: flex;
   gap: 12px;
-  color: #8e919b;
+  color: #a9acb5;
   font-size: 12px;
 }
 .game-card-specifics span {
@@ -1221,12 +1239,14 @@ html[data-theme="light"] .titlebar-controls button:hover {
   align-items: center;
   gap: 5px;
 }
-.game-card-specifics svg[fill="currentColor"] {
-  color: #ff6b81;
-}
 .game-card.skeleton {
   pointer-events: none;
-  background: linear-gradient(90deg, #0c0c0c 0%, #1a1a1a 50%, #0c0c0c 100%);
+  background: linear-gradient(
+    90deg,
+    var(--panel) 0%,
+    var(--panel2) 50%,
+    var(--panel) 100%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
@@ -1769,7 +1789,7 @@ html[data-theme="light"] .titlebar-controls button:hover {
   font-weight: 600;
 }
 .app .tabs button:hover {
-  background: #ffffff14;
+  background: var(--hover);
 }
 .app .tabs button.selected {
   border-color: transparent;
@@ -1813,7 +1833,17 @@ html[data-theme="light"] .titlebar-controls button:hover {
 
 /* Library page */
 .app .library-toolbar {
+  flex-wrap: wrap;
+  gap: 12px 20px;
   margin-bottom: 20px;
+  padding-bottom: 16px;
+}
+.app .toolbar-right {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.app .toolbar-right > select {
+  font-size: 12px;
 }
 .app .filter-tabs {
   display: flex;
@@ -1869,7 +1899,14 @@ html[data-theme="light"] .titlebar-controls button:hover {
   box-shadow: 0 8px 24px #0008;
 }
 .toast > svg {
+  flex: none;
   color: var(--success);
+}
+.toast.failed {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.toast.failed > svg {
+  color: var(--danger);
 }
 
 .app-boot {
@@ -1989,6 +2026,9 @@ html[data-theme="light"] .titlebar-controls button:hover {
 }
 .transfer-filters {
   margin-bottom: 24px;
+}
+.transfer-section > .notice {
+  margin-bottom: 12px;
 }
 .transfer-section .section-heading {
   display: flex;

@@ -341,13 +341,16 @@ export function DownloadsPage({
             ))}
           </div>
         ) : (
-          <p className="notice">
-            {jobs.length
-              ? t("Nenhum download nesta categoria.")
-              : t(
-                  "Nenhum download ainda. Escolha um jogo no catálogo para começar.",
-                )}
-          </p>
+          <div className="empty-panel">
+            <Download size={28} />
+            <p>
+              {jobs.length
+                ? t("Nenhum download nesta categoria.")
+                : t(
+                    "Nenhum download ainda. Escolha um jogo no catálogo para começar.",
+                  )}
+            </p>
+          </div>
         )}
       </section>
       {files && (

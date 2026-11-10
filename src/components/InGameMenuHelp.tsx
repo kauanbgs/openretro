@@ -4,6 +4,7 @@ import { EmulatorManager } from "../services/EmulatorManager";
 import { bridge } from "../services/bridge";
 import { KeyboardMap } from "./KeyboardMap";
 import { t } from "../i18n";
+import { failed } from "../utils/notice";
 
 export function hasRuntimeMenu(
   entry: LibraryGame | undefined,
@@ -60,7 +61,7 @@ export function InGameMenuHelp({
         onClick={() =>
           void bridge
             .openGameScreenshots(entry.item.id)
-            .catch((error) => notify(String(error)))
+            .catch((error) => notify(failed(error)))
         }
       >
         <Camera size={17} /> {t("Minhas capturas")}

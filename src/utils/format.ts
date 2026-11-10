@@ -33,3 +33,10 @@ export function formatRelative(date: Date, now = new Date()) {
       return relative.format(Math.round(seconds / size), unit);
   return t("agora mesmo");
 }
+/** Time played, short enough for a card: "45min", "3h", "1h 30min". */
+export function formatPlaytime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${Math.max(1, minutes)}min`;
+  const hours = `${Math.floor(minutes / 60)}h`;
+  return minutes % 60 ? `${hours} ${minutes % 60}min` : hours;
+}

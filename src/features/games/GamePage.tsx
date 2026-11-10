@@ -59,6 +59,7 @@ import { RemoveGameDialog } from "../../components/RemoveGameDialog";
 import { playedSha256 } from "../../services/mods";
 import { formatRelative } from "../../utils/format";
 import { locale, t } from "../../i18n";
+import { failed } from "../../utils/notice";
 
 const tabLabels: Record<string, string> = {
   Overview: t("Visão geral"),
@@ -180,7 +181,7 @@ export function GamePage({
       .then((r) => {
         if (active) setResolution(r);
       })
-      .catch((e) => notify(String(e)));
+      .catch((e) => notify(failed(e)));
     return () => {
       active = false;
     };
@@ -209,7 +210,7 @@ export function GamePage({
       await fn();
       await refresh();
     } catch (e) {
-      notify(String(e));
+      notify(failed(e));
     } finally {
       setBusy(false);
     }
@@ -253,7 +254,7 @@ export function GamePage({
         }),
       );
     } catch (e) {
-      notify(String(e));
+      notify(failed(e));
     } finally {
       setRunning(false);
       void queryClient.invalidateQueries({
@@ -603,7 +604,7 @@ export function GamePage({
                           onClick={() =>
                             void bridge
                               .openGameScreenshots(entry.item.id)
-                              .catch((e) => notify(String(e)))
+                              .catch((e) => notify(failed(e)))
                           }
                         >
                           {t("Abrir pasta")}
