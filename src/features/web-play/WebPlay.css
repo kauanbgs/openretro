@@ -66,6 +66,23 @@
   color: var(--text);
 }
 
+/* On a phone the title takes what the exit button leaves, and the screen
+   gets the whole width. */
+@media (max-width: 760px) {
+  .web-player-bar {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    height: calc(56px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 12px 0;
+  }
+  .web-player-bar > span {
+    display: none;
+  }
+  .web-player-stage {
+    padding: 8px 0 env(safe-area-inset-bottom);
+  }
+}
+
 /* Homebrew covers are small screenshots: scale them without blurring. */
 html.web-play .artwork img {
   image-rendering: pixelated;

@@ -2851,6 +2851,230 @@ html.remote .mobile-home {
   min-width: 0;
 }
 
+/* ---------- Web build on a phone ---------- */
+/* The browser version keeps the desktop shell on wide screens; on a phone the
+   sidebar becomes a bottom tab bar (as in the paired-phone layout above), with
+   the account button as its last tab. */
+@media (max-width: 760px) {
+  html.web-play {
+    --header-height: 56px;
+    --tabs-height: calc(60px + env(safe-area-inset-bottom));
+    --page-gutter: 14px;
+    --sidebar-width: 0px;
+    -webkit-text-size-adjust: 100%;
+  }
+  html.web-play .app main {
+    margin-left: 0;
+    padding-bottom: var(--tabs-height);
+  }
+  html.web-play .bottom-panel,
+  html.web-play .sidebar-library {
+    display: none;
+  }
+  html.web-play .app .sidebar {
+    inset: auto 0 0 0;
+    width: auto;
+    height: var(--tabs-height);
+    flex-direction: row;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-right: 0;
+    border-top: 1px solid var(--border);
+  }
+  html.web-play .sidebar-nav {
+    display: flex;
+    flex: 2;
+    gap: 0;
+    padding: 0;
+  }
+  html.web-play .sidebar-nav button,
+  html.web-play .sidebar-profile {
+    position: relative;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 60px;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    font-size: 11px;
+  }
+  html.web-play .sidebar-profile {
+    order: 1;
+    align-items: center;
+  }
+  html.web-play .sidebar-profile:hover {
+    background: transparent;
+  }
+  html.web-play .sidebar-nav span,
+  html.web-play .sidebar-profile > span:last-child {
+    display: block;
+  }
+  html.web-play .sidebar-profile > span:last-child small {
+    display: none;
+  }
+  html.web-play .sidebar-profile > span:last-child strong {
+    display: block;
+    max-width: 96px;
+    overflow: hidden;
+    color: var(--body);
+    font-size: 11px;
+    font-weight: 400;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  html.web-play .sidebar-profile[aria-expanded="true"] strong {
+    color: var(--text);
+  }
+  html.web-play .sidebar-nav button.active {
+    background: transparent;
+    color: var(--text);
+  }
+  html.web-play .sidebar-nav button.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 30%;
+    right: 30%;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: var(--text);
+  }
+  html.web-play .header {
+    gap: 8px;
+    padding: env(safe-area-inset-top) var(--page-gutter) 0;
+    height: calc(var(--header-height) + env(safe-area-inset-top));
+  }
+  html.web-play .header h1 {
+    flex: 1;
+    min-width: 0;
+    font-size: 17px;
+  }
+  html.web-play .header-actions {
+    min-width: 0;
+    margin-left: 0;
+  }
+  html.web-play .header-search,
+  html.web-play .header-search:focus-within {
+    width: 150px;
+    height: 36px;
+  }
+  html.web-play .header-search:focus-within {
+    width: 190px;
+  }
+  html.web-play .app .page-content {
+    padding: var(--page-gutter);
+  }
+  html.web-play .page-heading {
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  /* Home */
+  html.web-play .home {
+    gap: 16px;
+  }
+  html.web-play .hero {
+    height: 220px;
+  }
+  html.web-play .hero-content {
+    padding: 16px;
+  }
+  html.web-play .hero-content h2 {
+    font-size: 26px;
+  }
+  html.web-play .section-head {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  html.web-play .home-section-title {
+    min-width: 0;
+    font-size: 18px;
+    white-space: nowrap;
+  }
+  html.web-play .section-link {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  html.web-play .home-categories,
+  html.web-play .home-categories > div {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  html.web-play .home-categories .button {
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 12px;
+  }
+  html.web-play .cards-grid,
+  html.web-play .app .games-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  html.web-play .app .game-card {
+    height: 128px;
+  }
+  html.web-play .app .game-card:hover {
+    transform: none;
+  }
+  html.web-play .game-card-content {
+    padding: 22px 8px 8px;
+  }
+  html.web-play .game-card-title p {
+    font-size: 13px;
+  }
+  html.web-play .game-card-specifics {
+    gap: 8px;
+    overflow: hidden;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  /* Library */
+  html.web-play .catalogue-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  html.web-play .app .library-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  html.web-play .app .library-toolbar > *,
+  html.web-play .app .filter-tabs {
+    min-width: 0;
+    max-width: 100%;
+  }
+  html.web-play .app .toolbar-right {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  html.web-play .app .toolbar-right select {
+    flex: 1;
+    min-width: 0;
+  }
+  html.web-play .app .filter-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  html.web-play .app .filter-tabs button {
+    flex-shrink: 0;
+  }
+  html.web-play .modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 40px);
+  }
+  html.web-play .toast {
+    right: 10px;
+    left: 10px;
+    bottom: calc(var(--tabs-height) + 10px);
+    width: auto;
+    max-width: none;
+    transform: none;
+  }
+}
+
 /* Shown while an update installs; the app relaunches itself afterwards. */
 .update-overlay {
   position: fixed;
