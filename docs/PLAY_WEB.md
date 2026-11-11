@@ -10,6 +10,11 @@ npm run dev:play     # http://127.0.0.1:1422
 npm run build:play   # gera dist-play/, que funciona em qualquer pasta de um site
 ```
 
+O build do site (`npm run build:web`) já inclui a versão web em `/play/`
+(`web/scripts/build-play.mjs`). Assim, o Vercel, que publica
+openretro.com.br, e o GitHub Pages servem a demo que o botão "Try the demo"
+abre.
+
 Na versão web ficam Início, Biblioteca e a conta com amigos e mensagens.
 Downloads, fontes, Party, celular, Big Picture e configurações dependem do PC e
 ficam escondidos. O código
