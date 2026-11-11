@@ -73,7 +73,12 @@ import { AppBackdrop } from "./components/AppBackdrop";
 import { t } from "./i18n";
 import { version as appVersion } from "../package.json";
 import { failed, readNotice } from "./utils/notice";
-import { isWebPlay } from "./services/webPlay";
+import { isWebPlay, webOnboardingSeen } from "./services/webPlay";
+const WebOnboarding = lazy(() =>
+  import("./features/web-play/WebOnboarding").then((module) => ({
+    default: module.WebOnboarding,
+  })),
+);
 const WebHome = lazy(() =>
   import("./features/web-play/WebHome").then((module) => ({
     default: module.WebHome,
@@ -180,6 +185,10 @@ export function App() {
   const [playing, setPlaying] = useState<LibraryGame>();
   /** The web build's game, running in the browser over the app. */
   const [webGame, setWebGame] = useState<LibraryGame>();
+  /** The web build's welcome: on the first visit, and from "Como jogar". */
+  const [onboarding, setOnboarding] = useState(
+    () => isWebPlay && !webOnboardingSeen(),
+  );
   const downloads = useQuery({
     queryKey: ["download-jobs"],
     queryFn: bridge.downloadJobs,
@@ -823,7 +832,14 @@ export function App() {
               <WebGamePage
                 key={selected.id}
                 entry={activeEntry}
-                onPlay={() => setWebGame(activeEntry)}
+                signedIn={Boolean(account)}
+                onPlay={() => {
+                  // Browsing is open; playing in the browser needs an account.
+                  if (account) return setWebGame(activeEntry);
+                  setSocialView("friends");
+                  setSocialOpen(true);
+                  notify(t("Entre na sua conta para jogar no navegador."));
+                }}
                 onRemoved={() => {
                   setSelected(undefined);
                   void refresh();
@@ -925,9 +941,14 @@ export function App() {
               count: library.length,
             })}
           </button>
-          <a href="https://openretro.com.br" target="_blank" rel="noreferrer">
-            {t("Baixe o OpenRetro para Windows")}
-          </a>
+          <span className="web-play-footer-links">
+            <button onClick={() => setOnboarding(true)}>
+              {t("Como jogar")}
+            </button>
+            <a href="https://openretro.com.br" target="_blank" rel="noreferrer">
+              {t("Baixe o OpenRetro para Windows")}
+            </a>
+          </span>
         </footer>
       ) : (
         <footer className="bottom-panel">
@@ -996,6 +1017,20 @@ export function App() {
             setSocialOpen(true);
           }}
         />
+      )}
+      {/* Waits for the games, which its second step shows. */}
+      {onboarding && library.length > 0 && (
+        <Suspense fallback={null}>
+          <WebOnboarding
+            library={library}
+            signedIn={Boolean(account)}
+            onSignIn={() => {
+              setSocialView("friends");
+              setSocialOpen(true);
+            }}
+            onClose={() => setOnboarding(false)}
+          />
+        </Suspense>
       )}
       {phoneOpen && (
         <PhonePlayDialog onClose={() => setPhoneOpen(false)} notify={notify} />

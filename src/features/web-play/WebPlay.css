@@ -50,6 +50,22 @@
   text-align: center;
 }
 
+/* "Como jogar" and the desktop download, side by side in the status bar. */
+.web-play-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.web-play-footer-links > button,
+.web-play-footer-links > a {
+  color: inherit;
+  text-decoration: none;
+}
+.web-play-footer-links > button:hover,
+.web-play-footer-links > a:hover {
+  color: var(--text);
+}
+
 /* Homebrew covers are small screenshots: scale them without blurring. */
 html.web-play .artwork img {
   image-rendering: pixelated;

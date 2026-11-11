@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Gamepad2,
   Heart,
+  LogIn,
   Play,
   Scale,
   Trash2,
@@ -21,16 +22,20 @@ import { failed } from "../../utils/notice";
 import { t } from "../../i18n";
 import { GameMedia } from "../games/GameMedia";
 import "../games/GamePage.css";
+import "./WebPlay.css";
 import { webCredits } from "./library";
 
 export function WebGamePage({
   entry,
+  signedIn,
   onPlay,
   onRemoved,
   refresh,
   notify,
 }: {
   entry: LibraryGame;
+  /** Playing needs an account; without one, Play opens the sign-in. */
+  signedIn: boolean;
   onPlay: () => void;
   onRemoved: () => void;
   refresh: () => Promise<void>;
@@ -94,17 +99,24 @@ export function WebGamePage({
               : t("Você ainda não jogou")}
           </p>
           <p>
-            {item.playtime
-              ? t("{hours}h {minutes}min de jogo", {
-                  hours: Math.floor(item.playtime / 3600),
-                  minutes: Math.floor((item.playtime % 3600) / 60),
-                })
-              : t("Roda direto no navegador")}
+            {!signedIn
+              ? t("Entre na sua conta para jogar no navegador")
+              : item.playtime
+                ? t("{hours}h {minutes}min de jogo", {
+                    hours: Math.floor(item.playtime / 3600),
+                    minutes: Math.floor((item.playtime % 3600) / 60),
+                  })
+                : t("Roda direto no navegador")}
           </p>
         </div>
         <div className="hero-panel-actions">
           <button className="button primary play-button" onClick={onPlay}>
-            <Play size={16} fill="currentColor" /> {t("Jogar")}
+            {signedIn ? (
+              <Play size={16} fill="currentColor" />
+            ) : (
+              <LogIn size={16} />
+            )}
+            {t("Jogar")}
           </button>
           {credits?.local && (
             <button

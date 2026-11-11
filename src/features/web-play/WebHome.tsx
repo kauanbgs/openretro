@@ -9,6 +9,7 @@ import { PixelLandscape } from "../../components/PixelLandscape";
 import { platformById } from "../../db/platforms";
 import type { GameMetadata, LibraryGame } from "../../types";
 import { t } from "../../i18n";
+import "./WebPlay.css";
 
 const GRID_SIZE = 24;
 
