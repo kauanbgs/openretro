@@ -7,6 +7,7 @@ import {
 import {
   Compass,
   Download,
+  Gamepad2,
   Github,
   Home,
   Library,
@@ -24,6 +25,8 @@ const DOWNLOAD_FALLBACK = `${REPO}/releases/latest/download/OpenRetro-Setup.exe`
 const LATEST_RELEASE_API =
   "https://api.github.com/repos/kauanbgs/openretro/releases/latest";
 const SITE = "https://openretro.com.br";
+// The app's web build (docs/PLAY_WEB.md), published next to the site.
+const DEMO = "./play/";
 
 type Installer = { url: string; version?: string; size?: number };
 
@@ -534,6 +537,12 @@ export function Website() {
             <a href="#look">Your look</a>
             <a href="#friends">Play with friends</a>
             <a href="#faq">FAQ</a>
+            <a
+              href={DEMO}
+              onClick={() => track("demo_open", { where: "header" })}
+            >
+              Demo
+            </a>
           </nav>
           <a
             className="header-link"
@@ -559,6 +568,14 @@ export function Website() {
             </p>
             <div className="hero-action">
               {button("hero")}
+              <a
+                className="demo-button"
+                href={DEMO}
+                onClick={() => track("demo_open", { where: "hero" })}
+              >
+                <Gamepad2 size={19} />
+                Try the demo
+              </a>
               <DownloadNote installer={installer} platform={platform} />
             </div>
           </div>

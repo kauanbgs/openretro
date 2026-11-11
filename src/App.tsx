@@ -73,6 +73,22 @@ import { AppBackdrop } from "./components/AppBackdrop";
 import { t } from "./i18n";
 import { version as appVersion } from "../package.json";
 import { failed, readNotice } from "./utils/notice";
+import { isWebPlay } from "./services/webPlay";
+const WebHome = lazy(() =>
+  import("./features/web-play/WebHome").then((module) => ({
+    default: module.WebHome,
+  })),
+);
+const WebGamePage = lazy(() =>
+  import("./features/web-play/WebGamePage").then((module) => ({
+    default: module.WebGamePage,
+  })),
+);
+const WebPlayer = lazy(() =>
+  import("./features/web-play/WebPlayer").then((module) => ({
+    default: module.WebPlayer,
+  })),
+);
 const HomePage = lazy(() =>
   import("./features/home/HomePage").then((module) => ({
     default: module.HomePage,
@@ -134,21 +150,27 @@ const pageLabels: Record<Page, string> = {
   Settings: t("Configurações"),
 };
 // A phone browses, downloads and plays; emulators and settings stay on the PC.
-const navItems = isRemote
+// The web build only has what runs in a browser: its games and the library.
+const navItems = isWebPlay
   ? [
       { page: "Home" as Page, icon: Home },
-      { page: "Discover" as Page, icon: Compass },
       { page: "Library" as Page, icon: Library },
-      { page: "Downloads" as Page, icon: Download },
     ]
-  : [
-      { page: "Home" as Page, icon: Home },
-      { page: "Library" as Page, icon: Library },
-      { page: "Discover" as Page, icon: Compass },
-      { page: "Downloads" as Page, icon: Download },
-      { page: "Sources" as Page, icon: Link2 },
-      { page: "Settings" as Page, icon: Settings },
-    ];
+  : isRemote
+    ? [
+        { page: "Home" as Page, icon: Home },
+        { page: "Discover" as Page, icon: Compass },
+        { page: "Library" as Page, icon: Library },
+        { page: "Downloads" as Page, icon: Download },
+      ]
+    : [
+        { page: "Home" as Page, icon: Home },
+        { page: "Library" as Page, icon: Library },
+        { page: "Discover" as Page, icon: Compass },
+        { page: "Downloads" as Page, icon: Download },
+        { page: "Sources" as Page, icon: Link2 },
+        { page: "Settings" as Page, icon: Settings },
+      ];
 export function App() {
   const [page, setPage] = useState<Page>("Home");
   const [selected, setSelected] = useState<GameMetadata>();
@@ -156,6 +178,8 @@ export function App() {
   const [importGame, setImportGame] = useState<GameMetadata>();
   const [importCandidate, setImportCandidate] = useState<ImportCandidate>();
   const [playing, setPlaying] = useState<LibraryGame>();
+  /** The web build's game, running in the browser over the app. */
+  const [webGame, setWebGame] = useState<LibraryGame>();
   const downloads = useQuery({
     queryKey: ["download-jobs"],
     queryFn: bridge.downloadJobs,
@@ -211,6 +235,16 @@ export function App() {
   const libraryRef = useRef(library);
   const searchInput = useRef<HTMLInputElement>(null);
   libraryRef.current = library;
+  // Leaving a web game reloads the page (EmulatorJS can't be stopped); the
+  // address then names the game, so its page opens again.
+  useEffect(() => {
+    if (!isWebPlay || !library.length) return;
+    const id = new URLSearchParams(location.hash.slice(1)).get("game");
+    if (!id) return;
+    history.replaceState(null, "", location.pathname + location.search);
+    const entry = library.find((x) => x.item.id === id);
+    if (entry) setSelected(entry.game);
+  }, [library]);
   const notify = useCallback((s: string) => setToast(s), []);
   const notice = readNotice(toast);
   useEffect(() => startSocialClient(notify), [notify]);
@@ -353,6 +387,24 @@ export function App() {
     setPlatform("all");
   };
   const openImport = (g?: GameMetadata) => {
+    if (isWebPlay) {
+      void import("./features/web-play/library")
+        .then((m) => m.pickWebRoms())
+        .then(async (added) => {
+          if (!added) return;
+          await refresh();
+          navigate("Library");
+          notify(
+            added === 1
+              ? t("Jogo adicionado. Ele fica só neste navegador.")
+              : t("{count} jogos adicionados. Eles ficam só neste navegador.", {
+                  count: added,
+                }),
+          );
+        })
+        .catch((e) => notify(failed(e)));
+      return;
+    }
     if (isRemote)
       return notify(
         t("Adicione arquivos pelo computador, ou baixe pelo catálogo daqui."),
@@ -404,6 +456,13 @@ export function App() {
     );
   // Time on a game's page feeds recommendations; playing or Big Picture pauses it.
   usePageInterest(selected, Boolean(playing) || bigPicture);
+  // A web game owns the screen; nothing else runs behind it.
+  if (webGame)
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <WebPlayer entry={webGame} />
+      </Suspense>
+    );
   // Unmount desktop pages while the console owns the screen: no hidden catalog,
   // images, observers or page queries behind Big Picture.
   if (bigPicture)
@@ -504,7 +563,7 @@ export function App() {
             </button>
           ))}
         </nav>
-        {!isRemote && (
+        {!isRemote && !isWebPlay && (
           <nav className="sidebar-together" aria-label={t("Jogar junto")}>
             <h2>{t("Jogar junto")}</h2>
             <button
@@ -540,7 +599,11 @@ export function App() {
             <button
               className="icon-button"
               aria-label={t("Adicionar jogo")}
-              title={t("Adicionar jogo")}
+              title={
+                isWebPlay
+                  ? t("Abrir uma ROM do seu computador")
+                  : t("Adicionar jogo")
+              }
               onClick={() => openImport()}
             >
               <Plus size={16} />
@@ -638,7 +701,7 @@ export function App() {
                         })}
               </button>
             )}
-            {isRemote ? (
+            {isWebPlay ? null : isRemote ? (
               <>
                 {playing && (
                   <a className="button primary" href="/play">
@@ -679,14 +742,15 @@ export function App() {
                   autoFocus={isRemote && searchOpen}
                   aria-label={t("Buscar jogos")}
                   placeholder={
-                    page === "Library"
+                    page === "Library" || isWebPlay
                       ? t("Buscar na biblioteca")
                       : t("Buscar jogos")
                   }
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
-                    if (page !== "Library") setPage("Discover");
+                    if (isWebPlay) setPage("Library");
+                    else if (page !== "Library") setPage("Discover");
                     setSelected(undefined);
                   }}
                 />
@@ -703,7 +767,7 @@ export function App() {
               <SearchSuggestions
                 input={searchInput}
                 query={query}
-                enabled={page !== "Library"}
+                enabled={page !== "Library" && !isWebPlay}
                 onPick={(suggestion) => {
                   searchInput.current?.blur();
                   metadataProvider
@@ -753,6 +817,29 @@ export function App() {
                 setSocialOpen(true);
               }}
               onJoinParty={setGuestFriend}
+            />
+          ) : selected && isWebPlay ? (
+            activeEntry ? (
+              <WebGamePage
+                key={selected.id}
+                entry={activeEntry}
+                onPlay={() => setWebGame(activeEntry)}
+                onRemoved={() => {
+                  setSelected(undefined);
+                  void refresh();
+                }}
+                refresh={refresh}
+                notify={notify}
+              />
+            ) : (
+              <PageLoading />
+            )
+          ) : page === "Home" && isWebPlay ? (
+            <WebHome
+              library={library}
+              isPending={isPending}
+              onSelect={setSelected}
+              onLibrary={() => navigate("Library")}
             />
           ) : selected ? (
             <GamePage
@@ -831,30 +918,45 @@ export function App() {
           )}
         </Suspense>
       </main>
-      <footer className="bottom-panel">
-        <button onClick={() => navigate("Downloads")}>
-          {playing
-            ? t("Jogando {title}", { title: playing.game.title })
-            : downloading
-              ? t("Baixando {title} ({percent}%)", {
-                  title: downloading.game?.title ?? downloading.name,
-                  percent: downloading.progress.toFixed(0),
-                })
-              : t("Nenhum download em andamento")}
-        </button>
-        <button
-          onClick={() => setChangelog(true)}
-          title={t("Ver as novidades desta versão")}
-        >
-          OpenRetro v{appVersion}
-          {isDesktop ? "" : t(" · prévia no navegador")}
-        </button>
-      </footer>
-      <WhatsNew
-        version={appVersion}
-        show={changelog}
-        onHide={() => setChangelog(false)}
-      />
+      {isWebPlay ? (
+        <footer className="bottom-panel">
+          <button onClick={() => navigate("Library")}>
+            {t("{count} jogos que rodam no navegador", {
+              count: library.length,
+            })}
+          </button>
+          <a href="https://openretro.com.br" target="_blank" rel="noreferrer">
+            {t("Baixe o OpenRetro para Windows")}
+          </a>
+        </footer>
+      ) : (
+        <footer className="bottom-panel">
+          <button onClick={() => navigate("Downloads")}>
+            {playing
+              ? t("Jogando {title}", { title: playing.game.title })
+              : downloading
+                ? t("Baixando {title} ({percent}%)", {
+                    title: downloading.game?.title ?? downloading.name,
+                    percent: downloading.progress.toFixed(0),
+                  })
+                : t("Nenhum download em andamento")}
+          </button>
+          <button
+            onClick={() => setChangelog(true)}
+            title={t("Ver as novidades desta versão")}
+          >
+            OpenRetro v{appVersion}
+            {isDesktop ? "" : t(" · prévia no navegador")}
+          </button>
+        </footer>
+      )}
+      {!isWebPlay && (
+        <WhatsNew
+          version={appVersion}
+          show={changelog}
+          onHide={() => setChangelog(false)}
+        />
+      )}
       {partyOpen && (
         <PartyDialog
           onClose={() => setPartyOpen(false)}

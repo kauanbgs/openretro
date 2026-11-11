@@ -1,4 +1,5 @@
 import { invoke, isTauri, isRemote } from "./transport";
+import { isWebPlay } from "./webPlay";
 import { language } from "../i18n";
 import defaultOrigin from "../../src-tauri/src/remote_play/party-url.txt?raw";
 
@@ -157,7 +158,11 @@ export function createAccountApi(
     openPrivacy: () => native("account_open_privacy"),
   };
 }
-export const accountApi = createAccountApi(invoke, isTauri && !isRemote);
+// The web build signs in from the browser too (features/web-play/webSocial.ts).
+export const accountApi = createAccountApi(
+  invoke,
+  (isTauri && !isRemote) || isWebPlay,
+);
 
 // Pending email/code navigation is transient; never persist a challenge in browser storage.
 let pendingLogin: { email: string; resendAt: number } | null = null;

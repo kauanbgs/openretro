@@ -37,7 +37,7 @@ export async function notifyUsers(env, ids, event = "changed") {
 export async function friendsRoute(request, env, url) {
   const db = database(env, url),
     now = Date.now();
-  const { user, session } = await authenticate(request, db, now);
+  const { user, session, via } = await authenticate(request, db, now);
   if (url.pathname === "/api/friends/history")
     return historyRoute(request, env, { db, user, now });
   if (
@@ -50,8 +50,11 @@ export async function friendsRoute(request, env, url) {
     url.pathname.startsWith("/api/friends/messages/")
   )
     return messagesRoute(request, env, url, { db, user, now });
-  if (url.pathname.startsWith("/api/friends/party/"))
+  if (url.pathname.startsWith("/api/friends/party/")) {
+    // Parties run in the desktop app; the web build's cookie can't reach them.
+    if (via === "cookie") throw new AccountError(404, "Página não encontrada.");
     return partyRoute(request, env, url, { db, user, session, now });
+  }
   if (url.pathname === "/social") {
     if (
       request.method !== "GET" ||

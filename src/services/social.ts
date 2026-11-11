@@ -1,4 +1,5 @@
 import { invoke, isTauri, isRemote, listen } from "./transport";
+import { isWebPlay } from "./webPlay";
 import {
   accountApi,
   accountFailure,
@@ -251,7 +252,7 @@ interface SocialEventPayload {
   peer?: string;
 }
 export function startSocialClient(onNotify: (message: string) => void) {
-  if (!isTauri || isRemote || enabled) return () => {};
+  if ((!isTauri && !isWebPlay) || isRemote || enabled) return () => {};
   enabled = true;
   const unlisten = listen<SocialEventPayload>(
     "social-event",

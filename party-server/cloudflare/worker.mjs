@@ -11,6 +11,7 @@ import {
 import { related } from "./social/friends.mjs";
 import { authenticate, database } from "./social/auth.mjs";
 import { AccountError } from "./social/http.mjs";
+import { webOrigin } from "./social/web-session.mjs";
 import { recordActivity, sampleActivity } from "./social/activity.mjs";
 import { cloudflareTurn } from "./turn.mjs";
 import { DurableObject } from "cloudflare:workers";
@@ -112,9 +113,13 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
+    // The web build (openretro.com.br) signs in with a session cookie, so
+    // only its origin may send credentials (social/web-session.mjs).
+    const web = Boolean(webOrigin(request));
     const allowed =
       !origin ||
       origin === url.origin ||
+      web ||
       [
         "tauri://localhost",
         "http://tauri.localhost",
@@ -131,6 +136,7 @@ export default {
       ...(origin && allowed
         ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" }
         : {}),
+      ...(web ? { "Access-Control-Allow-Credentials": "true" } : {}),
     };
     const reply = (value, status = 200) =>
       new Response(JSON.stringify(value), {
@@ -211,10 +217,12 @@ export default {
           );
         let host;
         try {
+          // Hosting runs in the desktop app; the web build's cookie can't.
           ({ user: host } = await authenticate(
             request,
             database(env, url),
             Date.now(),
+            { cookie: false },
           ));
         } catch (error) {
           if (!(error instanceof AccountError)) throw error;

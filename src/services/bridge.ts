@@ -24,6 +24,7 @@ import type {
 } from "../types";
 import { parseDownloadSource } from "./downloadSources";
 import { sourceStore, type PreviewSource } from "./sourceStore";
+import { isWebPlay } from "./webPlay";
 import { t } from "../i18n";
 export interface FilePickerRequest {
   title: string;
@@ -256,7 +257,11 @@ export const bridge = {
     });
   },
   library: (): Promise<LibraryGame[]> =>
-    isDesktop ? invoke("list_library") : Promise.resolve(read().library),
+    isDesktop
+      ? invoke("list_library")
+      : isWebPlay
+        ? import("../features/web-play/library").then((m) => m.webLibrary())
+        : Promise.resolve(read().library),
   emulators: (): Promise<Emulator[]> =>
     isDesktop ? invoke("list_emulators") : Promise.resolve(read().emulators),
   emulatorInstallOptions: (): Promise<EmulatorInstall[]> =>
@@ -390,12 +395,20 @@ export const bridge = {
   },
   async removeGame(id: string, deleteFile = false) {
     if (isDesktop) return invoke("remove_game", { id, deleteFile });
+    if (isWebPlay)
+      return import("../features/web-play/library").then((m) =>
+        m.webRemove(id),
+      );
     const d = read();
     d.library = d.library.filter((x) => x.item.id !== id);
     write(d);
   },
   async favorite(id: string, favorite: boolean) {
     if (isDesktop) return invoke("set_favorite", { id, favorite });
+    if (isWebPlay)
+      return import("../features/web-play/library").then((m) =>
+        m.webFavorite(id, favorite),
+      );
     const d = read();
     d.library = d.library.map((x) =>
       x.item.id === id ? { ...x, item: { ...x.item, favorite } } : x,

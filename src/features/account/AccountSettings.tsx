@@ -3,6 +3,7 @@ import { Copy, RefreshCw } from "lucide-react";
 import { Modal } from "../../components/Modal";
 import { t } from "../../i18n";
 import { isRemote, isTauri } from "../../services/transport";
+import { isWebPlay } from "../../services/webPlay";
 import {
   accountApi,
   getPendingLogin,
@@ -91,7 +92,7 @@ export function AccountSettings({
           setVaultError(failure.kind === "vault");
           setSession({
             ...signedOut,
-            supported: isTauri && failure.kind !== "unsupported",
+            supported: (isTauri || isWebPlay) && failure.kind !== "unsupported",
           });
         }
       })

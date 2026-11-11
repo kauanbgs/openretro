@@ -499,6 +499,7 @@ async function fixture(bindings = {}, options = {}) {
       ip = "192.0.2.1",
       method = data === undefined ? "GET" : "POST",
       origin,
+      cookie,
       base = BASE,
     } = {},
   ) =>
@@ -509,6 +510,7 @@ async function fixture(bindings = {}, options = {}) {
         ...(data !== undefined ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(origin ? { Origin: origin } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
       },
       ...(data !== undefined ? { body: JSON.stringify(data) } : {}),
     });
@@ -3162,3 +3164,163 @@ test("the admin adds and removes playtest invites without a deploy, and invite l
     },
     { ADMIN_EMAILS: "boss@example.test" },
   ));
+
+// The web build (openretro.com.br) keeps its session in an HttpOnly cookie:
+// its scripts never see a token, and only its origin may use the cookie.
+const WEB = "https://openretro.com.br";
+const sessionFrom = (response) =>
+  /__Host-openretro_session=([a-f0-9]{64})/.exec(
+    response.headers.get("Set-Cookie") || "",
+  )?.[1];
+test("web build signs in with an HttpOnly cookie that only its origin can use", () =>
+  using(
+    async (f) => {
+      const email = "web@example.test";
+      assert.equal((await f.start(email, { origin: WEB })).status, 202);
+      const verified = await f.verify(f.code(), email, { origin: WEB });
+      assert.equal(verified.status, 200, await verified.clone().text());
+      assert.equal(verified.headers.get("Access-Control-Allow-Origin"), WEB);
+      assert.equal(
+        verified.headers.get("Access-Control-Allow-Credentials"),
+        "true",
+      );
+      const setCookie = verified.headers.get("Set-Cookie");
+      for (const attribute of [
+        "HttpOnly",
+        "Secure",
+        "SameSite=Strict",
+        "Path=/",
+      ])
+        assert.ok(setCookie.includes(attribute), setCookie);
+      assert.ok(!/Domain=/i.test(setCookie));
+      const body = await verified.json();
+      // The token exists only in the cookie, never in what scripts can read.
+      assert.equal(body.token, undefined);
+      assert.equal(body.user.email, email);
+      const token = sessionFrom(verified);
+      assert.ok(token);
+      assert.ok(!JSON.stringify(body).includes(token));
+      const cookie = `__Host-openretro_session=${token}`;
+      const session = await f.call("/api/auth/session", undefined, {
+        origin: WEB,
+        cookie,
+      });
+      assert.equal(session.status, 200);
+      assert.equal((await session.json()).user.email, email);
+      assert.equal(sessionFrom(session), token, "the cookie is renewed");
+      assert.equal(
+        (await f.call("/api/friends", undefined, { origin: WEB, cookie }))
+          .status,
+        200,
+      );
+      // The same cookie is refused without the web build's origin: no Origin
+      // (a plain navigation), another site, or the dev origin on a public host.
+      assert.equal(
+        (await f.call("/api/auth/session", undefined, { cookie })).status,
+        401,
+      );
+      for (const origin of [
+        "https://evil.test",
+        "https://party.openretro.com.br.evil.test",
+        "http://127.0.0.1:1422",
+      ]) {
+        const response = await f.call("/api/auth/session", undefined, {
+          origin,
+          cookie,
+        });
+        assert.notEqual(response.status, 200, origin);
+        assert.equal(
+          response.headers.get("Access-Control-Allow-Credentials"),
+          null,
+        );
+      }
+      // A malformed cookie is no session.
+      assert.equal(
+        (
+          await f.call("/api/auth/session", undefined, {
+            origin: WEB,
+            cookie: "__Host-openretro_session=nope",
+          })
+        ).status,
+        401,
+      );
+      // Admin and Party hosting never take the cookie.
+      assert.equal(
+        (
+          await f.call("/api/admin/overview", undefined, {
+            origin: WEB,
+            cookie,
+          })
+        ).status,
+        401,
+      );
+      assert.equal(
+        (
+          await f.call(
+            "/api/friends/party/host",
+            { code: "ABC234", joinable: true },
+            { origin: WEB, cookie },
+          )
+        ).status,
+        404,
+      );
+      // The realtime connection signs in with the cookie too.
+      const socket = await f.mf.dispatchFetch(BASE + "/social", {
+        headers: { Upgrade: "websocket", Origin: WEB, Cookie: cookie },
+      });
+      assert.equal(socket.status, 101);
+      socket.webSocket.accept();
+      socket.webSocket.close();
+      assert.equal(
+        (
+          await f.mf.dispatchFetch(BASE + "/social", {
+            headers: { Upgrade: "websocket", Cookie: cookie },
+          })
+        ).status,
+        401,
+      );
+      // Signing out ends the session and removes the cookie.
+      const out = await f.call("/api/auth/logout", null, {
+        origin: WEB,
+        cookie,
+      });
+      assert.equal(out.status, 204);
+      assert.match(out.headers.get("Set-Cookie"), /Max-Age=0/);
+      assert.equal(
+        (await f.call("/api/auth/session", undefined, { origin: WEB, cookie }))
+          .status,
+        401,
+      );
+    },
+    { ADMIN_EMAILS: "web@example.test" },
+  ));
+test("signing in again on the web ends the previous web session", () =>
+  using(async (f) => {
+    const email = "again@example.test";
+    const signIn = async (cookie) => {
+      await f.ageCode();
+      assert.equal((await f.start(email, { origin: WEB })).status, 202);
+      return f.verify(f.code(), email, { origin: WEB, cookie });
+    };
+    const first = sessionFrom(await signIn());
+    const cookie = `__Host-openretro_session=${first}`;
+    const second = sessionFrom(await signIn(cookie));
+    assert.ok(second && second !== first);
+    assert.equal(
+      (await f.call("/api/auth/session", undefined, { origin: WEB, cookie }))
+        .status,
+      401,
+    );
+    assert.equal(
+      (
+        await f.call("/api/auth/session", undefined, {
+          origin: WEB,
+          cookie: `__Host-openretro_session=${second}`,
+        })
+      ).status,
+      200,
+    );
+    // The desktop app still gets its token in the body, as before.
+    const desktop = await f.login("desktop@example.test");
+    assert.match(desktop.token, /^[a-f0-9]{64}$/);
+  }));

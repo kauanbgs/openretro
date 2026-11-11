@@ -3,7 +3,16 @@ name: Publish OpenRetro web
 on:
   push:
     branches: [main]
-    paths: ["web/**", ".github/workflows/web.yml"]
+    # The site, plus the app's web build that is published under /play/.
+    paths:
+      - "web/**"
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - ".github/workflows/web.yml"
   workflow_dispatch:
 
 concurrency:
@@ -21,9 +30,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            package-lock.json
       - run: npm ci --prefix web
       - run: npm run build:web
+      # OpenRetro in the browser (docs/PLAY_WEB.md), at openretro.com.br/play/.
+      - run: npm ci
+      - run: npm run build:play
+      - run: cp -r dist-play web/dist/play
       - uses: actions/upload-pages-artifact@v5
         with:
           path: web/dist

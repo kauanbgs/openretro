@@ -157,6 +157,27 @@ h2 {
   color: var(--slate);
   font-size: 14.5px;
 }
+/* The demo sits beside Download, quieter: an outline of the same size. */
+.demo-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 22px;
+  border: 1px solid #ffffff38;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.demo-button:hover {
+  border-color: #ffffff70;
+  background: #ffffff0f;
+}
 
 /* Hero: the app, large, rising from the bottom edge of the section */
 .hero {

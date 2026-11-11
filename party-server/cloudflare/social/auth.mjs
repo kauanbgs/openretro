@@ -15,6 +15,12 @@ import {
   unavailable,
 } from "./http.mjs";
 import { USER_QUOTA_SCOPES, emailQuotaKey, quota } from "./limits.mjs";
+import {
+  clearedSessionCookie,
+  cookieToken,
+  sessionCookie,
+  webOrigin,
+} from "./web-session.mjs";
 import { mailLocale, sendLoginEmail } from "./email.mjs";
 import { notifyUsers } from "./friends.mjs";
 import { recordActivity } from "./activity.mjs";
@@ -300,19 +306,43 @@ async function verify(request, env, db, now) {
       );
     throw new AccountError(401, invalidCode);
   }
-  return {
-    data: {
-      token,
-      expiresAt: expires,
-      user: publicUser(user),
-      needsProfile: !user.display_name,
-    },
+  const view = {
+    expiresAt: expires,
+    user: publicUser(user),
+    needsProfile: !user.display_name,
   };
+  // The web build gets the session as an HttpOnly cookie, never as a token
+  // its scripts could read. Signing in again there ends the previous session.
+  if (webOrigin(request)) {
+    const previous = cookieToken(request);
+    if (previous)
+      await db
+        .prepare("DELETE FROM sessions WHERE token_hash = ?")
+        .bind(await sha256(previous))
+        .run();
+    return {
+      data: view,
+      headers: { "Set-Cookie": sessionCookie(token, expires, now) },
+    };
+  }
+  return { data: { token, ...view } };
 }
-export async function authenticate(request, db, now) {
+/** The desktop app sends a Bearer token; the web build, its session cookie.
+ * Routes the web build has no use for (admin, hosting a Party) pass
+ * `{ cookie: false }`, so a page script there can never reach them. */
+export async function authenticate(request, db, now, { cookie = true } = {}) {
   const authorization = request.headers.get("Authorization") || "";
-  if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) throw invalidSession();
-  const tokenHash = await sha256(authorization.slice(7));
+  let token, via;
+  if (authorization) {
+    if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) throw invalidSession();
+    token = authorization.slice(7);
+    via = "bearer";
+  } else {
+    token = cookie ? cookieToken(request) : null;
+    via = "cookie";
+    if (!token) throw invalidSession();
+  }
+  const tokenHash = await sha256(token);
   let session = await db
     .prepare(
       `SELECT id, user_id, created_at, last_seen_at, expires_at FROM sessions
@@ -343,7 +373,7 @@ export async function authenticate(request, db, now) {
     .bind(session.user_id)
     .first();
   if (!user) throw invalidSession();
-  return { user, session, tokenHash };
+  return { user, session, tokenHash, token, via };
 }
 async function exportAccount(db, user, now, pepper) {
   const queries = [
@@ -446,7 +476,15 @@ export async function accountRoute(request, env, url) {
   if (url.pathname === "/api/auth/start")
     return start(request, env, db, url, now);
   if (url.pathname === "/api/auth/verify") return verify(request, env, db, now);
-  const { user, session, tokenHash } = await authenticate(request, db, now);
+  const { user, session, tokenHash, token, via } = await authenticate(
+    request,
+    db,
+    now,
+  );
+  // Ending a session from the web build also removes its cookie.
+  const signedOut = webOrigin(request)
+    ? { headers: { "Set-Cookie": clearedSessionCookie() } }
+    : {};
   if (url.pathname === "/api/auth/session") {
     const current = await alignFriendCode(db, user);
     return {
@@ -455,6 +493,14 @@ export async function accountRoute(request, env, url) {
         expiresAt: session.expires_at,
         needsProfile: !current.display_name,
       },
+      // The session was renewed above; the cookie follows it.
+      ...(via === "cookie"
+        ? {
+            headers: {
+              "Set-Cookie": sessionCookie(token, session.expires_at, now),
+            },
+          }
+        : {}),
     };
   }
   if (url.pathname === "/api/account/profile") {
@@ -581,7 +627,7 @@ export async function accountRoute(request, env, url) {
       .bind(tokenHash)
       .run();
     await notifyUsers(env, [user.id]);
-    return { status: 204 };
+    return { status: 204, ...signedOut };
   }
   if (url.pathname === "/api/auth/logout-all") {
     await db
@@ -589,7 +635,7 @@ export async function accountRoute(request, env, url) {
       .bind(user.id)
       .run();
     await notifyUsers(env, [user.id]);
-    return { status: 204 };
+    return { status: 204, ...signedOut };
   }
   if (url.pathname === "/api/account/export")
     return {
@@ -623,5 +669,5 @@ export async function accountRoute(request, env, url) {
     user.id,
     ...formerFriends.results.map((row) => row.friend_id),
   ]);
-  return { status: 204 };
+  return { status: 204, ...signedOut };
 }

@@ -18,6 +18,7 @@ import { ContextMenu } from "../../components/ContextMenu";
 import { RemoveGameDialog } from "../../components/RemoveGameDialog";
 import { Capsule } from "../../components/Capsule";
 import { isRemote } from "../../services/transport";
+import { isWebPlay } from "../../services/webPlay";
 import { platforms } from "../../db/platforms";
 import {
   catalogPlayers,
@@ -145,20 +146,23 @@ export function CollectionPage({
               </option>
             ))}
           </select>
-          <select
-            aria-label={t("Filtrar por número de jogadores")}
-            value={players}
-            onChange={(e) =>
-              setPlayers(e.target.value as PlayersFilter | "all")
-            }
-          >
-            <option value="all">{t("Qualquer número de jogadores")}</option>
-            {playersFilters.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {/* Player counts come from the catalog, which the web build lacks. */}
+          {!isWebPlay && (
+            <select
+              aria-label={t("Filtrar por número de jogadores")}
+              value={players}
+              onChange={(e) =>
+                setPlayers(e.target.value as PlayersFilter | "all")
+              }
+            >
+              <option value="all">{t("Qualquer número de jogadores")}</option>
+              {playersFilters.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             aria-label={t("Sort games")}
             value={sort}
@@ -275,7 +279,8 @@ export function CollectionPage({
               icon: <Play size={15} />,
               onSelect: () => onSelect(menu.entry.game),
             },
-            ...(isRemote
+            // The web build's list games aren't the player's to remove.
+            ...(isRemote || menu.entry.item.sourceProvider === "web-list"
               ? []
               : [
                   {

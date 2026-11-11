@@ -7,11 +7,14 @@ import "./styles.css";
 import "./shell.css";
 import { startAppearance } from "./services/appearance";
 import { isRemote } from "./services/transport";
+import { isWebPlay } from "./services/webPlay";
 import { bridge } from "./services/bridge";
 import { adoptLanguage } from "./i18n";
 import { t } from "./i18n";
 // A paired phone gets the touch layout in shell.css.
 document.documentElement.classList.toggle("remote", isRemote);
+document.documentElement.classList.toggle("web-play", isWebPlay);
+if (isWebPlay) document.title = t("OpenRetro: jogue no navegador");
 startAppearance();
 const InGameOverlay = lazy(() =>
   import("./features/in-game/InGameOverlay").then(({ InGameOverlay }) => ({

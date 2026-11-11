@@ -350,7 +350,7 @@ export async function adminRoute(request, env, url) {
     now = Date.now();
   let user;
   try {
-    ({ user } = await authenticate(request, db, now));
+    ({ user } = await authenticate(request, db, now, { cookie: false }));
   } catch (error) {
     if (error instanceof AccountError && error.status === 401) throw error;
     throw notFound();

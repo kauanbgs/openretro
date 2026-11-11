@@ -19,6 +19,7 @@ export async function socialResponse(request, env, { allowed, headers }) {
     return reply(null, 204, {
       "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "600",
     });
   try {
     const pathname = new URL(request.url).pathname;
@@ -32,17 +33,17 @@ export async function socialResponse(request, env, { allowed, headers }) {
             : accountRoute
     )(request, env, new URL(request.url));
     if (result.response) return result.response;
-    const { data, status = 200, attachment } = result;
-    return reply(
-      data,
-      status,
-      attachment
+    // Routes may add headers, such as the web build's session cookie.
+    const { data, status = 200, attachment, headers: extra = {} } = result;
+    return reply(data, status, {
+      ...extra,
+      ...(attachment
         ? {
             "Content-Disposition":
               'attachment; filename="openretro-conta.json"',
           }
-        : {},
-    );
+        : {}),
+    });
   } catch (error) {
     if (error instanceof AccountError)
       return reply(

@@ -7,6 +7,7 @@ import {
 } from "@tauri-apps/api/core";
 import { listen as tauriListen } from "@tauri-apps/api/event";
 import { t } from "../i18n";
+import { isWebPlay } from "./webPlay";
 
 type Window = typeof globalThis & {
   __TAURI_INTERNALS__?: unknown;
@@ -34,10 +35,23 @@ function translated(error: unknown): unknown {
   return typeof error === "string" ? t(error) : error;
 }
 
+/** The web build answers account and social commands itself (webSocial.ts). */
+const webSocial = () => import("../features/web-play/webSocial");
+
 export async function invoke<T>(
   command: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
+  if (isWebPlay) {
+    const web = await webSocial();
+    if (web.handlesWebCommand(command)) {
+      try {
+        return await web.webCommand<T>(command, args);
+      } catch (error) {
+        throw translated(error);
+      }
+    }
+  }
   if (!isRemote) {
     try {
       return await (args === undefined
@@ -87,6 +101,10 @@ export async function listen<T>(
   event: string,
   handler: (event: { payload: T }) => void,
 ): Promise<() => void> {
+  if (isWebPlay && event === "social-event")
+    return (await webSocial()).listenSocial(
+      handler as (event: { payload: unknown }) => void,
+    );
   if (!isRemote) return tauriListen<T>(event, handler);
   const set = handlers.get(event) ?? new Set<Handler>();
   set.add(handler as Handler);

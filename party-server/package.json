@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "wrangler dev --config cloudflare/wrangler.jsonc",
+    "start": "wrangler dev --config cloudflare/wrangler.jsonc --local-upstream 127.0.0.1:8787",
     "start:standalone": "node --env-file-if-exists=.env server.mjs",
     "test": "node --test test.mjs deploy.test.mjs cloudflare.test.mjs guest-input.test.mjs social.test.mjs",
     "deploy": "wrangler deploy --config cloudflare/wrangler.jsonc",

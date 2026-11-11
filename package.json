@@ -1,6 +1,6 @@
 {
   "name": "openretro",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,10 @@
     "build:web": "npm --prefix web run build",
     "preview:web": "npm --prefix web run preview",
     "dev": "vite --host 127.0.0.1",
+    "dev:play": "vite --host 127.0.0.1 --mode play",
     "build": "tsc -b && vite build",
+    "build:play": "tsc -b && vite build --mode play",
+    "play:catalog": "node scripts/build-play-catalog.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run src tests",
     "test:runtime-recipe": "pwsh -NoProfile -File scripts/test-runtime-recipe.ps1",
