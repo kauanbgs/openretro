@@ -4,7 +4,6 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Compass,
   Download,
-  Gamepad2,
   Github,
   Home,
   Library,
@@ -609,23 +608,33 @@ export function Website() {
               {t("Demo")}
             </a>
           </nav>
-          <a
-            className="header-link"
-            href={REPO}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t("OpenRetro on GitHub")}
-          >
-            <Github size={19} />
-          </a>
-          <LanguagePicker />
-          {button("header", true)}
+          <div className="header-end">
+            <a
+              className="header-link"
+              href={REPO}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t("OpenRetro on GitHub")}
+            >
+              <Github size={19} />
+            </a>
+            <LanguagePicker />
+            {button("header", true)}
+          </div>
         </div>
       </header>
 
       <main id="main">
-        <section className="hero wrap">
-          <div className="hero-copy">
+        <section className="hero">
+          <div className="aurora" aria-hidden="true">
+            <i className="aurora-glow" />
+            <i className="aurora-cyan" />
+            <i className="aurora-violet" />
+            <i className="aurora-ribbon" />
+            <i className="aurora-ribbon aurora-ribbon-2" />
+          </div>
+          <i className="aurora-low" aria-hidden="true" />
+          <div className="wrap hero-copy">
             <h1>{t("All your retro games in one place, ready to play.")}</h1>
             <p className="lede">
               {t(
@@ -639,13 +648,12 @@ export function Website() {
                 href={DEMO}
                 onClick={() => track("demo_open", { where: "hero" })}
               >
-                <Gamepad2 size={19} />
                 {t("Try the demo")}
               </a>
-              <DownloadNote installer={installer} platform={platform} />
             </div>
+            <DownloadNote installer={installer} platform={platform} />
           </div>
-          <div className="stage">
+          <div className="wrap stage">
             <AppWindow />
           </div>
         </section>

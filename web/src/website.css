@@ -1,11 +1,15 @@
+/* Palette from the logo: its deep indigo outline and its cyan fill. */
 :root {
-  --paper: #0a0a0c;
-  --surface: #151518;
-  --ink: #f1f2f5;
-  --slate: #a1a5b1;
-  --line: rgba(255, 255, 255, 0.12);
-  --link: #66bdea;
-  --night: #131316;
+  --paper: #0c0d22;
+  --surface: #15173a;
+  --ink: #f4f1eb;
+  --slate: #a2abc0;
+  --line: rgba(196, 204, 255, 0.12);
+  --link: #4cc3ef;
+  --cyan: #12ace2;
+  --indigo: #2e2866;
+  --violet: #5b4fd6;
+  --night: #121434;
   --night-raised: #1c1c1c;
   --night-line: rgba(255, 255, 255, 0.12);
   --night-text: #e9eaee;
@@ -97,12 +101,13 @@ h2 {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(10, 10, 12, 0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
+  background: rgba(12, 13, 34, 0.45);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid transparent;
 }
 .header-inner {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 32px;
   height: 64px;
@@ -110,7 +115,19 @@ h2 {
 .header nav {
   display: flex;
   gap: 26px;
-  margin-right: auto;
+}
+.header-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+/* In the header the flag alone names the language; the button keeps its label. */
+.header .site-language-name {
+  display: none;
+}
+.header .site-language > button {
+  background: rgba(255, 255, 255, 0.05);
 }
 .header nav a,
 .header-link {
@@ -118,6 +135,7 @@ h2 {
   font-size: 15px;
   font-weight: 500;
   text-decoration: none;
+  white-space: nowrap;
 }
 .header nav a:hover,
 .header-link:hover {
@@ -136,7 +154,7 @@ h2 {
   gap: 10px;
   padding: 14px 24px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--ink);
   color: var(--paper);
   font-size: 16px;
@@ -146,54 +164,57 @@ h2 {
   transition: background 150ms ease;
 }
 .download:hover {
-  background: #d4d7df;
+  background: #fff;
 }
 .download.compact {
   gap: 8px;
   padding: 8px 15px;
   font-size: 14.5px;
+  white-space: nowrap;
 }
 .download-note {
   color: var(--slate);
   font-size: 14.5px;
 }
-/* The demo sits beside Download, quieter: an outline of the same size. */
+/* The demo sits beside Download, quieter: an underlined text link. */
 .demo-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 13px 22px;
-  border: 1px solid #ffffff38;
-  border-radius: 8px;
+  padding: 4px 0;
   color: var(--ink);
   font-size: 16px;
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    background 150ms ease,
-    border-color 150ms ease;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: rgba(244, 241, 235, 0.4);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 7px;
+  transition: text-decoration-color 150ms ease;
 }
 .demo-button:hover {
-  border-color: #ffffff70;
-  background: #ffffff0f;
+  text-decoration-color: var(--ink);
 }
 
-/* Hero: the app, large, rising from the bottom edge of the section */
+/* Hero: centered statement under a moving aurora, the app rising below. */
 .hero {
-  padding: clamp(48px, 8vh, 96px) 0 0;
+  position: relative;
+  isolation: isolate;
+  margin-top: -64px;
+  padding: calc(64px + clamp(64px, 12vh, 132px)) 0 0;
+  overflow: hidden;
+  text-align: center;
 }
 .hero-copy {
   display: grid;
-  max-width: 720px;
-  gap: 22px;
+  justify-items: center;
+  gap: 26px;
 }
 .hero h1 {
-  font-size: clamp(40px, 5.2vw, 68px);
-  line-height: 1.04;
+  max-width: 13.5em;
+  font-size: clamp(44px, 7vw, 96px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
 }
 .lede {
-  max-width: 36em;
+  max-width: 34em;
   color: var(--slate);
   font-size: 19px;
 }
@@ -201,14 +222,152 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px 22px;
-  margin-top: 6px;
+  justify-content: center;
+  gap: 14px 32px;
+  margin-top: 8px;
+}
+.hero .download-note {
+  margin-top: -6px;
+  font-size: 14px;
 }
 .stage {
   position: relative;
   height: clamp(320px, 49vw, 600px);
-  margin-top: clamp(40px, 6vw, 72px);
+  margin-top: clamp(56px, 7vw, 88px);
   overflow: hidden;
+  text-align: left;
+}
+
+/* Aurora: soft color fields that drift on long, offset loops, so the
+   pattern never visibly repeats. Each layer moves only by transform. */
+.aurora {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: min(1150px, 140vh);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 95%);
+  mask-image: linear-gradient(180deg, #000 45%, transparent 95%);
+}
+.aurora i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+.aurora-glow {
+  left: 10%;
+  top: 30%;
+  width: 80%;
+  height: 55%;
+  background: radial-gradient(closest-side, rgba(46, 40, 102, 0.95), transparent);
+  animation: aurora-glow 26s ease-in-out infinite alternate;
+}
+.aurora-cyan {
+  left: -12%;
+  top: -22%;
+  width: 68%;
+  height: 62%;
+  background: radial-gradient(closest-side, rgba(18, 172, 226, 0.62), transparent);
+  animation: aurora-cyan 21s ease-in-out infinite alternate;
+}
+.aurora-violet {
+  right: -14%;
+  top: -14%;
+  width: 72%;
+  height: 66%;
+  background: radial-gradient(closest-side, rgba(91, 79, 214, 0.75), transparent);
+  animation: aurora-violet 27s ease-in-out infinite alternate;
+}
+/* The ribbons give the curtain shape: long, thin, tilted bands. */
+.aurora-ribbon {
+  left: 4%;
+  top: 6%;
+  width: 92%;
+  height: 26%;
+  background: radial-gradient(
+    closest-side,
+    rgba(76, 220, 240, 0.7),
+    rgba(18, 172, 226, 0.3) 55%,
+    transparent
+  );
+  filter: blur(18px);
+  transform: rotate(-9deg);
+  animation: aurora-ribbon 17s ease-in-out infinite alternate;
+}
+.aurora-ribbon-2 {
+  left: 18%;
+  top: 22%;
+  width: 78%;
+  height: 18%;
+  background: radial-gradient(
+    closest-side,
+    rgba(150, 134, 255, 0.62),
+    rgba(91, 79, 214, 0.26) 60%,
+    transparent
+  );
+  animation: aurora-ribbon-2 23s ease-in-out infinite alternate;
+}
+/* A low band behind the app window, so the light reaches the product. */
+.aurora-low {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  z-index: -1;
+  width: min(1500px, 130%);
+  height: 70%;
+  background:
+    radial-gradient(closest-side at 30% 55%, rgba(18, 172, 226, 0.45), transparent),
+    radial-gradient(closest-side at 70% 45%, rgba(91, 79, 214, 0.55), transparent);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: aurora-low 24s ease-in-out infinite alternate;
+}
+@keyframes aurora-low {
+  to {
+    transform: translateX(-46%) scale(1.12, 0.92);
+  }
+}
+@keyframes aurora-glow {
+  to {
+    transform: translate3d(4%, -8%, 0) scale(1.15);
+  }
+}
+@keyframes aurora-cyan {
+  50% {
+    transform: translate3d(14%, 8%, 0) rotate(10deg) scale(1.12);
+  }
+  to {
+    transform: translate3d(28%, 2%, 0) rotate(-4deg) scale(0.95);
+  }
+}
+@keyframes aurora-violet {
+  50% {
+    transform: translate3d(-12%, 10%, 0) rotate(-8deg) scale(1.08);
+  }
+  to {
+    transform: translate3d(-24%, -2%, 0) rotate(6deg) scale(1.15);
+  }
+}
+@keyframes aurora-ribbon {
+  50% {
+    transform: translate3d(-6%, 14%, 0) rotate(-3deg) scaleY(1.5);
+  }
+  to {
+    transform: translate3d(5%, 4%, 0) rotate(-13deg) scaleY(0.8);
+  }
+}
+@keyframes aurora-ribbon-2 {
+  from {
+    transform: rotate(7deg);
+  }
+  50% {
+    transform: translate3d(-10%, -10%, 0) rotate(2deg) scaleY(1.6);
+  }
+  to {
+    transform: translate3d(-18%, 6%, 0) rotate(10deg) scaleX(1.1);
+  }
 }
 .stage::after {
   content: "";
@@ -224,10 +383,13 @@ h2 {
   display: grid;
   grid-template-columns: 210px minmax(0, 1fr);
   height: 640px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(160, 200, 255, 0.22);
   border-radius: 14px 14px 0 0;
   background: #121212;
-  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.8);
+  box-shadow:
+    0 0 0 6px rgba(255, 255, 255, 0.03),
+    0 -20px 90px -30px rgba(18, 172, 226, 0.55),
+    0 30px 80px -20px rgba(0, 0, 0, 0.8);
   color: var(--night-muted);
   font-size: 12.5px;
   line-height: 1.4;
@@ -870,6 +1032,14 @@ h2 {
   }
 }
 
+@media (max-width: 1080px) {
+  .header nav {
+    display: none;
+  }
+  .header-inner {
+    grid-template-columns: auto 1fr;
+  }
+}
 @media (max-width: 960px) {
   .friends-panel {
     grid-template-columns: 1fr;
@@ -904,12 +1074,15 @@ h2 {
     display: none;
   }
   .header-inner {
-    justify-content: space-between;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+  }
+  .header-end {
+    gap: 10px;
   }
   .lede {
     font-size: 17px;
   }
-  .hero-action,
   .hero-action .download,
   .final-action .download {
     width: 100%;
