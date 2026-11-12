@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OpenRetro Setup</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="window">
+      <div class="aurora">
+        <i class="blob b1"></i>
+        <i class="blob b2"></i>
+        <i class="blob b3"></i>
+        <i class="blob b4"></i>
+      </div>
+
+      <header data-tauri-drag-region>
+        <div class="controls">
+          <button id="minimize" aria-label="Minimize">
+            <svg viewBox="0 0 12 12" width="12" height="12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
+          </button>
+          <button id="close" aria-label="Close">
+            <svg viewBox="0 0 12 12" width="12" height="12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="copy">
+        <p class="eyebrow">OpenRetro Setup<span id="versionTag"></span></p>
+
+        <section id="welcome" class="screen active">
+          <h1 data-i18n="headline"></h1>
+          <p class="lead" data-i18n="welcomeLead"></p>
+          <div class="actions">
+            <button id="install" class="game" data-i18n="install"></button>
+          </div>
+        </section>
+
+        <section id="progress" class="screen">
+          <h1 id="progressTitle"></h1>
+          <p class="lead" id="progressDetail"></p>
+          <div class="bar"><div id="barFill"></div></div>
+          <p class="small" id="progressNumbers"></p>
+        </section>
+
+        <section id="done" class="screen">
+          <h1 data-i18n="doneTitle"></h1>
+          <p class="lead" data-i18n="doneLead"></p>
+          <div class="actions">
+            <button id="launch" class="game" data-i18n="launch"></button>
+            <button id="finish" class="ghost" data-i18n="finish"></button>
+          </div>
+        </section>
+
+        <section id="error" class="screen">
+          <h1 data-i18n="errorTitle"></h1>
+          <p class="lead" id="errorLead"></p>
+          <div class="actions">
+            <button id="retry" class="game" data-i18n="retry"></button>
+            <button id="quit" class="ghost" data-i18n="finish"></button>
+          </div>
+        </section>
+      </div>
+
+      <div class="hero" aria-hidden="true">
+        <div class="halo"></div>
+        <img class="logo" src="logo.svg" alt="" />
+        <i class="px p1"></i>
+        <i class="px p2"></i>
+        <i class="px p3"></i>
+        <i class="px p4"></i>
+        <i class="px p5"></i>
+        <i class="px p6"></i>
+      </div>
+
+      <div class="seg" role="group" aria-label="Language">
+        <button data-lang="pt">PT</button>
+        <button data-lang="en">EN</button>
+      </div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

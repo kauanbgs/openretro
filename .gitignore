@@ -5,6 +5,8 @@ dist/
 dist-play/
 dist-runtime/
 src-tauri/target/
+installer/target/
+installer/gen/
 src-tauri/gen/
 *.log
 .env*
