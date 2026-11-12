@@ -22,3 +22,9 @@ web/.openai/local/
 # Local work that is not part of the app
 promo/
 codex-*.md
+
+# Local security audit and tooling
+.claude/
+docs/INFRA_SECURITY_2026-10-24.*
+docs/SECURITY_AUDIT_2026-10-24.md
+scripts/security-infra-check.mjs
