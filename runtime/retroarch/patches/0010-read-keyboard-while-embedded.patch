@@ -1,0 +1,50 @@
+diff --git a/input/drivers/dinput.c b/input/drivers/dinput.c
+index b4bb26f..f692582 100644
+--- a/input/drivers/dinput.c
++++ b/input/drivers/dinput.c
+@@ -57,6 +57,22 @@
+ #include "../../retroarch.h"
+ #include "../../verbosity.h"
+ 
++/* OpenRetro embeds the runtime window inside its own, so it is a child of
++ * another process's window and never the foreground window. A foreground
++ * DirectInput keyboard is then never acquired and the keyboard is dead. Read
++ * it in the background and keep it only while the game's top-level window
++ * (OpenRetro's, or the runtime's own when it runs alone) is in front, so
++ * other apps, the Party chat and OpenRetro's menu windows still keep their
++ * keys to themselves. */
++static bool openretro_game_has_keyboard(void)
++{
++   HWND game       = (HWND)video_driver_window_get();
++   HWND foreground = GetForegroundWindow();
++   if (!game || !foreground)
++      return false;
++   return GetAncestor(game, GA_ROOT) == GetAncestor(foreground, GA_ROOT);
++}
++
+ /* Context has to be global as joypads also ride on this context. */
+ LPDIRECTINPUT8 g_dinput_ctx;
+ 
+@@ -176,9 +192,9 @@ static void *dinput_init(const char *joypad_driver)
+    if (di->keyboard)
+    {
+       bool input_nowinkey_enable = config_get_ptr()->bools.input_nowinkey_enable;
+-      DWORD flags                = DISCL_NONEXCLUSIVE | DISCL_FOREGROUND;
+-      if (input_nowinkey_enable)
+-         flags                  |= DISCL_NOWINKEY;
++      /* DISCL_NOWINKEY needs DISCL_FOREGROUND, so it no longer applies. */
++      DWORD flags                = DISCL_NONEXCLUSIVE | DISCL_BACKGROUND;
++      (void)input_nowinkey_enable;
+ 
+       IDirectInputDevice8_SetDataFormat(di->keyboard, &c_dfDIKeyboard);
+       IDirectInputDevice8_SetCooperativeLevel(di->keyboard,
+@@ -259,6 +275,9 @@ static void dinput_poll(void *data)
+          di->state[RETROK_UNKNOWN] = 0;
+       }
+ 
++      if (!openretro_game_has_keyboard())
++         memset(di->state, 0, sizeof(di->state));
++
+       /* If both shift keys are pressed simultaneously, the OS will not issue
+        * a WM_KEYUP for the first one. That up event will be issued here. */
+       if ((di->flags & DINP_FLAG_SHIFT_L) && !(GetAsyncKeyState(VK_LSHIFT) >> 1))
