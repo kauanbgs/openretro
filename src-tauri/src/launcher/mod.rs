@@ -193,7 +193,7 @@ pub async fn launch_game(
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted,chosen) = {
+ let (entry,emulator,auto_resume,ps2_resolution,stretch,keys,sdl_library,hardcore_wanted,chosen) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
@@ -203,6 +203,8 @@ pub async fn launch_game(
   let ps2_resolution=settings.as_ref().and_then(|v|v["ps2Resolution"].as_str().map(String::from));
   // Stretched by default; only an explicit "original" keeps the console's shape.
   let stretch=settings.as_ref().map_or(true,|v|v["gameScreenMode"]!="original");
+  // Player 1's keys, with the ones changed in Configurações › Teclado.
+  let keys=runtime_menu::KeyLayout::from_settings(settings.as_ref());
   // The runtime's SDL2 tells which controllers are connected.
   let sdl_library=database::emulators(&conn)?.into_iter().find(|e|e.id=="openretro-retroarch").and_then(|e|std::path::Path::new(&e.executable_path).parent().map(|dir|dir.join("SDL2.dll")));
   let hardcore_wanted=crate::achievements::hardcore_enabled(&conn);
@@ -216,7 +218,7 @@ pub async fn launch_game(
      }
      _ => None,
   };
-  (entry,emulator,auto_resume,ps2_resolution,stretch,sdl_library,hardcore_wanted,chosen)
+  (entry,emulator,auto_resume,ps2_resolution,stretch,keys,sdl_library,hardcore_wanted,chosen)
  };
  // The selected translation or hack plays instead of the original file.
  let variant=entry.item.active_variant.clone();
@@ -302,7 +304,7 @@ pub async fn launch_game(
  let mut args:Vec<String>=if managed_retroarch {
     let data=app.path().app_data_dir().map_err(error)?;
     let variant_saves=variant.as_ref().map(|v|crate::mods::variant_saves(&data,v)).transpose()?;
-    let config=runtime_menu::prepare_game(&data, &executable, &entry.item.sha256, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining && !hardcore, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)))?;
+    let config=runtime_menu::prepare_game(&data, &executable, &entry.item.sha256, auto_resume && boot_states && !joining, (auto_resume || slot==Some(-1)) && boot_states && !joining && !hardcore, stretch, variant.as_ref().zip(variant_saves.as_ref()).map(|(v,s)|(v.id.as_str(),s)), &keys)?;
     // RetroArch reads several appended configs separated by "|".
     let appended=match &achievements { Some(extra)=>format!("{}|{}",config.display(),extra.path().display()), None=>config.to_string_lossy().into_owned() };
     let mut args:Vec<String>=vec!["--appendconfig".into(),appended];

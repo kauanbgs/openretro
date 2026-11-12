@@ -418,8 +418,8 @@ export const en: Record<string, string> = {
   "Salvar · carregar estado": "Save · load state",
   "Trocar slot": "Change slot",
   "Capturar tela": "Take screenshot",
-  "No PlayStation: Círculo = X, Cruz = Z, Triângulo = S e Quadrado = A.":
-    "On PlayStation: Circle = X, Cross = Z, Triangle = S and Square = A.",
+  "No PlayStation: Círculo = {a}, Cruz = {b}, Triângulo = {x} e Quadrado = {y}.":
+    "On PlayStation: Circle = {a}, Cross = {b}, Triangle = {x} and Square = {y}.",
   "Fechar janela": "Close window",
   "Jogar no celular": "Play on your phone",
   "QR code para abrir o OpenRetro no celular":
@@ -2431,4 +2431,42 @@ export const en: Record<string, string> = {
   "Monoespaçada": "Monospaced",
   "Abra o aplicativo desktop para usar seus arquivos.": "Open the desktop app to use your files.",
   "Escolher imagem ou vídeo de fundo": "Choose a background picture or video",
+  "* numérico": "Numpad *",
+  ", numérico": "Numpad .",
+  "/ numérico": "Numpad /",
+  "Aperte uma tecla…": "Press a key…",
+  "As teclas F ficam com os atalhos do jogo, como salvar estado.":
+    "The F keys stay with the game shortcuts, like saving a state.",
+  "As teclas do jogador 1 nos jogos do runtime integrado, do NES ao PS2. Clique em um botão e aperte a tecla nova; Esc cancela. Vale a partir do próximo jogo aberto. PS3 e Switch usam os controles do próprio emulador.":
+    "Player 1's keys in games on the integrated runtime, from NES to PS2. Click a button and press the new key; Esc cancels. Applies from the next game you open. PS3 and Switch use their own emulator's controls.",
+  "As teclas voltaram ao padrão.": "The keys are back to the defaults.",
+  "Atalhos fixos": "Fixed shortcuts",
+  Botões: "Buttons",
+  "Ctrl direito": "Right Ctrl",
+  "Ctrl esquerdo": "Left Ctrl",
+  "Durante a Party, T também abre o chat.":
+    "During a Party, T also opens the chat.",
+  "Durante a Party, M também liga e desliga o microfone.":
+    "During a Party, M also turns the microphone on and off.",
+  "Enter numérico": "Numpad Enter",
+  "Escolha as teclas que jogam no lugar do controle.":
+    "Choose the keys that play instead of a controller.",
+  "Essa tecla é um atalho do runtime e não pode ir para o jogo.":
+    "This key is a runtime shortcut and can't go to the game.",
+  "F1 abre o menu do OpenRetro durante o jogo.":
+    "F1 opens the OpenRetro menu during a game.",
+  "F1 abre o menu do jogo, F2 e F4 salvam e carregam o estado, F6 e F7 trocam o slot e F8 tira uma captura. Essas teclas não podem ir para o jogo.":
+    "F1 opens the game menu, F2 and F4 save and load the state, F6 and F7 change the slot and F8 takes a screenshot. These keys can't go to the game.",
+  Gatilhos: "Shoulder buttons",
+  Num: "Num",
+  "O Windows usa essa tecla e o jogo não a recebe.":
+    "Windows uses this key and the game never gets it.",
+  "O runtime não reconhece essa tecla. Escolha outra.":
+    "The runtime doesn't know this key. Choose another one.",
+  "Restaurar teclas padrão": "Restore default keys",
+  "Shift esquerdo": "Left Shift",
+  Teclado: "Keyboard",
+  "{action}: {key}. Clique para trocar.": "{action}: {key}. Click to change.",
+  "{other} ficou com {key}, que era de {action}.":
+    "{other} now has {key}, which was {action}'s.",
 };

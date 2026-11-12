@@ -93,7 +93,7 @@ fn screenshots_directory(data: &Path, hash: &str) -> Result<PathBuf> {
 
 /// Generated append-configs are private to OpenRetro; the user's RetroArch config
 /// and existing cartridge saves remain untouched.
-pub fn prepare(data: &Path, executable: &Path, hash: &str) -> Result<PathBuf> {
+pub fn prepare(data: &Path, executable: &Path, hash: &str, keys: &KeyLayout) -> Result<PathBuf> {
     let screenshots = screenshots_directory(data, hash)?;
     let system = super::bios::system_dir(data);
     std::fs::create_dir_all(&system).map_err(error)?;
@@ -125,6 +125,7 @@ pub fn prepare(data: &Path, executable: &Path, hash: &str) -> Result<PathBuf> {
             &screenshots,
             &system,
             profiles.parent().ok_or("Invalid controller directory.")?,
+            keys,
         ),
     )
     .map_err(error)?;
@@ -139,8 +140,9 @@ pub fn prepare_game(
     auto_load: bool,
     stretch: bool,
     variant: Option<(&str, &crate::mods::VariantSaves)>,
+    keys: &KeyLayout,
 ) -> Result<PathBuf> {
-    let base = prepare(data, executable, hash)?;
+    let base = prepare(data, executable, hash, keys)?;
     let mut config = std::fs::read_to_string(base).map_err(error)?;
     config.push_str(screen_config(stretch));
     config.push_str(&format!("savestate_auto_save = \"{auto_save}\"\nsavestate_auto_load = \"{auto_load}\"\ninput_max_users = \"4\"\n"));
@@ -261,9 +263,10 @@ fn controller_bindings() -> &'static str {
     "input_b_btn = \"0\"\ninput_a_btn = \"1\"\ninput_y_btn = \"2\"\ninput_x_btn = \"3\"\ninput_select_btn = \"4\"\ninput_start_btn = \"6\"\ninput_l3_btn = \"7\"\ninput_r3_btn = \"8\"\ninput_l_btn = \"9\"\ninput_r_btn = \"10\"\ninput_up_btn = \"11\"\ninput_down_btn = \"12\"\ninput_left_btn = \"13\"\ninput_right_btn = \"14\"\ninput_l_x_plus_axis = \"+0\"\ninput_l_x_minus_axis = \"-0\"\ninput_l_y_plus_axis = \"+1\"\ninput_l_y_minus_axis = \"-1\"\ninput_r_x_plus_axis = \"+2\"\ninput_r_x_minus_axis = \"-2\"\ninput_r_y_plus_axis = \"+3\"\ninput_r_y_minus_axis = \"-3\"\ninput_l2_axis = \"+4\"\ninput_r2_axis = \"+5\"\ninput_menu_toggle_btn = \"5\"\ninput_menu_toggle_btn_label = \"PS\"\n"
 }
 
-/// Player 1's keyboard: every SNES and PlayStation button plus both analog
-/// sticks. The face buttons, d-pad, L/R, Start and Select keep RetroArch's
-/// defaults; the page and in-game menu show the same map to the player.
+/// Player 1's default keyboard: every SNES and PlayStation button plus both
+/// analog sticks. The player can change any of them in Configurações ›
+/// Teclado (src/features/settings/keyboardBindings.ts mirrors this table);
+/// the page and in-game menu show the keys in use.
 const KEYBOARD_BINDINGS: &[(&str, &str)] = &[
     ("input_player1_up", "up"),
     ("input_player1_down", "down"),
@@ -312,10 +315,82 @@ const DISABLED_HOTKEYS: &[&str] = &[
     "input_shader_prev",
 ];
 
-fn keyboard_bindings() -> String {
+/// Player 1's keys for one launch, by input_player1_* option.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeyLayout(Vec<(&'static str, String)>);
+
+impl Default for KeyLayout {
+    fn default() -> Self {
+        Self(
+            KEYBOARD_BINDINGS
+                .iter()
+                .map(|(option, key)| (*option, key.to_string()))
+                .collect(),
+        )
+    }
+}
+
+/// RetroArch key names a player may choose, besides single letters and the
+/// number rows.
+const NAMED_KEYS: &[&str] = &[
+    "up", "down", "left", "right", "enter", "kp_enter", "tab", "space", "backspace", "insert",
+    "del", "home", "end", "pageup", "pagedown", "shift", "rshift", "ctrl", "rctrl", "alt", "ralt",
+    "capslock", "comma", "period", "slash", "semicolon", "quote", "leftbracket", "rightbracket",
+    "backslash", "oem102", "minus", "equals", "multiply", "divide", "kp_period",
+];
+
+/// Whether `key` is a key the game may have: known to RetroArch, and none of
+/// the hotkeys that stay on (F keys, Esc, Scroll Lock, `, numpad + and -).
+fn choosable(key: &str) -> bool {
+    let digit = |prefix: &str| {
+        key.strip_prefix(prefix)
+            .is_some_and(|rest| rest.len() == 1 && rest.as_bytes()[0].is_ascii_digit())
+    };
+    (key.len() == 1 && key.as_bytes()[0].is_ascii_lowercase())
+        || digit("num")
+        || digit("keypad")
+        || NAMED_KEYS.contains(&key)
+}
+
+impl KeyLayout {
+    /// The defaults with the keys chosen in Configurações › Teclado, read
+    /// from the saved settings' `keyboardBindings` (option suffix → key). An
+    /// unknown or reserved key, or a key bound twice, keeps the defaults: a
+    /// broken layout must never leave the player without a way to play.
+    pub fn from_settings(settings: Option<&serde_json::Value>) -> Self {
+        let mut layout = Self::default();
+        let Some(chosen) = settings
+            .and_then(|value| value.get("keyboardBindings"))
+            .and_then(|value| value.as_object())
+        else {
+            return layout;
+        };
+        for (option, key) in layout.0.iter_mut() {
+            let suffix = option.trim_start_matches("input_player1_");
+            let Some(value) = chosen.get(suffix) else {
+                continue;
+            };
+            match value.as_str() {
+                Some(choice) if choosable(choice) => *key = choice.to_string(),
+                _ => {
+                    log::warn!("Ignoring the saved keyboard layout: {suffix} has an invalid key");
+                    return Self::default();
+                }
+            }
+        }
+        let unique: std::collections::HashSet<_> = layout.0.iter().map(|(_, key)| key).collect();
+        if unique.len() != layout.0.len() {
+            log::warn!("Ignoring the saved keyboard layout: a key is bound twice");
+            return Self::default();
+        }
+        layout
+    }
+}
+
+fn keyboard_bindings(keys: &KeyLayout) -> String {
     let mut config = String::new();
-    for (key, value) in KEYBOARD_BINDINGS {
-        config.push_str(&format!("{key} = \"{value}\"\n"));
+    for (option, key) in &keys.0 {
+        config.push_str(&format!("{option} = \"{key}\"\n"));
     }
     for key in DISABLED_HOTKEYS {
         config.push_str(&format!("{key} = \"nul\"\n"));
@@ -323,7 +398,13 @@ fn keyboard_bindings() -> String {
     config
 }
 
-fn render(runtime: &Path, screenshots: &Path, system: &Path, profiles: &Path) -> String {
+fn render(
+    runtime: &Path,
+    screenshots: &Path,
+    system: &Path,
+    profiles: &Path,
+    keys: &KeyLayout,
+) -> String {
     let mut config = String::from(
         r#"# OpenRetro in-game controls. Regenerated on launch.
 config_save_on_exit = "false"
@@ -387,7 +468,7 @@ input_state_slot_increase = "f7"
 input_state_slot_decrease = "f6"
 "#,
     );
-    config.push_str(&keyboard_bindings());
+    config.push_str(&keyboard_bindings(keys));
     // Phone play relays each phone's buttons to these loopback ports, one per player.
     config.push_str(&format!(
         "network_remote_enable = \"true\"\nnetwork_remote_base_port = \"{}\"\n",
@@ -438,14 +519,14 @@ mod tests {
         let executable = root.join("runtime/retroarch.exe");
         let hash = "c".repeat(64);
         let path =
-            prepare_game(&root, &executable, &hash, false, false, true, None).unwrap();
+            prepare_game(&root, &executable, &hash, false, false, true, None, &KeyLayout::default()).unwrap();
         let stretched = std::fs::read_to_string(&path).unwrap();
         assert!(stretched.contains("aspect_ratio_index = \"24\""));
         assert!(stretched.contains("video_force_aspect = \"false\""));
         assert!(stretched.contains("video_scale_integer = \"false\""));
 
         let original =
-            prepare_game(&root, &executable, &hash, false, false, false, None).unwrap();
+            prepare_game(&root, &executable, &hash, false, false, false, None, &KeyLayout::default()).unwrap();
         assert_eq!(path, original);
         let original = std::fs::read_to_string(original).unwrap();
         assert!(original.contains("aspect_ratio_index = \"22\""));
@@ -539,7 +620,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("openretro-player-{}", uuid::Uuid::new_v4()));
         let hash = "a".repeat(64);
         let path =
-            prepare_game(&root, &root.join("retroarch.exe"), &hash, true, true, false, None).unwrap();
+            prepare_game(&root, &root.join("retroarch.exe"), &hash, true, true, false, None, &KeyLayout::default()).unwrap();
         let text = std::fs::read_to_string(path).unwrap();
         assert!(text.contains("savestate_auto_save = \"true\""));
         assert!(text.contains("savestate_auto_load = \"true\""));
@@ -552,6 +633,7 @@ mod tests {
             false,
             false,
             None,
+            &KeyLayout::default(),
         )
         .unwrap();
         let text = std::fs::read_to_string(default).unwrap();
@@ -575,6 +657,7 @@ mod tests {
             &root.join("data"),
             &root.join("runtime/retroarch.exe"),
             &hash,
+            &KeyLayout::default(),
         )
         .unwrap();
         let text = std::fs::read_to_string(config).unwrap();
@@ -602,6 +685,7 @@ mod tests {
             &root.join("data"),
             &root.join("runtime/retroarch.exe"),
             &second_hash,
+            &KeyLayout::default(),
         )
         .unwrap();
         assert!(std::fs::read_to_string(second)
@@ -611,9 +695,54 @@ mod tests {
         assert!(prepare(
             &root.join("data"),
             &root.join("runtime/retroarch.exe"),
-            "../outside"
+            "../outside",
+            &KeyLayout::default()
         )
         .is_err());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn chosen_keys_replace_the_defaults_and_reach_the_config() {
+        let settings = serde_json::json!({
+            "keyboardBindings": { "a": "u", "up": "num8", "start": "space" }
+        });
+        let keys = KeyLayout::from_settings(Some(&settings));
+        let text = keyboard_bindings(&keys);
+        assert!(text.contains("input_player1_a = \"u\"\n"));
+        assert!(text.contains("input_player1_up = \"num8\"\n"));
+        assert!(text.contains("input_player1_start = \"space\"\n"));
+        // Untouched buttons keep their defaults, and hotkeys stay disabled.
+        assert!(text.contains("input_player1_b = \"z\"\n"));
+        assert!(text.contains("input_toggle_fast_forward = \"nul\"\n"));
+        assert_eq!(text.matches("input_player1_a =").count(), 1);
+    }
+
+    #[test]
+    fn a_broken_layout_falls_back_to_the_defaults() {
+        let defaults = KeyLayout::default();
+        assert_eq!(KeyLayout::from_settings(None), defaults);
+        assert_eq!(
+            KeyLayout::from_settings(Some(&serde_json::json!({ "keyboardBindings": {} }))),
+            defaults
+        );
+        for broken in [
+            serde_json::json!({ "a": "f2" }),
+            serde_json::json!({ "a": "escape" }),
+            serde_json::json!({ "a": "scroll_lock" }),
+            serde_json::json!({ "a": "backquote" }),
+            serde_json::json!({ "a": "add" }),
+            serde_json::json!({ "a": "nul" }),
+            serde_json::json!({ "a": "x\"\ninput_exit_emulator = \"q" }),
+            serde_json::json!({ "a": 7 }),
+            // B already has Z by default.
+            serde_json::json!({ "a": "z" }),
+        ] {
+            let settings = serde_json::json!({ "keyboardBindings": broken });
+            assert_eq!(KeyLayout::from_settings(Some(&settings)), defaults, "{broken}");
+        }
+        // Swapping two keys is a valid layout.
+        let swapped = serde_json::json!({ "keyboardBindings": { "a": "z", "b": "x" } });
+        assert_ne!(KeyLayout::from_settings(Some(&swapped)), defaults);
     }
 }

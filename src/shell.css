@@ -3367,3 +3367,84 @@ html.remote .mobile-home {
 .tv-workspace .settings-nav-about {
   display: none;
 }
+
+/* Configurações › Teclado: one button per game button, in two columns. */
+.key-bindings-note {
+  max-width: 880px;
+  margin-top: 24px;
+}
+.key-bindings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
+  max-width: 880px;
+}
+.key-binding {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.key-binding-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(8px * var(--rs));
+  background: var(--panel);
+  color: var(--body);
+  font-size: 12px;
+}
+.key-binding-key:hover {
+  border-color: var(--accent);
+}
+.key-binding-key.listening {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.key-binding-key kbd {
+  min-width: 22px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: calc(5px * var(--rs));
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.6;
+  color: var(--text);
+}
+.key-bindings-message {
+  max-width: 880px;
+  margin-top: 12px;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.key-bindings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.key-bindings-actions .key-bindings-message {
+  margin-top: 0;
+}
+.key-bindings-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .key-bindings {
+    grid-template-columns: 1fr;
+  }
+}

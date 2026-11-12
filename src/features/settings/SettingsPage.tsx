@@ -9,6 +9,7 @@ import {
   Folder,
   Settings,
   Gamepad2,
+  Keyboard,
   Download,
   Palette,
   Wrench,
@@ -20,10 +21,12 @@ import { defaultSettings, type AppSettings } from "../../types";
 import { version as appVersion } from "../../../package.json";
 import { adoptLanguage, languages, t } from "../../i18n";
 import { AchievementsAccount } from "../achievements/AchievementsAccount";
+import { KeyboardSettings } from "./KeyboardSettings";
 import { failed } from "../../utils/notice";
 type Section =
   | "General"
   | "Games"
+  | "Keyboard"
   | "Achievements"
   | "Downloads"
   | "Appearance"
@@ -45,6 +48,12 @@ const sections: {
     label: t("Jogos"),
     icon: Gamepad2,
     description: t("Como a imagem dos jogos aparece e as atualizações do PS3."),
+  },
+  {
+    id: "Keyboard",
+    label: t("Teclado"),
+    icon: Keyboard,
+    description: t("Escolha as teclas que jogam no lugar do controle."),
   },
   {
     id: "Achievements",
@@ -477,6 +486,8 @@ export function SettingsPage({ notify }: { notify: (s: string) => void }) {
                 </div>
               </Group>
             </>
+          ) : section === "Keyboard" ? (
+            <KeyboardSettings settings={settings} save={save} />
           ) : section === "Achievements" ? (
             <>
               <Group title={t("RetroAchievements")}>

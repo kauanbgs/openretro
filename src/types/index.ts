@@ -210,6 +210,9 @@ export interface AppSettings {
   discordPresence?: boolean;
   /** RetroAchievements hardcore: no state loading, unlocks count double. */
   achievementsHardcore?: boolean;
+  /** Player 1's keys the player changed in the runtime, by RetroArch
+   * input_player1_* suffix; the rest keep their defaults. */
+  keyboardBindings?: Partial<Record<string, string>>;
 }
 /** The signed-in RetroAchievements account. */
 export interface AchievementsAccount {

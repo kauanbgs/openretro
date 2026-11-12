@@ -490,6 +490,7 @@ fn the_library_plays_the_selected_variant_with_its_own_saves() {
         true,
         false,
         Some((&active.id, &saves)),
+        &crate::launcher::runtime_menu::KeyLayout::default(),
     )
     .unwrap();
     let text = std::fs::read_to_string(&config).unwrap();
@@ -515,6 +516,7 @@ fn the_library_plays_the_selected_variant_with_its_own_saves() {
         true,
         false,
         Some((&shared.id, &saves)),
+        &crate::launcher::runtime_menu::KeyLayout::default(),
     )
     .unwrap();
     let text = std::fs::read_to_string(config).unwrap();
