@@ -43,6 +43,17 @@ jobs:
           "OPENRETRO_RELEASE_NOTES<<$delimiter" >> $env:GITHUB_ENV
           $notes >> $env:GITHUB_ENV
           $delimiter >> $env:GITHUB_ENV
+      - name: Build the OpenRetro installer
+        shell: pwsh
+        run: |
+          cargo test --manifest-path installer/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --release --features tauri/custom-protocol --manifest-path installer/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item installer/target/release/openretro-installer.exe (Join-Path $env:RUNNER_TEMP "OpenRetro-Setup.exe")
+          # tauri-action looks for tauri.conf.json files and would pick this one
+          # over the app's. Move the installer out of its way now that it is built.
+          Move-Item installer (Join-Path $env:RUNNER_TEMP "installer-src")
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,13 +75,6 @@ jobs:
           Get-ChildItem dist-runtime -File | ForEach-Object {
             gh release upload "v$version" $_.FullName --clobber
           }
-      - name: Build the OpenRetro installer
-        shell: pwsh
-        run: |
-          cargo test --manifest-path installer/Cargo.toml
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo build --release --features tauri/custom-protocol --manifest-path installer/Cargo.toml
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Attach installer under a stable name for the website
         shell: pwsh
         env:
@@ -81,5 +85,4 @@ jobs:
           # that setup is still what the in-app updater installs.
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $stable = Join-Path $env:RUNNER_TEMP "OpenRetro-Setup.exe"
-          Copy-Item installer/target/release/openretro-installer.exe $stable
           gh release upload "v$version" $stable --clobber
