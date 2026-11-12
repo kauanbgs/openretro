@@ -48,9 +48,11 @@ function useInstaller() {
             }[];
           } | null,
         ) => {
-          const asset = release?.assets?.find((item) =>
-            /_x64-setup\.exe$/i.test(item.name),
-          );
+          // The OpenRetro installer window; older releases only have the NSIS setup.
+          const assets = release?.assets ?? [];
+          const asset =
+            assets.find((item) => /^OpenRetro-Setup\.exe$/i.test(item.name)) ??
+            assets.find((item) => /_x64-setup\.exe$/i.test(item.name));
           if (asset)
             setInstaller({
               url: asset.browser_download_url,
