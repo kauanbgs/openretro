@@ -1,9 +1,6 @@
-import {
-  useEffect,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { t } from "./i18n";
+import { LanguagePicker } from "./LanguagePicker";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Compass,
   Download,
@@ -18,7 +15,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-
 const REPO = "https://github.com/kauanbgs/openretro";
 // Stable asset name published with every release; used until the API answers.
 const DOWNLOAD_FALLBACK = `${REPO}/releases/latest/download/OpenRetro-Setup.exe`;
@@ -28,8 +24,11 @@ const SITE = "https://openretro.com.br";
 // The app's web build (docs/PLAY_WEB.md), published next to the site.
 const DEMO = "./play/";
 
-type Installer = { url: string; version?: string; size?: number };
-
+type Installer = {
+  url: string;
+  version?: string;
+  size?: number;
+};
 // Resolves the latest Windows installer so the button downloads it directly.
 function useInstaller() {
   const [installer, setInstaller] = useState<Installer>({
@@ -66,7 +65,6 @@ function useInstaller() {
   }, []);
   return installer;
 }
-
 type Platform = "windows" | "mobile" | "other";
 function detectPlatform(): Platform {
   const agent = navigator.userAgent;
@@ -74,7 +72,6 @@ function detectPlatform(): Platform {
   if (/Windows/i.test(agent)) return "windows";
   return "other";
 }
-
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
@@ -83,7 +80,6 @@ declare global {
 function track(name: string, params: Record<string, unknown> = {}) {
   window.gtag?.("event", name, params);
 }
-
 const systemGroups = [
   {
     maker: "Nintendo",
@@ -98,25 +94,28 @@ const systemGroups = [
     ],
   },
   { maker: "Sega", names: ["Master System", "Mega Drive"] },
-  { maker: "Sony", names: ["PlayStation", "PlayStation 2", "PlayStation 3", "PSP"] },
-  { maker: "Other", names: ["Arcade", "MS-DOS"] },
+  {
+    maker: "Sony",
+    names: ["PlayStation", "PlayStation 2", "PlayStation 3", "PSP"],
+  },
+  { maker: t("Other"), names: ["Arcade", "MS-DOS"] },
 ];
-
 const steps = [
   {
-    title: "Install OpenRetro",
-    text: "One small installer. Updates arrive on their own.",
+    title: t("Install OpenRetro"),
+    text: t("One small installer. Updates arrive on their own."),
   },
   {
-    title: "Choose your games folder",
-    text: "Your games appear with covers, years and descriptions.",
+    title: t("Choose your games folder"),
+    text: t("Your games appear with covers, years and descriptions."),
   },
   {
-    title: "Press play",
-    text: "The right emulator downloads and configures itself. Plug in a controller and go.",
+    title: t("Press play"),
+    text: t(
+      "The right emulator downloads and configures itself. Plug in a controller and go.",
+    ),
   },
 ];
-
 // The looks that ship in Settings > Appearance, drawn at thumbnail size.
 const themes: {
   name: string;
@@ -127,13 +126,48 @@ const themes: {
   radius: number;
   backdrop?: string;
 }[] = [
-  { name: "Default", bg: "#121212", panel: "#0c0c0c", text: "#e9eaee", accent: "#c0c1c7", radius: 1 },
-  { name: "Charcoal", bg: "#000000", panel: "#0a0a0a", text: "#ededed", accent: "#ededed", radius: 0.5 },
-  { name: "Cartridge", bg: "#17140f", panel: "#201c15", text: "#efe6d2", accent: "#e0a43a", radius: 0.75 },
-  { name: "Brick", bg: "#0f380f", panel: "#306230", text: "#cadc9f", accent: "#9bbc0f", radius: 0 },
-  { name: "Classic gray", bg: "#d6d3cc", panel: "#c4c0b8", text: "#26252d", accent: "#5b4b8a", radius: 1.25 },
   {
-    name: "Glass",
+    name: t("Default"),
+    bg: "#121212",
+    panel: "#0c0c0c",
+    text: "#e9eaee",
+    accent: "#c0c1c7",
+    radius: 1,
+  },
+  {
+    name: t("Charcoal"),
+    bg: "#000000",
+    panel: "#0a0a0a",
+    text: "#ededed",
+    accent: "#ededed",
+    radius: 0.5,
+  },
+  {
+    name: t("Cartridge"),
+    bg: "#17140f",
+    panel: "#201c15",
+    text: "#efe6d2",
+    accent: "#e0a43a",
+    radius: 0.75,
+  },
+  {
+    name: t("Brick"),
+    bg: "#0f380f",
+    panel: "#306230",
+    text: "#cadc9f",
+    accent: "#9bbc0f",
+    radius: 0,
+  },
+  {
+    name: t("Classic gray"),
+    bg: "#d6d3cc",
+    panel: "#c4c0b8",
+    text: "#26252d",
+    accent: "#5b4b8a",
+    radius: 1.25,
+  },
+  {
+    name: t("Glass"),
     bg: "#0c1020",
     panel: "#ffffff22",
     text: "#f4f6ff",
@@ -142,7 +176,7 @@ const themes: {
     backdrop: "linear-gradient(140deg, #3a1c71, #0f6a8c)",
   },
   {
-    name: "Midnight",
+    name: t("Midnight"),
     bg: "#0c1020",
     panel: "#141a30",
     text: "#e4e8f7",
@@ -151,7 +185,7 @@ const themes: {
     backdrop: "linear-gradient(160deg, #0c1020, #241338)",
   },
   {
-    name: "Your picture",
+    name: t("Your picture"),
     bg: "#0c0c0c",
     panel: "#0c0c0caa",
     text: "#f2f2f2",
@@ -160,87 +194,102 @@ const themes: {
     backdrop: "url(./art/mario-world.jpg) center / cover",
   },
 ];
-
 const features = [
   {
-    title: "Covers and details, filled in",
-    text: "Add a game and it shows up with its cover, year and description.",
+    title: t("Covers and details, filled in"),
+    text: t("Add a game and it shows up with its cover, year and description."),
   },
   {
-    title: "Make it look like yours",
-    text: "Pick colors, corners and a font, or put a picture or video behind everything.",
+    title: t("Make it look like yours"),
+    text: t(
+      "Pick colors, corners and a font, or put a picture or video behind everything.",
+    ),
   },
   {
-    title: "Controller-first TV mode",
-    text: "Switch to full screen and browse your library from the couch.",
+    title: t("Controller-first TV mode"),
+    text: t("Switch to full screen and browse your library from the couch."),
   },
   {
-    title: "Resume where you stopped",
-    text: "Jump back into your last session and keep save states.",
+    title: t("Resume where you stopped"),
+    text: t("Jump back into your last session and keep save states."),
   },
   {
     title: "Nintendo Switch",
-    text: "Add Switch games and play them with the emulator you already use.",
+    text: t(
+      "Add Switch games and play them with the emulator you already use.",
+    ),
   },
   {
-    title: "Achievements",
-    text: "Earn RetroAchievements in games you already know by heart.",
+    title: t("Achievements"),
+    text: t("Earn RetroAchievements in games you already know by heart."),
   },
   {
-    title: "Friends and chat",
-    text: "Add friends, send messages and see what they're playing.",
+    title: t("Friends and chat"),
+    text: t("Add friends, send messages and see what they're playing."),
   },
   {
-    title: "Discord status",
-    text: "Your Discord profile shows the game you're playing.",
+    title: t("Discord status"),
+    text: t("Your Discord profile shows the game you're playing."),
   },
 ];
-
-const faqs: { q: string; a: ReactNode }[] = [
+const faqs: {
+  q: string;
+  a: ReactNode;
+}[] = [
   {
-    q: "Is it really free?",
-    a: "Yes. There's no price, no subscription and no ads. The code is open source under the MIT license.",
+    q: t("Is it really free?"),
+    a: t(
+      "Yes. There's no price, no subscription and no ads. The code is open source under the MIT license.",
+    ),
   },
   {
-    q: "Does it come with games?",
-    a: "No. OpenRetro is a launcher. You add games you own from a folder on your PC, or from download sources you add yourself.",
+    q: t("Does it come with games?"),
+    a: t(
+      "No. OpenRetro is a launcher. You add games you own from a folder on your PC, or from download sources you add yourself.",
+    ),
   },
   {
-    q: "Do I have to set up emulators?",
-    a: "No. The first time you play a system, OpenRetro downloads and configures its emulator. Nintendo Switch is the exception: you bring your own emulator.",
+    q: t("Do I have to set up emulators?"),
+    a: t(
+      "No. The first time you play a system, OpenRetro downloads and configures its emulator. Nintendo Switch is the exception: you bring your own emulator.",
+    ),
   },
   {
-    q: "Do my friends need to install anything?",
-    a: "No. Friends join your Party from a link in their browser. Your phone connects the same way.",
+    q: t("Do my friends need to install anything?"),
+    a: t(
+      "No. Friends join your Party from a link in their browser. Your phone connects the same way.",
+    ),
   },
   {
-    q: 'Windows says "Windows protected your PC". Is it safe?',
+    q: t('Windows says "Windows protected your PC". Is it safe?'),
     a: (
       <>
-        The installer isn't code-signed yet, so SmartScreen warns about it.
-        Click <b>More info</b>, then <b>Run anyway</b>. All of the code is
-        public on{" "}
+        {t(
+          "The installer isn't code-signed yet, so SmartScreen warns about it. Click ",
+        )}
+        <b>{t("More info")}</b>
+        {t(", then ")}
+        <b>{t("Run anyway")}</b>
+        {t(". All of the code is public on")}{" "}
         <a href={REPO} target="_blank" rel="noreferrer">
-          GitHub
+          {"GitHub"}
         </a>
-        .
+        {"."}
       </>
     ),
   },
   {
-    q: "Do I need an account?",
-    a: "Not to play. You only sign in for friends, chat and Parties.",
+    q: t("Do I need an account?"),
+    a: t("Not to play. You only sign in for friends, chat and Parties."),
   },
   {
-    q: "Does it run on Mac or Linux?",
-    a: "Not yet. OpenRetro runs on Windows 10 and 11, 64-bit.",
+    q: t("Does it run on Mac or Linux?"),
+    a: t("Not yet. OpenRetro runs on Windows 10 and 11, 64-bit."),
   },
 ];
-
 function formatSize(bytes?: number) {
   return bytes ? `${Math.round(bytes / 1024 / 1024)} MB` : undefined;
 }
-
 function WindowsMark({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
@@ -251,16 +300,14 @@ function WindowsMark({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
 function Brand() {
   return (
-    <a className="brand" href="#top" aria-label="OpenRetro home">
+    <a className="brand" href="#top" aria-label={t("OpenRetro home")}>
       <img src="./openretro.svg" alt="" width="26" height="26" />
-      OpenRetro
+      {"OpenRetro"}
     </a>
   );
 }
-
 function DownloadButton({
   installer,
   platform,
@@ -282,7 +329,7 @@ function DownloadButton({
         if (navigator.share)
           await navigator.share({
             title: "OpenRetro",
-            text: "Download OpenRetro on my PC",
+            text: t("Download OpenRetro on my PC"),
             url: SITE,
           });
         else {
@@ -294,9 +341,18 @@ function DownloadButton({
       }
     };
     return (
-      <button className={`download ${compact ? "compact" : ""}`} onClick={share}>
+      <button
+        className={`download ${compact ? "compact" : ""}`}
+        onClick={share}
+      >
         <Share2 size={compact ? 16 : 19} />
-        {copied ? "Link copied" : compact ? "Send to PC" : "Send the link to my PC"}
+        {t(
+          copied
+            ? "Link copied"
+            : compact
+              ? "Send to PC"
+              : "Send the link to my PC",
+        )}
       </button>
     );
   }
@@ -314,11 +370,10 @@ function DownloadButton({
       }}
     >
       <WindowsMark size={compact ? 15 : 18} />
-      {compact ? "Download" : "Download for Windows"}
+      {t(compact ? "Download" : "Download for Windows")}
     </a>
   );
 }
-
 function DownloadNote({
   installer,
   platform,
@@ -329,25 +384,33 @@ function DownloadNote({
   if (platform === "mobile")
     return (
       <p className="download-note">
-        OpenRetro is a Windows app. Send yourself the link and download it on
-        your PC.
+        {t(
+          "OpenRetro is a Windows app. Send yourself the link and download it on your PC.",
+        )}
       </p>
     );
   if (platform === "other")
     return (
       <p className="download-note">
-        OpenRetro runs on Windows 10 and 11. Mac and Linux aren't supported yet.
+        {t(
+          "OpenRetro runs on Windows 10 and 11. Mac and Linux aren't supported yet.",
+        )}
       </p>
     );
   const size = formatSize(installer.size);
   return (
     <p className="download-note">
-      Free for Windows 10 and 11{size ? `, ${size}` : ""}.
-      {installer.version ? ` Version ${installer.version.replace(/^v/, "")}.` : ""}
+      {t("Free for Windows 10 and 11")}
+      {size ? `, ${size}` : ""}
+      {"."}
+      {installer.version
+        ? t(" Version {version}.", {
+            version: installer.version.replace(/^v/, ""),
+          })
+        : ""}
     </p>
   );
 }
-
 function AfterDownload({ onClose, url }: { onClose: () => void; url: string }) {
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -365,35 +428,40 @@ function AfterDownload({ onClose, url }: { onClose: () => void; url: string }) {
         aria-labelledby="after-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <button className="modal-close" aria-label="Close" onClick={onClose}>
+        <button
+          className="modal-close"
+          aria-label={t("Close")}
+          onClick={onClose}
+        >
           <X size={18} />
         </button>
-        <h2 id="after-title">Your download started</h2>
+        <h2 id="after-title">{t("Your download started")}</h2>
         <ol className="install-steps">
           <li>
-            <b>Open OpenRetro-Setup.exe</b>
-            <span>You'll find it in your Downloads folder.</span>
+            <b>{t("Open OpenRetro-Setup.exe")}</b>
+            <span>{t("You'll find it in your Downloads folder.")}</span>
           </li>
           <li>
-            <b>If Windows shows a blue warning</b>
+            <b>{t("If Windows shows a blue warning")}</b>
             <span>
-              Click More info, then Run anyway. The installer isn't code-signed
-              yet.
+              {t(
+                "Click More info, then Run anyway. The installer isn't code-signed yet.",
+              )}
             </span>
           </li>
           <li>
-            <b>Add your games and press play</b>
-            <span>Each emulator sets itself up the first time.</span>
+            <b>{t("Add your games and press play")}</b>
+            <span>{t("Each emulator sets itself up the first time.")}</span>
           </li>
         </ol>
         <p className="modal-retry">
-          Nothing happened? <a href={url}>Download again</a>
+          {t("Nothing happened? ")}
+          <a href={url}>{t("Download again")}</a>
         </p>
       </section>
     </div>
   );
 }
-
 const libraryCovers = [
   { id: "mario-world", name: "Super Mario World", system: "SNES" },
   { id: "sonic", name: "Sonic the Hedgehog", system: "MD" },
@@ -401,16 +469,15 @@ const libraryCovers = [
   { id: "metroid", name: "Super Metroid", system: "SNES" },
   { id: "crash", name: "Crash Bandicoot", system: "PS1" },
 ];
-
 // The app itself, drawn with the same layout and colors it ships with.
 function AppWindow() {
   const nav = [
-    { icon: Home, label: "Home", active: true },
-    { icon: Library, label: "Library" },
-    { icon: Compass, label: "Catalog" },
-    { icon: Download, label: "Downloads" },
-    { icon: Link2, label: "Sources" },
-    { icon: Settings, label: "Settings" },
+    { icon: Home, label: t("Home"), active: true },
+    { icon: Library, label: t("Library") },
+    { icon: Compass, label: t("Catalog") },
+    { icon: Download, label: t("Downloads") },
+    { icon: Link2, label: t("Sources") },
+    { icon: Settings, label: t("Settings") },
   ];
   return (
     <div className="appwin" aria-hidden="true">
@@ -418,8 +485,8 @@ function AppWindow() {
         <div className="appwin-profile">
           <i />
           <span>
-            <b>Player one</b>
-            <small>Friends and account</small>
+            <b>{t("Player one")}</b>
+            <small>{t("Friends and account")}</small>
           </span>
         </div>
         <ul className="appwin-nav">
@@ -430,18 +497,18 @@ function AppWindow() {
             </li>
           ))}
         </ul>
-        <p className="appwin-group">Play together</p>
+        <p className="appwin-group">{t("Play together")}</p>
         <ul className="appwin-nav">
           <li>
             <Smartphone size={16} strokeWidth={1.8} />
-            Play on your phone
+            {t("Play on your phone")}
           </li>
           <li>
             <Users size={16} strokeWidth={1.8} />
-            Play with friends
+            {t("Play with friends")}
           </li>
         </ul>
-        <p className="appwin-group">My library</p>
+        <p className="appwin-group">{t("My library")}</p>
         <ul className="appwin-games">
           {libraryCovers.slice(0, 4).map((game) => (
             <li key={game.id}>
@@ -453,19 +520,19 @@ function AppWindow() {
       </aside>
       <div className="appwin-main">
         <div className="appwin-top">
-          <b>Home</b>
-          <span className="appwin-pill">Big Picture</span>
-          <span className="appwin-search">Search games</span>
+          <b>{t("Home")}</b>
+          <span className="appwin-pill">{"Big Picture"}</span>
+          <span className="appwin-search">{t("Search games")}</span>
         </div>
         <div className="appwin-hero">
           <img src="./art/donkey-kong.jpg" alt="" />
           <div>
-            <small>Continue playing</small>
-            <b>Donkey Kong Country</b>
-            <span>Super Nintendo, 1994</span>
+            <small>{t("Continue playing")}</small>
+            <b>{"Donkey Kong Country"}</b>
+            <span>{"Super Nintendo, 1994"}</span>
           </div>
         </div>
-        <p className="appwin-title">My library</p>
+        <p className="appwin-title">{t("My library")}</p>
         <div className="appwin-cards">
           {libraryCovers.map((game) => (
             <figure key={game.id}>
@@ -481,7 +548,6 @@ function AppWindow() {
     </div>
   );
 }
-
 function ThemeThumb({ theme }: { theme: (typeof themes)[number] }) {
   return (
     <figure
@@ -510,7 +576,6 @@ function ThemeThumb({ theme }: { theme: (typeof themes)[number] }) {
     </figure>
   );
 }
-
 export function Website() {
   const installer = useInstaller();
   const [platform] = useState(detectPlatform);
@@ -527,21 +592,21 @@ export function Website() {
   return (
     <div className="site" id="top">
       <a className="skip-link" href="#main">
-        Skip to content
+        {t("Skip to content")}
       </a>
       <header className="header">
         <div className="wrap header-inner">
           <Brand />
-          <nav aria-label="Main">
-            <a href="#how">How it works</a>
-            <a href="#look">Your look</a>
-            <a href="#friends">Play with friends</a>
-            <a href="#faq">FAQ</a>
+          <nav aria-label={t("Main")}>
+            <a href="#how">{t("How it works")}</a>
+            <a href="#look">{t("Your look")}</a>
+            <a href="#friends">{t("Play with friends")}</a>
+            <a href="#faq">{t("FAQ")}</a>
             <a
               href={DEMO}
               onClick={() => track("demo_open", { where: "header" })}
             >
-              Demo
+              {t("Demo")}
             </a>
           </nav>
           <a
@@ -549,10 +614,11 @@ export function Website() {
             href={REPO}
             target="_blank"
             rel="noreferrer"
-            aria-label="OpenRetro on GitHub"
+            aria-label={t("OpenRetro on GitHub")}
           >
             <Github size={19} />
           </a>
+          <LanguagePicker />
           {button("header", true)}
         </div>
       </header>
@@ -560,11 +626,11 @@ export function Website() {
       <main id="main">
         <section className="hero wrap">
           <div className="hero-copy">
-            <h1>All your retro games in one place, ready to play.</h1>
+            <h1>{t("All your retro games in one place, ready to play.")}</h1>
             <p className="lede">
-              OpenRetro is a free launcher for Windows. Add your games, press
-              play, and it sets up the emulator for you. Friends can even join
-              from their browser.
+              {t(
+                "OpenRetro is a free launcher for Windows. Add your games, press play, and it sets up the emulator for you. Friends can even join from their browser.",
+              )}
             </p>
             <div className="hero-action">
               {button("hero")}
@@ -574,7 +640,7 @@ export function Website() {
                 onClick={() => track("demo_open", { where: "hero" })}
               >
                 <Gamepad2 size={19} />
-                Try the demo
+                {t("Try the demo")}
               </a>
               <DownloadNote installer={installer} platform={platform} />
             </div>
@@ -584,8 +650,8 @@ export function Website() {
           </div>
         </section>
 
-        <section className="systems wrap" aria-label="Supported systems">
-          <h2>Plays games from every system you grew up with</h2>
+        <section className="systems wrap" aria-label={t("Supported systems")}>
+          <h2>{t("Plays games from every system you grew up with")}</h2>
           <div className="systems-grid">
             {systemGroups.map((group) => (
               <div key={group.maker}>
@@ -601,7 +667,7 @@ export function Website() {
         </section>
 
         <section className="how wrap" id="how">
-          <h2>Playing in three steps</h2>
+          <h2>{t("Playing in three steps")}</h2>
           <ol>
             {steps.map((step) => (
               <li key={step.title}>
@@ -614,11 +680,11 @@ export function Website() {
 
         <section className="look wrap" id="look">
           <div className="look-copy">
-            <h2>Make it look like yours</h2>
+            <h2>{t("Make it look like yours")}</h2>
             <p>
-              Pick the colors, how round the corners are and the font. Put a
-              gradient, a picture or a video behind everything, and share your
-              look with a friend as a line of text.
+              {t(
+                "Pick the colors, how round the corners are and the font. Put a gradient, a picture or a video behind everything, and share your look with a friend as a line of text.",
+              )}
             </p>
           </div>
           <div className="thumbs">
@@ -631,15 +697,16 @@ export function Website() {
         <section className="friends wrap" id="friends">
           <div className="friends-panel">
             <div className="friends-copy">
-              <h2>Your friends join from a link</h2>
+              <h2>{t("Your friends join from a link")}</h2>
               <p>
-                The game runs on your PC. Start a Party and send the link: up
-                to three friends play along from their browser, with a keyboard
-                or a controller, and you can chat while you play.
+                {t(
+                  "The game runs on your PC. Start a Party and send the link: up to three friends play along from their browser, with a keyboard or a controller, and you can chat while you play.",
+                )}
               </p>
               <p>
-                Your phone works the same way. Scan a code and it becomes a
-                second screen with touch controls.
+                {t(
+                  "Your phone works the same way. Scan a code and it becomes a second screen with touch controls.",
+                )}
               </p>
             </div>
             <div className="party" aria-hidden="true">
@@ -647,29 +714,31 @@ export function Website() {
                 <img src="./art/mario-kart.jpg" alt="" loading="lazy" />
                 <div className="party-chat">
                   <span>
-                    <b>Ana</b> rematch?
+                    <b>{"Ana"}</b>
+                    {t(" rematch?")}
                   </span>
                   <span>
-                    <b>Leo</b> one more cup
+                    <b>{"Leo"}</b>
+                    {t(" one more cup")}
                   </span>
                 </div>
               </div>
               <ul className="party-players">
                 <li>
                   <i className="p1" />
-                  You
+                  {t("You")}
                 </li>
                 <li>
                   <i className="p2" />
-                  Ana
+                  {"Ana"}
                 </li>
                 <li>
                   <i className="p3" />
-                  Leo
+                  {"Leo"}
                 </li>
                 <li className="open">
                   <i />
-                  Open seat
+                  {t("Open seat")}
                 </li>
               </ul>
             </div>
@@ -677,7 +746,7 @@ export function Website() {
         </section>
 
         <section className="features wrap">
-          <h2>Everything else you'd expect</h2>
+          <h2>{t("Everything else you'd expect")}</h2>
           <dl>
             {features.map((item) => (
               <div key={item.title}>
@@ -689,7 +758,7 @@ export function Website() {
         </section>
 
         <section className="faq wrap" id="faq">
-          <h2>Questions</h2>
+          <h2>{t("Questions")}</h2>
           <div>
             {faqs.map((item, index) => (
               <details key={item.q} open={index === 0}>
@@ -703,8 +772,8 @@ export function Website() {
         <section className="final">
           <div className="wrap final-inner">
             <div>
-              <h2>Ready when you are</h2>
-              <p>Free, open source and set up in a couple of minutes.</p>
+              <h2>{t("Ready when you are")}</h2>
+              <p>{t("Free, open source and set up in a couple of minutes.")}</p>
             </div>
             <div className="final-action">
               {button("footer")}
@@ -716,18 +785,19 @@ export function Website() {
 
       <footer className="footer wrap">
         <Brand />
-        <nav aria-label="Footer">
+        <nav aria-label={t("Footer")}>
           <a href={REPO} target="_blank" rel="noreferrer">
-            Source code
+            {t("Source code")}
           </a>
           <a href={`${REPO}/issues`} target="_blank" rel="noreferrer">
-            Report a problem
+            {t("Report a problem")}
           </a>
-          <a href="./credits.html">Credits and licenses</a>
+          <a href="./credits.html">{t("Credits and licenses")}</a>
         </nav>
         <p>
-          OpenRetro doesn't include or distribute games. Game artwork belongs to
-          its respective owners.
+          {t(
+            "OpenRetro doesn't include or distribute games. Game artwork belongs to its respective owners.",
+          )}
         </p>
       </footer>
 

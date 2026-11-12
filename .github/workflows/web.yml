@@ -6,6 +6,7 @@ on:
     # The site, plus the app's web build that is published under /play/.
     paths:
       - "web/**"
+      - "shared/**"
       - "src/**"
       - "public/**"
       - "index.html"

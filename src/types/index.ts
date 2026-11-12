@@ -166,7 +166,7 @@ export interface AppSettings {
   animations: boolean;
   language: string;
   /** The interface language; system or unset follows the user's language. */
-  interfaceLanguage?: "system" | "pt-BR" | "en";
+  interfaceLanguage?: "system" | "pt-BR" | "en" | "es";
   downloadDirectory: string;
   concurrentDownloads: number;
   bandwidthLimit: number;

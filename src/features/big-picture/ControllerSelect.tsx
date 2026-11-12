@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type RefObject,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
@@ -13,6 +14,7 @@ type Input = ((key: string) => boolean) | null;
 export interface SelectOption {
   value: string;
   label: string;
+  icon?: ReactNode;
 }
 
 /** Focus navigates between controls; only confirm opens/commits a selection. */
@@ -23,6 +25,8 @@ export function ControllerSelect({
   options,
   onChange,
   disabled = false,
+  className = "",
+  optionHeight = 42,
 }: {
   input: RefObject<Input>;
   label: string;
@@ -30,6 +34,8 @@ export function ControllerSelect({
   options: SelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  className?: string;
+  optionHeight?: number;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -63,7 +69,7 @@ export function ControllerSelect({
     const rect = trigger.current!.getBoundingClientRect();
     const height = Math.min(
       280,
-      options.length * 42 + 14,
+      options.length * optionHeight + 14,
       window.innerHeight - 154,
     );
     const width = Math.min(Math.max(rect.width, 240), window.innerWidth - 32);
@@ -127,7 +133,7 @@ export function ControllerSelect({
     <>
       <button
         ref={trigger}
-        className="tv-select-trigger"
+        className={`tv-select-trigger ${className}`}
         role="combobox"
         aria-label={label}
         aria-expanded={open}
@@ -161,7 +167,10 @@ export function ControllerSelect({
           }
         }}
       >
-        <span>{current?.label ?? label}</span>
+        <span>
+          {current?.icon}
+          {current?.label ?? label}
+        </span>
         <ChevronDown size={17} />
       </button>
       {open &&
@@ -171,7 +180,7 @@ export function ControllerSelect({
             id={id}
             role="listbox"
             aria-label={label}
-            className="tv-select-menu"
+            className={`tv-select-menu ${className ? `${className}-menu` : ""}`}
             style={{
               left: position.left,
               top: position.top,
@@ -190,7 +199,10 @@ export function ControllerSelect({
                 onMouseEnter={() => setHighlight(index)}
                 onClick={() => commit(index)}
               >
-                <span>{option.label}</span>
+                <span>
+                  {option.icon}
+                  {option.label}
+                </span>
                 {option.value === value && <Check size={17} />}
               </div>
             ))}

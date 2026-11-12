@@ -80,7 +80,7 @@ const titles: Record<WorkspacePage, string> = {
   friends: t("Amigos"),
   profile: t("Perfil"),
   settings: t("Configurações"),
-  downloads: "Downloads",
+  downloads: t("Downloads"),
   sources: t("Fontes de download"),
   game: t("Gerenciar jogo"),
   import: t("Adicionar jogos"),
@@ -482,7 +482,7 @@ export function ConsoleWorkspace({
             <button disabled={updating} onClick={onUpdate}>
               <RefreshCw size={18} />
               {updating
-                ? "Atualizando…"
+                ? t("Atualizando…")
                 : updateVersion
                   ? t("Atualizar · {version}", { version: updateVersion })
                   : t("Verificar atualizações")}
@@ -532,7 +532,9 @@ export function ConsoleWorkspace({
               onJoinParty={(friend) => onRoute({ page: "party-guest", friend })}
             />
           )}
-          {route.page === "settings" && <SettingsPage notify={notify} />}
+          {route.page === "settings" && (
+            <SettingsPage notify={notify} languageInput={keyboardInput} />
+          )}
           {route.page === "themes" && <ConsoleThemes notify={notify} />}
           {route.page === "sources" && (
             <div className="page-content">

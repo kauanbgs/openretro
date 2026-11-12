@@ -442,7 +442,7 @@ export function BigPicture({
   const centerActions: ConsoleAction[] = [
     {
       id: "downloads",
-      label: "Downloads",
+      label: t("Downloads"),
       detail: activeJobs
         ? t("{count} em andamento", { count: activeJobs })
         : t("Nada baixando"),
@@ -968,7 +968,7 @@ export function BigPicture({
             <button
               data-top
               className={topFocused("downloads")}
-              aria-label="Downloads"
+              aria-label={t("Downloads")}
               onClick={() => openWorkspace({ page: "downloads" })}
             >
               <Download size={22} />

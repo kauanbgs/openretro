@@ -38,7 +38,7 @@ export function KeyboardSettings({
   save,
 }: {
   settings: AppSettings;
-  save: (patch: Partial<AppSettings>) => Promise<void>;
+  save: (patch: Partial<AppSettings>) => Promise<unknown>;
 }) {
   const saved = settings.keyboardBindings as KeyboardBindings | undefined;
   const layout = resolveLayout(saved);

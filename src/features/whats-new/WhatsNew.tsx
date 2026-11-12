@@ -29,8 +29,8 @@ function markSeen(version: string) {
   }
 }
 
-const text = (value: { pt: string; en: string }) =>
-  language === "en" ? value.en : value.pt;
+const text = (value: { pt: string; en: string; es: string }) =>
+  language === "en" ? value.en : language === "es" ? value.es : value.pt;
 
 /** The version's news, once, the first time it opens. */
 export function WhatsNew({
@@ -80,7 +80,8 @@ export function WhatsNewDialog({
   onClose: () => void;
 }) {
   const [picked, setPicked] = useState(history?.[0]?.version);
-  const entry = history?.find((item) => item.version === picked) ?? history?.[0];
+  const entry =
+    history?.find((item) => item.version === picked) ?? history?.[0];
   const version = entry?.version ?? firstVersion!;
   const note = entry?.note ?? firstNote!;
   const social = useSyncExternalStore(
