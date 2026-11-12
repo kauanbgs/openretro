@@ -75,6 +75,42 @@ export function WebPlayer({ entry }: { entry: LibraryGame }) {
     return () => window.removeEventListener("pagehide", saveTime);
   }, [entry]);
 
+  // EmulatorJS only listens for keys on its own element, so a click on the
+  // bar or the black margins, or a trip to another tab, left the keyboard
+  // dead. Keys pressed anywhere else are sent to the game, which also takes
+  // the focus back. Browser shortcuts (Ctrl, Alt, the F keys) stay the
+  // browser's.
+  useEffect(() => {
+    const forward = (event: KeyboardEvent) => {
+      const screen = document.getElementById("web-player-screen");
+      if (!screen || screen.contains(event.target as Node)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.isComposing || /^F\d+$/.test(event.key)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      screen.focus({ preventScroll: true });
+      const copy = new KeyboardEvent(event.type, {
+        key: event.key,
+        code: event.code,
+        location: event.location,
+        repeat: event.repeat,
+        shiftKey: event.shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      // EmulatorJS reads the legacy keyCode, which the constructor can't set.
+      for (const name of ["keyCode", "which"] as const)
+        Object.defineProperty(copy, name, { get: () => event.keyCode });
+      screen.dispatchEvent(copy);
+    };
+    window.addEventListener("keydown", forward, true);
+    window.addEventListener("keyup", forward, true);
+    return () => {
+      window.removeEventListener("keydown", forward, true);
+      window.removeEventListener("keyup", forward, true);
+    };
+  }, []);
+
   const leave = () => {
     location.hash = new URLSearchParams({ game: entry.item.id }).toString();
     location.reload();
@@ -98,7 +134,7 @@ export function WebPlayer({ entry }: { entry: LibraryGame }) {
             </button>
           </div>
         ) : (
-          <div id="web-player-screen">
+          <div id="web-player-screen" tabIndex={-1}>
             <div className="web-player-message">
               <LoaderCircle className="spin" size={24} />
             </div>
