@@ -1,0 +1,1 @@
+OpenRetro agora fala espanhol. O idioma muda sozinho conforme o seu Windows e, se quiser outro, escolha em Configurações ou no seletor de idioma do site, que também ganhou português e espanhol. Quem baixa o OpenRetro pelo site agora abre um instalador novo, mais bonito: ele pega a versão mais recente, confere o arquivo e instala sem precisar de administrador.
