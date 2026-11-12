@@ -90,8 +90,11 @@ async fn run(app: &AppHandle) -> Result<(), &'static str> {
     }
     let version = manifest.version.trim_start_matches('v').to_owned();
 
+    // latest.json points at GitHub API asset URLs, which answer with JSON
+    // about the asset unless the file itself is asked for.
     let response = client
         .get(&platform.url)
+        .header("Accept", "application/octet-stream")
         .send()
         .await
         .and_then(|r| r.error_for_status())
