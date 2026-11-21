@@ -1,0 +1,1 @@
+Agora o OpenRetro mostra, dentro do app, as novidades da 1.4: o servidor de biblioteca para baixar jogos de outro PC, em casa ou de longe, o Salvar automaticamente e os downloads em pastas com o nome do jogo.

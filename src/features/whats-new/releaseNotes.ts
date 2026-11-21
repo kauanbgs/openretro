@@ -461,6 +461,116 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     ],
     closing: { pt: "Bom jogo!", en: "Have fun!", es: "¡Que te diviertas!" },
   },
+  "1.4.0": {
+    date: "2026-11-21",
+    title: {
+      pt: "OpenRetro 1.4 - Sua biblioteca em qualquer PC",
+      en: "OpenRetro 1.4 - Your library on any PC",
+      es: "OpenRetro 1.4 - Tu biblioteca en cualquier PC",
+    },
+    banner: [
+      {
+        art: "logo",
+        lead: { pt: "Sua biblioteca", en: "Your library", es: "Tu biblioteca" },
+        strong: { pt: "em outro PC", en: "on another PC", es: "en otro PC" },
+        text: {
+          pt: "Um PC guarda os jogos, o outro baixa e joga. Em Configurações, Servidor.",
+          en: "One PC keeps the games, the other downloads and plays. In Settings, Server.",
+          es: "Un PC guarda los juegos y el otro los descarga y juega. En Configuración, Servidor.",
+        },
+      },
+      {
+        art: "landscape",
+        lead: { pt: "De casa ou", en: "From home or", es: "Desde casa o" },
+        strong: { pt: "de longe", en: "away", es: "desde lejos" },
+        text: {
+          pt: "Pela rede da casa ou por uma conexão privada e segura entre os seus PCs.",
+          en: "Over your home network or a private, secure connection between your PCs.",
+          es: "Por la red de casa o con una conexión privada y segura entre tus PC.",
+        },
+      },
+    ],
+    body: [
+      {
+        pt: "Olá, pessoal! 🖥️",
+        en: "Hi everyone! 🖥️",
+        es: "¡Hola a todos! 🖥️",
+      },
+      {
+        pt: "A 1.4 deixa você guardar os jogos num PC e baixar no outro, como um servidor de jogos. O jogo não é transmitido: ele é baixado e roda no PC de quem joga.",
+        en: "1.4 lets you keep your games on one PC and download them on another, like a game server. The game is not streamed: it is downloaded and runs on the PC of whoever plays.",
+        es: "La versión 1.4 te permite guardar los juegos en un PC y descargarlos en otro, como un servidor de juegos. El juego no se transmite: se descarga y se ejecuta en el PC de quien juega.",
+      },
+      {
+        pt: "O que chegou na 1.4:",
+        en: "What's new in 1.4:",
+        es: "Novedades de 1.4:",
+      },
+    ],
+    highlights: [
+      {
+        title: {
+          pt: "Servidor de biblioteca",
+          en: "Library server",
+          es: "Servidor de biblioteca",
+        },
+        text: {
+          pt: "em Configurações, Servidor, ligue o compartilhamento no PC que tem os jogos e cole o link de pareamento no outro. Os jogos aparecem como downloads, e o app baixa, extrai e adiciona à sua biblioteca. Há um passo a passo na própria tela.",
+          en: "in Settings, Server, turn on sharing on the PC that has the games and paste the pairing link on the other one. The games show up as downloads, and the app downloads, extracts and adds them to your library. There is a step by step guide on that screen.",
+          es: "en Configuración, Servidor, activa el uso compartido en el PC que tiene los juegos y pega el enlace de emparejamiento en el otro. Los juegos aparecen como descargas y la app los descarga, extrae y añade a tu biblioteca. Hay una guía paso a paso en esa misma pantalla.",
+        },
+      },
+      {
+        title: {
+          pt: "De qualquer lugar",
+          en: "From anywhere",
+          es: "Desde cualquier lugar",
+        },
+        text: {
+          pt: "para usar fora de casa, o OpenRetro instala sozinho o acesso remoto necessário, com a sua permissão. Você só entra, ou cria, uma conta grátis, e usa a mesma nos dois PCs.",
+          en: "to use it away from home, OpenRetro installs the remote access it needs by itself, with your permission. You just sign in, or create, a free account, and use the same one on both PCs.",
+          es: "para usarlo fuera de casa, OpenRetro instala solo el acceso remoto necesario, con tu permiso. Solo tienes que iniciar sesión, o crear, una cuenta gratis y usar la misma en los dos PC.",
+        },
+      },
+      {
+        title: {
+          pt: "Só pela rede local",
+          en: "Local network only",
+          es: "Solo en la red local",
+        },
+        text: {
+          pt: "se os dois PCs estão na mesma casa, ligue Também pela rede local e não precisa instalar nada. Vem desligado, porque a rede local não é criptografada.",
+          en: "if both PCs are in the same home, turn on Also on the local network and there is nothing to install. It is off by default, because the local network is not encrypted.",
+          es: "si los dos PC están en la misma casa, activa También en la red local y no hace falta instalar nada. Viene desactivado, porque la red local no está cifrada.",
+        },
+      },
+      {
+        title: {
+          pt: "Salvar automaticamente",
+          en: "Save automatically",
+          es: "Guardar automáticamente",
+        },
+        text: {
+          pt: "em Configurações, o jogo é gravado no estado automático de tempos em tempos, sem mexer nos seus slots. Vem desligado.",
+          en: "in Settings, the game is saved to the automatic state every so often, without touching your slots. It is off by default.",
+          es: "en Configuración, el juego se guarda en el estado automático cada cierto tiempo, sin tocar tus slots. Viene desactivado.",
+        },
+      },
+      {
+        title: {
+          pt: "Downloads em pastas",
+          en: "Downloads in folders",
+          es: "Descargas en carpetas",
+        },
+        text: {
+          pt: "cada jogo baixado agora fica numa pasta com o nome dele, fácil de achar.",
+          en: "each downloaded game now goes into a folder named after it, easy to find.",
+          es: "cada juego descargado ahora va a una carpeta con su nombre, fácil de encontrar.",
+        },
+      },
+    ],
+    closing: { pt: "Bom jogo!", en: "Have fun!", es: "¡Que te diviertas!" },
+  },
 };
 
 const parts = (version: string) => version.split(".").map(Number);
