@@ -10,12 +10,14 @@ mod file_browser;
 mod filesystem;
 mod in_game;
 mod launcher;
+mod library_server;
 mod metadata;
 mod models;
 mod mods;
 mod profiles;
 mod recommendations;
 mod remote_play;
+mod tailscale;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -55,6 +57,9 @@ pub fn run() {
             app.manage(downloads::sources::SourceIndex::default());
             app.manage(in_game::InGameService::default());
             app.manage(remote_play::RemotePlay::default());
+            app.manage(library_server::LibraryServer::default());
+            app.manage(tailscale::Tailscale::default());
+            library_server::resume(app.handle());
             app.manage(discord::Presence::default());
             app.manage(account::AccountGate::default());
             app.manage(account::social::Social::default());
@@ -178,6 +183,13 @@ pub fn run() {
             remote_play::remote_play_start,
             remote_play::remote_play_stop,
             remote_play::remote_play_network_settings,
+            library_server::library_server_status,
+            library_server::library_server_start,
+            library_server::library_server_stop,
+            library_server::library_server_reset_token,
+            library_server::library_server_set_lan,
+            tailscale::tailscale_status,
+            tailscale::tailscale_setup,
             discord::discord_presence_sync,
             launcher::runtime_menu::open_game_screenshots,
             launcher::runtime_menu::list_game_screenshots,

@@ -1197,6 +1197,10 @@ export const es: Record<string, string> = {
   "Trocar ou personalizar": "Cambiar o personalizar",
   Jogando: "Jugando",
   "Continuar de onde parou": "Continuar donde lo dejaste",
+  "Salvar automaticamente": "Guardar automáticamente",
+  "Grava o jogo no estado automático de tempos em tempos, sem mexer nos seus slots. Não vale para jogo online, modo hardcore e PS2.":
+    "Guarda el juego en el estado automático cada cierto tiempo, sin tocar tus ranuras. No vale para juego en línea, modo hardcore ni PS2.",
+  "A cada {n} min": "Cada {n} min",
   "No runtime integrado, salva ao encerrar normalmente e retoma ao jogar novamente. Depende do suporte a estados do core.":
     "En el runtime integrado, guarda al salir normalmente y reanuda al volver a jugar. Depende del soporte de estados del núcleo.",
   "Coop de sofá": "Cooperativo local",
@@ -2918,4 +2922,108 @@ export const es: Record<string, string> = {
     "{action}: {key}. Haz clic para cambiar.",
   "{other} ficou com {key}, que era de {action}.":
     "{other} se quedó con {key}, que era de {action}.",
+  "Servidor":
+    "Servidor",
+  "Compartilhe sua biblioteca com outros PCs, na rede local ou pelo Tailscale.":
+    "Comparte tu biblioteca con otros PC, en la red local o con Tailscale.",
+  "Biblioteca compartilhada":
+    "Biblioteca compartida",
+  "Compartilhar minha biblioteca":
+    "Compartir mi biblioteca",
+  "Deixa outro OpenRetro listar e baixar os jogos deste PC. Só quem tem o link de pareamento consegue acessar.":
+    "Permite que otro OpenRetro vea y descargue los juegos de este PC. Solo entra quien tiene el enlace de emparejamiento.",
+  "Endereço":
+    "Dirección",
+  "rede local":
+    "red local",
+  "Tailscale não encontrado. Para acessar de fora de casa, instale o Tailscale neste PC e no outro e entre com a mesma conta.":
+    "No se encontró Tailscale. Para conectarte desde fuera de casa, instala Tailscale en este PC y en el otro e inicia sesión con la misma cuenta.",
+  "Parear outro PC":
+    "Emparejar otro PC",
+  "No outro OpenRetro, adicione este servidor com o link abaixo. Trate o link como uma senha.":
+    "En el otro OpenRetro, añade este servidor con el enlace de abajo. Trata el enlace como una contraseña.",
+  "QR code do link de pareamento":
+    "Código QR del enlace de emparejamiento",
+  "Link de pareamento":
+    "Enlace de emparejamiento",
+  "Jogos compartilhados":
+    "Juegos compartidos",
+  "Jogos instalados que são um único arquivo. Pastas ficam de fora por enquanto.":
+    "Juegos instalados que son un solo archivo. Las carpetas quedan fuera por ahora.",
+  "Novo link de pareamento":
+    "Nuevo enlace de emparejamiento",
+  "Isso desconecta todos os PCs já pareados, que precisarão do novo link. Confirmar?":
+    "Esto desconecta todos los PC emparejados, que necesitarán el nuevo enlace. ¿Confirmar?",
+  "Use se o link vazou ou se quiser desconectar os PCs pareados.":
+    "Úsalo si el enlace se filtró o quieres desconectar los PC emparejados.",
+  "Abra o aplicativo desktop para compartilhar a biblioteca.":
+    "Abre la aplicación de escritorio para compartir la biblioteca.",
+  "Link inválido. Cole o link de pareamento do outro PC.":
+    "Enlace no válido. Pega el enlace de emparejamiento del otro PC.",
+  "Use o endereço do Tailscale do outro PC, que começa com 100. Instale o Tailscale nos dois PCs.":
+    "Usa la dirección de Tailscale del otro PC, que empieza por 100. Instala Tailscale en los dos PC.",
+  "Biblioteca conectada. Os jogos aparecem como downloads.":
+    "Biblioteca conectada. Sus juegos aparecen como descargas.",
+  "Conectar a outro PC":
+    "Conectar con otro PC",
+  "Cole o link de pareamento mostrado no outro OpenRetro. Os jogos dele passam a aparecer como downloads, e o app baixa, extrai e adiciona à sua biblioteca.":
+    "Pega el enlace de emparejamiento que muestra el otro OpenRetro. Sus juegos aparecen como descargas, y la app los descarga, extrae y añade a tu biblioteca.",
+  "Conectar":
+    "Conectar",
+  "Biblioteca de outro PC":
+    "Biblioteca de otro PC",
+  "Acesso de fora de casa":
+    "Acceso desde fuera de casa",
+  "Ativo. Seus outros PCs acessam este de qualquer lugar.":
+    "Activo. Tus otros PC acceden a este desde cualquier lugar.",
+  "Baixando o acesso remoto… {percent}%":
+    "Descargando el acceso remoto… {percent}%",
+  "Instalando… aceite a janela de permissão do Windows que abrir.":
+    "Instalando… acepta la ventana de permiso de Windows que se abra.",
+  "Falta só entrar na sua conta. Abrimos uma página no navegador: entre ou crie uma conta grátis. Use a mesma conta no outro PC.":
+    "Solo falta iniciar sesión. Abrimos una página en el navegador: entra o crea una cuenta gratis. Usa la misma cuenta en el otro PC.",
+  "O acesso remoto já está instalado, mas falta entrar na conta.":
+    "El acceso remoto ya está instalado, pero falta iniciar sesión.",
+  "Para jogar de outro lugar, o OpenRetro instala o Tailscale, um programa gratuito que cria uma conexão privada e segura entre os seus PCs.":
+    "Para jugar desde otro lugar, OpenRetro instala Tailscale, un programa gratuito que crea una conexión privada y segura entre tus PC.",
+  "Ativar acesso remoto":
+    "Activar acceso remoto",
+  "Antes de conectar, o OpenRetro configura o acesso remoto neste PC. Quando terminar, toque em Conectar de novo.":
+    "Antes de conectar, OpenRetro configura el acceso remoto en este PC. Cuando termine, pulsa Conectar de nuevo.",
+  "Também pela rede local":
+    "También en la red local",
+  "Deixa PCs da sua casa conectarem sem instalar nada. A rede local não é criptografada: ligue só em uma rede em que você confia.":
+    "Permite que los PC de tu casa se conecten sin instalar nada. La red local no está cifrada: actívalo solo en una red de confianza.",
+  "Link para a rede local":
+    "Enlace para la red local",
+  "Para PCs na mesma casa. Fora dela, use o link de acesso remoto.":
+    "Para PC en la misma casa. Fuera de ella, usa el enlace de acceso remoto.",
+  "Use o endereço do outro PC: o do acesso remoto, que começa com 100., ou o da rede local, como 192.168.":
+    "Usa la dirección del otro PC: la de acceso remoto, que empieza por 100., o la de la red local, como 192.168.",
+  "Como usar, passo a passo":
+    "Cómo usarlo, paso a paso",
+  "Um PC guarda os jogos e o outro baixa e joga. O jogo não é transmitido: ele é baixado e roda no PC de quem joga.":
+    "Un PC guarda los juegos y el otro los descarga y juega. El juego no se transmite: se descarga y se ejecuta en el PC de quien juega.",
+  "No PC que tem os jogos":
+    "En el PC que tiene los juegos",
+  "Ligue Compartilhar minha biblioteca. Na primeira vez, o OpenRetro prepara o acesso de fora de casa sozinho: aceite a janela do Windows e entre, ou crie uma conta grátis, na página que abrir no navegador.":
+    "Activa Compartir mi biblioteca. La primera vez, OpenRetro prepara solo el acceso desde fuera de casa: acepta la ventana de Windows e inicia sesión, o crea una cuenta gratis, en la página que se abra en el navegador.",
+  "Copie o link de pareamento. Ele funciona como uma senha: não o poste em lugares públicos.":
+    "Copia el enlace de emparejamiento. Funciona como una contraseña: no lo publiques en lugares públicos.",
+  "Deixe o OpenRetro aberto neste PC enquanto o outro baixa.":
+    "Deja OpenRetro abierto en este PC mientras el otro descarga.",
+  "No PC onde você quer jogar":
+    "En el PC donde quieres jugar",
+  "Instale o OpenRetro, abra Configurações, Servidor, e cole o link em Conectar a outro PC.":
+    "Instala OpenRetro, abre Ajustes, Servidor, y pega el enlace en Conectar con otro PC.",
+  "Na primeira vez, entre com a mesma conta do outro PC e toque em Conectar de novo.":
+    "La primera vez, inicia sesión con la misma cuenta del otro PC y pulsa Conectar de nuevo.",
+  "Abra o jogo no Catálogo, clique em baixar e escolha a fonte OpenRetro com o nome do PC. O progresso aparece em Downloads e o jogo entra na sua biblioteca.":
+    "Abre el juego en el Catálogo, pulsa descargar y elige la fuente OpenRetro con el nombre del PC. El progreso aparece en Descargas y el juego entra en tu biblioteca.",
+  "Só em casa, sem instalar nada":
+    "Solo en casa, sin instalar nada",
+  "Ligue Também pela rede local no PC dos jogos e use o link da rede local. Jogos novos aparecem em Fontes, no botão Sincronizar.":
+    "Activa También en la red local en el PC de los juegos y usa el enlace de la red local. Los juegos nuevos aparecen en Fuentes, con el botón Sincronizar.",
+  "Jogos que são pastas, como os de PS3, não são compartilhados por enquanto.":
+    "Los juegos que son carpetas, como los de PS3, no se comparten por ahora.",
 };

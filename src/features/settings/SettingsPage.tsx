@@ -14,6 +14,7 @@ import {
   Palette,
   Wrench,
   Trophy,
+  Server,
   type LucideIcon,
 } from "lucide-react";
 import { bridge, isDesktop, isRemote } from "../../services/bridge";
@@ -23,6 +24,11 @@ import { adoptLanguage, t } from "../../i18n";
 import { LanguageSelect } from "../../components/LanguageSelect";
 import { AchievementsAccount } from "../achievements/AchievementsAccount";
 import { KeyboardSettings } from "./KeyboardSettings";
+import {
+  ConnectToLibrary,
+  LibraryServerSettings,
+} from "./LibraryServerSettings";
+import { LibraryServerGuide } from "./LibraryServerGuide";
 import { failed } from "../../utils/notice";
 type Section =
   | "General"
@@ -30,6 +36,7 @@ type Section =
   | "Keyboard"
   | "Achievements"
   | "Downloads"
+  | "Server"
   | "Appearance"
   | "Advanced";
 const sections: {
@@ -67,6 +74,14 @@ const sections: {
     label: t("Downloads"),
     icon: Download,
     description: t("Fontes de jogos, pasta de destino e o que fazer depois."),
+  },
+  {
+    id: "Server",
+    label: t("Servidor"),
+    icon: Server,
+    description: t(
+      "Compartilhe sua biblioteca com outros PCs, na rede local ou pelo Tailscale.",
+    ),
   },
   {
     id: "Appearance",
@@ -259,6 +274,34 @@ export function SettingsPage({
                       void save({ autoResume: settings.autoResume === false })
                     }
                   />
+                </div>
+                <div className="setting-row">
+                  <div>
+                    <strong>{t("Salvar automaticamente")}</strong>
+                    <p>
+                      {t(
+                        "Grava o jogo no estado automático de tempos em tempos, sem mexer nos seus slots. Não vale para jogo online, modo hardcore e PS2.",
+                      )}
+                    </p>
+                  </div>
+                  <select
+                    aria-label={t("Salvar automaticamente")}
+                    value={String(settings.autoSaveMinutes ?? 0)}
+                    onChange={(e) =>
+                      void save({
+                        autoSaveMinutes: Number(
+                          e.target.value,
+                        ) as AppSettings["autoSaveMinutes"],
+                      })
+                    }
+                  >
+                    <option value="0">{t("Desligado")}</option>
+                    {[5, 10, 15, 30, 60].map((minutes) => (
+                      <option key={minutes} value={minutes}>
+                        {t("A cada {n} min", { n: minutes })}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="setting-row">
                   <div>
@@ -610,6 +653,16 @@ export function SettingsPage({
                     readOnly
                   />
                 </div>
+              </Group>
+            </>
+          ) : section === "Server" ? (
+            <>
+              <LibraryServerGuide />
+              <Group title={t("Biblioteca compartilhada")}>
+                <LibraryServerSettings notify={notify} Switch={Switch} />
+              </Group>
+              <Group title={t("Biblioteca de outro PC")}>
+                <ConnectToLibrary notify={notify} />
               </Group>
             </>
           ) : section === "Appearance" ? (

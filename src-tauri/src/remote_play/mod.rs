@@ -58,7 +58,7 @@ pub struct RemotePlayStatus {
     network: Option<network::NetworkProfile>,
 }
 
-fn qr_svg(text: &str) -> Option<String> {
+pub(crate) fn qr_svg(text: &str) -> Option<String> {
     qrcode::QrCode::new(text.as_bytes()).ok().map(|code| {
         code.render::<qrcode::render::svg::Color>()
             .min_dimensions(220, 220)
@@ -152,12 +152,12 @@ pub fn remote_play_stop(app: tauri::AppHandle) -> Result<()> {
 }
 
 /// A pairing token: 128 random bits, hex encoded.
-fn new_token() -> String {
+pub(crate) fn new_token() -> String {
     uuid::Uuid::new_v4().simple().to_string()
 }
 
 /// Constant-time comparison, so response timing reveals nothing about the token.
-fn token_matches(expected: &str, given: &str) -> bool {
+pub(crate) fn token_matches(expected: &str, given: &str) -> bool {
     expected.len() == given.len()
         && expected
             .bytes()

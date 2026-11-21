@@ -79,6 +79,37 @@ export interface RemotePlayStatus {
   /** The network phones connect on, once checked; Windows blocks a public one. */
   network: { public: boolean; name: string } | null;
 }
+/** Remote access for the shared library, set up by the app itself. */
+export interface TailscaleStatus {
+  /** Not installed, installed without an account, or ready to use. */
+  state: "missing" | "needsLogin" | "ready";
+  address: string | null;
+  setup: {
+    running: boolean;
+    stage: "" | "downloading" | "installing" | "login" | "failed";
+    percent: number;
+    message: string | null;
+  };
+}
+/** This PC's library, served to other OpenRetro apps (LAN or Tailscale). */
+export interface LibraryServerStatus {
+  running: boolean;
+  port: number;
+  /** Address and token in one link, the way another OpenRetro pairs. */
+  url: string | null;
+  /** The link as an SVG QR code. */
+  qr: string | null;
+  token: string | null;
+  tailscale: string | null;
+  /** This PC's local-network address, while the local network is allowed. */
+  lan: string | null;
+  /** Whether devices on the local network may connect, besides remote access. */
+  lanEnabled: boolean;
+  /** Pairing link for the local network, when allowed. */
+  lanUrl: string | null;
+  /** Games another PC can download. */
+  games: number;
+}
 export interface LibraryItem {
   id: string;
   gameId: string;
@@ -161,6 +192,8 @@ export interface ImportCandidate {
 }
 export interface AppSettings {
   autoResume?: boolean;
+  /** Minutes between automatic saves while playing; 0 or absent is off. */
+  autoSaveMinutes?: 0 | 5 | 10 | 15 | 30 | 60;
   theme: "dark" | "light";
   density: "comfortable" | "compact";
   animations: boolean;

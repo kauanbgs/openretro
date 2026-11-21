@@ -204,11 +204,43 @@ pub fn magnet_hash(uri: &str) -> Result<String> {
     }
     Err("Magnet must include a valid BitTorrent v1 infohash (btih).".into())
 }
+/// An OpenRetro library server on Tailscale or the local network. Tailscale
+/// encrypts its own traffic; a local network does not, which the player chose
+/// when allowing it. Plain HTTP is accepted only for those addresses and only
+/// for the server's own paths, so a source cannot point it at anything else.
+pub fn library_server_url(url: &reqwest::Url) -> bool {
+    url.scheme() == "http"
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url
+            .host_str()
+            .and_then(|host| host.parse::<std::net::Ipv4Addr>().ok())
+            .is_some_and(|ip| {
+                crate::library_server::is_tailscale(ip) || crate::library_server::is_lan(ip)
+            })
+        && library_server_path(url.path())
+}
+/// `/api/source`, or `/api/games/<uuid>/file` with an optional file name.
+fn library_server_path(path: &str) -> bool {
+    if path == "/api/source" {
+        return true;
+    }
+    let Some(rest) = path.strip_prefix("/api/games/") else {
+        return false;
+    };
+    let (id, tail) = rest.split_once('/').unwrap_or((rest, ""));
+    id.len() == 36
+        && id.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+        && (tail == "file" || tail.starts_with("file/"))
+}
 pub fn direct_url(uri: &str) -> Result<reqwest::Url> {
     if uri.len() > 16_384 {
         return Err("Download URL is too long.".into());
     }
     let url = reqwest::Url::parse(uri).map_err(|_| "Invalid download URL.")?;
+    if library_server_url(&url) {
+        return Ok(url);
+    }
     if url.scheme() != "https"
         || url.host_str().is_none()
         || !url.username().is_empty()
@@ -262,10 +294,11 @@ pub fn parse_document(text: &str) -> Result<SourceDocument> {
 }
 fn fetch_document(url: &str) -> Result<SourceDocument> {
     let url = reqwest::Url::parse(url).map_err(|_| "Enter a valid HTTPS source URL.")?;
-    if url.scheme() != "https"
+    if !library_server_url(&url)
+        && (url.scheme() != "https"
         || url.host_str().is_none()
         || !url.username().is_empty()
-        || url.password().is_some()
+        || url.password().is_some())
     {
         return Err("Source URL must use HTTPS without embedded credentials.".into());
     }
@@ -429,6 +462,35 @@ mod tests {
             "https://user:pass@example.org/game.zip",
         ] {
             assert!(direct_url(uri).is_err());
+        }
+    }
+    #[test]
+    fn plain_http_is_allowed_only_to_a_library_server() {
+        let id = "0b9a3c1e-5d7f-4a62-8c10-3e4f5a6b7c8d";
+        for uri in [
+            format!("http://100.101.102.103:47821/api/games/{id}/file/Game.gba?t=0123"),
+            format!("http://100.64.0.1:47821/api/games/{id}/file?t=0123"),
+            format!("http://192.168.0.10:47821/api/games/{id}/file/Game.gba?t=0123"),
+            "http://10.0.0.2:47821/api/source?t=0123".to_string(),
+        ] {
+            assert!(direct_url(&uri).is_ok(), "{uri}");
+        }
+        for uri in [
+            // Not a trusted network.
+            "http://127.0.0.1:47821/api/source?t=0123".to_string(),
+            "http://8.8.8.8:47821/api/source?t=0123".to_string(),
+            "http://100.128.0.1:47821/api/source?t=0123".to_string(),
+            "http://example.org/api/source".to_string(),
+            // Not one of the server's own paths.
+            "http://192.168.0.10:47821/other".to_string(),
+            "http://192.168.0.10:47821/api/admin".to_string(),
+            "http://192.168.0.10:47821/api/games/not-an-id/file".to_string(),
+            format!("http://192.168.0.10:47821/api/games/{id}/config"),
+            format!("http://192.168.0.10:47821/api/games/{id}/file2"),
+            // Credentials.
+            "http://user:pass@100.101.102.103:47821/api/source".to_string(),
+        ] {
+            assert!(direct_url(&uri).is_err(), "{uri}");
         }
     }
     #[test]

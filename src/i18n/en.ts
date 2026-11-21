@@ -1176,6 +1176,10 @@ export const en: Record<string, string> = {
   "Trocar ou personalizar": "Switch or customize",
   Jogando: "Playing",
   "Continuar de onde parou": "Continue where you left off",
+  "Salvar automaticamente": "Save automatically",
+  "Grava o jogo no estado automático de tempos em tempos, sem mexer nos seus slots. Não vale para jogo online, modo hardcore e PS2.":
+    "Saves the game to the automatic state every so often, without touching your slots. Does not apply to online play, hardcore mode or PS2.",
+  "A cada {n} min": "Every {n} min",
   "No runtime integrado, salva ao encerrar normalmente e retoma ao jogar novamente. Depende do suporte a estados do core.":
     "In the built-in runtime, saves when you quit normally and resumes when you play again. Depends on the core's support for states.",
   "Coop de sofá": "Couch co-op",
@@ -2469,4 +2473,108 @@ export const en: Record<string, string> = {
   "{action}: {key}. Clique para trocar.": "{action}: {key}. Click to change.",
   "{other} ficou com {key}, que era de {action}.":
     "{other} now has {key}, which was {action}'s.",
+  "Servidor":
+    "Server",
+  "Compartilhe sua biblioteca com outros PCs, na rede local ou pelo Tailscale.":
+    "Share your library with other PCs, on your local network or over Tailscale.",
+  "Biblioteca compartilhada":
+    "Shared library",
+  "Compartilhar minha biblioteca":
+    "Share my library",
+  "Deixa outro OpenRetro listar e baixar os jogos deste PC. Só quem tem o link de pareamento consegue acessar.":
+    "Lets another OpenRetro list and download this PC's games. Only someone with the pairing link can get in.",
+  "Endereço":
+    "Address",
+  "rede local":
+    "local network",
+  "Tailscale não encontrado. Para acessar de fora de casa, instale o Tailscale neste PC e no outro e entre com a mesma conta.":
+    "Tailscale not found. To connect from outside your home, install Tailscale on this PC and the other one, and sign in with the same account.",
+  "Parear outro PC":
+    "Pair another PC",
+  "No outro OpenRetro, adicione este servidor com o link abaixo. Trate o link como uma senha.":
+    "In the other OpenRetro, add this server with the link below. Treat the link like a password.",
+  "QR code do link de pareamento":
+    "Pairing link QR code",
+  "Link de pareamento":
+    "Pairing link",
+  "Jogos compartilhados":
+    "Shared games",
+  "Jogos instalados que são um único arquivo. Pastas ficam de fora por enquanto.":
+    "Installed games that are a single file. Folders are left out for now.",
+  "Novo link de pareamento":
+    "New pairing link",
+  "Isso desconecta todos os PCs já pareados, que precisarão do novo link. Confirmar?":
+    "This disconnects every paired PC; they will need the new link. Confirm?",
+  "Use se o link vazou ou se quiser desconectar os PCs pareados.":
+    "Use it if the link leaked or you want to disconnect the paired PCs.",
+  "Abra o aplicativo desktop para compartilhar a biblioteca.":
+    "Open the desktop app to share your library.",
+  "Link inválido. Cole o link de pareamento do outro PC.":
+    "Invalid link. Paste the pairing link from the other PC.",
+  "Use o endereço do Tailscale do outro PC, que começa com 100. Instale o Tailscale nos dois PCs.":
+    "Use the other PC's Tailscale address, which starts with 100. Install Tailscale on both PCs.",
+  "Biblioteca conectada. Os jogos aparecem como downloads.":
+    "Library connected. Its games show up as downloads.",
+  "Conectar a outro PC":
+    "Connect to another PC",
+  "Cole o link de pareamento mostrado no outro OpenRetro. Os jogos dele passam a aparecer como downloads, e o app baixa, extrai e adiciona à sua biblioteca.":
+    "Paste the pairing link shown in the other OpenRetro. Its games appear as downloads, and the app downloads, extracts and adds them to your library.",
+  "Conectar":
+    "Connect",
+  "Biblioteca de outro PC":
+    "Another PC's library",
+  "Acesso de fora de casa":
+    "Access from away from home",
+  "Ativo. Seus outros PCs acessam este de qualquer lugar.":
+    "On. Your other PCs can reach this one from anywhere.",
+  "Baixando o acesso remoto… {percent}%":
+    "Downloading remote access… {percent}%",
+  "Instalando… aceite a janela de permissão do Windows que abrir.":
+    "Installing… accept the Windows permission window that opens.",
+  "Falta só entrar na sua conta. Abrimos uma página no navegador: entre ou crie uma conta grátis. Use a mesma conta no outro PC.":
+    "Just sign in to your account. We opened a page in your browser: sign in or create a free account. Use the same account on the other PC.",
+  "O acesso remoto já está instalado, mas falta entrar na conta.":
+    "Remote access is already installed, but you still need to sign in.",
+  "Para jogar de outro lugar, o OpenRetro instala o Tailscale, um programa gratuito que cria uma conexão privada e segura entre os seus PCs.":
+    "To play from elsewhere, OpenRetro installs Tailscale, a free program that creates a private, secure connection between your PCs.",
+  "Ativar acesso remoto":
+    "Turn on remote access",
+  "Antes de conectar, o OpenRetro configura o acesso remoto neste PC. Quando terminar, toque em Conectar de novo.":
+    "Before connecting, OpenRetro sets up remote access on this PC. When it finishes, press Connect again.",
+  "Também pela rede local":
+    "Also on the local network",
+  "Deixa PCs da sua casa conectarem sem instalar nada. A rede local não é criptografada: ligue só em uma rede em que você confia.":
+    "Lets PCs in your home connect without installing anything. The local network is not encrypted: turn it on only on a network you trust.",
+  "Link para a rede local":
+    "Local network link",
+  "Para PCs na mesma casa. Fora dela, use o link de acesso remoto.":
+    "For PCs in the same home. Away from it, use the remote access link.",
+  "Use o endereço do outro PC: o do acesso remoto, que começa com 100., ou o da rede local, como 192.168.":
+    "Use the other PC's address: the remote access one, which starts with 100., or the local network one, like 192.168.",
+  "Como usar, passo a passo":
+    "How to use it, step by step",
+  "Um PC guarda os jogos e o outro baixa e joga. O jogo não é transmitido: ele é baixado e roda no PC de quem joga.":
+    "One PC keeps the games and the other downloads and plays. The game is not streamed: it is downloaded and runs on the PC of whoever plays.",
+  "No PC que tem os jogos":
+    "On the PC that has the games",
+  "Ligue Compartilhar minha biblioteca. Na primeira vez, o OpenRetro prepara o acesso de fora de casa sozinho: aceite a janela do Windows e entre, ou crie uma conta grátis, na página que abrir no navegador.":
+    "Turn on Share my library. The first time, OpenRetro sets up access from outside your home by itself: accept the Windows window and sign in, or create a free account, on the page that opens in your browser.",
+  "Copie o link de pareamento. Ele funciona como uma senha: não o poste em lugares públicos.":
+    "Copy the pairing link. It works like a password: do not post it in public places.",
+  "Deixe o OpenRetro aberto neste PC enquanto o outro baixa.":
+    "Keep OpenRetro open on this PC while the other one downloads.",
+  "No PC onde você quer jogar":
+    "On the PC where you want to play",
+  "Instale o OpenRetro, abra Configurações, Servidor, e cole o link em Conectar a outro PC.":
+    "Install OpenRetro, open Settings, Server, and paste the link under Connect to another PC.",
+  "Na primeira vez, entre com a mesma conta do outro PC e toque em Conectar de novo.":
+    "The first time, sign in with the same account as the other PC and press Connect again.",
+  "Abra o jogo no Catálogo, clique em baixar e escolha a fonte OpenRetro com o nome do PC. O progresso aparece em Downloads e o jogo entra na sua biblioteca.":
+    "Open the game in the Catalog, click download and pick the OpenRetro source with the PC's name. Progress shows in Downloads and the game joins your library.",
+  "Só em casa, sem instalar nada":
+    "Only at home, with nothing to install",
+  "Ligue Também pela rede local no PC dos jogos e use o link da rede local. Jogos novos aparecem em Fontes, no botão Sincronizar.":
+    "Turn on Also on the local network on the PC with the games and use the local network link. New games show up under Sources, with the Sync button.",
+  "Jogos que são pastas, como os de PS3, não são compartilhados por enquanto.":
+    "Games that are folders, like PS3 ones, are not shared for now.",
 };

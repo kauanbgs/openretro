@@ -193,13 +193,14 @@ pub async fn launch_game(
     }
     tauri::async_runtime::spawn_blocking(move || {
  let db=app.state::<Database>();
- let (entry,emulator,auto_resume,ps2_resolution,stretch,keys,sdl_library,hardcore_wanted,chosen) = {
+ let (entry,emulator,auto_resume,ps2_resolution,stretch,keys,sdl_library,hardcore_wanted,chosen,autosave_minutes) = {
   let conn=db.0.lock().map_err(error)?;
   let entry = database::library(&conn)?.into_iter().find(|g| g.item.id == id).ok_or("This game is no longer in your library.")?;
   let emulator=select_emulator(&conn,&entry)?;
   let settings: String=conn.query_row("SELECT value FROM settings WHERE key='app'",[],|r|r.get(0)).unwrap_or_default();
   let settings=serde_json::from_str::<serde_json::Value>(&settings).ok();
   let auto_resume=settings.as_ref().and_then(|v|v["autoResume"].as_bool()).unwrap_or(true);
+  let autosave_minutes=settings.as_ref().and_then(|v|v["autoSaveMinutes"].as_u64()).filter(|m|[5,10,15,30,60].contains(m));
   let ps2_resolution=settings.as_ref().and_then(|v|v["ps2Resolution"].as_str().map(String::from));
   // Stretched by default; only an explicit "original" keeps the console's shape.
   let stretch=settings.as_ref().map_or(true,|v|v["gameScreenMode"]!="original");
@@ -218,7 +219,7 @@ pub async fn launch_game(
      }
      _ => None,
   };
-  (entry,emulator,auto_resume,ps2_resolution,stretch,keys,sdl_library,hardcore_wanted,chosen)
+  (entry,emulator,auto_resume,ps2_resolution,stretch,keys,sdl_library,hardcore_wanted,chosen,autosave_minutes)
  };
  // The selected translation or hack plays instead of the original file.
  let variant=entry.item.active_variant.clone();
@@ -396,6 +397,10 @@ pub async fn launch_game(
  // closes. Give it time to finish saves, then reap the managed child.
  let mut closed_since=None;
  let mut checked=Instant::now();
+ // Saving every few minutes needs the runtime's commands; online play, hardcore
+ // and consoles that cannot load a state at boot are left alone.
+ let autosave_every=autosave_minutes.filter(|_|managed_retroarch && !hardcore && netplay.is_none() && boot_states).map(|m|Duration::from_secs(m*60));
+ let mut autosaved=Instant::now();
  // A Switch emulator draws its game under a menu bar and a status bar. They
  // stay hidden, and show while the pointer is at the top or bottom edge.
  #[cfg(windows)]
@@ -409,6 +414,14 @@ pub async fn launch_game(
        Ok(Some(status))=>break Ok(status),
        Err(error)=>break Err(error),
        Ok(None)=>{}
+    }
+    if autosave_every.is_some_and(|every|autosaved.elapsed()>=every) {
+       // With the game menu open it waits, and saves once the game resumes.
+       match crate::in_game::autosave(&app,&id) {
+          Ok(true)=>autosaved=Instant::now(),
+          Ok(false)=>{}
+          Err(message)=>{ autosaved=Instant::now(); log::warn!("Autosave skipped: {message}"); }
+       }
     }
     // The runtime can recreate its window or lose its place; keep the game inside OpenRetro.
     if managed_retroarch && checked.elapsed()>=Duration::from_millis(500) {

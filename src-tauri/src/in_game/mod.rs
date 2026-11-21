@@ -454,6 +454,34 @@ pub fn remote_action(app: &tauri::AppHandle, action: &str) -> Result<()> {
     write_command(session, command)
 }
 
+/// Saves the running game into the automatic state, the one that resumes it
+/// next time. The runtime has no command for a chosen slot, so it steps down
+/// to the automatic slot (-1), saves and steps back: the player's slot and
+/// manual states stay as they were. Skipped while the game menu is open.
+/// Returns whether a save was requested.
+pub fn autosave(app: &tauri::AppHandle, id: &str) -> Result<bool> {
+    let service = app.state::<InGameService>();
+    let mut guard = service.0.lock().map_err(error)?;
+    let Some(session) = guard
+        .as_mut()
+        .filter(|session| session.info.id == id && !session.info.open)
+    else {
+        return Ok(false);
+    };
+    if session.stdin.is_none() {
+        return Ok(false);
+    }
+    let steps = session.info.slot.max(0) + 1;
+    for _ in 0..steps {
+        write_command(session, "STATE_SLOT_MINUS")?;
+    }
+    write_command(session, "SAVE_STATE")?;
+    for _ in 0..steps {
+        write_command(session, "STATE_SLOT_PLUS")?;
+    }
+    Ok(true)
+}
+
 /// Whether save, load and reset reach the running game. RPCS3 has none.
 pub fn states_available(app: &tauri::AppHandle) -> bool {
     app.state::<InGameService>()

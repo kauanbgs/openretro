@@ -3448,3 +3448,69 @@ html.remote .mobile-home {
     grid-template-columns: 1fr;
   }
 }
+
+.library-server-pairing {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.library-server-pairing .phone-play-qr {
+  flex: none;
+  width: 168px;
+}
+.library-server-pairing .phone-play-qr svg {
+  width: 100%;
+  height: auto;
+}
+.library-server-pairing .input-action {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+}
+.library-server-pairing .input-action input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.library-guide {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.library-guide summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.library-guide h4 {
+  margin: 16px 0 4px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.library-guide p {
+  margin: 10px 0 0;
+}
+.library-guide ol {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  list-style: decimal;
+}
+.library-guide li + li {
+  margin-top: 4px;
+}
+.library-guide-note {
+  color: var(--muted);
+}

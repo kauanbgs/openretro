@@ -312,11 +312,63 @@ fn safe_download_filename(candidate: &str) -> Option<String> {
     }
 }
 fn direct_filename(url: &reqwest::Url) -> String {
+    // A page like archive.org's `view_archive.php?file=Game.zip` serves the
+    // file named in its query, not a PHP page.
+    let from_query = || {
+        url.query_pairs()
+            .find(|(key, _)| key == "file")
+            .and_then(|(_, file)| file.rsplit(['/', '\\']).next().map(str::to_owned))
+    };
     url.path_segments()
         .and_then(|mut segments| segments.next_back())
         .filter(|name| !name.is_empty())
+        .map(percent_decode)
+        .and_then(|name| {
+            if name.to_ascii_lowercase().ends_with(".php") {
+                from_query().or(Some(name))
+            } else {
+                Some(name)
+            }
+        })
+        .as_deref()
         .and_then(safe_download_filename)
         .unwrap_or_else(|| "download.bin".into())
+}
+fn percent_decode(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = bytes.get(i + 1..i + 3).and_then(|hex| std::str::from_utf8(hex).ok());
+        if bytes[i] == b'%' {
+            if let Some(byte) = hex.and_then(|hex| u8::from_str_radix(hex, 16).ok()) {
+                out.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| text.to_owned())
+}
+/// The download's folder: the game's name, so the player finds it in their
+/// downloads folder. A name already taken gets " (2)", " (3)" and so on.
+fn game_folder(root: &Path, title: &str) -> PathBuf {
+    let cleaned: String = title
+        .chars()
+        .map(|c| if c.is_control() || "/\\:*?\"<>|".contains(c) { ' ' } else { c })
+        .collect();
+    let mut name = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    if name.chars().count() > 80 {
+        name = name.chars().take(80).collect();
+    }
+    let name = name.trim_end_matches(['.', ' ']).to_string();
+    let name = if validate_component(&name).is_ok() { name } else { "Jogo".into() };
+    (1..1000)
+        .map(|n| if n == 1 { root.join(&name) } else { root.join(format!("{name} ({n})")) })
+        .find(|path| !path.exists())
+        .unwrap_or_else(|| root.join(uuid::Uuid::new_v4().to_string()))
 }
 fn response_filename(headers: &reqwest::header::HeaderMap) -> Option<String> {
     let header = headers
@@ -430,7 +482,8 @@ fn extract_playable_zip(
     if archive.len() > 10_000 {
         return Err("Downloaded ZIP has too many entries.".into());
     }
-    let output_root = directory.join("extracted");
+    // The game goes straight into its folder, beside the archive.
+    let output_root = directory.to_path_buf();
     // Sizes are known up front, so the bar can show real extraction progress.
     let mut total = 0u64;
     for index in 0..archive.len() {
@@ -900,7 +953,8 @@ pub async fn start_source_download(
         return Err("Choose an absolute download directory in Settings.".into());
     }
     std::fs::create_dir_all(&root).map_err(error)?;
-    let directory = root.canonicalize().map_err(error)?.join(&id);
+    let title = game.as_ref().map(|game| game.title.as_str()).filter(|t| !t.trim().is_empty()).unwrap_or(&selected.entry.title);
+    let directory = game_folder(&root.canonicalize().map_err(error)?, title);
     std::fs::create_dir(&directory).map_err(error)?;
     let job = DownloadJob {
         id: id.clone(),
@@ -1235,6 +1289,33 @@ mod tests {
     }
 
     #[test]
+    fn downloads_are_folders_named_after_the_game() {
+        let root = std::env::temp_dir().join(format!("openretro-folder-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        assert_eq!(game_folder(&root, "Tekken 5 (USA)"), root.join("Tekken 5 (USA)"));
+        assert_eq!(game_folder(&root, "Zelda: A Link / Past?"), root.join("Zelda A Link Past"));
+        assert_eq!(game_folder(&root, "  ..  "), root.join("Jogo"));
+        assert_eq!(game_folder(&root, "CON"), root.join("Jogo"));
+        std::fs::create_dir(root.join("Tekken 5 (USA)")).unwrap();
+        assert_eq!(game_folder(&root, "Tekken 5 (USA)"), root.join("Tekken 5 (USA) (2)"));
+        let long = "A".repeat(200);
+        assert_eq!(game_folder(&root, &long).file_name().unwrap().len(), 80);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn direct_downloads_keep_the_real_file_name() {
+        let name = |url: &str| direct_filename(&reqwest::Url::parse(url).unwrap());
+        assert_eq!(
+            name("https://archive.org/download/x/Tekken%205%20%28USA%29.zip"),
+            "Tekken 5 (USA).zip"
+        );
+        assert_eq!(
+            name("https://archive.org/view_archive.php?archive=/1/items/x/All.zip&file=Mario%20Kart%2064%20%28USA%29.z64"),
+            "Mario Kart 64 (USA).z64"
+        );
+        assert_eq!(name("https://example.com/"), "download.bin");
+    }
+    #[test]
     fn extraction_reports_progress_and_keeps_only_playable_files() {
         let root = std::env::temp_dir().join(format!("openretro-extract-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
@@ -1252,7 +1333,7 @@ mod tests {
         let mut reports = Vec::new();
         let hashes =
             extract_playable_zip(&archive, &root, |done, total| reports.push((done, total))).unwrap();
-        let extracted = root.join("extracted/Game (USA).sfc");
+        let extracted = root.join("Game (USA).sfc");
         assert_eq!(std::fs::read(&extracted).unwrap(), game);
         let path = extracted.canonicalize().unwrap();
         assert_eq!(
@@ -1260,7 +1341,7 @@ mod tests {
             (game.len() as u64, crate::filesystem::hash(&path).unwrap())
         );
         assert_eq!(hashes.len(), 1);
-        assert!(!root.join("extracted/readme.txt").exists());
+        assert!(!root.join("readme.txt").exists());
         assert!(reports.len() > 1);
         assert_eq!(*reports.last().unwrap(), (game.len() as u64, game.len() as u64));
         std::fs::remove_dir_all(root).unwrap();
@@ -1285,8 +1366,9 @@ mod tests {
         std::fs::write(&archive, bytes).unwrap();
         let result = extract_playable_zip(&archive, &root, |_, _| {});
         assert!(matches!(result, Err(ExtractError::Corrupt(_))), "{result:?}");
-        let extracted: Vec<_> = std::fs::read_dir(root.join("extracted")).unwrap().collect();
-        assert!(extracted.is_empty());
+        // Only the archive is left: no game and no partial file.
+        let left: Vec<_> = std::fs::read_dir(&root).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert_eq!(left, vec![std::ffi::OsString::from("game.zip")]);
         std::fs::remove_dir_all(root).unwrap();
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

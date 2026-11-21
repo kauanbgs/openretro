@@ -12,7 +12,9 @@ import type {
   LibraryGame,
   NetplaySession,
   RemotePlayStatus,
+  LibraryServerStatus,
   SaveState,
+  TailscaleStatus,
 } from "../types";
 import { defaultSettings } from "../types";
 import type {
@@ -522,6 +524,55 @@ export const bridge = {
   /** Windows' page for the phone play network's profile. */
   async remotePlayNetworkSettings(): Promise<void> {
     if (isDesktop) return invoke("remote_play_network_settings");
+  },
+  /** The library server other OpenRetro apps download games from. */
+  async libraryServerStatus(): Promise<LibraryServerStatus> {
+    return isDesktop
+      ? invoke("library_server_status")
+      : {
+          running: false,
+          port: 47821,
+          url: null,
+          qr: null,
+          token: null,
+          tailscale: null,
+          lan: null,
+          lanEnabled: false,
+          lanUrl: null,
+          games: 0,
+        };
+  },
+  async libraryServerStart(): Promise<LibraryServerStatus> {
+    if (!isDesktop)
+      throw new Error(
+        t("Abra o aplicativo desktop para compartilhar a biblioteca."),
+      );
+    return invoke("library_server_start");
+  },
+  async libraryServerStop(): Promise<LibraryServerStatus> {
+    return invoke("library_server_stop");
+  },
+  /** Lets PCs on the local network connect too, or stops that. */
+  async libraryServerSetLan(enabled: boolean): Promise<LibraryServerStatus> {
+    return invoke("library_server_set_lan", { enabled });
+  },
+  /** Whether remote access is installed and signed in on this PC. */
+  async tailscaleStatus(): Promise<TailscaleStatus> {
+    return isDesktop
+      ? invoke("tailscale_status")
+      : {
+          state: "missing",
+          address: null,
+          setup: { running: false, stage: "", percent: 0, message: null },
+        };
+  },
+  /** Installs and signs in to remote access; follow it with tailscaleStatus. */
+  async tailscaleSetup(): Promise<TailscaleStatus> {
+    return invoke("tailscale_setup");
+  },
+  /** A new token: every paired device must pair again. */
+  async libraryServerResetToken(): Promise<LibraryServerStatus> {
+    return invoke("library_server_reset_token");
   },
   /** Applies the Discord setting at once, during a game too. */
   async discordPresenceSync(): Promise<void> {
